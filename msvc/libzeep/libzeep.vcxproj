@@ -1,0 +1,185 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{8DB71094-266D-4B6B-8076-0F58A3944F4B}</ProjectGuid>
+    <RootNamespace>libzeepvc</RootNamespace>
+    <Keyword>Win32Proj</Keyword>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <CharacterSet>Unicode</CharacterSet>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <CharacterSet>Unicode</CharacterSet>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <_ProjectFileVersion>10.0.30319.1</_ProjectFileVersion>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">libzeep</TargetName>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">libzeep</TargetName>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">libzeep</TargetName>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">libzeep</TargetName>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <BuildLog>
+      <Path>$(IntDir)BuildLog1.htm</Path>
+    </BuildLog>
+    <ClCompile>
+      <Optimization>Disabled</Optimization>
+      <AdditionalIncludeDirectories>C:\Boost\include\boost-1_46_1;$(SolutionDir)..\..\libzeep;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;DEBUG;BOOST_FILESYSTEM_VERSION=2;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <MinimalRebuild>true</MinimalRebuild>
+      <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
+      <ForcedIncludeFiles>$(SolutionDir)..\..\libzeep\msvc\stdafx.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <Lib>
+      <Verbose>true</Verbose>
+    </Lib>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <BuildLog>
+      <Path>$(IntDir)BuildLog1.htm</Path>
+    </BuildLog>
+    <ClCompile>
+      <Optimization>Disabled</Optimization>
+      <AdditionalIncludeDirectories>C:\Boost\include\boost-1_47;$(SolutionDir)..\..\libzeep;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <ForcedIncludeFiles>$(SolutionDir)..\..\libzeep\msvc\stdafx.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <Lib>
+      <Verbose>true</Verbose>
+    </Lib>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <Optimization>MaxSpeed</Optimization>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <AdditionalIncludeDirectories>C:\Boost\include\boost-1_46_1;$(SolutionDir)..\..\libzeep;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;BOOST_FILESYSTEM_VERSION=2;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <ForcedIncludeFiles>$(SolutionDir)..\..\libzeep\msvc\stdafx.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <Optimization>MaxSpeed</Optimization>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <AdditionalIncludeDirectories>C:\Boost\include\boost-1_47;$(SolutionDir)..\..\libzeep;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <ForcedIncludeFiles>$(SolutionDir)..\..\libzeep\msvc\stdafx.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\..\libzeep\src\connection.cpp" />
+    <ClCompile Include="..\..\..\libzeep\src\doctype.cpp" />
+    <ClCompile Include="..\..\..\libzeep\src\document.cpp" />
+    <ClCompile Include="..\..\..\libzeep\src\exception.cpp" />
+    <ClCompile Include="..\..\..\libzeep\src\http-server.cpp" />
+    <ClCompile Include="..\..\..\libzeep\src\node.cpp" />
+    <ClCompile Include="..\..\..\libzeep\src\parser.cpp" />
+    <ClCompile Include="..\..\..\libzeep\src\preforked-http-server.cpp" />
+    <ClCompile Include="..\..\..\libzeep\src\reply.cpp" />
+    <ClCompile Include="..\..\..\libzeep\src\request_parser.cpp" />
+    <ClCompile Include="..\..\..\libzeep\src\soap-envelope.cpp" />
+    <ClCompile Include="..\..\..\libzeep\src\soap-server.cpp" />
+    <ClCompile Include="..\..\..\libzeep\src\unicode_support.cpp" />
+    <ClCompile Include="..\..\..\libzeep\src\webapp-el.cpp" />
+    <ClCompile Include="..\..\..\libzeep\src\webapp.cpp" />
+    <ClCompile Include="..\..\..\libzeep\src\writer.cpp" />
+    <ClCompile Include="..\..\..\libzeep\src\xpath.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\..\libzeep\src\document-imp.hpp" />
+    <ClInclude Include="..\..\..\libzeep\msvc\stdafx.h" />
+    <ClInclude Include="..\..\..\libzeep\msvc\targetver.h" />
+    <ClInclude Include="..\..\..\libzeep\zeep\config.hpp" />
+    <ClInclude Include="..\..\..\libzeep\zeep\dispatcher.hpp" />
+    <ClInclude Include="..\..\..\libzeep\zeep\envelope.hpp" />
+    <ClInclude Include="..\..\..\libzeep\zeep\exception.hpp" />
+    <ClInclude Include="..\..\..\libzeep\zeep\server.hpp" />
+    <ClInclude Include="..\..\..\libzeep\zeep\xml\doctype.hpp" />
+    <ClInclude Include="..\..\..\libzeep\zeep\xml\document.hpp" />
+    <ClInclude Include="..\..\..\libzeep\zeep\xml\node.hpp" />
+    <ClInclude Include="..\..\..\libzeep\zeep\xml\parser.hpp" />
+    <ClInclude Include="..\..\..\libzeep\zeep\xml\serialize.hpp" />
+    <ClInclude Include="..\..\..\libzeep\zeep\xml\unicode_support.hpp" />
+    <ClInclude Include="..\..\..\libzeep\zeep\xml\writer.hpp" />
+    <ClInclude Include="..\..\..\libzeep\zeep\xml\xpath.hpp" />
+    <ClInclude Include="..\..\..\libzeep\zeep\http\connection.hpp" />
+    <ClInclude Include="..\..\..\libzeep\zeep\http\header.hpp" />
+    <ClInclude Include="..\..\..\libzeep\zeep\http\preforked-server.hpp" />
+    <ClInclude Include="..\..\..\libzeep\zeep\http\reply.hpp" />
+    <ClInclude Include="..\..\..\libzeep\zeep\http\request.hpp" />
+    <ClInclude Include="..\..\..\libzeep\zeep\http\request_handler.hpp" />
+    <ClInclude Include="..\..\..\libzeep\zeep\http\request_parser.hpp" />
+    <ClInclude Include="..\..\..\libzeep\zeep\http\server.hpp" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

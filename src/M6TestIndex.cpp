@@ -5,6 +5,7 @@
 #include <zeep/xml/document.hpp>
 #include <boost/foreach.hpp>
 #define foreach BOOST_FOREACH
+#include <boost/algorithm/string.hpp>
 
 #include "M6Lib.h"
 #include "M6File.h"
@@ -16,6 +17,7 @@
 
 using namespace std;
 namespace fs = boost::filesystem;
+namespace ba = boost::algorithm;
 
 BOOST_AUTO_TEST_CASE(start_up)
 {
@@ -67,34 +69,72 @@ BOOST_AUTO_TEST_CASE(file_io)
 	file.Truncate(7);
 	BOOST_CHECK_EQUAL(file.Size(), 7);
 	BOOST_CHECK_EQUAL(fs::file_size(filename), 7);
-
-	// clean up
-	fs::remove(filename);
 }
 
 const char filename[] = "test.index";
+const char* strings[] = {
+	"aap", "noot", "mies", "boom", "roos", "vis", "vuur", "water"
+};
 
 BOOST_AUTO_TEST_CASE(file_ix_1)
 {
 	if (fs::exists(filename))
 		fs::remove(filename);
 
-	const char* strings[] = {
-		"aap", "noot", "mies", "boom", "roos", "vis", "vuur", "water"
-	};
 	int64 nr = 1;
 	
 	M6SimpleIndex indx(filename, true);
 	
 	foreach (const char* key, strings)
 		indx.Insert(key, nr++);
+
+	nr = 1;
+	foreach (const char* key, strings)
+	{
+		int64 v;
+		BOOST_CHECK(indx.Find(key, v));
+		BOOST_CHECK_EQUAL(v, nr);
+		++nr;
+	}
 }
 
 BOOST_AUTO_TEST_CASE(file_ix_2)
 {
+	M6SimpleIndex indx(filename, false);
+
+	int64 nr = 1;
+	foreach (const char* key, strings)
+	{
+		int64 v;
+		BOOST_CHECK(indx.Find(key, v));
+		BOOST_CHECK_EQUAL(v, nr);
+		++nr;
+	}
+}
+
+BOOST_AUTO_TEST_CASE(file_ix_3)
+{
+	if (fs::exists(filename))
+		fs::remove(filename);
+
 	M6SimpleIndex indx(filename, true);
-//	
-//	foreach (const char* key, strings)
-//		indx.Insert(key, nr++);
+
+	ifstream text("../../../test-doc-2.txt");
+	BOOST_REQUIRE(text.is_open());
+
+	int64 nr = 1;
+	for (;;)
+	{
+		string word;
+		text >> word;
+		ba::to_lower(word);
+		
+		int64 v;
+		if (indx.Find(word, v))
+			continue;
+		
+		indx.Insert(word, nr);
+		++nr;
+	}
 }
 

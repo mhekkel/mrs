@@ -26,8 +26,8 @@ class M6BasicIndex
 //	M6BasicIndex*	Create(const fs::path& inPath, const std::string& inLocale,
 //						bool inCaseSensitive, MDataProviderFunc& inData);
 //
-	virtual int		CompareKeys(const char* inKeyA, uint32 inKeyLengthA,
-						const char* inKeyB, uint32 inKeyLengthB) const = 0;
+	virtual int		CompareKeys(const char* inKeyA, size_t inKeyLengthA,
+						const char* inKeyB, size_t inKeyLengthB) const = 0;
 
 	class iterator : public std::iterator<std::bidirectional_iterator_tag,M6Tuple>
 	{
@@ -65,9 +65,8 @@ class M6BasicIndex
 	iterator		LowerBound(const std::string& inKey) const;
 	iterator		UpperBound(const std::string& inKey) const;
 	
-//	iterator		Insert(const M6Tuple& value);
-	void			Insert(const std::string& key, int64 value);
-//	iterator		insert(iterator before, const M6Tuple& value);
+	void			Insert(const std::string& inKey, int64 inValue);
+	bool			Find(const std::string& inKey, int64& outValue);
 
 	uint32			Size() const;
 
@@ -83,8 +82,8 @@ template<class COMPARATOR> class M6Index : public M6BasicIndex
 					M6Index(const std::string& inPath, bool inCreate)
 						: M6BasicIndex(inPath, inCreate) {}
 
-	virtual int		CompareKeys(const char* inKeyA, uint32 inKeyLengthA,
-								const char* inKeyB, uint32 inKeyLengthB) const
+	virtual int		CompareKeys(const char* inKeyA, size_t inKeyLengthA,
+								const char* inKeyB, size_t inKeyLengthB) const
 						{ return mComparator(inKeyA, inKeyLengthA, inKeyB, inKeyLengthB); }
 
   protected:
@@ -94,14 +93,14 @@ template<class COMPARATOR> class M6Index : public M6BasicIndex
 // simplistic comparator, based on strncmp
 struct M6BasicComparator
 {
-	int operator()(const char* inKeyA, uint32 inKeyLengthA, const char* inKeyB, uint32 inKeyLengthB) const
+	int operator()(const char* inKeyA, size_t inKeyLengthA, const char* inKeyB, size_t inKeyLengthB) const
 	{
-		uint32 l = inKeyLengthA;
+		size_t l = inKeyLengthA;
 		if (l > inKeyLengthB)
 			l = inKeyLengthB;
 		int d = strncmp(inKeyA, inKeyB, l);
 		if (d == 0)
-			d = int(inKeyLengthA - inKeyLengthB);
+			d = static_cast<int>(inKeyLengthA - inKeyLengthB);
 		return d;
 	}
 };

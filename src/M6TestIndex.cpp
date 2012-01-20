@@ -146,6 +146,9 @@ BOOST_AUTO_TEST_CASE(file_ix_3)
 
 		++nr;
 	}
+	
+	cout << "Created tree with " << indx.size()
+		<< " keys and a depth of " << indx.depth() << endl;
 
 	foreach (auto t, testix)
 	{

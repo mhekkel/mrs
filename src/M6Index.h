@@ -70,6 +70,7 @@ class M6BasicIndex
 	bool			find(const std::string& inKey, int64& outValue);
 
 	uint32			size() const;
+	uint32			depth() const;
 
   protected:
 	M6IndexImpl*	mImpl;

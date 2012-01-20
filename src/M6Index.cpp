@@ -90,6 +90,7 @@ class M6IndexImpl
 					End();
 
 	uint32			Size() const				{ return mHeader.mSize; }
+	uint32			Depth() const				{ return mHeader.mDepth; }
 	
 	M6File&			GetFile()					{ return mFile; }
 	
@@ -248,7 +249,8 @@ bool M6IndexPage::GetNext(uint32& ioPage, uint32& ioKey, M6Tuple& outTuple) cons
 	}
 	else if (mData.mLink != 0)
 	{
-		M6IndexPage next(mIndex, mData.mLink);
+		ioPage = mData.mLink;
+		M6IndexPage next(mIndex, ioPage);
 		ioKey = 0;
 		next.GetTuple(ioKey, outTuple);
 		result = true;
@@ -488,9 +490,10 @@ M6IndexImpl::M6IndexImpl(M6BasicIndex& inIndex, const string& inPath, bool inCre
 
 		// and create a root page to keep code simple
 		M6IndexPage root(*this);
-		page.mHeader.mRoot = root.GetPageNr();
 
 		mHeader = page.mHeader;
+		mHeader.mRoot = root.GetPageNr();
+		mHeader.mDepth = 1;
 		mDirty = true;
 	}
 	else
@@ -641,5 +644,10 @@ bool M6BasicIndex::find(const string& inKey, int64& outValue)
 uint32 M6BasicIndex::size() const
 {
 	return mImpl->Size();
+}
+
+uint32 M6BasicIndex::depth() const
+{
+	return mImpl->Depth();
 }
 

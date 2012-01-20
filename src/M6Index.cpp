@@ -75,12 +75,40 @@ BOOST_STATIC_ASSERT(sizeof(M6IxFileHeaderPage) == kM6IndexPageSize);
 
 // --------------------------------------------------------------------
 
+class M6IndexImpl
+{
+  public:
+					M6IndexImpl(M6BasicIndex& inIndex, const string& inPath, bool inCreate);
+					~M6IndexImpl();
+
+	void			Insert(const string& inKey, int64 inValue);
+	bool			Find(const string& inKey, int64& outValue);
+	
+	uint32			Size() const				{ return mHeader.mSize; }
+	
+	M6File&			GetFile()					{ return mFile; }
+	
+	int				CompareKeys(const char* inKeyA, size_t inKeyLengthA,
+						const char* inKeyB, size_t inKeyLengthB) const
+					{
+						return mIndex.CompareKeys(inKeyA, inKeyLengthA, inKeyB, inKeyLengthB);
+					}
+
+  private:
+	M6File			mFile;
+	M6BasicIndex&	mIndex;
+	M6IxFileHeader	mHeader;
+	bool			mDirty;
+};
+
+// --------------------------------------------------------------------
+
 class M6IndexPage
 {
   public:
-					M6IndexPage(M6File& inFile, M6BasicIndex& inIndex);
-					M6IndexPage(M6File& inFile, M6BasicIndex& inIndex, uint32 inPageNr);
-					M6IndexPage(M6File& inFile, M6BasicIndex& inIndex,
+					M6IndexPage(M6IndexImpl& inIndex);
+					M6IndexPage(M6IndexImpl& inIndex, uint32 inPageNr);
+					M6IndexPage(M6IndexImpl& inIndex,
 						uint32 inPreviousRoot, const string& inKey, int64 inValue);
 					~M6IndexPage();
 	
@@ -93,21 +121,25 @@ class M6IndexPage
 	uint32			GetPageNr() const								{ return mPageNr; }
 	int				CompareKeys(uint32 inA, uint32 inB) const;
 
+	void			GetTuple(uint32 inKey, M6Tuple& outTuple) const;
+	bool			GetNext(uint32& ioPage, uint32& ioKey, M6Tuple& outTuple) const;
+
   private:
 
 	void			Split(string& outFirstKey, int64& outPageNr);
+	void			Insert(const string& inKey, int64 inValue, uint32 inIndex);
 
+	M6IndexImpl&	mIndex;
 	M6File&			mFile;
-	M6BasicIndex&	mIndex;
 	M6IndexPageData	mData;
 	uint16			mKeyOffsets[kM6MaxEntriesPerPage + 1];
 	uint32			mPageNr;
 	bool			mDirty;
 };
 
-M6IndexPage::M6IndexPage(M6File& inFile, M6BasicIndex& inIndex)
-	: mFile(inFile)
-	, mIndex(inIndex)
+M6IndexPage::M6IndexPage(M6IndexImpl& inIndex)
+	: mIndex(inIndex)
+	, mFile(mIndex.GetFile())
 	, mDirty(true)
 {
 	int64 fileSize = mFile.Size();
@@ -120,10 +152,10 @@ M6IndexPage::M6IndexPage(M6File& inFile, M6BasicIndex& inIndex)
 	mData = data;
 }
 
-M6IndexPage::M6IndexPage(M6File& inFile, M6BasicIndex& inIndex,
+M6IndexPage::M6IndexPage(M6IndexImpl& inIndex,
 		uint32 inPreviousRoot, const string& inKey, int64 inValue)
-	: mFile(inFile)
-	, mIndex(inIndex)
+	: mIndex(inIndex)
+	, mFile(mIndex.GetFile())
 	, mDirty(true)
 {
 	int64 fileSize = mFile.Size();
@@ -135,14 +167,15 @@ M6IndexPage::M6IndexPage(M6File& inFile, M6BasicIndex& inIndex,
 	static const M6IndexPageData data = {};
 	mData = data;
 	mData.mLink = inPreviousRoot;
+	mData.mN = 1;
 	mData.mData[kM6IndexPageDataCount - 1] = inValue;
 	mData.mKeys[0] = static_cast<uint8>(inKey.length());
 	memcpy(mData.mKeys + 1, inKey.c_str(), inKey.length());
 }
 
-M6IndexPage::M6IndexPage(M6File& inFile, M6BasicIndex& inIndex, uint32 inPageNr)
-	: mFile(inFile)
-	, mIndex(inIndex)
+M6IndexPage::M6IndexPage(M6IndexImpl& inIndex, uint32 inPageNr)
+	: mIndex(inIndex)
+	, mFile(mIndex.GetFile())
 	, mPageNr(inPageNr)
 	, mDirty(false)
 {
@@ -187,6 +220,34 @@ int M6IndexPage::CompareKeys(uint32 inA, uint32 inB) const
 	return mIndex.CompareKeys(a, *ka, b, *kb);
 }
 
+void M6IndexPage::GetTuple(uint32 inKey, M6Tuple& outTuple) const
+{
+	assert(inKey < mData.mN);
+
+	const uint8* key = mData.mKeys + mKeyOffsets[inKey];
+	outTuple.key.assign(reinterpret_cast<const char*>(key) + 1, *key);
+	outTuple.value = mData.mData[kM6IndexPageDataCount - inKey - 1];
+}
+
+bool M6IndexPage::GetNext(uint32& ioPage, uint32& ioKey, M6Tuple& outTuple) const
+{
+	bool result = false;
+	++ioKey;
+	if (ioKey < mData.mN)
+		result = true;
+	else if (mData.mLink != 0)
+	{
+		M6IndexPage next(mIndex, mData.mLink);
+		ioKey = 0;
+		next.GetTuple(ioKey, outTuple);
+	}
+	
+	if (result)
+		GetTuple(ioKey, outTuple);
+	
+	return result;
+}
+
 /*
 	Insert returns a bool indicating the depth increased.
 	In that case the ioKey and ioValue are updated to the values
@@ -212,32 +273,16 @@ bool M6IndexPage::Insert(const string& inKey, int64 inValue, string& outKey, int
 		else
 			L = i + 1;
 	}
+
+	// will need this
+	uint32 free = kM6IndexPageKeySpace - mKeyOffsets[mData.mN] - mData.mN * sizeof(int64);
 	
 	// R now points to the first key greater or equal to inKey
 	// or it is -1 one if all keys are larger than inKey
 
-	// if this is a non-leaf page, propagate the Insert
-	if (not (mData.mFlags & eM6IndexPageIsLeaf))
-	{
-		uint32 pageNr;
-		
-		if (R < 0)
-			pageNr = mData.mLink;
-		else
-			pageNr = static_cast<uint32>(mData.mData[kM6IndexPageDataCount - R - 1]);
-		
-		M6IndexPage page(mFile, mIndex, pageNr);
-		if (not page.Insert(inKey, inValue, outKey, outValue))
-		{
-			// need to increase height
-			THROW(("to be implemented"));
-		}
-	}
-	else
+	if (mData.mFlags & eM6IndexPageIsLeaf)
 	{
 		// leaf node. First calculate whether the tuple will fit in this page
-		uint32 free =
-			kM6IndexPageKeySpace - mKeyOffsets[mData.mN] - mData.mN * sizeof(int64);
 
 		// Store the key at R + 1
 		uint32 ix = R + 1;
@@ -253,7 +298,7 @@ bool M6IndexPage::Insert(const string& inKey, int64 inValue, string& outKey, int
 			
 			if (ix > mData.mN)
 			{
-				M6IndexPage next(mFile, mIndex, mData.mLink);
+				M6IndexPage next(mIndex, mData.mLink);
 				
 				string k;
 				int64 v;
@@ -267,35 +312,36 @@ bool M6IndexPage::Insert(const string& inKey, int64 inValue, string& outKey, int
 		
 		assert(free >= inKey.length() + 1 + sizeof(inValue));
 		
-		if (ix <= mData.mN)
+		if (ix <= mData.mN)		// it fits. Store it.
+			Insert(inKey, inValue, ix);
+	}
+	else
+	{
+		// if this is a non-leaf page, propagate the Insert
+		uint32 pageNr;
+		
+		if (R < 0)
+			pageNr = mData.mLink;
+		else
+			pageNr = static_cast<uint32>(mData.mData[kM6IndexPageDataCount - R - 1]);
+		
+		M6IndexPage page(mIndex, pageNr);
+		if (page.Insert(inKey, inValue, outKey, outValue))
 		{
-			// it fits. Store it.
-			if (ix < mData.mN)
+			// Store the key at R + 1
+			uint32 ix = R + 1;
+
+			// need to insert key since a new page was added
+			string k = outKey;
+			int64 v = outValue;
+			
+			if (free < k.length() + 1 + sizeof(v))
 			{
-				uint8* src = mData.mKeys + mKeyOffsets[ix];
-				uint8* dst = src + inKey.length() + 1;
-				
-				// shift keys
-				memmove(dst, src, mKeyOffsets[mData.mN] - mKeyOffsets[ix]);
-				
-				// shift data
-				int64* dsrc = mData.mData + kM6IndexPageDataCount - mData.mN;
-				int64* ddst = dsrc - 1;
-				
-				memmove(ddst, dsrc, (mData.mN - ix) * sizeof(int64));
-				
-				// shift key offsets
-				for (uint32 i = ix + 1; i <= mData.mN; ++i)
-					mKeyOffsets[i] = static_cast<uint16>(mKeyOffsets[i - 1] + inKey.length() + 1);
+				Split(outKey, outValue);
+				result = true;
 			}
 			
-			uint8* k = mData.mKeys + mKeyOffsets[ix];
-			*k = static_cast<uint8>(inKey.length());
-			memcpy(k + 1, inKey.c_str(), *k);
-			mData.mData[kM6IndexPageDataCount - ix - 1] = inValue;
-			++mData.mN;
-
-			mDirty = true;
+			Insert(k, v, ix);
 		}
 	}
 
@@ -304,7 +350,7 @@ bool M6IndexPage::Insert(const string& inKey, int64 inValue, string& outKey, int
 
 void M6IndexPage::Split(string& outFirstKey, int64& outPageNr)
 {
-	M6IndexPage next(mFile, mIndex);
+	M6IndexPage next(mIndex);
 
 	M6IndexPageData& ld = mData;
 	M6IndexPageData& rd = next.mData;
@@ -341,6 +387,36 @@ void M6IndexPage::Split(string& outFirstKey, int64& outPageNr)
 	
 	outFirstKey.assign(reinterpret_cast<char*>(rd.mKeys + 1), *rd.mKeys);
 	outPageNr = next.GetPageNr();
+
+	mDirty = true;
+}
+
+void M6IndexPage::Insert(const string& inKey, int64 inValue, uint32 inIndex)
+{
+	if (inIndex < mData.mN)
+	{
+		uint8* src = mData.mKeys + mKeyOffsets[inIndex];
+		uint8* dst = src + inKey.length() + 1;
+		
+		// shift keys
+		memmove(dst, src, mKeyOffsets[mData.mN] - mKeyOffsets[inIndex]);
+		
+		// shift data
+		int64* dsrc = mData.mData + kM6IndexPageDataCount - mData.mN;
+		int64* ddst = dsrc - 1;
+		
+		memmove(ddst, dsrc, (mData.mN - inIndex) * sizeof(int64));
+		
+		// shift key offsets
+		for (uint32 i = inIndex + 1; i <= mData.mN; ++i)
+			mKeyOffsets[i] = static_cast<uint16>(mKeyOffsets[i - 1] + inKey.length() + 1);
+	}
+	
+	uint8* k = mData.mKeys + mKeyOffsets[inIndex];
+	*k = static_cast<uint8>(inKey.length());
+	memcpy(k + 1, inKey.c_str(), *k);
+	mData.mData[kM6IndexPageDataCount - inIndex - 1] = inValue;
+	++mData.mN;
 
 	mDirty = true;
 }
@@ -382,7 +458,7 @@ bool M6IndexPage::Find(const string& inKey, int64& outValue)
 		else
 			pageNr = static_cast<uint32>(mData.mData[kM6IndexPageDataCount - R - 1]);
 		
-		M6IndexPage page(mFile, mIndex, pageNr);
+		M6IndexPage page(mIndex, pageNr);
 		result = page.Find(inKey, outValue);
 	}
 	
@@ -390,24 +466,6 @@ bool M6IndexPage::Find(const string& inKey, int64& outValue)
 }
 
 // --------------------------------------------------------------------
-
-class M6IndexImpl
-{
-  public:
-					M6IndexImpl(M6BasicIndex& inIndex, const string& inPath, bool inCreate);
-					~M6IndexImpl();
-
-	void			Insert(const string& inKey, int64 inValue);
-	bool			Find(const string& inKey, int64& outValue);
-	
-	uint32			Size() const				{ return mHeader.mSize; }
-
-  private:
-	M6File			mFile;
-	M6BasicIndex&	mIndex;
-	M6IxFileHeader	mHeader;
-	bool			mDirty;
-};
 
 M6IndexImpl::M6IndexImpl(M6BasicIndex& inIndex, const string& inPath, bool inCreate)
 	: mFile(inPath, inCreate ? eReadWrite : eReadOnly)
@@ -420,7 +478,7 @@ M6IndexImpl::M6IndexImpl(M6BasicIndex& inIndex, const string& inPath, bool inCre
 		mFile.PWrite(&page, kM6IndexPageSize, 0);
 
 		// and create a root page to keep code simple
-		M6IndexPage root(mFile, mIndex);
+		M6IndexPage root(*this);
 		page.mHeader.mRoot = root.GetPageNr();
 
 		mHeader = page.mHeader;
@@ -441,7 +499,7 @@ M6IndexImpl::~M6IndexImpl()
 
 void M6IndexImpl::Insert(const string& inKey, int64 inValue)
 {
-	M6IndexPage root(mFile, mIndex, mHeader.mRoot);
+	M6IndexPage root(*this, mHeader.mRoot);
 	
 	string key;
 	int64 value;
@@ -452,7 +510,7 @@ void M6IndexImpl::Insert(const string& inKey, int64 inValue)
 		++mHeader.mDepth;
 		
 		// construct a new root page (using special constructor)
-		M6IndexPage newRoot(mFile, mIndex, mHeader.mRoot, key, value);
+		M6IndexPage newRoot(*this, mHeader.mRoot, key, value);
 		mHeader.mRoot = newRoot.GetPageNr();
 	}
 
@@ -462,14 +520,59 @@ void M6IndexImpl::Insert(const string& inKey, int64 inValue)
 
 bool M6IndexImpl::Find(const string& inKey, int64& outValue)
 {
-	M6IndexPage root(mFile, mIndex, mHeader.mRoot);
+	M6IndexPage root(*this, mHeader.mRoot);
 	return root.Find(inKey, outValue);
 }
 
 // --------------------------------------------------------------------
 
 M6BasicIndex::iterator::iterator()
+	: mIndex(nullptr)
+	, mPage(0)
+	, mKeyNr(0)
 {
+}
+
+M6BasicIndex::iterator::iterator(const iterator& iter)
+	: mIndex(iter.mIndex)
+	, mPage(iter.mPage)
+	, mKeyNr(iter.mKeyNr)
+	, mCurrent(iter.mCurrent)
+{
+}
+
+M6BasicIndex::iterator::iterator(M6IndexImpl* inImpl, uint32 inPageNr, uint32 inKeyNr)
+	: mIndex(inImpl)
+	, mPage(inPageNr)
+	, mKeyNr(inKeyNr)
+{
+	M6IndexPage page(*mIndex, mPage);
+	page.GetTuple(mKeyNr, mCurrent);
+}
+
+M6BasicIndex::iterator& M6BasicIndex::iterator::operator=(const iterator& iter)
+{
+	if (this != &iter)
+	{
+		mIndex = iter.mIndex;
+		mPage = iter.mPage;
+		mKeyNr = iter.mKeyNr;
+	}
+	
+	return *this;
+}
+
+M6BasicIndex::iterator& M6BasicIndex::iterator::operator++()
+{
+	M6IndexPage page(*mIndex, mPage);
+	if (not page.GetNext(mPage, mKeyNr, mCurrent))
+	{
+		mIndex = nullptr;
+		mPage = 0;
+		mKeyNr = 0;
+	}
+
+	return *this;
 }
 
 // --------------------------------------------------------------------

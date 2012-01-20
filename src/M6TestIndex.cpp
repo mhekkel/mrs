@@ -72,10 +72,10 @@ BOOST_AUTO_TEST_CASE(file_io)
 	fs::remove(filename);
 }
 
+const char filename[] = "test.index";
+
 BOOST_AUTO_TEST_CASE(file_ix_1)
 {
-	const char filename[] = "test.index";
-
 	if (fs::exists(filename))
 		fs::remove(filename);
 
@@ -84,8 +84,17 @@ BOOST_AUTO_TEST_CASE(file_ix_1)
 	};
 	int64 nr = 1;
 	
-	M6IndexBase indx(filename, true);
+	M6SimpleIndex indx(filename, true);
 	
 	foreach (const char* key, strings)
 		indx.Insert(key, nr++);
 }
+
+BOOST_AUTO_TEST_CASE(file_ix_2)
+{
+	M6SimpleIndex indx(filename, true);
+//	
+//	foreach (const char* key, strings)
+//		indx.Insert(key, nr++);
+}
+

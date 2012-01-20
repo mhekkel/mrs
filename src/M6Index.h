@@ -1,29 +1,33 @@
+//	Basic index class
+//	
+//	
+
 #pragma once
 
 #include <boost/function.hpp>
 
-class M6Index;
-
 class M6IndexImpl;
+
 struct M6Tuple
 {
 	std::string		key;
 	int64			value;
 };
 
-class M6IndexBase
+class M6BasicIndex
 {
   public:
 
-					M6IndexBase(const std::string& inPath, bool inCreate);
-	virtual			~M6IndexBase();
+					M6BasicIndex(const std::string& inPath, bool inCreate);
+	virtual			~M6BasicIndex();
 	
 //	typedef boost::function<bool(std::string&,int64&)>	MDataProviderFunc;
 //	
-//	M6IndexBase*	Create(const fs::path& inPath, const std::string& inLocale,
+//	M6BasicIndex*	Create(const fs::path& inPath, const std::string& inLocale,
 //						bool inCaseSensitive, MDataProviderFunc& inData);
 //
-	virtual int		CompareKeys(const std::string& inKeyA, const std::string& inKeyB) const;
+	virtual int		CompareKeys(const char* inKeyA, uint32 inKeyLengthA,
+						const char* inKeyB, uint32 inKeyLengthB) const = 0;
 
 	class iterator : public std::iterator<std::bidirectional_iterator_tag,M6Tuple>
 	{
@@ -62,7 +66,7 @@ class M6IndexBase
 	iterator		UpperBound(const std::string& inKey) const;
 	
 //	iterator		Insert(const M6Tuple& value);
-	iterator		Insert(const std::string& key, int64 value);
+	void			Insert(const std::string& key, int64 value);
 //	iterator		insert(iterator before, const M6Tuple& value);
 
 	uint32			Size() const;
@@ -71,14 +75,35 @@ class M6IndexBase
 	M6IndexImpl*	mImpl;
 };
 
-//template
-//<
-//	typename Comparator
-//>
-//class M6Index : public M6IndexBase
-//{
-//  public:
-//
-//	virtual int		CompareKeys(const std::string& inKeyA, const std::string& inKeyB) const;
-//	
-//};
+template<class COMPARATOR> class M6Index : public M6BasicIndex
+{
+  public:
+	typedef COMPARATOR			M6Comparator;
+
+					M6Index(const std::string& inPath, bool inCreate)
+						: M6BasicIndex(inPath, inCreate) {}
+
+	virtual int		CompareKeys(const char* inKeyA, uint32 inKeyLengthA,
+								const char* inKeyB, uint32 inKeyLengthB) const
+						{ return mComparator(inKeyA, inKeyLengthA, inKeyB, inKeyLengthB); }
+
+  protected:
+	M6Comparator	mComparator;
+};
+
+// simplistic comparator, based on strncmp
+struct M6BasicComparator
+{
+	int operator()(const char* inKeyA, uint32 inKeyLengthA, const char* inKeyB, uint32 inKeyLengthB) const
+	{
+		uint32 l = inKeyLengthA;
+		if (l > inKeyLengthB)
+			l = inKeyLengthB;
+		int d = strncmp(inKeyA, inKeyB, l);
+		if (d == 0)
+			d = int(inKeyLengthA - inKeyLengthB);
+		return d;
+	}
+};
+
+typedef M6Index<M6BasicComparator>	M6SimpleIndex;

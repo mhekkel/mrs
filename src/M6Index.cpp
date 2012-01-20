@@ -84,6 +84,11 @@ class M6IndexImpl
 	void			Insert(const string& inKey, int64 inValue);
 	bool			Find(const string& inKey, int64& outValue);
 	
+	M6BasicIndex::iterator
+					Begin();
+	M6BasicIndex::iterator
+					End();
+
 	uint32			Size() const				{ return mHeader.mSize; }
 	
 	M6File&			GetFile()					{ return mFile; }
@@ -112,7 +117,10 @@ class M6IndexPage
 						uint32 inPreviousRoot, const string& inKey, int64 inValue);
 					~M6IndexPage();
 	
+	bool			IsLeaf() const									{ return mData.mFlags & eM6IndexPageIsLeaf; }
+	
 	void			SetLink(uint32 inLink);
+	uint32			GetLink() const									{ return mData.mLink; }
 	
 	bool			Insert(const string& inKey, int64 inValue,
 						string& outKey, int64& outValue);
@@ -234,16 +242,17 @@ bool M6IndexPage::GetNext(uint32& ioPage, uint32& ioKey, M6Tuple& outTuple) cons
 	bool result = false;
 	++ioKey;
 	if (ioKey < mData.mN)
+	{
 		result = true;
+		GetTuple(ioKey, outTuple);
+	}
 	else if (mData.mLink != 0)
 	{
 		M6IndexPage next(mIndex, mData.mLink);
 		ioKey = 0;
 		next.GetTuple(ioKey, outTuple);
+		result = true;
 	}
-	
-	if (result)
-		GetTuple(ioKey, outTuple);
 	
 	return result;
 }
@@ -524,6 +533,25 @@ bool M6IndexImpl::Find(const string& inKey, int64& outValue)
 	return root.Find(inKey, outValue);
 }
 
+M6BasicIndex::iterator M6IndexImpl::Begin()
+{
+	uint32 pageNr = mHeader.mRoot;
+	for (;;)
+	{
+		M6IndexPage page(*this, pageNr);
+		if (page.IsLeaf())
+			break;
+		pageNr = page.GetLink();
+	}
+	
+	return M6BasicIndex::iterator(this, pageNr, 0);
+}
+
+M6BasicIndex::iterator M6IndexImpl::End()
+{
+	return M6BasicIndex::iterator(nullptr, 0, 0);
+}
+
 // --------------------------------------------------------------------
 
 M6BasicIndex::iterator::iterator()
@@ -546,8 +574,11 @@ M6BasicIndex::iterator::iterator(M6IndexImpl* inImpl, uint32 inPageNr, uint32 in
 	, mPage(inPageNr)
 	, mKeyNr(inKeyNr)
 {
-	M6IndexPage page(*mIndex, mPage);
-	page.GetTuple(mKeyNr, mCurrent);
+	if (mIndex != nullptr)
+	{
+		M6IndexPage page(*mIndex, mPage);
+		page.GetTuple(mKeyNr, mCurrent);
+	}
 }
 
 M6BasicIndex::iterator& M6BasicIndex::iterator::operator=(const iterator& iter)
@@ -587,17 +618,27 @@ M6BasicIndex::~M6BasicIndex()
 	delete mImpl;
 }
 
-void M6BasicIndex::Insert(const string& key, int64 value)
+M6BasicIndex::iterator M6BasicIndex::begin() const
+{
+	return mImpl->Begin();
+}
+
+M6BasicIndex::iterator M6BasicIndex::end() const
+{
+	return mImpl->End();
+}
+
+void M6BasicIndex::insert(const string& key, int64 value)
 {
 	mImpl->Insert(key, value);
 }
 
-bool M6BasicIndex::Find(const string& inKey, int64& outValue)
+bool M6BasicIndex::find(const string& inKey, int64& outValue)
 {
 	return mImpl->Find(inKey, outValue);
 }
 
-uint32 M6BasicIndex::Size() const
+uint32 M6BasicIndex::size() const
 {
 	return mImpl->Size();
 }

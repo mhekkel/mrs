@@ -60,16 +60,16 @@ class M6BasicIndex
 		M6Tuple			mCurrent;
 	};
 	
-	iterator		Begin() const;
-	iterator		End() const;
+	iterator		begin() const;
+	iterator		end() const;
 	
-	iterator		LowerBound(const std::string& inKey) const;
-	iterator		UpperBound(const std::string& inKey) const;
+	iterator		lower_bound(const std::string& inKey) const;
+	iterator		upper_bound(const std::string& inKey) const;
 	
-	void			Insert(const std::string& inKey, int64 inValue);
-	bool			Find(const std::string& inKey, int64& outValue);
+	void			insert(const std::string& inKey, int64 inValue);
+	bool			find(const std::string& inKey, int64& outValue);
 
-	uint32			Size() const;
+	uint32			size() const;
 
   protected:
 	M6IndexImpl*	mImpl;

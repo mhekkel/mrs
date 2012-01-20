@@ -88,13 +88,13 @@ BOOST_AUTO_TEST_CASE(file_ix_1)
 	M6SimpleIndex indx(filename, true);
 	
 	foreach (const char* key, strings)
-		indx.Insert(key, nr++);
+		indx.insert(key, nr++);
 
 	nr = 1;
 	foreach (const char* key, strings)
 	{
 		int64 v;
-		BOOST_CHECK(indx.Find(key, v));
+		BOOST_CHECK(indx.find(key, v));
 		BOOST_CHECK_EQUAL(v, nr);
 		++nr;
 	}
@@ -108,7 +108,7 @@ BOOST_AUTO_TEST_CASE(file_ix_2)
 	foreach (const char* key, strings)
 	{
 		int64 v;
-		BOOST_CHECK(indx.Find(key, v));
+		BOOST_CHECK(indx.find(key, v));
 		BOOST_CHECK_EQUAL(v, nr);
 		++nr;
 	}
@@ -138,10 +138,10 @@ BOOST_AUTO_TEST_CASE(file_ix_3)
 		ba::to_lower(word);
 		
 		int64 v;
-		if (indx.Find(word, v))
+		if (indx.find(word, v))
 			continue;
 		
-		indx.Insert(word, nr);
+		indx.insert(word, nr);
 		testix[word] = nr;
 
 		++nr;
@@ -150,12 +150,13 @@ BOOST_AUTO_TEST_CASE(file_ix_3)
 	foreach (auto t, testix)
 	{
 		int64 v;
-		BOOST_CHECK(indx.Find(t.first, v));
+		BOOST_CHECK(indx.find(t.first, v));
 		BOOST_CHECK_EQUAL(v, t.second);
 	}
 	
 	nr = 0;
-	for (M6SimpleIndex::iterator i = indx.Begin(); i != indx.End(); ++i)
+	//foreach (auto i, indx)
+	for (auto i = indx.begin(); i != indx.end(); ++i)
 	{
 		BOOST_CHECK_EQUAL(testix[i->key], i->value);
 		++nr;

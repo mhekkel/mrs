@@ -12,13 +12,21 @@ struct M6Tuple
 {
 	std::string		key;
 	int64			value;
+
+					M6Tuple() : value(0) {}
+					M6Tuple(const std::string& inKey, int64 inValue)
+						: key(inKey), value(inValue) {}
 };
+
+typedef boost::function<bool(M6Tuple&)>		M6SortedInputIterator;
 
 class M6BasicIndex
 {
   public:
 
 					M6BasicIndex(const std::string& inPath, bool inCreate);
+					M6BasicIndex(const std::string& inPath, M6SortedInputIterator& inData);
+
 	virtual			~M6BasicIndex();
 	
 //	typedef boost::function<bool(std::string&,int64&)>	MDataProviderFunc;
@@ -83,6 +91,9 @@ template<class COMPARATOR> class M6Index : public M6BasicIndex
 
 					M6Index(const std::string& inPath, bool inCreate)
 						: M6BasicIndex(inPath, inCreate) {}
+
+					M6Index(const std::string& inPath, M6SortedInputIterator& inData)
+						: M6BasicIndex(inPath, inData) {}
 
 	virtual int		CompareKeys(const char* inKeyA, size_t inKeyLengthA,
 								const char* inKeyB, size_t inKeyLengthB) const

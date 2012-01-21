@@ -21,17 +21,17 @@ using namespace std;
 namespace fs = boost::filesystem;
 namespace ba = boost::algorithm;
 
-BOOST_AUTO_TEST_CASE(start_up)
-{
-	cout << "Hello, world!" << endl;
-}
-
-BOOST_AUTO_TEST_CASE(zeep_test)
-{
-	zeep::xml::document doc;
-
-	cout << "Hello, world!" << endl;
-}
+//BOOST_AUTO_TEST_CASE(start_up)
+//{
+//	cout << "Hello, world!" << endl;
+//}
+//
+//BOOST_AUTO_TEST_CASE(zeep_test)
+//{
+//	zeep::xml::document doc;
+//
+//	cout << "Hello, world!" << endl;
+//}
 
 BOOST_AUTO_TEST_CASE(file_io)
 {
@@ -166,6 +166,27 @@ BOOST_AUTO_TEST_CASE(file_ix_3)
 	}
 	
 	BOOST_CHECK_EQUAL(nr, testix.size());
+
+	indx.Vacuum();
+
+	foreach (auto t, testix)
+	{
+		int64 v;
+		BOOST_CHECK(indx.find(t.first, v));
+		BOOST_CHECK_EQUAL(v, t.second);
+	}
+	
+	nr = 0;
+	//foreach (auto i, indx)
+	for (auto i = indx.begin(); i != indx.end(); ++i)
+	{
+//		cout << i->key << " -> " << i->value << endl;
+
+		BOOST_CHECK_EQUAL(testix[i->key], i->value);
+		++nr;
+	}
+	
+	BOOST_CHECK_EQUAL(nr, testix.size());
 }
 
 BOOST_AUTO_TEST_CASE(file_ix_4)
@@ -221,11 +242,32 @@ BOOST_AUTO_TEST_CASE(file_ix_4)
 	//foreach (auto i, indx)
 	for (auto i = indx.begin(); i != indx.end(); ++i)
 	{
-		cout << i->key << " -> " << i->value << endl;
+//		cout << i->key << " -> " << i->value << endl;
 
 		BOOST_CHECK_EQUAL(testix[i->key], i->value);
 		++nr;
 	}
 	
+	BOOST_CHECK_EQUAL(nr, testix.size());
+
+	indx.Vacuum();
+
+	foreach (auto t, testix)
+	{
+		int64 v;
+		BOOST_CHECK(indx.find(t.first, v));
+		BOOST_CHECK_EQUAL(v, t.second);
+	}
+	
+	nr = 0;
+	//foreach (auto i, indx)
+	for (auto i = indx.begin(); i != indx.end(); ++i)
+	{
+//		cout << i->key << " -> " << i->value << endl;
+
+		BOOST_CHECK_EQUAL(testix[i->key], i->value);
+		++nr;
+	}
+
 	BOOST_CHECK_EQUAL(nr, testix.size());
 }	

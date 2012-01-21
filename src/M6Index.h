@@ -29,11 +29,8 @@ class M6BasicIndex
 
 	virtual			~M6BasicIndex();
 	
-//	typedef boost::function<bool(std::string&,int64&)>	MDataProviderFunc;
-//	
-//	M6BasicIndex*	Create(const fs::path& inPath, const std::string& inLocale,
-//						bool inCaseSensitive, MDataProviderFunc& inData);
-//
+	void			Vacuum();
+	
 	virtual int		CompareKeys(const char* inKeyA, size_t inKeyLengthA,
 						const char* inKeyB, size_t inKeyLengthB) const = 0;
 

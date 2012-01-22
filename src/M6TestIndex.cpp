@@ -137,12 +137,24 @@ BOOST_AUTO_TEST_CASE(file_ix_3)
 
 		ba::to_lower(word);
 		
-		int64 v;
-		if (indx.find(word, v))
+		if (testix.find(word) != testix.end())
 			continue;
+
+		//if (indx.find(word, v))
+		//	continue;
 		
 		indx.insert(word, nr);
 		testix[word] = nr;
+
+//		int64 v;
+//		BOOST_CHECK(indx.find(word, v));
+
+		foreach (auto t, testix)
+		{
+			int64 v;
+			BOOST_CHECK(indx.find(t.first, v));
+			BOOST_CHECK_EQUAL(v, t.second);
+		}
 
 		++nr;
 	}

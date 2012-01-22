@@ -28,10 +28,11 @@ using namespace std::tr1;
 // this boils down to 42.
 
 const uint32
-	kM6IndexPageSize = 512,
+	kM6IndexPageSize = 128,
 	kM6IndexPageHeaderSize = 8,
 	kM6MaxEntriesPerPage = (kM6IndexPageSize - kM6IndexPageHeaderSize) / 12,	// keeps code simple
 	kM6IndexPageKeySpace = kM6IndexPageSize - kM6IndexPageHeaderSize,
+	kM6IndexPageMinKeySpace = kM6IndexPageKeySpace / 4,
 	kM6IndexPageDataCount = (kM6IndexPageKeySpace / sizeof(int64));
 
 BOOST_STATIC_ASSERT(kM6IndexPageDataCount >= kM6MaxEntriesPerPage);
@@ -89,6 +90,7 @@ class M6IndexImpl
 					~M6IndexImpl();
 
 	void			Insert(const string& inKey, int64 inValue);
+	void			Erase(const string& inKey);
 	bool			Find(const string& inKey, int64& outValue);
 	void			Vacuum();
 	
@@ -107,6 +109,8 @@ class M6IndexImpl
 					{
 						return mIndex.CompareKeys(inKeyA, inKeyLengthA, inKeyB, inKeyLengthB);
 					}
+
+	void			Validate();
 
   private:
 
@@ -145,12 +149,12 @@ class M6IndexPage
 	void			MoveTo(uint32 inPageNr);
 	
 	// First Insert, used for updating an index
-	bool			Insert(const string& inKey, int64 inValue,
-						string& outKey, int64& outValue);
+	bool			Insert(string& ioKey, int64& ioValue);
 
 	// Second Insert, inserts in this page only (no passing on to next level)
 	void			Insert(const string& inKey, int64 inValue, uint32 inIndex);
 
+	bool			Erase(const string& inKey);
 	void			Erase(uint32 inIndex);
 
 	bool			Find(const string& inKey, int64& outValue);
@@ -161,14 +165,21 @@ class M6IndexPage
 	void			GetTuple(uint32 inIndex, M6Tuple& outTuple) const;
 	string			GetKey(uint32 inIndex) const;
 	int64			GetValue(uint32 inIndex) const;
+	uint32			GetValue32(uint32 inIndex) const;
 	bool			GetNext(uint32& ioPage, uint32& ioKey, M6Tuple& outTuple) const;
+
+	void			Validate();
 
   private:
 
 					M6IndexPage(const M6IndexPage&);
 	M6IndexPage&	operator=(const M6IndexPage&);
 
-	void			Split(string& outFirstKey, int64& outPageNr);
+//	void			Split(string& outFirstKey, int64& outPageNr);
+	bool			InsertAndSplitLeafIfNeeded(uint32 inIndex, string& ioKey, int64& ioValue);
+	bool			InsertAndSplitBranchIfNeeded(uint32 inIndex, string& ioKey, int64& ioValue);
+
+	void			Join(M6IndexPage& inPageRight);
 
 	M6IndexImpl&	mIndex;
 	M6File&			mFile;
@@ -223,9 +234,9 @@ M6IndexPage::M6IndexPage(M6IndexImpl& inIndex, uint32 inPageNr)
 	uint8* key = mData.mKeys;
 	for (uint32 i = 0; i <= mData.mN; ++i)
 	{
+		assert(key <= mData.mKeys + kM6IndexPageSize);
 		mKeyOffsets[i] = static_cast<uint16>(key - mData.mKeys);
 		key += *key + 1;
-		assert(key <= mData.mKeys + kM6IndexPageSize);
 	}
 }
 
@@ -264,6 +275,32 @@ void M6IndexPage::AllocateNew(bool inLinkNewToOld)
 	mKeyOffsets[0] = 0;
 }
 
+void M6IndexPage::Validate()
+{
+	assert(mData.mN > 0);
+
+	for (int i = 0; i < mData.mN; ++i)
+		assert(not GetKey(i).empty());
+
+	for (int i = 1; i < mData.mN; ++i)
+		assert(GetKey(i - 1).compare(GetKey(i)) < 0);
+	
+	if (not IsLeaf())
+	{
+		M6IndexPage link(mIndex, mData.mLink);
+		assert(link.GetKey(0).compare(GetKey(0)) < 0);
+		
+		link.Validate();
+		
+		for (int i = 0; i < mData.mN; ++i)
+		{
+			M6IndexPage link(mIndex, GetValue32(i));
+			assert(link.GetKey(0) == GetKey(i));
+			link.Validate();
+		}
+	}
+}
+
 void M6IndexPage::SetLink(int64 inLink)
 {
 	if (inLink > numeric_limits<uint32>::max())
@@ -280,7 +317,7 @@ void M6IndexPage::MoveTo(uint32 inPageNr)
 		M6IndexPage page(mIndex, inPageNr);
 		
 		// only save page if it is a leaf
-		if (page.mData.mFlags & eM6IndexPageIsLeaf)
+		if (page.IsLeaf())
 		{
 			page.mPageNr = mPageNr;
 			page.mDirty = true;
@@ -313,15 +350,6 @@ int M6IndexPage::CompareKeys(uint32 inA, uint32 inB) const
 	return mIndex.CompareKeys(a, *ka, b, *kb);
 }
 
-void M6IndexPage::GetTuple(uint32 inIndex, M6Tuple& outTuple) const
-{
-	assert(inIndex < mData.mN);
-
-	const uint8* key = mData.mKeys + mKeyOffsets[inIndex];
-	outTuple.key.assign(reinterpret_cast<const char*>(key) + 1, *key);
-	outTuple.value = mData.mData[kM6IndexPageDataCount - inIndex - 1];
-}
-
 inline string M6IndexPage::GetKey(uint32 inIndex) const
 {
 	assert(inIndex < mData.mN);
@@ -333,6 +361,21 @@ inline int64 M6IndexPage::GetValue(uint32 inIndex) const
 {
 	assert(inIndex < mData.mN);
 	return mData.mData[kM6IndexPageDataCount - inIndex - 1];
+}
+
+inline uint32 M6IndexPage::GetValue32(uint32 inIndex) const
+{
+	assert(inIndex < mData.mN);
+	int64 v = mData.mData[kM6IndexPageDataCount - inIndex - 1];
+	if (v > numeric_limits<uint32>::max())
+		THROW(("Invalid value"));
+	return static_cast<uint32>(v);
+}
+
+void M6IndexPage::GetTuple(uint32 inIndex, M6Tuple& outTuple) const
+{
+	outTuple.key = GetKey(inIndex);
+	outTuple.value = GetValue(inIndex);
 }
 
 bool M6IndexPage::GetNext(uint32& ioPage, uint32& ioIndex, M6Tuple& outTuple) const
@@ -362,7 +405,7 @@ bool M6IndexPage::GetNext(uint32& ioPage, uint32& ioIndex, M6Tuple& outTuple) co
 	to be inserted in the page a level up.
 */
 
-bool M6IndexPage::Insert(const string& inKey, int64 inValue, string& outKey, int64& outValue)
+bool M6IndexPage::Insert(string& ioKey, int64& ioValue)
 {
 	bool result = false;
 
@@ -375,54 +418,18 @@ bool M6IndexPage::Insert(const string& inKey, int64 inValue, string& outKey, int
 		const uint8* ko = mData.mKeys + mKeyOffsets[i];
 		const char* k = reinterpret_cast<const char*>(ko + 1);
 
-		int d = mIndex.CompareKeys(inKey.c_str(), inKey.length(), k, *ko);
+		int d = mIndex.CompareKeys(ioKey.c_str(), ioKey.length(), k, *ko);
 		if (d < 0)
 			R = i - 1;
 		else
 			L = i + 1;
 	}
 
-	// will need this
-	uint32 free = kM6IndexPageKeySpace - mKeyOffsets[mData.mN] - mData.mN * sizeof(int64);
-	
-	// R now points to the first key greater or equal to inKey
-	// or it is -1 one if all keys are larger than inKey
+	// R now points to the first key greater or equal to ioKey
+	// or it is -1 one if all keys are larger than ioKey
 
-	if (mData.mFlags & eM6IndexPageIsLeaf)
-	{
-		// leaf node. First calculate whether the tuple will fit in this page
-
-		// Store the key at R + 1
-		uint32 ix = R + 1;
-
-		// if not, we have to split this page.
-		if (mData.mN >= kM6MaxEntriesPerPage or
-			free < inKey.length() + 1 + sizeof(inValue))
-		{
-			Split(outKey, outValue);
-			result = true;
-
-			mData.mLink = static_cast<uint32>(outValue);
-			
-			if (ix > mData.mN)
-			{
-				M6IndexPage next(mIndex, mData.mLink);
-				
-				string k;
-				int64 v;
-
-				bool r = next.Insert(inKey, inValue, k, v);
-				assert(r == false);
-			}
-			
-			free = kM6IndexPageKeySpace - mKeyOffsets[mData.mN] + mData.mN * sizeof(int64);
-		}
-		
-		assert(free >= inKey.length() + 1 + sizeof(inValue));
-		
-		if (ix <= mData.mN)		// it fits. Store it.
-			Insert(inKey, inValue, ix);
-	}
+	if (IsLeaf())
+		result = InsertAndSplitLeafIfNeeded(R + 1, ioKey, ioValue);
 	else
 	{
 		// if this is a non-leaf page, propagate the Insert
@@ -431,26 +438,11 @@ bool M6IndexPage::Insert(const string& inKey, int64 inValue, string& outKey, int
 		if (R < 0)
 			pageNr = mData.mLink;
 		else
-			pageNr = static_cast<uint32>(mData.mData[kM6IndexPageDataCount - R - 1]);
+			pageNr = GetValue32(R);
 		
 		M6IndexPage page(mIndex, pageNr);
-		if (page.Insert(inKey, inValue, outKey, outValue))
-		{
-			// Store the key at R + 1
-			uint32 ix = R + 1;
-
-			// need to insert key since a new page was added
-			string k = outKey;
-			int64 v = outValue;
-			
-			if (free < k.length() + 1 + sizeof(v))
-			{
-				Split(outKey, outValue);
-				result = true;
-			}
-			
-			Insert(k, v, ix);
-		}
+		if (page.Insert(ioKey, ioValue))
+			result = InsertAndSplitBranchIfNeeded(R + 1, ioKey, ioValue);
 	}
 
 	return result;
@@ -480,51 +472,333 @@ void M6IndexPage::Erase(uint32 inIndex)
 	mDirty = true;
 }
 
-void M6IndexPage::Split(string& outFirstKey, int64& outPageNr)
+bool M6IndexPage::Erase(const string& inKey)
 {
-	M6IndexPage next(mIndex);
-
-	M6IndexPageData& ld = mData;
-	M6IndexPageData& rd = next.mData;
+	bool result = false;
 	
-	uint32 N = mData.mN;
-	rd.mN = ld.mN / 2;
-	ld.mN -= rd.mN;
+	// Start by locating a position in the page
+	int L = 0, R = mData.mN - 1;
+	while (L <= R)
+	{
+		int i = (L + R) / 2;
+
+		const uint8* ko = mData.mKeys + mKeyOffsets[i];
+		const char* k = reinterpret_cast<const char*>(ko + 1);
+
+		int d = mIndex.CompareKeys(inKey.c_str(), inKey.length(), k, *ko);
+		if (d < 0)
+			R = i - 1;
+		else
+			L = i + 1;
+	}
+
+	// R now points to the first key greater or equal to inKey
+	// or it is -1 one if all keys are larger than inKey
+
+	if (IsLeaf())
+	{
+		// erase the key at R + 1
+		uint32 ix = R + 1;
+		
+		if (GetKey(ix) == inKey)
+		{
+			Erase(ix);
+			result = true;
+		}
+	}
+	else
+	{
+		// if this is a non-leaf page, propagate the Erase
+		uint32 pageNr;
+		
+		if (R < 0)
+			pageNr = mData.mLink;
+		else
+			pageNr = GetValue32(R);
+		
+		M6IndexPage page(mIndex, pageNr);
+		if (page.Erase(inKey))
+		{
+			uint32 ix = R + 1;
+			
+			// Erase was successful, now compensate.
+			// maybe we can merge the sub page with its left sibling?
+			
+			if (ix > 0)
+			{
+				M6IndexPage left(mIndex, GetValue32(ix - 1));
+				if (page.Free() + left.Free() > kM6IndexPageKeySpace)
+				{
+					// Merge pages
+					
+					
+					
+				}
+			}
+
+			
+			if (page.GetN() == 0)
+			{
+				assert(R == -1 or GetKey(R) == inKey);
+				if (R == -1)
+				{
+					mData.mLink = GetValue32(0);
+					Erase(0);
+				}
+				else
+				{
+					if (page.IsLeaf())
+					{
+						uint32 leftNr = mData.mLink;
+						if (R > 0)
+							leftNr = static_cast<uint32>(GetValue(R - 1));
+						M6IndexPage left(mIndex, leftNr);
+						left.SetLink(page.GetLink());
+					}
+					
+					Erase(R);
+				}
+				
+				result = true;
+			}
+//			else if (
+		}
+	}
+	
+	return result;
+}
+
+bool M6IndexPage::InsertAndSplitLeafIfNeeded(uint32 inIndex, string& ioKey, int64& ioValue)
+{
+	bool result = false;
+	
+	if (CanStore(ioKey))
+		Insert(ioKey, ioValue, inIndex);
+	else
+	{
+		result = true;
+		
+		M6IndexPage next(mIndex);
+	
+		M6IndexPageData& ld = mData;
+		M6IndexPageData& rd = next.mData;
+		
+		uint32 N = mData.mN;
+		rd.mN = ld.mN / 2;
+		ld.mN -= rd.mN;
+		
+		// copy keys
+		void* src = ld.mKeys + mKeyOffsets[ld.mN];
+		void* dst = rd.mKeys;
+		uint32 n = mKeyOffsets[N] - mKeyOffsets[ld.mN];
+		memcpy(dst, src, n);
+		
+		// copy data
+		src = ld.mData + kM6IndexPageDataCount - N;
+		dst = rd.mData + kM6IndexPageDataCount - rd.mN;
+		n = rd.mN * sizeof(int64);
+		memcpy(dst, src, n);
+		
+		// update rest
+		rd.mFlags = ld.mFlags;
+		rd.mLink = ld.mLink;
+		ld.mLink = next.GetPageNr();
+		
+		// including the key offsets
+		uint8* key = rd.mKeys;
+		for (uint32 i = 0; i <= rd.mN; ++i)
+		{
+			assert(key <= rd.mKeys + kM6IndexPageSize);
+			next.mKeyOffsets[i] = static_cast<uint16>(key - rd.mKeys);
+			key += *key + 1;
+		}
+		
+		if (inIndex <= mData.mN)
+			Insert(ioKey, ioValue, inIndex);
+		else
+			next.Insert(ioKey, ioValue, inIndex - mData.mN);
+		
+		ioKey = next.GetKey(0);
+		ioValue = next.GetPageNr();
+	}
+
+	mDirty = true;
+	
+	return result;
+}
+
+bool M6IndexPage::InsertAndSplitBranchIfNeeded(uint32 inIndex, string& ioKey, int64& ioValue)
+{
+	bool result = false;
+	
+	if (CanStore(ioKey))
+		Insert(ioKey, ioValue, inIndex);
+	else
+	{
+		result = true;
+		
+		M6IndexPage next(mIndex);
+	
+		M6IndexPageData& ld = mData;
+		M6IndexPageData& rd = next.mData;
+		
+		uint32 N = mData.mN - 1;
+		rd.mN = N / 2;
+		ld.mN = N - rd.mN;
+		
+		// avoid the case where the inserted key is less than the first of the next page
+		if (inIndex == ld.mN + 1)
+		{
+			--ld.mN;
+			++rd.mN;
+		}
+		
+		// copy keys
+		void* src = ld.mKeys + mKeyOffsets[ld.mN + 1];
+		void* dst = rd.mKeys;
+		uint32 n = mKeyOffsets[N + 1] - mKeyOffsets[ld.mN + 1];
+		memcpy(dst, src, n);
+		
+		// copy data
+		src = ld.mData + kM6IndexPageDataCount - N - 1;
+		dst = rd.mData + kM6IndexPageDataCount - rd.mN;
+		n = rd.mN * sizeof(int64);
+		memcpy(dst, src, n);
+		
+		// update rest
+		rd.mFlags = ld.mFlags;
+		rd.mLink = ld.mData[kM6IndexPageDataCount - ld.mN - 1];
+		
+		// including the key offsets
+		uint8* key = rd.mKeys;
+		for (uint32 i = 0; i <= rd.mN; ++i)
+		{
+			assert(key <= rd.mKeys + kM6IndexPageSize);
+			next.mKeyOffsets[i] = static_cast<uint16>(key - rd.mKeys);
+			key += *key + 1;
+		}
+		
+		if (inIndex <= mData.mN)
+			Insert(ioKey, ioValue, inIndex);
+		else
+			next.Insert(ioKey, ioValue, inIndex - mData.mN - 1);
+		
+		ioKey = next.GetKey(0);
+		ioValue = next.GetPageNr();
+	}
+
+	mDirty = true;
+	
+	return result;
+}
+
+//void M6IndexPage::Split(string& outFirstKey, int64& outPageNr)
+//{
+//	M6IndexPage next(mIndex);
+//
+//	M6IndexPageData& ld = mData;
+//	M6IndexPageData& rd = next.mData;
+//	
+//	// leaf nodes are split differently from branch nodes
+//	if (IsLeaf())
+//	{
+//		uint32 N = mData.mN;
+//		rd.mN = ld.mN / 2;
+//		ld.mN -= rd.mN;
+//		
+//		// copy keys
+//		void* src = ld.mKeys + mKeyOffsets[ld.mN];
+//		void* dst = rd.mKeys;
+//		uint32 n = mKeyOffsets[N] - mKeyOffsets[ld.mN];
+//		memcpy(dst, src, n);
+//		
+//		// copy data
+//		src = ld.mData + kM6IndexPageDataCount - N;
+//		dst = rd.mData + kM6IndexPageDataCount - rd.mN;
+//		n = rd.mN * sizeof(int64);
+//		memcpy(dst, src, n);
+//		
+//		// update rest
+//		rd.mFlags = ld.mFlags;
+//		rd.mLink = ld.mLink;
+//		ld.mLink = next.GetPageNr();
+//	}
+//	else
+//	{
+//		uint32 N = mData.mN - 1;
+//		rd.mN = N / 2;
+//		ld.mN = N - rd.mN;
+//		
+//		// copy keys
+//		void* src = ld.mKeys + mKeyOffsets[ld.mN + 1];
+//		void* dst = rd.mKeys;
+//		uint32 n = mKeyOffsets[N + 1] - mKeyOffsets[ld.mN + 1];
+//		memcpy(dst, src, n);
+//		
+//		// copy data
+//		src = ld.mData + kM6IndexPageDataCount - N - 1;
+//		dst = rd.mData + kM6IndexPageDataCount - rd.mN;
+//		n = rd.mN * sizeof(int64);
+//		memcpy(dst, src, n);
+//		
+//		// update rest
+//		rd.mFlags = ld.mFlags;
+//		rd.mLink = ld.mData[kM6IndexPageDataCount - ld.mN - 1];
+//	}
+//	
+//	// including the key offsets
+//	uint8* key = rd.mKeys;
+//	for (uint32 i = 0; i <= rd.mN; ++i)
+//	{
+//		assert(key <= rd.mKeys + kM6IndexPageSize);
+//		next.mKeyOffsets[i] = static_cast<uint16>(key - rd.mKeys);
+//		key += *key + 1;
+//	}
+//	
+//	outFirstKey = next.GetKey(0);
+//	outPageNr = next.GetPageNr();
+//
+//	mDirty = true;
+//}
+
+void M6IndexPage::Join(M6IndexPage& inPageRight)
+{
+	M6IndexPageData& ld = mData;
+	M6IndexPageData& rd = inPageRight.mData;
 	
 	// copy keys
-	void* src = ld.mKeys + mKeyOffsets[ld.mN];
-	void* dst = rd.mKeys;
-	uint32 n = mKeyOffsets[N] - mKeyOffsets[ld.mN];
+	void* dst = ld.mKeys + mKeyOffsets[ld.mN];
+	void* src = rd.mKeys;
+	uint32 n = inPageRight.mKeyOffsets[rd.mN];
 	memcpy(dst, src, n);
 	
 	// copy data
-	src = ld.mData + kM6IndexPageDataCount - N;
-	dst = rd.mData + kM6IndexPageDataCount - rd.mN;
+	dst = ld.mData + kM6IndexPageDataCount - ld.mN - rd.mN;
+	src = rd.mData + kM6IndexPageDataCount - rd.mN;
 	n = rd.mN * sizeof(int64);
 	memcpy(dst, src, n);
 	
 	// update rest
-	rd.mFlags = ld.mFlags;
-	rd.mLink = ld.mLink;
-	ld.mLink = next.GetPageNr();
+	if (IsLeaf())
+		ld.mLink = rd.mLink;
+	ld.mN += rd.mN;
 	
 	// including the key offsets
-	uint8* key = rd.mKeys;
-	for (uint32 i = 0; i <= rd.mN; ++i)
+	uint8* key = ld.mKeys;
+	for (uint32 i = 0; i <= ld.mN; ++i)
 	{
-		next.mKeyOffsets[i] = static_cast<uint16>(key - rd.mKeys);
+		mKeyOffsets[i] = static_cast<uint16>(key - ld.mKeys);
 		key += *key + 1;
-		assert(key <= rd.mKeys + kM6IndexPageSize);
+		assert(key <= ld.mKeys + kM6IndexPageSize);
 	}
 	
-	outFirstKey.assign(reinterpret_cast<char*>(rd.mKeys + 1), *rd.mKeys);
-	outPageNr = next.GetPageNr();
-
 	mDirty = true;
 }
 
 void M6IndexPage::Insert(const string& inKey, int64 inValue, uint32 inIndex)
 {
+	assert(inIndex <= mData.mN);
+	
 	if (inIndex < mData.mN)
 	{
 		uint8* src = mData.mKeys + mKeyOffsets[inIndex];
@@ -569,10 +843,10 @@ bool M6IndexPage::Find(const string& inKey, int64& outValue)
 		int d = mIndex.CompareKeys(inKey.c_str(), inKey.length(), k, *ko);
 		
 		// found ?
-		if (d == 0 and mData.mFlags & eM6IndexPageIsLeaf)
+		if (d == 0 and IsLeaf())
 		{
+			outValue = GetValue(i);
 			result = true;
-			outValue = mData.mData[kM6IndexPageDataCount - i - 1];
 			break;
 		}
 		else if (d < 0)
@@ -581,14 +855,17 @@ bool M6IndexPage::Find(const string& inKey, int64& outValue)
 			L = i + 1;
 	}
 	
-	if (not (mData.mFlags & eM6IndexPageIsLeaf))
+	if (IsLeaf() and result == false)
+		cerr << "not found" << endl;
+	
+	if (not IsLeaf())
 	{
 		uint32 pageNr;
 		
 		if (R < 0)
 			pageNr = mData.mLink;
 		else
-			pageNr = static_cast<uint32>(mData.mData[kM6IndexPageDataCount - R - 1]);
+			pageNr = GetValue32(R);
 		
 		M6IndexPage page(mIndex, pageNr);
 		result = page.Find(inKey, outValue);
@@ -672,10 +949,10 @@ void M6IndexImpl::Insert(const string& inKey, int64 inValue)
 {
 	M6IndexPage root(*this, mHeader.mRoot);
 	
-	string key;
-	int64 value;
+	string key(inKey);
+	int64 value(inValue);
 
-	if (root.Insert(inKey, inValue, key, value))
+	if (root.Insert(key, value))
 	{
 		// increase depth
 		++mHeader.mDepth;
@@ -687,6 +964,27 @@ void M6IndexImpl::Insert(const string& inKey, int64 inValue)
 
 	++mHeader.mSize;
 	mDirty = true;
+}
+
+void M6IndexImpl::Erase(const string& inKey)
+{
+//	M6IndexPage root(*this, mHeader.mRoot);
+//	
+//	string key;
+//	int64 value;
+//
+//	if (root.Insert(inKey, inValue, key, value))
+//	{
+//		// increase depth
+//		++mHeader.mDepth;
+//		
+//		// construct a new root page (using special constructor)
+//		M6IndexPage newRoot(*this, mHeader.mRoot, key, value);
+//		mHeader.mRoot = newRoot.GetPageNr();
+//	}
+//
+//	++mHeader.mSize;
+//	mDirty = true;
 }
 
 bool M6IndexImpl::Find(const string& inKey, int64& outValue)
@@ -851,6 +1149,17 @@ void M6IndexImpl::CreateUpLevels(deque<M6Tuple>& up)
 	mHeader.mRoot = static_cast<uint32>(up.front().value);
 }
 
+void M6IndexImpl::Validate()
+{
+	M6IndexPage root(*this, mHeader.mRoot);
+	root.Validate();
+	
+	uint32 n = 0;
+	for (M6BasicIndex::iterator i = Begin(); i != End(); ++i)
+		++n;
+	assert(n == mHeader.mSize);
+}
+
 M6BasicIndex::iterator M6IndexImpl::Begin()
 {
 	uint32 pageNr = mHeader.mRoot;
@@ -959,9 +1268,10 @@ M6BasicIndex::iterator M6BasicIndex::end() const
 void M6BasicIndex::insert(const string& key, int64 value)
 {
 	mImpl->Insert(key, value);
+	mImpl->Validate();
 }
 
-void M6BasicIndex::erasing(const string& key)
+void M6BasicIndex::erase(const string& key)
 {
 	mImpl->Erase(key);
 }

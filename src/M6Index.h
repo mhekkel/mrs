@@ -72,6 +72,7 @@ class M6BasicIndex
 	iterator		upper_bound(const std::string& inKey) const;
 	
 	void			insert(const std::string& inKey, int64 inValue);
+	void			erase(const std::string& inKey);
 	bool			find(const std::string& inKey, int64& outValue);
 
 	uint32			size() const;

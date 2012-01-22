@@ -159,6 +159,8 @@ class M6IndexPage
 	int				CompareKeys(uint32 inA, uint32 inB) const;
 
 	void			GetTuple(uint32 inIndex, M6Tuple& outTuple) const;
+	string			GetKey(uint32 inIndex) const;
+	int64			GetValue(uint32 inIndex) const;
 	bool			GetNext(uint32& ioPage, uint32& ioKey, M6Tuple& outTuple) const;
 
   private:
@@ -318,6 +320,19 @@ void M6IndexPage::GetTuple(uint32 inIndex, M6Tuple& outTuple) const
 	const uint8* key = mData.mKeys + mKeyOffsets[inIndex];
 	outTuple.key.assign(reinterpret_cast<const char*>(key) + 1, *key);
 	outTuple.value = mData.mData[kM6IndexPageDataCount - inIndex - 1];
+}
+
+inline string M6IndexPage::GetKey(uint32 inIndex) const
+{
+	assert(inIndex < mData.mN);
+	const uint8* key = mData.mKeys + mKeyOffsets[inIndex];
+	return string(reinterpret_cast<const char*>(key) + 1, *key);
+}
+
+inline int64 M6IndexPage::GetValue(uint32 inIndex) const
+{
+	assert(inIndex < mData.mN);
+	return mData.mData[kM6IndexPageDataCount - inIndex - 1];
 }
 
 bool M6IndexPage::GetNext(uint32& ioPage, uint32& ioIndex, M6Tuple& outTuple) const
@@ -696,54 +711,18 @@ void M6IndexImpl::Vacuum()
 		pageNr = page.GetLink();
 	}
 	
-	uint32 firstPage = pageNr;
-	deque<M6Tuple> up;
-
-	for (;;)
-	{
-		M6IndexPage page(*this, pageNr);
-		
-		M6Tuple tuple;
-		page.GetTuple(0, tuple);
-		tuple.value = page.GetPageNr();
-		up.push_back(tuple);
-		
-		if (page.GetLink() == 0)
-			break;
-		
-		M6IndexPage next(*this, page.GetLink());
-		assert(next.GetN() > 0);
-		
-		for (;;)
-		{
-			next.GetTuple(0, tuple);
-			if (not page.CanStore(tuple.key))
-			{
-				pageNr = next.GetPageNr();
-				break;
-			}
-			
-			page.Insert(tuple.key, tuple.value, page.GetN());
-			next.Erase(0);
-			
-			if (next.GetN() == 0)
-			{
-				page.SetLink(next.GetLink());
-				break;
-			}
-		}
-	}
-	
-	// reorder pages and keep an indirect array of reordered pages
+	// keep an indirect array of reordered pages
 	uint32 pageCount = static_cast<uint32>(mFile.Size() / kM6IndexPageSize) + 1;
 	vector<uint32> ix1(pageCount);
 	iota(ix1.begin(), ix1.end(), 0);
 	vector<uint32> ix2(ix1);
 
-	pageNr = firstPage;
+	deque<M6Tuple> up;
 	uint32 n = 1;
-	while (pageNr != 0)
+
+	for (;;)
 	{
+		pageNr = ix1[pageNr];
 		M6IndexPage page(*this, pageNr);
 		if (pageNr != n)
 		{
@@ -751,22 +730,44 @@ void M6IndexImpl::Vacuum()
 			swap(ix2[pageNr], ix2[n]);
 			page.MoveTo(n);
 		}
+
+		up.push_back(M6Tuple(page.GetKey(0), page.GetPageNr()));
+		uint32 link = page.GetLink();
 		
+		while (link != 0)
+		{
+			M6IndexPage next(*this, ix1[link]);
+			if (next.GetN() == 0)
+			{
+				link = next.GetLink();
+				continue;
+			}
+
+			string key = next.GetKey(0);
+			assert(key.compare(page.GetKey(page.GetN() - 1)) > 0);
+			if (not page.CanStore(key))
+				break;
+			
+			page.Insert(key, next.GetValue(0), page.GetN());
+			next.Erase(0);
+		}
+		
+		if (link == 0)
+		{
+			page.SetLink(0);
+			break;
+		}
+
+		pageNr = link;
+
 		++n;
-		pageNr = ix1[page.GetLink()];
-		assert(pageNr == 0 or pageNr >= n);
-		if (pageNr != 0)
-			page.SetLink(n);
+		page.SetLink(n);
 	}
-	
-	// update the up list
-	foreach (M6Tuple& tuple, up)
-		tuple.value = ix1[tuple.value];
 	
 	// OK, so we have all the pages on disk, in order.
 	// truncate the file (erasing the remaining pages)
 	// and rebuild the branches.
-	mFile.Truncate(n * kM6IndexPageSize);
+	mFile.Truncate((n + 1) * kM6IndexPageSize);
 	
 	CreateUpLevels(up);
 }
@@ -958,6 +959,11 @@ M6BasicIndex::iterator M6BasicIndex::end() const
 void M6BasicIndex::insert(const string& key, int64 value)
 {
 	mImpl->Insert(key, value);
+}
+
+void M6BasicIndex::erasing(const string& key)
+{
+	mImpl->Erase(key);
 }
 
 bool M6BasicIndex::find(const string& inKey, int64& outValue)

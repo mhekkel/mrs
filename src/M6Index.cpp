@@ -41,7 +41,7 @@ BOOST_STATIC_ASSERT(kM6IndexPageDataCount >= kM6MaxEntriesPerPage);
 
 enum {
 	eM6IndexPageIsLeaf		= (1 << 0),
-	eM6IndexPageBigEndian	= (1 << 1),
+	eM6IndexPageIsDirty		= (1 << 1),
 };
 
 struct M6IndexPageData
@@ -123,12 +123,11 @@ class M6IndexImpl
 
 	void			Validate();
 	void			Dump();
-	
-//	struct M6CachePageRef
-//	{
-//					operator*()
-//	};
 
+	// page cache
+	void			CachePage(uint32& inPageNr, M6IndexPageData*& outData);
+	void			ReleasePage(uint32 inPageNr, M6IndexPageData*& outData);
+	
   private:
 
 	void			CreateUpLevels(deque<M6Tuple>& up);
@@ -150,10 +149,8 @@ class M6IndexImpl
 class M6IndexPage
 {
   public:
-					M6IndexPage(M6IndexImpl& inIndex);
+					M6IndexPage(M6IndexImpl& inIndex, bool inIsLeaf);
 					M6IndexPage(M6IndexImpl& inIndex, uint32 inPageNr);
-					M6IndexPage(M6IndexImpl& inIndex,
-						uint32 inPreviousRoot, const string& inKey, int64 inValue);
 
 					// special constructor, splits off the right half of inLeft
 					M6IndexPage(M6IndexPage& inLeft, uint32 inAtIndex);
@@ -162,16 +159,16 @@ class M6IndexPage
 
 	void			AllocateNew(bool inLinkNewToOld = false);
 	
-	bool			IsLeaf() const					{ return mData.mFlags & eM6IndexPageIsLeaf; }
+	bool			IsLeaf() const					{ return mData->mFlags & eM6IndexPageIsLeaf; }
 	void			SetLeaf(bool isLeaf);
 	
-	uint32			GetN() const					{ return mData.mN; }
+	uint32			GetN() const					{ return mData->mN; }
 
-	uint32			Free() const					{ return kM6IndexPageKeySpace - mKeyOffsets[mData.mN] - mData.mN * sizeof(int64); }
-	bool			CanStore(const string& inKey)	{ return mData.mN < kM6MaxEntriesPerPage and Free() >= inKey.length() + 1 + sizeof(int64); }
+	uint32			Free() const					{ return kM6IndexPageKeySpace - mKeyOffsets[mData->mN] - mData->mN * sizeof(int64); }
+	bool			CanStore(const string& inKey)	{ return mData->mN < kM6MaxEntriesPerPage and Free() >= inKey.length() + 1 + sizeof(int64); }
 	
 	void			SetLink(int64 inLink);
-	uint32			GetLink() const					{ return mData.mLink; }
+	uint32			GetLink() const					{ return mData->mLink; }
 	
 	void			MoveTo(uint32 inPageNr);
 	
@@ -202,82 +199,56 @@ class M6IndexPage
 
 	void			Join(M6IndexPage& inPageRight);
 
-	void			Read();
-	void			Write();
-
 	M6IndexImpl&	mIndexImpl;
-	M6File&			mFile;
-	M6IndexPageData	mData;
+	M6IndexPageData*
+					mData;
 	uint16			mKeyOffsets[kM6MaxEntriesPerPage + 1];
 	uint32			mPageNr;
-	bool			mDirty;
 };
 
-M6IndexPage::M6IndexPage(M6IndexImpl& inIndex)
+M6IndexPage::M6IndexPage(M6IndexImpl& inIndex, bool inIsLeaf)
 	: mIndexImpl(inIndex)
-	, mFile(mIndexImpl.GetFile())
-	, mDirty(false)
+	, mData(nullptr)
 {
 	AllocateNew();
 	
 	// by default we create leaf pages.
-	mData.mFlags |= eM6IndexPageIsLeaf;
-	mDirty = true;
-}
-
-M6IndexPage::M6IndexPage(M6IndexImpl& inIndex,
-		uint32 inPreviousRoot, const string& inKey, int64 inValue)
-	: mIndexImpl(inIndex)
-	, mFile(mIndexImpl.GetFile())
-	, mDirty(false)
-{
-	AllocateNew();
-	
-	// init the data
-	mData.mLink = inPreviousRoot;
-	mData.mN = 1;
-	mData.mData[kM6IndexPageDataCount - 1] = net_swapper::swap(inValue);
-	mData.mKeys[0] = static_cast<uint8>(inKey.length());
-	memcpy(mData.mKeys + 1, inKey.c_str(), inKey.length());
-
-	mDirty = true;
+	if (inIsLeaf)
+		mData->mFlags |= eM6IndexPageIsLeaf;
+	mData->mFlags |= eM6IndexPageIsDirty;
 }
 
 M6IndexPage::M6IndexPage(M6IndexImpl& inIndex, uint32 inPageNr)
 	: mIndexImpl(inIndex)
-	, mFile(mIndexImpl.GetFile())
+	, mData(nullptr)
 	, mPageNr(inPageNr)
-	, mDirty(false)
 {
-	int64 offset = mPageNr * kM6IndexPageSize;
+	mIndexImpl.CachePage(mPageNr, mData);
 	
-	Read();
+	assert(mData->mN <= kM6MaxEntriesPerPage);
 	
-	assert(mData.mN <= kM6MaxEntriesPerPage);
-	
-	uint8* key = mData.mKeys;
-	for (uint32 i = 0; i <= mData.mN; ++i)
+	uint8* key = mData->mKeys;
+	for (uint32 i = 0; i <= mData->mN; ++i)
 	{
-		assert(key <= mData.mKeys + kM6IndexPageSize);
-		mKeyOffsets[i] = static_cast<uint16>(key - mData.mKeys);
+		assert(key <= mData->mKeys + kM6IndexPageSize);
+		mKeyOffsets[i] = static_cast<uint16>(key - mData->mKeys);
 		key += *key + 1;
 	}
 }
 
 M6IndexPage::M6IndexPage(M6IndexPage& inLeft, uint32 inOffset)
 	: mIndexImpl(inLeft.mIndexImpl)
-	, mFile(inLeft.mFile)
-	, mDirty(false)
+	, mData(nullptr)
 {
 	AllocateNew();
 	
 	// copy flags
-	mData.mFlags = inLeft.mData.mFlags;
+	mData->mFlags = inLeft.mData->mFlags;
 	
 	// leaf nodes are split differently from branch nodes
 	
-	M6IndexPageData& ld = inLeft.mData;
-	M6IndexPageData& rd = mData;
+	M6IndexPageData& ld = *inLeft.mData;
+	M6IndexPageData& rd = *mData;
 	
 	uint32 rlink = inLeft.GetValue32(inOffset - 1);
 	
@@ -320,67 +291,39 @@ M6IndexPage::M6IndexPage(M6IndexPage& inLeft, uint32 inOffset)
 		key += *key + 1;
 	}
 	
-	inLeft.mDirty = true;
-	mDirty = true;
+	inLeft.mData->mFlags |= eM6IndexPageIsDirty;
+	mData->mFlags |= eM6IndexPageIsDirty;
 }
 
 M6IndexPage::~M6IndexPage()
 {
-	if (mDirty)
-		Write();
-}
-
-void M6IndexPage::Read()
-{
-	mFile.PRead(&mData, sizeof(mData), mPageNr * kM6IndexPageSize);
-	
-	mData.mFlags = net_swapper::swap(mData.mFlags);
-	mData.mN = net_swapper::swap(mData.mN);
-	mData.mLink = net_swapper::swap(mData.mLink);
-	
-	mDirty = false;
-}
-
-void M6IndexPage::Write()
-{
-	mData.mFlags = net_swapper::swap(mData.mFlags);
-	mData.mN = net_swapper::swap(mData.mN);
-	mData.mLink = net_swapper::swap(mData.mLink);
-
-	mFile.PWrite(&mData, sizeof(mData), mPageNr * kM6IndexPageSize);
-
-	mData.mFlags = net_swapper::swap(mData.mFlags);
-	mData.mN = net_swapper::swap(mData.mN);
-	mData.mLink = net_swapper::swap(mData.mLink);
-
-	mDirty = false;
+	mIndexImpl.ReleasePage(mPageNr, mData);
 }
 
 void M6IndexPage::AllocateNew(bool inLinkNewToOld)
 {
-	int64 fileSize = mFile.Size();
-	uint16 newPageNr = static_cast<uint32>((fileSize - 1) / kM6IndexPageSize) + 1;
-	int64 offset = newPageNr * kM6IndexPageSize;
-	mFile.Truncate(offset + kM6IndexPageSize);
+	uint16 flags = 0;
+	
+	M6IndexPageData* newData;
+	uint32 newPageNr = 0;
+	mIndexImpl.CachePage(newPageNr, newData);
 	
 	if (inLinkNewToOld)
 	{
-		mData.mLink = newPageNr;
-		mDirty = true; 
+		mData->mLink = newPageNr;
+		mData->mFlags |= eM6IndexPageIsDirty;
 	}
 	
-	if (mDirty)
-		Write();
-	
+	if (mData != nullptr)
+	{
+		flags = mData->mFlags;
+		mIndexImpl.ReleasePage(mPageNr, mData);
+	}
+
+	mData = newData;
 	mPageNr = newPageNr;
 	
-	// clear the data
-	static const M6IndexPageData data = {};
-
-	uint16 flags = mData.mFlags;
-	mData = data;
-	if (inLinkNewToOld)
-		mData.mFlags = flags;
+	mData->mFlags = flags;
 	
 	mKeyOffsets[0] = 0;
 }
@@ -389,7 +332,7 @@ void M6IndexPage::Validate()
 {
 	if (not IsLeaf())
 	{
-		for (uint32 i = 0; i < mData.mN; ++i)
+		for (uint32 i = 0; i < mData->mN; ++i)
 		{
 			uint32 pageNr = GetValue32(i);
 
@@ -419,28 +362,28 @@ void M6IndexPage::Dump(int inLevel)
 
 	if (IsLeaf())
 	{
-		cout << prefix << "leaf page at " << mPageNr << "; N = " << mData.mN << ": [";
-		for (int i = 0; i < mData.mN; ++i)
-			cout << GetKey(i) << (i + 1 < mData.mN ? ", " : "");
+		cout << prefix << "leaf page at " << mPageNr << "; N = " << mData->mN << ": [";
+		for (int i = 0; i < mData->mN; ++i)
+			cout << GetKey(i) << (i + 1 < mData->mN ? ", " : "");
 		cout << "]" << endl;
 
-		if (mData.mLink)
+		if (mData->mLink)
 		{
-			M6IndexPage next(mIndexImpl, mData.mLink);
+			M6IndexPage next(mIndexImpl, mData->mLink);
 			cout << prefix << "  " << "link: " << next.GetKey(0) << endl;
 		}
 	}
 	else
 	{
-		cout << prefix << "branch page at " << mPageNr << "; N = " << mData.mN << ": {";
-		for (int i = 0; i < mData.mN; ++i)
-			cout << GetKey(i) << (i + 1 < mData.mN ? ", " : "");
+		cout << prefix << "branch page at " << mPageNr << "; N = " << mData->mN << ": {";
+		for (int i = 0; i < mData->mN; ++i)
+			cout << GetKey(i) << (i + 1 < mData->mN ? ", " : "");
 		cout << "}" << endl;
 
-		M6IndexPage link(mIndexImpl, mData.mLink);
+		M6IndexPage link(mIndexImpl, mData->mLink);
 		link.Dump(inLevel + 1);
 		
-		for (int i = 0; i < mData.mN; ++i)
+		for (int i = 0; i < mData->mN; ++i)
 		{
 			cout << prefix << i << ") " << GetKey(i) << endl;
 			
@@ -455,8 +398,8 @@ void M6IndexPage::SetLink(int64 inLink)
 	if (inLink > numeric_limits<uint32>::max())
 		THROW(("Invalid link value"));
 	
-	mData.mLink = static_cast<uint32>(inLink);
-	mDirty = true;
+	mData->mLink = static_cast<uint32>(inLink);
+	mData->mFlags |= eM6IndexPageIsDirty;
 }
 
 void M6IndexPage::MoveTo(uint32 inPageNr)
@@ -469,39 +412,39 @@ void M6IndexPage::MoveTo(uint32 inPageNr)
 		if (page.IsLeaf())
 		{
 			page.mPageNr = mPageNr;
-			page.mDirty = true;
+			page.mData->mFlags |= eM6IndexPageIsDirty;
 		}
 		
 		mPageNr = inPageNr;
-		mDirty = true;
+		mData->mFlags |= eM6IndexPageIsDirty;
 	}
 }
 
 void M6IndexPage::SetLeaf(bool inIsLeaf)
 {
 	if (inIsLeaf)
-		mData.mFlags |= eM6IndexPageIsLeaf;
+		mData->mFlags |= eM6IndexPageIsLeaf;
 	else
-		mData.mFlags &= ~eM6IndexPageIsLeaf;
+		mData->mFlags &= ~eM6IndexPageIsLeaf;
 }
 
 inline string M6IndexPage::GetKey(uint32 inIndex) const
 {
-	assert(inIndex < mData.mN);
-	const uint8* key = mData.mKeys + mKeyOffsets[inIndex];
+	assert(inIndex < mData->mN);
+	const uint8* key = mData->mKeys + mKeyOffsets[inIndex];
 	return string(reinterpret_cast<const char*>(key) + 1, *key);
 }
 
 inline int64 M6IndexPage::GetValue(uint32 inIndex) const
 {
-	assert(inIndex < mData.mN);
-	return net_swapper::swap(mData.mData[kM6IndexPageDataCount - inIndex - 1]);
+	assert(inIndex < mData->mN);
+	return net_swapper::swap(mData->mData[kM6IndexPageDataCount - inIndex - 1]);
 }
 
 inline uint32 M6IndexPage::GetValue32(uint32 inIndex) const
 {
-	assert(inIndex < mData.mN);
-	int64 v = net_swapper::swap(mData.mData[kM6IndexPageDataCount - inIndex - 1]);
+	assert(inIndex < mData->mN);
+	int64 v = net_swapper::swap(mData->mData[kM6IndexPageDataCount - inIndex - 1]);
 	if (v > numeric_limits<uint32>::max())
 		THROW(("Invalid value"));
 	return static_cast<uint32>(v);
@@ -517,14 +460,14 @@ bool M6IndexPage::GetNext(uint32& ioPage, uint32& ioIndex, M6Tuple& outTuple) co
 {
 	bool result = false;
 	++ioIndex;
-	if (ioIndex < mData.mN)
+	if (ioIndex < mData->mN)
 	{
 		result = true;
 		GetTuple(ioIndex, outTuple);
 	}
-	else if (mData.mLink != 0)
+	else if (mData->mLink != 0)
 	{
-		ioPage = mData.mLink;
+		ioPage = mData->mLink;
 		M6IndexPage next(mIndexImpl, ioPage);
 		ioIndex = 0;
 		next.GetTuple(ioIndex, outTuple);
@@ -545,12 +488,12 @@ bool M6IndexPage::Insert(string& ioKey, int64& ioValue)
 	bool result = false;
 
 	// Start by locating a position in the page
-	int32 L = 0, R = mData.mN - 1;
+	int32 L = 0, R = mData->mN - 1;
 	while (L <= R)
 	{
 		int32 i = (L + R) / 2;
 
-		const uint8* ko = mData.mKeys + mKeyOffsets[i];
+		const uint8* ko = mData->mKeys + mKeyOffsets[i];
 		const char* k = reinterpret_cast<const char*>(ko + 1);
 
 		int d = mIndexImpl.CompareKeys(ioKey.c_str(), ioKey.length(), k, *ko);
@@ -571,13 +514,13 @@ bool M6IndexPage::Insert(string& ioKey, int64& ioValue)
 		else
 		{
 			// create a new leaf page
-			uint32 split = mData.mN / 2 + 1;
+			uint32 split = mData->mN / 2 + 1;
 			M6IndexPage next(*this, split);
 			
-			if (ix <= mData.mN)
+			if (ix <= mData->mN)
 				InsertKeyValue(ioKey, ioValue, ix);
 			else
-				next.InsertKeyValue(ioKey, ioValue, ix - mData.mN);
+				next.InsertKeyValue(ioKey, ioValue, ix - mData->mN);
 			
 			ioKey = next.GetKey(0);
 			ioValue = next.GetPageNr();
@@ -590,9 +533,11 @@ bool M6IndexPage::Insert(string& ioKey, int64& ioValue)
 		uint32 pageNr;
 		
 		if (R < 0)
-			pageNr = mData.mLink;
+			pageNr = mData->mLink;
 		else
 			pageNr = GetValue32(R);
+
+		assert(pageNr);
 		
 		M6IndexPage page(mIndexImpl, pageNr);
 		if (page.Insert(ioKey, ioValue))
@@ -606,15 +551,15 @@ bool M6IndexPage::Insert(string& ioKey, int64& ioValue)
 				// the key needs to be inserted but it didn't fit
 				// so we need to split the page
 				
-				uint32 split = mData.mN / 2 + 1;
+				uint32 split = mData->mN / 2 + 1;
 				string up = GetKey(split);
 				
 				M6IndexPage next(*this, split + 1);
 				
-				if (ix <= mData.mN)
+				if (ix <= mData->mN)
 					InsertKeyValue(ioKey, ioValue, ix);
 				else
-					next.InsertKeyValue(ioKey, ioValue, ix - mData.mN - 1);
+					next.InsertKeyValue(ioKey, ioValue, ix - mData->mN - 1);
 				
 				ioKey = up;
 				ioValue = next.GetPageNr();
@@ -629,26 +574,26 @@ bool M6IndexPage::Insert(string& ioKey, int64& ioValue)
 
 void M6IndexPage::Erase(uint32 inIndex)
 {
-	assert(inIndex < mData.mN);
+	assert(inIndex < mData->mN);
 	
-	if (mData.mN > 1)
+	if (mData->mN > 1)
 	{
-		void* src = mData.mKeys + mKeyOffsets[inIndex + 1];
-		void* dst = mData.mKeys + mKeyOffsets[inIndex];
-		uint32 n = mKeyOffsets[mData.mN] - mKeyOffsets[inIndex + 1];
+		void* src = mData->mKeys + mKeyOffsets[inIndex + 1];
+		void* dst = mData->mKeys + mKeyOffsets[inIndex];
+		uint32 n = mKeyOffsets[mData->mN] - mKeyOffsets[inIndex + 1];
 		memmove(dst, src, n);
 		
-		src = mData.mData + kM6IndexPageDataCount - mData.mN;
-		dst = mData.mData + kM6IndexPageDataCount - mData.mN + 1;
-		n = (mData.mN - inIndex - 1) * sizeof(int64);
+		src = mData->mData + kM6IndexPageDataCount - mData->mN;
+		dst = mData->mData + kM6IndexPageDataCount - mData->mN + 1;
+		n = (mData->mN - inIndex - 1) * sizeof(int64);
 		memmove(dst, src, n);
 
-		for (int i = inIndex + 1; i < mData.mN; ++i)
-			mKeyOffsets[i] = mKeyOffsets[i - 1] + mData.mKeys[mKeyOffsets[i - 1]] + 1;
+		for (int i = inIndex + 1; i < mData->mN; ++i)
+			mKeyOffsets[i] = mKeyOffsets[i - 1] + mData->mKeys[mKeyOffsets[i - 1]] + 1;
 	}
 	
-	--mData.mN;
-	mDirty = true;
+	--mData->mN;
+	mData->mFlags |= eM6IndexPageIsDirty;
 }
 
 bool M6IndexPage::Erase(const string& inKey)
@@ -656,12 +601,12 @@ bool M6IndexPage::Erase(const string& inKey)
 	bool result = false;
 	
 	// Start by locating a position in the page
-	int L = 0, R = mData.mN - 1;
+	int L = 0, R = mData->mN - 1;
 	while (L <= R)
 	{
 		int i = (L + R) / 2;
 
-		const uint8* ko = mData.mKeys + mKeyOffsets[i];
+		const uint8* ko = mData->mKeys + mKeyOffsets[i];
 		const char* k = reinterpret_cast<const char*>(ko + 1);
 
 		int d = mIndexImpl.CompareKeys(inKey.c_str(), inKey.length(), k, *ko);
@@ -691,7 +636,7 @@ bool M6IndexPage::Erase(const string& inKey)
 		uint32 pageNr;
 		
 		if (R < 0)
-			pageNr = mData.mLink;
+			pageNr = mData->mLink;
 		else
 			pageNr = GetValue32(R);
 		
@@ -721,14 +666,14 @@ bool M6IndexPage::Erase(const string& inKey)
 				assert(R == -1 or GetKey(R) == inKey);
 				if (R == -1)
 				{
-					mData.mLink = GetValue32(0);
+					mData->mLink = GetValue32(0);
 					Erase(0);
 				}
 				else
 				{
 					if (page.IsLeaf())
 					{
-						uint32 leftNr = mData.mLink;
+						uint32 leftNr = mData->mLink;
 						if (R > 0)
 							leftNr = static_cast<uint32>(GetValue(R - 1));
 						M6IndexPage left(mIndexImpl, leftNr);
@@ -749,8 +694,8 @@ bool M6IndexPage::Erase(const string& inKey)
 
 void M6IndexPage::Join(M6IndexPage& inPageRight)
 {
-	M6IndexPageData& ld = mData;
-	M6IndexPageData& rd = inPageRight.mData;
+	M6IndexPageData& ld = *mData;
+	M6IndexPageData& rd = *inPageRight.mData;
 	
 	// copy keys
 	void* dst = ld.mKeys + mKeyOffsets[ld.mN];
@@ -778,39 +723,39 @@ void M6IndexPage::Join(M6IndexPage& inPageRight)
 		assert(key <= ld.mKeys + kM6IndexPageSize);
 	}
 	
-	mDirty = true;
+	mData->mFlags |= eM6IndexPageIsDirty;
 }
 
 void M6IndexPage::InsertKeyValue(const string& inKey, int64 inValue, uint32 inIndex)
 {
-	assert(inIndex <= mData.mN);
+	assert(inIndex <= mData->mN);
 	
-	if (inIndex < mData.mN)
+	if (inIndex < mData->mN)
 	{
-		void* src = mData.mKeys + mKeyOffsets[inIndex];
-		void* dst = mData.mKeys + mKeyOffsets[inIndex] + inKey.length() + 1;
+		void* src = mData->mKeys + mKeyOffsets[inIndex];
+		void* dst = mData->mKeys + mKeyOffsets[inIndex] + inKey.length() + 1;
 		
 		// shift keys
-		memmove(dst, src, mKeyOffsets[mData.mN] - mKeyOffsets[inIndex]);
+		memmove(dst, src, mKeyOffsets[mData->mN] - mKeyOffsets[inIndex]);
 		
 		// shift data
-		src = mData.mData + kM6IndexPageDataCount - mData.mN;
-		dst = mData.mData + kM6IndexPageDataCount - mData.mN - 1;
+		src = mData->mData + kM6IndexPageDataCount - mData->mN;
+		dst = mData->mData + kM6IndexPageDataCount - mData->mN - 1;
 		
-		memmove(dst, src, (mData.mN - inIndex) * sizeof(int64));
+		memmove(dst, src, (mData->mN - inIndex) * sizeof(int64));
 	}
 	
-	uint8* k = mData.mKeys + mKeyOffsets[inIndex];
+	uint8* k = mData->mKeys + mKeyOffsets[inIndex];
 	*k = static_cast<uint8>(inKey.length());
 	memcpy(k + 1, inKey.c_str(), *k);
-	mData.mData[kM6IndexPageDataCount - inIndex - 1] = net_swapper::swap(inValue);
-	++mData.mN;
+	mData->mData[kM6IndexPageDataCount - inIndex - 1] = net_swapper::swap(inValue);
+	++mData->mN;
 
 	// update key offsets
-	for (uint32 i = inIndex + 1; i <= mData.mN; ++i)
-		mKeyOffsets[i] = static_cast<uint16>(mKeyOffsets[i - 1] + mData.mKeys[mKeyOffsets[i - 1]] + 1);
+	for (uint32 i = inIndex + 1; i <= mData->mN; ++i)
+		mKeyOffsets[i] = static_cast<uint16>(mKeyOffsets[i - 1] + mData->mKeys[mKeyOffsets[i - 1]] + 1);
 
-	mDirty = true;
+	mData->mFlags |= eM6IndexPageIsDirty;
 }
 
 bool M6IndexPage::Find(const string& inKey, int64& outValue)
@@ -818,12 +763,12 @@ bool M6IndexPage::Find(const string& inKey, int64& outValue)
 	bool result = false;
 
 	// Start by locating a position in the page
-	int L = 0, R = mData.mN - 1;
+	int L = 0, R = mData->mN - 1;
 	while (L <= R)
 	{
 		int i = (L + R) / 2;
 
-		const uint8* ko = mData.mKeys + mKeyOffsets[i];
+		const uint8* ko = mData->mKeys + mKeyOffsets[i];
 		const char* k = reinterpret_cast<const char*>(ko + 1);
 
 		int d = mIndexImpl.CompareKeys(inKey.c_str(), inKey.length(), k, *ko);
@@ -846,7 +791,7 @@ bool M6IndexPage::Find(const string& inKey, int64& outValue)
 		uint32 pageNr;
 		
 		if (R < 0)
-			pageNr = mData.mLink;
+			pageNr = mData->mLink;
 		else
 			pageNr = GetValue32(R);
 		
@@ -870,7 +815,7 @@ M6IndexImpl::M6IndexImpl(M6BasicIndex& inIndex, const string& inPath, bool inCre
 		mFile.PWrite(&page, kM6IndexPageSize, 0);
 
 		// and create a root page to keep code simple
-		M6IndexPage root(*this);
+		M6IndexPage root(*this, true);
 
 		mHeader = page.mHeader;
 		mHeader.mRoot = root.GetPageNr();
@@ -900,7 +845,7 @@ M6IndexImpl::M6IndexImpl(M6BasicIndex& inIndex, const string& inPath,
 	// inData is sorted, so we start by writing out leaf pages:
 
 	// construct a new leaf page
-	M6IndexPage page(*this);
+	M6IndexPage page(*this, true);
 	
 	deque<M6Tuple> up;		// keep track of the nodes we have to create for the next levels
 	M6Tuple tuple;
@@ -930,6 +875,44 @@ M6IndexImpl::~M6IndexImpl()
 		mFile.PWrite(mHeader, 0);
 }
 
+void M6IndexImpl::CachePage(uint32& ioPageNr, M6IndexPageData*& ioData)
+{
+	ioData = new M6IndexPageData;
+	
+	if (ioPageNr == 0)
+	{
+		int64 fileSize = mFile.Size();
+		ioPageNr = static_cast<uint32>((fileSize - 1) / kM6IndexPageSize) + 1;
+		int64 offset = ioPageNr * kM6IndexPageSize;
+		mFile.Truncate(offset + kM6IndexPageSize);
+		
+		memset(ioData, 0, kM6IndexPageSize);
+	}
+	else
+	{
+		mFile.PRead(ioData, kM6IndexPageSize, ioPageNr * kM6IndexPageSize);
+
+		ioData->mFlags = net_swapper::swap(ioData->mFlags);
+		ioData->mN = net_swapper::swap(ioData->mN);
+		ioData->mLink = net_swapper::swap(ioData->mLink);
+	}
+}
+
+void M6IndexImpl::ReleasePage(uint32 inPageNr, M6IndexPageData*& ioData)
+{
+	if (ioData->mFlags & eM6IndexPageIsDirty)
+	{
+		ioData->mFlags = net_swapper::swap(ioData->mFlags);
+		ioData->mN = net_swapper::swap(ioData->mN);
+		ioData->mLink = net_swapper::swap(ioData->mLink);
+	
+		mFile.PWrite(ioData, kM6IndexPageSize, inPageNr * kM6IndexPageSize);
+	}
+
+	delete ioData;
+	ioData = nullptr;
+}
+
 void M6IndexImpl::Insert(const string& inKey, int64 inValue)
 {
 	//cout << "Insert " << inKey << endl;
@@ -947,8 +930,9 @@ void M6IndexImpl::Insert(const string& inKey, int64 inValue)
 		// increase depth
 		++mHeader.mDepth;
 
-		// construct a new root page (using special constructor)
-		M6IndexPage newRoot(*this, mHeader.mRoot, key, value);
+		M6IndexPage newRoot(*this, false);
+		newRoot.SetLink(mHeader.mRoot);
+		newRoot.InsertKeyValue(key, value, 0);
 		mHeader.mRoot = newRoot.GetPageNr();
 	}
 
@@ -1074,7 +1058,7 @@ void M6IndexImpl::CreateUpLevels(deque<M6Tuple>& up)
 		M6Tuple tuple = up.front();
 		up.pop_front();
 		
-		M6IndexPage page(*this);
+		M6IndexPage page(*this, false);
 		page.SetLeaf(false);
 		page.SetLink(tuple.value);
 		

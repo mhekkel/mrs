@@ -30,8 +30,8 @@ using namespace std::tr1;
 const uint32
 	kM6IndexPageSize = 128,
 	kM6IndexPageHeaderSize = 8,
-	kM6MaxEntriesPerPage = (kM6IndexPageSize - kM6IndexPageHeaderSize) / 12,	// keeps code simple
-//	kM6MaxEntriesPerPage = 3,
+//	kM6MaxEntriesPerPage = (kM6IndexPageSize - kM6IndexPageHeaderSize) / 12,	// keeps code simple
+	kM6MaxEntriesPerPage = 3,
 	kM6IndexPageKeySpace = kM6IndexPageSize - kM6IndexPageHeaderSize,
 	kM6IndexPageMinKeySpace = kM6IndexPageKeySpace / 4,
 	kM6IndexPageDataCount = (kM6IndexPageKeySpace / sizeof(int64));
@@ -580,9 +580,7 @@ bool M6IndexPage::Insert(string& ioKey, int64& ioValue)
 				// so we need to split the page
 				
 				uint32 split = mData.mN / 2 + 1;
-				
-				M6Tuple tuple;
-				GetTuple(split, tuple);
+				string up = GetKey(split);
 				
 				M6IndexPage next(*this, split + 1);
 				
@@ -591,7 +589,7 @@ bool M6IndexPage::Insert(string& ioKey, int64& ioValue)
 				else
 					next.Insert(ioKey, ioValue, ix - mData.mN - 1);
 				
-				ioKey = tuple.key;
+				ioKey = up;
 				ioValue = next.GetPageNr();
 				
 				result = true;
@@ -1187,13 +1185,9 @@ void M6IndexImpl::CreateUpLevels(deque<M6Tuple>& up)
 		page.SetLeaf(false);
 		page.SetLink(tuple.value);
 		
-		tuple = up.front();
-		up.pop_front();
-		page.Insert(tuple.key, tuple.value, 0);
-		
 		// store this new page for the next round
 		nextUp.push_back(M6Tuple(tuple.key, page.GetPageNr()));
-
+		
 		while (not up.empty())
 		{
 			tuple = up.front();
@@ -1211,6 +1205,7 @@ void M6IndexImpl::CreateUpLevels(deque<M6Tuple>& up)
 				// special case, if up.size() == 2 and we can store both
 				// keys, store them and break the loop
 				if (up.size() == 2 and
+					page.GetN() + 1 < kM6MaxEntriesPerPage and
 					page.Free() >= (up[0].key.length() + up[1].key.length() + 2 + 2 * sizeof(int64)))
 				{
 					page.Insert(up[0].key, up[0].value, page.GetN());
@@ -1232,11 +1227,7 @@ void M6IndexImpl::CreateUpLevels(deque<M6Tuple>& up)
 			page.AllocateNew();
 			page.SetLeaf(false);
 			page.SetLink(tuple.value);
-			up.pop_front();
-			
-			assert(up.size() >= 1);
 
-			tuple = up.front();
 			nextUp.push_back(M6Tuple(tuple.key, page.GetPageNr()));
 			up.pop_front();
 		}
@@ -1373,16 +1364,16 @@ void M6BasicIndex::insert(const string& key, int64 value)
 {
 	mImpl->Insert(key, value);
 
-	// validate
-	string k;
-	for (iterator i = begin(); i != end(); ++i)
-	{
-		assert(k < i->key);
-		k = i->key;
-	}
-
-	//mImpl->Dump();
-	mImpl->Validate();
+//	// validate
+//	string k;
+//	for (iterator i = begin(); i != end(); ++i)
+//	{
+//		assert(k < i->key);
+//		k = i->key;
+//	}
+//
+//	//mImpl->Dump();
+//	mImpl->Validate();
 }
 
 void M6BasicIndex::erase(const string& key)

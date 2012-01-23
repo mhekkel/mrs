@@ -8,6 +8,8 @@
 
 class M6IndexImpl;
 
+extern const uint32 kM6MaxKeyLength;
+
 struct M6Tuple
 {
 	std::string		key;

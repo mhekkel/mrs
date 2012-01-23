@@ -125,6 +125,7 @@ class M6IndexImpl
 	void			Dump();
 
 	// page cache
+#pragma message("Create AllocatePage")
 	void			CachePage(uint32& inPageNr, M6IndexPageData*& outData);
 	void			ReleasePage(uint32 inPageNr, M6IndexPageData*& outData);
 	
@@ -843,8 +844,6 @@ M6IndexImpl::M6IndexImpl(M6BasicIndex& inIndex, const string& inPath,
 	mFile.PWrite(mHeader, 0);
 	
 	// inData is sorted, so we start by writing out leaf pages:
-
-	// construct a new leaf page
 	M6IndexPage page(*this, true);
 	
 	deque<M6Tuple> up;		// keep track of the nodes we have to create for the next levels

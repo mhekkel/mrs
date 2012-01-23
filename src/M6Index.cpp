@@ -30,8 +30,8 @@ using namespace std::tr1;
 const uint32
 	kM6IndexPageSize = 128,
 	kM6IndexPageHeaderSize = 8,
-//	kM6MaxEntriesPerPage = (kM6IndexPageSize - kM6IndexPageHeaderSize) / 12,	// keeps code simple
-	kM6MaxEntriesPerPage = 3,
+	kM6MaxEntriesPerPage = (kM6IndexPageSize - kM6IndexPageHeaderSize) / 12,	// keeps code simple
+//	kM6MaxEntriesPerPage = 3,
 	kM6IndexPageKeySpace = kM6IndexPageSize - kM6IndexPageHeaderSize,
 	kM6IndexPageMinKeySpace = kM6IndexPageKeySpace / 4,
 	kM6IndexPageDataCount = (kM6IndexPageKeySpace / sizeof(int64));
@@ -580,8 +580,6 @@ bool M6IndexPage::Insert(string& ioKey, int64& ioValue)
 				// so we need to split the page
 				
 				uint32 split = mData.mN / 2 + 1;
-				//if (split == ix + 1)
-				//	--split;
 				
 				M6Tuple tuple;
 				GetTuple(split, tuple);

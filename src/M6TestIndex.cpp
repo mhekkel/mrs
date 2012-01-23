@@ -179,25 +179,25 @@ BOOST_AUTO_TEST_CASE(file_ix_3)
 	}
 	
 	BOOST_CHECK_EQUAL(nr, testix.size());
-
-	indx.Vacuum();
-
-	foreach (auto t, testix)
-	{
-		int64 v;
-		BOOST_CHECK(indx.find(t.first, v));
-		BOOST_CHECK_EQUAL(v, t.second);
-	}
-	
-	nr = 0;
-	//foreach (auto i, indx)
-	for (auto i = indx.begin(); i != indx.end(); ++i)
-	{
-//		cout << i->key << " -> " << i->value << endl;
-
-		BOOST_CHECK_EQUAL(testix[i->key], i->value);
-		++nr;
-	}
+//
+//	indx.Vacuum();
+//
+//	foreach (auto t, testix)
+//	{
+//		int64 v;
+//		BOOST_CHECK(indx.find(t.first, v));
+//		BOOST_CHECK_EQUAL(v, t.second);
+//	}
+//	
+//	nr = 0;
+//	//foreach (auto i, indx)
+//	for (auto i = indx.begin(); i != indx.end(); ++i)
+//	{
+////		cout << i->key << " -> " << i->value << endl;
+//
+//		BOOST_CHECK_EQUAL(testix[i->key], i->value);
+//		++nr;
+//	}
 	
 	BOOST_CHECK_EQUAL(nr, testix.size());
 }

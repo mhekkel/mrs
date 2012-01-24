@@ -29,7 +29,7 @@ using namespace std::tr1;
 // this boils down to 42.
 
 const uint32
-	kM6IndexPageSize = 2048,
+	kM6IndexPageSize = 8192,
 //	kM6IndexPageSize = 128,
 	kM6IndexPageHeaderSize = 8,
 	kM6MaxEntriesPerPage = (kM6IndexPageSize - kM6IndexPageHeaderSize) / 12,	// keeps code simple
@@ -116,8 +116,6 @@ class M6IndexImpl
 
 	uint32			Size() const				{ return mHeader.mSize; }
 	uint32			Depth() const				{ return mHeader.mDepth; }
-	
-	M6File&			GetFile()					{ return mFile; }
 	
 	int				CompareKeys(const char* inKeyA, size_t inKeyLengthA,
 						const char* inKeyB, size_t inKeyLengthB) const
@@ -860,6 +858,8 @@ M6IndexImpl::M6IndexImpl(M6BasicIndex& inIndex, const string& inPath,
 	, mIndex(inIndex)
 	, mDirty(false)
 {
+	mFile.Truncate(0);
+	
 	M6IxFileHeaderPage data = { kM6IndexFileSignature, sizeof(M6IxFileHeader) };
 	mFile.PWrite(&data, kM6IndexPageSize, 0);
 
@@ -885,6 +885,7 @@ M6IndexImpl::M6IndexImpl(M6BasicIndex& inIndex, const string& inPath,
 		}
 		
 		page.InsertKeyValue(tuple.key, tuple.value, page.GetN());
+		++mHeader.mSize;
 	}
 	
 	// all data is written in the leafs, now construct branch pages

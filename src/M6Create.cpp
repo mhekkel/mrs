@@ -12,12 +12,12 @@ int main(int argc, char* argv[])
 {
 	try
 	{
-		po::options_description desc("mrs-ws options");
+		po::options_description desc("m6-create options");
 		desc.add_options()
 			("help,h",								"Display help message")
 			("input,i",		po::value<string>(),	"Input file (one entry per line)")
 			("output,o",	po::value<string>(),	"Output file (defaults to input-file-name + .ix)")
-			("verbose,v",							"Be verbose")
+//			("verbose,v",							"Be verbose")
 			;
 
 		po::positional_options_description p;

@@ -1,13 +1,15 @@
 #include "M6Lib.h"
 
+#include <deque>
+#include <vector>
+#include <list>
+#include <numeric>
+#include <memory>
+
 #include <boost/static_assert.hpp>
 #include <boost/tr1/tuple.hpp>
 #include <boost/foreach.hpp>
 #define foreach BOOST_FOREACH
-
-#include <deque>
-#include <vector>
-#include <numeric>
 
 #include "M6Index.h"
 #include "M6Error.h"
@@ -29,8 +31,8 @@ using namespace std::tr1;
 const uint32
 	kM6IndexPageSize = 2048,
 	kM6IndexPageHeaderSize = 8,
-	kM6MaxEntriesPerPage = (kM6IndexPageSize - kM6IndexPageHeaderSize) / 12,	// keeps code simple
-//	kM6MaxEntriesPerPage = 3,
+//	kM6MaxEntriesPerPage = (kM6IndexPageSize - kM6IndexPageHeaderSize) / 12,	// keeps code simple
+	kM6MaxEntriesPerPage = 3,
 	kM6IndexPageKeySpace = kM6IndexPageSize - kM6IndexPageHeaderSize,
 	kM6IndexPageMinKeySpace = kM6IndexPageKeySpace / 4,
 	kM6MaxKeyLength = (255 < kM6IndexPageMinKeySpace ? 255 : kM6IndexPageMinKeySpace),
@@ -41,6 +43,7 @@ BOOST_STATIC_ASSERT(kM6IndexPageDataCount >= kM6MaxEntriesPerPage);
 enum {
 	eM6IndexPageIsLeaf		= (1 << 0),
 	eM6IndexPageIsDirty		= (1 << 1),
+	eM6IndexPageLocked		= (1 << 2),
 };
 
 struct M6IndexPageData
@@ -126,7 +129,8 @@ class M6IndexImpl
 	// page cache
 	void			AllocatePage(uint32& outPageNr, M6IndexPageData*& outData);
 	void			CachePage(uint32 inPageNr, M6IndexPageData*& outData);
-	void			ReleasePage(uint32 inPageNr, M6IndexPageData*& outData);
+	void			ReleasePage(uint32 inPageNr, M6IndexPageData*& inData);
+	void			SwapPages(uint32 inPageA, uint32 inPageB);
 	
   private:
 
@@ -136,12 +140,15 @@ class M6IndexImpl
 	M6BasicIndex&	mIndex;
 	M6IxFileHeader	mHeader;
 	bool			mDirty;
-//
-//	static const uint32 kM6LRUCacheSize = 10;
-//	
-//	M6IndexPageData	mCache[kM6LRUCacheSize];
-//	uint32			mCacheIx[kM6LRUCacheSize];
-//	uint32			mCacheCnt;
+
+	static const uint32 kM6LRUCacheSize = 10;
+	struct M6LRUCacheEntry
+	{
+		uint32				mPageNr;
+		M6IndexPageData*	mData;
+	};
+	
+	list<M6LRUCacheEntry>	mCache;
 };
 
 // --------------------------------------------------------------------
@@ -410,13 +417,12 @@ void M6IndexPage::MoveTo(uint32 inPageNr)
 	if (inPageNr != mPageNr)
 	{
 		M6IndexPage page(mIndexImpl, inPageNr);
-		
-		// only save page if it is a leaf
-		if (page.IsLeaf())
-		{
-			page.mPageNr = mPageNr;
+
+		mIndexImpl.SwapPages(mPageNr, inPageNr);
+
+		page.mPageNr = mPageNr;
+		if (page.IsLeaf())	// only save page if it is a leaf
 			page.mData->mFlags |= eM6IndexPageIsDirty;
-		}
 		
 		mPageNr = inPageNr;
 		mData->mFlags |= eM6IndexPageIsDirty;
@@ -875,18 +881,34 @@ M6IndexImpl::~M6IndexImpl()
 {
 	if (mDirty)
 		mFile.PWrite(mHeader, 0);
+
+	for (auto c = mCache.begin(); c != mCache.end(); ++c)
+	{
+		if (c->mData->mFlags & eM6IndexPageIsDirty)
+			THROW(("Page still dirty!"));
+
+		if (c->mData->mFlags & eM6IndexPageLocked)
+			THROW(("Page still locked!"));
+		
+		delete c->mData;
+	}
 }
 
 void M6IndexImpl::AllocatePage(uint32& outPageNr, M6IndexPageData*& ioData)
 {
-	ioData = new M6IndexPageData;
-	
 	int64 fileSize = mFile.Size();
 	outPageNr = static_cast<uint32>((fileSize - 1) / kM6IndexPageSize) + 1;
 	int64 offset = outPageNr * kM6IndexPageSize;
 	mFile.Truncate(offset + kM6IndexPageSize);
 	
+	M6LRUCacheEntry e;
+	e.mPageNr = outPageNr;
+	e.mData = ioData = new M6IndexPageData;
+	mCache.push_front(e);
+	
 	memset(ioData, 0, kM6IndexPageSize);
+	
+	ioData->mFlags |= eM6IndexPageLocked;
 }
 
 void M6IndexImpl::CachePage(uint32 inPageNr, M6IndexPageData*& ioData)
@@ -894,28 +916,102 @@ void M6IndexImpl::CachePage(uint32 inPageNr, M6IndexPageData*& ioData)
 	if (inPageNr == 0)
 		THROW(("Invalid page number"));
 	
-	ioData = new M6IndexPageData;
+	ioData = nullptr;
 	
-	mFile.PRead(ioData, kM6IndexPageSize, inPageNr * kM6IndexPageSize);
+	foreach (M6LRUCacheEntry& e, mCache)
+	{
+		if (e.mPageNr == inPageNr)
+		{
+			ioData = e.mData;
+			if (ioData->mFlags & eM6IndexPageLocked)
+				THROW(("Internal error, cache page is locked"));
+			break;
+		}
+	}
+	
+	if (ioData == nullptr)
+	{
+		M6LRUCacheEntry e;
+		e.mPageNr = inPageNr;
+		e.mData = ioData = new M6IndexPageData;
+		mCache.push_front(e);
+		
+		mFile.PRead(ioData, kM6IndexPageSize, inPageNr * kM6IndexPageSize);
+	
+		ioData->mFlags = net_swapper::swap(ioData->mFlags);
+		ioData->mN = net_swapper::swap(ioData->mN);
+		ioData->mLink = net_swapper::swap(ioData->mLink);
+	}
 
-	ioData->mFlags = net_swapper::swap(ioData->mFlags);
-	ioData->mN = net_swapper::swap(ioData->mN);
-	ioData->mLink = net_swapper::swap(ioData->mLink);
+	ioData->mFlags |= eM6IndexPageLocked;
+	
+	if (mCache.size() > kM6LRUCacheSize)
+	{
+		auto c = mCache.end();
+		while (c != mCache.begin())
+		{
+			--c;
+			if ((c->mData->mFlags & eM6IndexPageLocked) == 0)
+			{
+				delete c->mData;
+				mCache.erase(c);
+				break;
+			}
+		}
+	}
 }
 
 void M6IndexImpl::ReleasePage(uint32 inPageNr, M6IndexPageData*& ioData)
 {
+	// validation
+	bool found = false;
+	foreach (M6LRUCacheEntry& e, mCache)
+	{
+		if (e.mData == ioData and e.mPageNr == inPageNr)
+		{
+			found = true;
+			break;
+		}
+	}
+	
+	if (not found)
+		THROW(("Invalid page in release"));
+	
 	if (ioData->mFlags & eM6IndexPageIsDirty)
 	{
+		ioData->mFlags &= ~(eM6IndexPageIsDirty|eM6IndexPageLocked);
+
 		ioData->mFlags = net_swapper::swap(ioData->mFlags);
 		ioData->mN = net_swapper::swap(ioData->mN);
 		ioData->mLink = net_swapper::swap(ioData->mLink);
 	
 		mFile.PWrite(ioData, kM6IndexPageSize, inPageNr * kM6IndexPageSize);
-	}
 
-	delete ioData;
+		ioData->mFlags = net_swapper::swap(ioData->mFlags);
+		ioData->mN = net_swapper::swap(ioData->mN);
+		ioData->mLink = net_swapper::swap(ioData->mLink);
+	}
+	else
+		ioData->mFlags &= ~eM6IndexPageLocked;
+
 	ioData = nullptr;
+}
+
+void M6IndexImpl::SwapPages(uint32 inPageA, uint32 inPageB)
+{
+	list<M6LRUCacheEntry>::iterator a = mCache.end(), b = mCache.end(), i;
+	for (i = mCache.begin(); i != mCache.end(); ++i)
+	{
+		if (i->mPageNr == inPageA)
+			a = i;
+		if (i->mPageNr == inPageB)
+			b = i;
+	}
+	
+	if (a == mCache.end() or b == mCache.end())
+		THROW(("Invalid pages in SwapPages"));
+	
+	swap(a->mPageNr, b->mPageNr);
 }
 
 void M6IndexImpl::Insert(const string& inKey, int64 inValue)

@@ -66,6 +66,10 @@ int main(int argc, char* argv[])
 			};
 		
 		M6SimpleIndex indx(outfile, data);
+		
+		cout << "Created index with:" << endl
+			 << "  " << indx.size() << " entries" << endl
+			 << "  " << indx.depth() << " depth" << endl;
 	}
 	catch (exception& e)
 	{

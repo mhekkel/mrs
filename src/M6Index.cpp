@@ -29,7 +29,7 @@ using namespace std::tr1;
 // this boils down to 42.
 
 const uint32
-	kM6IndexPageSize = 16384,
+	kM6IndexPageSize = 8192,
 //	kM6IndexPageSize = 128,
 	kM6IndexPageHeaderSize = 8,
 	kM6MaxEntriesPerPage = (kM6IndexPageSize - kM6IndexPageHeaderSize) / 12,	// keeps code simple

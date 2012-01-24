@@ -1,5 +1,4 @@
 #include "M6Lib.h"
-#include "M6File.h"
 
 #include <boost/static_assert.hpp>
 #include <boost/tr1/tuple.hpp>
@@ -92,7 +91,7 @@ class M6IndexImpl
   public:
 	typedef M6BasicIndex::iterator	iterator;
 
-					M6IndexImpl(M6BasicIndex& inIndex, const string& inPath, bool inCreate);
+					M6IndexImpl(M6BasicIndex& inIndex, const string& inPath, MOpenMode inMode);
 					M6IndexImpl(M6BasicIndex& inIndex, const string& inPath,
 						M6SortedInputIterator& inData);
 					~M6IndexImpl();
@@ -125,8 +124,8 @@ class M6IndexImpl
 	void			Dump();
 
 	// page cache
-#pragma message("Create AllocatePage")
-	void			CachePage(uint32& inPageNr, M6IndexPageData*& outData);
+	void			AllocatePage(uint32& outPageNr, M6IndexPageData*& outData);
+	void			CachePage(uint32 inPageNr, M6IndexPageData*& outData);
 	void			ReleasePage(uint32 inPageNr, M6IndexPageData*& outData);
 	
   private:
@@ -224,6 +223,9 @@ M6IndexPage::M6IndexPage(M6IndexImpl& inIndex, uint32 inPageNr)
 	, mData(nullptr)
 	, mPageNr(inPageNr)
 {
+	if (mPageNr == 0)
+		THROW(("Invalid page number"));
+	
 	mIndexImpl.CachePage(mPageNr, mData);
 	
 	assert(mData->mN <= kM6MaxEntriesPerPage);
@@ -306,8 +308,8 @@ void M6IndexPage::AllocateNew(bool inLinkNewToOld)
 	uint16 flags = 0;
 	
 	M6IndexPageData* newData;
-	uint32 newPageNr = 0;
-	mIndexImpl.CachePage(newPageNr, newData);
+	uint32 newPageNr;
+	mIndexImpl.AllocatePage(newPageNr, newData);
 	
 	if (inLinkNewToOld)
 	{
@@ -805,12 +807,12 @@ bool M6IndexPage::Find(const string& inKey, int64& outValue)
 
 // --------------------------------------------------------------------
 
-M6IndexImpl::M6IndexImpl(M6BasicIndex& inIndex, const string& inPath, bool inCreate)
-	: mFile(inPath, inCreate ? eReadWrite : eReadOnly)
+M6IndexImpl::M6IndexImpl(M6BasicIndex& inIndex, const string& inPath, MOpenMode inMode)
+	: mFile(inPath, inMode)
 	, mIndex(inIndex)
 	, mDirty(false)
 {
-	if (inCreate)
+	if (inMode == eReadWrite and mFile.Size() == 0)
 	{
 		M6IxFileHeaderPage page = { kM6IndexFileSignature, sizeof(M6IxFileHeader) };
 		mFile.PWrite(&page, kM6IndexPageSize, 0);
@@ -821,6 +823,7 @@ M6IndexImpl::M6IndexImpl(M6BasicIndex& inIndex, const string& inPath, bool inCre
 		mHeader = page.mHeader;
 		mHeader.mRoot = root.GetPageNr();
 		mHeader.mDepth = 1;
+		mDirty = true;
 		
 		mFile.PWrite(mHeader, 0);
 	}
@@ -874,27 +877,30 @@ M6IndexImpl::~M6IndexImpl()
 		mFile.PWrite(mHeader, 0);
 }
 
-void M6IndexImpl::CachePage(uint32& ioPageNr, M6IndexPageData*& ioData)
+void M6IndexImpl::AllocatePage(uint32& outPageNr, M6IndexPageData*& ioData)
 {
 	ioData = new M6IndexPageData;
 	
-	if (ioPageNr == 0)
-	{
-		int64 fileSize = mFile.Size();
-		ioPageNr = static_cast<uint32>((fileSize - 1) / kM6IndexPageSize) + 1;
-		int64 offset = ioPageNr * kM6IndexPageSize;
-		mFile.Truncate(offset + kM6IndexPageSize);
-		
-		memset(ioData, 0, kM6IndexPageSize);
-	}
-	else
-	{
-		mFile.PRead(ioData, kM6IndexPageSize, ioPageNr * kM6IndexPageSize);
+	int64 fileSize = mFile.Size();
+	outPageNr = static_cast<uint32>((fileSize - 1) / kM6IndexPageSize) + 1;
+	int64 offset = outPageNr * kM6IndexPageSize;
+	mFile.Truncate(offset + kM6IndexPageSize);
+	
+	memset(ioData, 0, kM6IndexPageSize);
+}
 
-		ioData->mFlags = net_swapper::swap(ioData->mFlags);
-		ioData->mN = net_swapper::swap(ioData->mN);
-		ioData->mLink = net_swapper::swap(ioData->mLink);
-	}
+void M6IndexImpl::CachePage(uint32 inPageNr, M6IndexPageData*& ioData)
+{
+	if (inPageNr == 0)
+		THROW(("Invalid page number"));
+	
+	ioData = new M6IndexPageData;
+	
+	mFile.PRead(ioData, kM6IndexPageSize, inPageNr * kM6IndexPageSize);
+
+	ioData->mFlags = net_swapper::swap(ioData->mFlags);
+	ioData->mN = net_swapper::swap(ioData->mN);
+	ioData->mLink = net_swapper::swap(ioData->mLink);
 }
 
 void M6IndexImpl::ReleasePage(uint32 inPageNr, M6IndexPageData*& ioData)
@@ -1113,6 +1119,7 @@ void M6IndexImpl::CreateUpLevels(deque<M6Tuple>& up)
 	
 	assert(up.size() == 1);
 	mHeader.mRoot = static_cast<uint32>(up.front().value);
+	mDirty = true;
 }
 
 void M6IndexImpl::Validate()
@@ -1206,8 +1213,8 @@ M6BasicIndex::iterator& M6BasicIndex::iterator::operator++()
 
 // --------------------------------------------------------------------
 
-M6BasicIndex::M6BasicIndex(const string& inPath, bool inCreate)
-	: mImpl(new M6IndexImpl(*this, inPath, inCreate))
+M6BasicIndex::M6BasicIndex(const string& inPath, MOpenMode inMode)
+	: mImpl(new M6IndexImpl(*this, inPath, inMode))
 {
 }
 

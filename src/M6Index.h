@@ -6,6 +6,8 @@
 
 #include <boost/function.hpp>
 
+#include "M6File.h"
+
 class M6IndexImpl;
 
 extern const uint32 kM6MaxKeyLength;
@@ -26,7 +28,7 @@ class M6BasicIndex
 {
   public:
 
-					M6BasicIndex(const std::string& inPath, bool inCreate);
+					M6BasicIndex(const std::string& inPath, MOpenMode inMode);
 					M6BasicIndex(const std::string& inPath, M6SortedInputIterator& inData);
 
 	virtual			~M6BasicIndex();
@@ -36,6 +38,7 @@ class M6BasicIndex
 	virtual int		CompareKeys(const char* inKeyA, size_t inKeyLengthA,
 						const char* inKeyB, size_t inKeyLengthB) const = 0;
 
+	// TODO: rewrite iterator to be able to mutate value's directly
 	class iterator : public std::iterator<std::bidirectional_iterator_tag,const M6Tuple>
 	{
 	  public:
@@ -67,6 +70,9 @@ class M6BasicIndex
 		M6Tuple			mCurrent;
 	};
 	
+	// lame, but works for now (needed for boost::range)
+	typedef iterator const_iterator;
+	
 	iterator		begin() const;
 	iterator		end() const;
 	
@@ -89,8 +95,8 @@ template<class COMPARATOR> class M6Index : public M6BasicIndex
   public:
 	typedef COMPARATOR			M6Comparator;
 
-					M6Index(const std::string& inPath, bool inCreate)
-						: M6BasicIndex(inPath, inCreate) {}
+					M6Index(const std::string& inPath, MOpenMode inMode)
+						: M6BasicIndex(inPath, inMode) {}
 
 					M6Index(const std::string& inPath, M6SortedInputIterator& inData)
 						: M6BasicIndex(inPath, inData) {}

@@ -86,7 +86,7 @@ BOOST_AUTO_TEST_CASE(file_ix_1)
 
 	int64 nr = 1;
 	
-	M6SimpleIndex indx(filename, true);
+	M6SimpleIndex indx(filename, eReadWrite);
 	
 	foreach (const char* key, strings)
 		indx.insert(key, nr++);
@@ -103,7 +103,7 @@ BOOST_AUTO_TEST_CASE(file_ix_1)
 
 //BOOST_AUTO_TEST_CASE(file_ix_2)
 //{
-//	M6SimpleIndex indx(filename, false);
+//	M6SimpleIndex indx(filename, eReadOnly);
 //
 //	int64 nr = 1;
 //	foreach (const char* key, strings)
@@ -120,7 +120,7 @@ BOOST_AUTO_TEST_CASE(file_ix_3)
 	if (fs::exists(filename))
 		fs::remove(filename);
 
-	M6SimpleIndex indx(filename, true);
+	M6SimpleIndex indx(filename, eReadWrite);
 
 	ifstream text("../../../test/test-doc-2.txt");
 	BOOST_REQUIRE(text.is_open());
@@ -161,10 +161,9 @@ BOOST_AUTO_TEST_CASE(file_ix_3)
 	}
 	
 	nr = 0;
-	//foreach (auto i, indx)
-	for (auto i = indx.begin(); i != indx.end(); ++i)
+	foreach (const M6Tuple& i, indx)
 	{
-		BOOST_CHECK_EQUAL(testix[i->key], i->value);
+		BOOST_CHECK_EQUAL(testix[i.key], i.value);
 		++nr;
 	}
 	
@@ -180,16 +179,14 @@ BOOST_AUTO_TEST_CASE(file_ix_3)
 	}
 	
 	nr = 0;
-	//foreach (auto i, indx)
-	for (auto i = indx.begin(); i != indx.end(); ++i)
+	foreach (auto i, indx)
 	{
-//		cout << i->key << " -> " << i->value << endl;
-
-		BOOST_CHECK_EQUAL(testix[i->key], i->value);
+		BOOST_CHECK_EQUAL(testix[i.key], i.value);
 		++nr;
 	}
 	
 	BOOST_CHECK_EQUAL(nr, testix.size());
+	BOOST_CHECK_EQUAL(nr, indx.size());
 }
 
 BOOST_AUTO_TEST_CASE(file_ix_4)
@@ -242,11 +239,8 @@ BOOST_AUTO_TEST_CASE(file_ix_4)
 	}
 	
 	nr = 0;
-	//foreach (auto i, indx)
 	for (auto i = indx.begin(); i != indx.end(); ++i)
 	{
-//		cout << i->key << " -> " << i->value << endl;
-
 		BOOST_CHECK_EQUAL(testix[i->key], i->value);
 		++nr;
 	}
@@ -263,14 +257,51 @@ BOOST_AUTO_TEST_CASE(file_ix_4)
 	}
 	
 	nr = 0;
-	//foreach (auto i, indx)
 	for (auto i = indx.begin(); i != indx.end(); ++i)
 	{
-//		cout << i->key << " -> " << i->value << endl;
-
 		BOOST_CHECK_EQUAL(testix[i->key], i->value);
 		++nr;
 	}
 
+	BOOST_CHECK_EQUAL(nr, testix.size());
+}	
+
+BOOST_AUTO_TEST_CASE(file_ix_5)
+{
+	ifstream text("../../../test/test-doc-2.txt");
+	BOOST_REQUIRE(text.is_open());
+
+	map<string,int64> testix;
+
+	int64 nr = 1;
+	for (;;)
+	{
+		string word;
+		text >> word;
+
+		if (word.empty() and text.eof())
+			break;
+
+		ba::to_lower(word);
+		
+		testix[word] = nr++;
+	}
+	
+	M6SimpleIndex indx(filename, eReadWrite);
+
+	foreach (auto t, testix)
+	{
+		int64 v;
+		BOOST_CHECK(indx.find(t.first, v));
+		BOOST_CHECK_EQUAL(v, t.second);
+	}
+	
+	nr = 0;
+	foreach (auto i, indx)
+	{
+		BOOST_CHECK_EQUAL(testix[i.key], i.value);
+		++nr;
+	}
+	
 	BOOST_CHECK_EQUAL(nr, testix.size());
 }	

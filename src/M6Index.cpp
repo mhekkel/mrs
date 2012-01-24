@@ -29,11 +29,11 @@ using namespace std::tr1;
 // this boils down to 42.
 
 const uint32
-	//kM6IndexPageSize = 2048,
-	kM6IndexPageSize = 256,
+//	kM6IndexPageSize = 2048,
+	kM6IndexPageSize = 128,
 	kM6IndexPageHeaderSize = 8,
-	kM6MaxEntriesPerPage = (kM6IndexPageSize - kM6IndexPageHeaderSize) / 12,	// keeps code simple
-//	kM6MaxEntriesPerPage = 3,
+//	kM6MaxEntriesPerPage = (kM6IndexPageSize - kM6IndexPageHeaderSize) / 12,	// keeps code simple
+	kM6MaxEntriesPerPage = 3,
 	kM6IndexPageKeySpace = kM6IndexPageSize - kM6IndexPageHeaderSize,
 	kM6IndexPageMinKeySpace = kM6IndexPageKeySpace / 4,
 	kM6MaxKeyLength = (255 < kM6IndexPageMinKeySpace ? 255 : kM6IndexPageMinKeySpace),
@@ -241,6 +241,7 @@ M6IndexPage::M6IndexPage(M6IndexImpl& inIndex, uint32 inPageNr)
 		THROW(("Invalid page number"));
 	
 	mIndexImpl.CachePage(mPageNr, mData);
+	assert(mData->mFlags & eM6IndexPageLocked);
 	
 	assert(mData->mN <= kM6MaxEntriesPerPage);
 	
@@ -258,9 +259,12 @@ M6IndexPage::M6IndexPage(M6IndexPage& inLeft, uint32 inOffset)
 	, mData(nullptr)
 {
 	AllocateNew();
+	assert(mData->mFlags & eM6IndexPageLocked);
+	assert(mData->mFlags & eM6IndexPageIsDirty);
 	
-	// copy flags
-	mData->mFlags = inLeft.mData->mFlags;
+	// copy leaf flag
+	if (inLeft.mData->mFlags & eM6IndexPageIsLeaf)
+		mData->mFlags |= eM6IndexPageIsLeaf;
 	
 	// leaf nodes are split differently from branch nodes
 	
@@ -319,7 +323,7 @@ M6IndexPage::~M6IndexPage()
 
 void M6IndexPage::AllocateNew(bool inLinkNewToOld)
 {
-	uint16 flags = 0;
+	bool isLeaf = false;
 	
 	M6IndexPageData* newData;
 	uint32 newPageNr;
@@ -333,14 +337,17 @@ void M6IndexPage::AllocateNew(bool inLinkNewToOld)
 	
 	if (mData != nullptr)
 	{
-		flags = mData->mFlags;
+		isLeaf = mData->mFlags & eM6IndexPageIsLeaf;
 		mIndexImpl.ReleasePage(mPageNr, mData);
 	}
 
 	mData = newData;
 	mPageNr = newPageNr;
+	assert(mData->mFlags & eM6IndexPageLocked);
+	assert(mData->mFlags & eM6IndexPageIsDirty);
 	
-	mData->mFlags = flags;
+	if (isLeaf)
+		mData->mFlags |= eM6IndexPageIsLeaf;
 	
 	mKeyOffsets[0] = 0;
 }
@@ -915,7 +922,7 @@ void M6IndexImpl::AllocatePage(uint32& outPageNr, M6IndexPageData*& ioData)
 	
 	memset(ioData, 0, kM6IndexPageSize);
 	
-	ioData->mFlags |= eM6IndexPageLocked;
+	ioData->mFlags |= eM6IndexPageLocked | eM6IndexPageIsDirty;
 }
 
 void M6IndexImpl::CachePage(uint32 inPageNr, M6IndexPageData*& ioData)
@@ -947,21 +954,6 @@ void M6IndexImpl::CachePage(uint32 inPageNr, M6IndexPageData*& ioData)
 	}
 
 	ioData->mFlags |= eM6IndexPageLocked;
-	
-	if (mCache.size() > kM6LRUCacheSize)
-	{
-		auto c = mCache.end();
-		while (c != mCache.begin())
-		{
-			--c;
-			if ((c->mData->mFlags & eM6IndexPageLocked) == 0)
-			{
-				delete c->mData;
-				mCache.erase(c);
-				break;
-			}
-		}
-	}
 }
 
 void M6IndexImpl::ReleasePage(uint32 inPageNr, M6IndexPageData*& ioData)
@@ -989,6 +981,18 @@ void M6IndexImpl::ReleasePage(uint32 inPageNr, M6IndexPageData*& ioData)
 		ioData->mFlags &= ~eM6IndexPageLocked;
 
 	ioData = nullptr;
+
+	// clean up the cache, if needed
+	auto c = mCache.end();
+	while (c != mCache.begin() and mCache.size() > kM6LRUCacheSize)
+	{
+		--c;
+		if ((c->mData->mFlags & eM6IndexPageLocked) == 0)
+		{
+			delete c->mData;
+			c = mCache.erase(c);
+		}
+	}
 }
 
 void M6IndexImpl::SwapPages(uint32 inPageA, uint32 inPageB)
@@ -1010,11 +1014,6 @@ void M6IndexImpl::SwapPages(uint32 inPageA, uint32 inPageB)
 
 void M6IndexImpl::Insert(const string& inKey, int64 inValue)
 {
-	//cout << "Insert " << inKey << endl;
-	//
-	//if (inKey == "vaak")
-	//	cout << "stop" << endl;
-
 	M6IndexPage root(*this, mHeader.mRoot);
 	
 	string key(inKey);
@@ -1335,6 +1334,9 @@ M6BasicIndex::iterator M6BasicIndex::end() const
 
 void M6BasicIndex::insert(const string& key, int64 value)
 {
+	if (key.length() >= kM6MaxKeyLength)
+		THROW(("Invalid key length"));
+
 	mImpl->Insert(key, value);
 }
 

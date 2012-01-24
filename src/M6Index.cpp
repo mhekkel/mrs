@@ -29,10 +29,11 @@ using namespace std::tr1;
 // this boils down to 42.
 
 const uint32
-	kM6IndexPageSize = 2048,
+	//kM6IndexPageSize = 2048,
+	kM6IndexPageSize = 256,
 	kM6IndexPageHeaderSize = 8,
-//	kM6MaxEntriesPerPage = (kM6IndexPageSize - kM6IndexPageHeaderSize) / 12,	// keeps code simple
-	kM6MaxEntriesPerPage = 3,
+	kM6MaxEntriesPerPage = (kM6IndexPageSize - kM6IndexPageHeaderSize) / 12,	// keeps code simple
+//	kM6MaxEntriesPerPage = 3,
 	kM6IndexPageKeySpace = kM6IndexPageSize - kM6IndexPageHeaderSize,
 	kM6IndexPageMinKeySpace = kM6IndexPageKeySpace / 4,
 	kM6MaxKeyLength = (255 < kM6IndexPageMinKeySpace ? 255 : kM6IndexPageMinKeySpace),
@@ -56,6 +57,12 @@ struct M6IndexPageData
 		uint8	mKeys[kM6IndexPageKeySpace];
 		int64	mData[kM6IndexPageDataCount];
 	};
+
+	template<class Archive>
+	void serialize(Archive& ar)
+	{
+		ar & mFlags & mN & mLink & mKeys;
+	}
 };
 
 BOOST_STATIC_ASSERT(sizeof(M6IndexPageData) == kM6IndexPageSize);
@@ -936,11 +943,7 @@ void M6IndexImpl::CachePage(uint32 inPageNr, M6IndexPageData*& ioData)
 		e.mData = ioData = new M6IndexPageData;
 		mCache.push_front(e);
 		
-		mFile.PRead(ioData, kM6IndexPageSize, inPageNr * kM6IndexPageSize);
-	
-		ioData->mFlags = net_swapper::swap(ioData->mFlags);
-		ioData->mN = net_swapper::swap(ioData->mN);
-		ioData->mLink = net_swapper::swap(ioData->mLink);
+		mFile.PRead(*ioData, inPageNr * kM6IndexPageSize);
 	}
 
 	ioData->mFlags |= eM6IndexPageLocked;
@@ -980,16 +983,7 @@ void M6IndexImpl::ReleasePage(uint32 inPageNr, M6IndexPageData*& ioData)
 	if (ioData->mFlags & eM6IndexPageIsDirty)
 	{
 		ioData->mFlags &= ~(eM6IndexPageIsDirty|eM6IndexPageLocked);
-
-		ioData->mFlags = net_swapper::swap(ioData->mFlags);
-		ioData->mN = net_swapper::swap(ioData->mN);
-		ioData->mLink = net_swapper::swap(ioData->mLink);
-	
-		mFile.PWrite(ioData, kM6IndexPageSize, inPageNr * kM6IndexPageSize);
-
-		ioData->mFlags = net_swapper::swap(ioData->mFlags);
-		ioData->mN = net_swapper::swap(ioData->mN);
-		ioData->mLink = net_swapper::swap(ioData->mLink);
+		mFile.PWrite(*ioData, inPageNr * kM6IndexPageSize);
 	}
 	else
 		ioData->mFlags &= ~eM6IndexPageLocked;

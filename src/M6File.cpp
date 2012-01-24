@@ -204,28 +204,73 @@ void pread(MHandle inHandle, void* inBuffer, int64 inSize, int64 inOffset)
 
 #else
 
+#include <fcntl.h>
+
 MHandle open(const std::string& inFile, MOpenMode inMode)
 {
+	int mode;
+	
+	if (inMode == eReadWrite)
+		mode = O_RDWR | O_CREAT;
+	else
+		mode = O_RDONLY;
+
+	int fd = open(inFile.c_str(), mode, 0644);
+	if (fd < 0)
+		THROW(("Error opening file %s, %s", inFile.c_str(), strerror(errno)));
+	
+	return fd;
 }
 
 MHandle open_tempfile(const std::string& inFileNameTemplate)
 {
+//	char path[PATH_MAX] = {};
+//
+//	outPath = inDirectory / (inBaseName + ".XXXXXX");
+//	strcpy(path, outPath.string().c_str());
+//	
+//	int fd = ::mkstemp(path);
+//	if (fd < 0)
+//		THROW(("Error creating temporary file: %s", strerror(errno)));
+//
+//	outPath = path;
+//	
+//	return fd;
+	return -1;
 }
  
 void close(MHandle inHandle)
 {
+	::close(inHandle);
 }
 
 void truncate(MHandle inHandle, int64 inSize)
 {
+	int err = ftruncate(inHandle, inSize);
+	if (err < 0)
+		THROW(("truncate error: %s", strerror(errno)));
+}
+
+int64 file_size(MHandle inHandle)
+{
+	int64 size = lseek(inHandle, 0, SEEK_END);
+	if (size < 0)
+		THROW(("Error seeking file: %s", strerror(errno)));
+	return size;
 }
 
 void pwrite(MHandle inHandle, const void* inBuffer, int64 inSize, int64 inOffset)
 {
+	int64 result = ::pwrite(inHandle, inBuffer, inSize, inOffset);
+	if (result < 0)
+		THROW(("Error writing file: %s", strerror(errno)));
 }
 
 void pread(MHandle inHandle, void* inBuffer, int64 inSize, int64 inOffset)
 {
+	int64 result = ::pread(inHandle, inBuffer, inSize, inOffset);
+	if (result < 0)
+		THROW(("Error reading file: %s", strerror(errno)));
 }
 
 #endif

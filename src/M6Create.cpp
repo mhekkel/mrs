@@ -54,7 +54,7 @@ int main(int argc, char* argv[])
 					getline(in, line);
 
 					if (line.empty())
-						continue;
+						break;
 
 					outTuple.key = line;
 					outTuple.value = ++nr;

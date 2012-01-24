@@ -15,7 +15,11 @@
 #include "M6Error.h"
 
 #define BOOST_TEST_MAIN
+//#define BOOST_TEST_MODULE MyTest
+//#define BOOST_TEST_DYN_LINK
 #include <boost/test/unit_test.hpp>
+//#include <boost/test/minimal.hpp>
+//#include <boost/test/included/unit_test.hpp>
 
 using namespace std;
 namespace fs = boost::filesystem;
@@ -122,7 +126,7 @@ BOOST_AUTO_TEST_CASE(file_ix_3)
 
 	M6SimpleIndex indx(filename, eReadWrite);
 
-	ifstream text("../../../test/test-doc-2.txt");
+	ifstream text("test/test-doc-2.txt");
 	BOOST_REQUIRE(text.is_open());
 
 	map<string,int64> testix;
@@ -194,7 +198,7 @@ BOOST_AUTO_TEST_CASE(file_ix_4)
 	if (fs::exists(filename))
 		fs::remove(filename);
 
-	ifstream text("../../../test/test-doc-2.txt");
+	ifstream text("test/test-doc-2.txt");
 	BOOST_REQUIRE(text.is_open());
 
 	map<string,int64> testix;
@@ -268,7 +272,7 @@ BOOST_AUTO_TEST_CASE(file_ix_4)
 
 BOOST_AUTO_TEST_CASE(file_ix_5)
 {
-	ifstream text("../../../test/test-doc-2.txt");
+	ifstream text("test/test-doc-2.txt");
 	BOOST_REQUIRE(text.is_open());
 
 	map<string,int64> testix;

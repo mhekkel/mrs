@@ -29,11 +29,11 @@ using namespace std::tr1;
 // this boils down to 42.
 
 const uint32
-//	kM6IndexPageSize = 2048,
-	kM6IndexPageSize = 128,
+	kM6IndexPageSize = 2048,
+//	kM6IndexPageSize = 128,
 	kM6IndexPageHeaderSize = 8,
-//	kM6MaxEntriesPerPage = (kM6IndexPageSize - kM6IndexPageHeaderSize) / 12,	// keeps code simple
-	kM6MaxEntriesPerPage = 3,
+	kM6MaxEntriesPerPage = (kM6IndexPageSize - kM6IndexPageHeaderSize) / 12,	// keeps code simple
+//	kM6MaxEntriesPerPage = 3,
 	kM6IndexPageKeySpace = kM6IndexPageSize - kM6IndexPageHeaderSize,
 	kM6IndexPageMinKeySpace = kM6IndexPageKeySpace / 4,
 	kM6MaxKeyLength = (255 < kM6IndexPageMinKeySpace ? 255 : kM6IndexPageMinKeySpace),

@@ -1,4 +1,4 @@
-//	Basic index class
+//	Basic index class using B+ tree data structure
 //	
 //	
 

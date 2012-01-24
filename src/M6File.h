@@ -102,7 +102,7 @@ class M6FileReader
 		void operator()(M6File& inFile, T& value, int64 inOffset)
 		{
 			inFile.PRead(&value, sizeof(value), inOffset);
-			value = net_swapper::swap(value);
+			value = swap_bytes(value);
 		}
 	};
 	
@@ -143,7 +143,7 @@ class M6FileWriter
 	{
 		void operator()(M6File& inFile, const T& value, int64 inOffset)
 		{
-			T v = net_swapper::swap(value);
+			T v = swap_bytes(value);
 			inFile.PWrite(&v, sizeof(T), inOffset);
 		}
 	};

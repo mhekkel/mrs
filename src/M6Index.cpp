@@ -128,8 +128,10 @@ class M6IndexImpl
 						return mIndex.CompareKeys(inKeyA.c_str(), inKeyA.length(), inKeyB.c_str(), inKeyB.length());
 					}
 
+#if DEBUG
 	void			Validate();
 	void			Dump();
+#endif
 
 	// page cache
 	void			AllocatePage(uint32& outPageNr, M6IndexPageData*& outData);
@@ -201,8 +203,10 @@ class M6IndexPage
 
 	bool			GetNext(uint32& ioPage, uint32& ioKey, M6Tuple& outTuple) const;
 
+#if DEBUG
 	void			Validate();
 	void			Dump(int inLevel = 0);
+#endif
 
   private:
 
@@ -297,7 +301,7 @@ M6IndexPage::M6IndexPage(M6IndexPage& inLeft, uint32 inOffset)
 	}
 	else
 	{
-		rd.mLink = static_cast<uint32>(net_swapper::swap(ld.mData[kM6IndexPageDataCount - inOffset]));
+		rd.mLink = static_cast<uint32>(swap_bytes(ld.mData[kM6IndexPageDataCount - inOffset]));
 		ld.mN = inOffset - 1;
 	}
 	
@@ -350,71 +354,6 @@ void M6IndexPage::AllocateNew(bool inLinkNewToOld)
 	mKeyOffsets[0] = 0;
 }
 
-void M6IndexPage::Validate()
-{
-	if (not IsLeaf())
-	{
-		for (uint32 i = 0; i < mData->mN; ++i)
-		{
-			uint32 pageNr = GetValue32(i);
-
-			for (;;)
-			{
-				M6IndexPage page(mIndexImpl, pageNr);
-				if (page.IsLeaf())
-					break;
-				pageNr = page.GetLink();
-			}
-			
-			M6IndexPage page(mIndexImpl, pageNr);
-			if (GetKey(i) != page.GetKey(0))
-			{
-				cout << "Invalid tree" << endl;
-				abort();
-			}
-			
-			page.Validate();
-		}
-	}
-}
-
-void M6IndexPage::Dump(int inLevel)
-{
-	string prefix(inLevel * 2, ' ');
-
-	if (IsLeaf())
-	{
-		cout << prefix << "leaf page at " << mPageNr << "; N = " << mData->mN << ": [";
-		for (int i = 0; i < mData->mN; ++i)
-			cout << GetKey(i) << (i + 1 < mData->mN ? ", " : "");
-		cout << "]" << endl;
-
-		if (mData->mLink)
-		{
-			M6IndexPage next(mIndexImpl, mData->mLink);
-			cout << prefix << "  " << "link: " << next.GetKey(0) << endl;
-		}
-	}
-	else
-	{
-		cout << prefix << "branch page at " << mPageNr << "; N = " << mData->mN << ": {";
-		for (int i = 0; i < mData->mN; ++i)
-			cout << GetKey(i) << (i + 1 < mData->mN ? ", " : "");
-		cout << "}" << endl;
-
-		M6IndexPage link(mIndexImpl, mData->mLink);
-		link.Dump(inLevel + 1);
-		
-		for (int i = 0; i < mData->mN; ++i)
-		{
-			cout << prefix << i << ") " << GetKey(i) << endl;
-			
-			M6IndexPage sub(mIndexImpl, GetValue32(i));
-			sub.Dump(inLevel + 1);
-		}
-	}
-}
-
 void M6IndexPage::SetLink(int64 inLink)
 {
 	if (inLink > numeric_limits<uint32>::max())
@@ -459,19 +398,19 @@ inline string M6IndexPage::GetKey(uint32 inIndex) const
 inline int64 M6IndexPage::GetValue(uint32 inIndex) const
 {
 	assert(inIndex < mData->mN);
-	return net_swapper::swap(mData->mData[kM6IndexPageDataCount - inIndex - 1]);
+	return swap_bytes(mData->mData[kM6IndexPageDataCount - inIndex - 1]);
 }
 
 inline uint32 M6IndexPage::GetValue32(uint32 inIndex) const
 {
 	assert(inIndex < mData->mN);
-	int64 v = net_swapper::swap(mData->mData[kM6IndexPageDataCount - inIndex - 1]);
+	int64 v = swap_bytes(mData->mData[kM6IndexPageDataCount - inIndex - 1]);
 	if (v > numeric_limits<uint32>::max())
 		THROW(("Invalid value"));
 	return static_cast<uint32>(v);
 }
 
-void M6IndexPage::GetTuple(uint32 inIndex, M6Tuple& outTuple) const
+inline void M6IndexPage::GetTuple(uint32 inIndex, M6Tuple& outTuple) const
 {
 	outTuple.key = GetKey(inIndex);
 	outTuple.value = GetValue(inIndex);
@@ -696,7 +635,7 @@ bool M6IndexPage::Erase(const string& inKey)
 					{
 						uint32 leftNr = mData->mLink;
 						if (R > 0)
-							leftNr = static_cast<uint32>(GetValue(R - 1));
+							leftNr = GetValue32(R - 1);
 						M6IndexPage left(mIndexImpl, leftNr);
 						left.SetLink(page.GetLink());
 					}
@@ -769,7 +708,7 @@ void M6IndexPage::InsertKeyValue(const string& inKey, int64 inValue, uint32 inIn
 	uint8* k = mData->mKeys + mKeyOffsets[inIndex];
 	*k = static_cast<uint8>(inKey.length());
 	memcpy(k + 1, inKey.c_str(), *k);
-	mData->mData[kM6IndexPageDataCount - inIndex - 1] = net_swapper::swap(inValue);
+	mData->mData[kM6IndexPageDataCount - inIndex - 1] = swap_bytes(inValue);
 	++mData->mN;
 
 	// update key offsets
@@ -1079,7 +1018,7 @@ void M6IndexImpl::Vacuum()
 	}
 	
 	// keep an indirect array of reordered pages
-	uint32 pageCount = static_cast<uint32>(mFile.Size() / kM6IndexPageSize) + 1;
+	size_t pageCount = (mFile.Size() / kM6IndexPageSize) + 1;
 	vector<uint32> ix1(pageCount);
 	iota(ix1.begin(), ix1.end(), 0);
 	vector<uint32> ix2(ix1);
@@ -1212,22 +1151,6 @@ void M6IndexImpl::CreateUpLevels(deque<M6Tuple>& up)
 	mDirty = true;
 }
 
-void M6IndexImpl::Validate()
-{
-	M6IndexPage root(*this, mHeader.mRoot);
-	root.Validate();
-}
-
-void M6IndexImpl::Dump()
-{
-	cout << endl
-		 << "Dumping tree" << endl
-		 << endl;
-
-	M6IndexPage root(*this, mHeader.mRoot);
-	root.Dump(0);
-}
-
 M6BasicIndex::iterator M6IndexImpl::Begin()
 {
 	uint32 pageNr = mHeader.mRoot;
@@ -1283,6 +1206,7 @@ M6BasicIndex::iterator& M6BasicIndex::iterator::operator=(const iterator& iter)
 		mIndex = iter.mIndex;
 		mPage = iter.mPage;
 		mKeyNr = iter.mKeyNr;
+		mCurrent = iter.mCurrent;
 	}
 	
 	return *this;
@@ -1296,6 +1220,7 @@ M6BasicIndex::iterator& M6BasicIndex::iterator::operator++()
 		mIndex = nullptr;
 		mPage = 0;
 		mKeyNr = 0;
+		mCurrent = M6Tuple();
 	}
 
 	return *this;
@@ -1361,3 +1286,89 @@ uint32 M6BasicIndex::depth() const
 	return mImpl->Depth();
 }
 
+// DEBUG code
+
+#if DEBUG
+
+void M6IndexPage::Validate()
+{
+	if (not IsLeaf())
+	{
+		for (uint32 i = 0; i < mData->mN; ++i)
+		{
+			uint32 pageNr = GetValue32(i);
+
+			for (;;)
+			{
+				M6IndexPage page(mIndexImpl, pageNr);
+				if (page.IsLeaf())
+					break;
+				pageNr = page.GetLink();
+			}
+			
+			M6IndexPage page(mIndexImpl, pageNr);
+			if (GetKey(i) != page.GetKey(0))
+			{
+				cout << "Invalid tree" << endl;
+				abort();
+			}
+			
+			page.Validate();
+		}
+	}
+}
+
+void M6IndexPage::Dump(int inLevel)
+{
+	string prefix(inLevel * 2, ' ');
+
+	if (IsLeaf())
+	{
+		cout << prefix << "leaf page at " << mPageNr << "; N = " << mData->mN << ": [";
+		for (int i = 0; i < mData->mN; ++i)
+			cout << GetKey(i) << (i + 1 < mData->mN ? ", " : "");
+		cout << "]" << endl;
+
+		if (mData->mLink)
+		{
+			M6IndexPage next(mIndexImpl, mData->mLink);
+			cout << prefix << "  " << "link: " << next.GetKey(0) << endl;
+		}
+	}
+	else
+	{
+		cout << prefix << "branch page at " << mPageNr << "; N = " << mData->mN << ": {";
+		for (int i = 0; i < mData->mN; ++i)
+			cout << GetKey(i) << (i + 1 < mData->mN ? ", " : "");
+		cout << "}" << endl;
+
+		M6IndexPage link(mIndexImpl, mData->mLink);
+		link.Dump(inLevel + 1);
+		
+		for (int i = 0; i < mData->mN; ++i)
+		{
+			cout << prefix << i << ") " << GetKey(i) << endl;
+			
+			M6IndexPage sub(mIndexImpl, GetValue32(i));
+			sub.Dump(inLevel + 1);
+		}
+	}
+}
+
+void M6IndexImpl::Validate()
+{
+	M6IndexPage root(*this, mHeader.mRoot);
+	root.Validate();
+}
+
+void M6IndexImpl::Dump()
+{
+	cout << endl
+		 << "Dumping tree" << endl
+		 << endl;
+
+	M6IndexPage root(*this, mHeader.mRoot);
+	root.Dump(0);
+}
+
+#endif

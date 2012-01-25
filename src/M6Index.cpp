@@ -286,55 +286,25 @@ M6IndexPage::M6IndexPage(M6IndexPage& inLeft, uint32 inOffset)
 	// copy leaf flag
 	if (inLeft.mData->mFlags & eM6IndexPageIsLeaf)
 		mData->mFlags |= eM6IndexPageIsLeaf;
-	
-	// leaf nodes are split differently from branch nodes
-	
-	M6IndexPageData& ld = *inLeft.mData;
-	M6IndexPageData& rd = *mData;
-	
+
 	uint32 rlink = inLeft.GetValue32(inOffset - 1);
 	
-	uint32 N = ld.mN;
-	rd.mN = N - inOffset;
-	ld.mN = inOffset;
-	
-	// copy keys
-	void* src = ld.mKeys + inLeft.mKeyOffsets[ld.mN];
-	void* dst = rd.mKeys;
-	uint32 n = inLeft.mKeyOffsets[N] - inLeft.mKeyOffsets[ld.mN];
-	memcpy(dst, src, n);
-	
-	// copy data
-	src = ld.mData + kM6IndexPageDataCount - N;
-	dst = rd.mData + kM6IndexPageDataCount - rd.mN;
-	n = rd.mN * sizeof(int64);
-	memcpy(dst, src, n);
+	// leaf nodes are split differently from branch nodes
+	MoveEntries(inLeft, *this, inOffset, 0, inLeft.mData->mN - inOffset);
 	
 	// update rest
-	rd.mFlags = ld.mFlags;
+	mData->mFlags = inLeft.mData->mFlags;
 	
 	if (IsLeaf())
 	{
-		rd.mLink = ld.mLink;
-		ld.mLink = GetPageNr();
+		mData->mLink = inLeft.mData->mLink;
+		inLeft.mData->mLink = GetPageNr();
 	}
 	else
 	{
-		rd.mLink = static_cast<uint32>(swap_bytes(ld.mData[kM6IndexPageDataCount - inOffset]));
-		ld.mN = inOffset - 1;
+		mData->mLink = static_cast<uint32>(swap_bytes(inLeft.mData->mData[kM6IndexPageDataCount - inOffset]));
+		inLeft.mData->mN = inOffset - 1;
 	}
-	
-	// including the key offsets
-	uint8* key = rd.mKeys;
-	for (uint32 i = 0; i <= rd.mN; ++i)
-	{
-		assert(key <= rd.mKeys + kM6IndexPageSize);
-		mKeyOffsets[i] = static_cast<uint16>(key - rd.mKeys);
-		key += *key + 1;
-	}
-	
-	inLeft.mData->mFlags |= eM6IndexPageIsDirty;
-	mData->mFlags |= eM6IndexPageIsDirty;
 }
 
 M6IndexPage::~M6IndexPage()
@@ -385,43 +355,85 @@ void M6IndexPage::MoveEntries(M6IndexPage& inSrc, M6IndexPage& inDst,
 {
 	assert(inSrcOffset <= inSrc.mData->mN);
 	assert(inDstOffset <= inDst.mData->mN);
+	assert(inDstOffset + inCount <= kM6MaxEntriesPerPage);
 	
-	uint8* srcKeys = inSrc.mData->mKeys + inSrc.mKeyOffsets[inSrcOffset];
-	uint8* dstKeys = inDst.mData->mKeys + inDst.mKeyOffsets[inDstOffset];
+	// make room in dst first
+	if (inDstOffset < inDst.mData->mN)
+	{
+		// make room in dst by shifting entries
+		void* src = inDst.mData->mKeys + inDst.mKeyOffsets[inDstOffset];
+		void* dst = inDst.mData->mKeys + inDst.mKeyOffsets[inDstOffset + inCount];
+		uint32 n = inDst.mKeyOffsets[inDst.mData->mN] - inDst.mKeyOffsets[inDstOffset];
+		memmove(dst, src, n);
+		
+		src = inDst.mData->mData + kM6IndexPageDataCount - inDst.mData->mN;
+		dst = inDst.mData->mData + kM6IndexPageDataCount - inDst.mData->mN - inCount;
+		memmove(dst, src, (inDst.mData->mN - inDstOffset) * sizeof(int64));
+	}
 	
-	uint32 byteCount = inSrc.mKeyOffsets[inSrcOffset
+	// copy keys
+	void* src = inSrc.mData->mKeys + inSrc.mKeyOffsets[inSrcOffset];
+	void* dst = inDst.mData->mKeys + inDst.mKeyOffsets[inDstOffset];
 	
+	uint32 byteCount = inSrc.mKeyOffsets[inSrcOffset + inCount] -
+					   inSrc.mKeyOffsets[inSrcOffset];
+
+	assert(inSrc.mKeyOffsets[inSrcOffset] + byteCount <= kM6IndexPageKeySpace);
+	assert(byteCount + inCount * sizeof(int64) <= inDst.Free());
+
+	memcpy(dst, src, byteCount);
+	
+	// and data	
+	src = inSrc.mData->mData + kM6IndexPageDataCount - inSrc.mData->mN - inSrcOffset - inCount;
+	dst = inDst.mData->mData + kM6IndexPageDataCount - inDst.mData->mN - inDstOffset - inCount;
+	byteCount = inCount * sizeof(int64);
+	memcpy(dst, src, byteCount);
+	
+	// and finally move remaining data in src
+	if (inSrcOffset + inCount < inSrc.mData->mN)
+	{
+		void* src = inSrc.mData->mKeys + inSrc.mKeyOffsets[inSrcOffset + inCount];
+		void* dst = inSrc.mData->mKeys + inSrc.mKeyOffsets[inSrcOffset];
+		uint32 n = inSrc.mKeyOffsets[inSrc.mData->mN] - inSrc.mKeyOffsets[inSrcOffset + inCount];
+		memmove(dst, src, n);
+		
+		src = inSrc.mData->mData + kM6IndexPageDataCount - inSrc.mData->mN;
+		dst = inSrc.mData->mData + kM6IndexPageDataCount - inSrc.mData->mN - inCount;
+		memmove(dst, src, (inSrc.mData->mN - inSrcOffset - inCount) * sizeof(int64));
+	}
+	
+	inDst.mData->mN += inCount;
+	inSrc.mData->mN -= inCount;
+	
+	// update key offsets
+	uint8* key = inSrc.mData->mKeys + inSrc.mKeyOffsets[inSrcOffset];
+	for (int32 i = inSrcOffset; i <= inSrc.mData->mN; ++i)
+	{
+		assert(key <= inSrc.mData->mKeys + kM6IndexPageSize);
+		inSrc.mKeyOffsets[i] = static_cast<uint16>(key - inSrc.mData->mKeys);
+		key += *key + 1;
+	}
+
+	key = inDst.mData->mKeys + inDst.mKeyOffsets[inDstOffset];
+	for (int32 i = inDstOffset; i <= inDst.mData->mN; ++i)
+	{
+		assert(key <= inDst.mData->mKeys + kM6IndexPageSize);
+		inDst.mKeyOffsets[i] = static_cast<uint16>(key - inDst.mData->mKeys);
+		key += *key + 1;
+	}
+
+	inSrc.mData->mFlags |= eM6IndexPageIsDirty;
+	inDst.mData->mFlags |= eM6IndexPageIsDirty;
 }
 
 void M6IndexPage::Join(M6IndexPage& inRight, M6IndexPage& inParent, uint32 inIndex)
 {
-	// copy keys
-	void* src = inRight.mData->mKeys;
-	void* dst = mData->mKeys + mKeyOffsets[mData->mN];
-	uint32 n = inRight.mKeyOffsets[inRight.mData->mN];
-	memcpy(dst, src, n);
-	
-	// copy data
-	src = inRight.mData->mData + kM6IndexPageDataCount - inRight.mData->mN;
-	dst = mData->mData + kM6IndexPageDataCount - mData->mN - inRight.mData->mN;
-	n = inRight.mData->mN * sizeof(int64);
-	memcpy(dst, src, n);
-	
-	// including the key offsets
-	uint8* key = mData->mKeys + mKeyOffsets[mData->mN];
-	for (int32 i = mData->mN; i <= mData->mN + inRight.mData->mN; ++i)
-	{
-		assert(key <= mData->mKeys + kM6IndexPageSize);
-		mKeyOffsets[i] = static_cast<uint16>(key - mData->mKeys);
-		key += *key + 1;
-	}
-
-	mData->mN += inRight.mData->mN;
+	MoveEntries(inRight, *this, 0, mData->mN, inRight.mData->mN);
 	
 	if (IsLeaf())
 		mData->mLink = inRight.mData->mLink;
 
-	inParent->Erase(inIndex);
+	inParent.Erase(inIndex);
 	inRight.Deallocate();
 	
 	mData->mFlags |= eM6IndexPageIsDirty;
@@ -432,7 +444,7 @@ bool M6IndexPage::Underflow(M6IndexPage& inParent, M6IndexPage& inLeft, M6IndexP
 	// Page left of right contains too few entries, see if we can fix this
 	// first try a merge
 	if (inLeft.Free() + inRight.Free() >= kM6IndexPageKeySpace and
-		mData->mN + right.mData->mN <= kM6MaxEntriesPerPage)
+		inLeft.mData->mN + inRight.mData->mN <= kM6MaxEntriesPerPage)
 	{
 		inLeft.Join(inRight, inParent, inIndex);
 	}
@@ -463,46 +475,18 @@ bool M6IndexPage::Underflow(M6IndexPage& inParent, M6IndexPage& inLeft, M6IndexP
 			}
 			
 			// move the data
-
-			// copy keys
-			void* src = inRight.mData->mKeys;
-			void* dst = inLeft.mData->mKeys + inLeft.mKeyOffsets[inLeft.mData->mN];
-			uint32 n = inRight.mKeyOffsets[ln];
-			memcpy(dst, src, n);
-			
-			// copy data
-			src = inRight.mData->mData + kM6IndexPageDataCount - inRight.mData->mN;
-			dst = inLeft.mData->mData + kM6IndexPageDataCount - inLeft.mData->mN - inRight.mData->mN;
-			n = inRight.mData->mN * sizeof(int64);
-			memcpy(dst, src, n);
-			
-			// including the key offsets
-			uint8* key = inLeft.mData->mKeys + inLeft.mKeyOffsets[inLeft.mData->mN];
-			for (int32 i = inLeft.mData->mN; i <= inLeft.mData->mN + inRight.mData->mN; ++i)
-			{
-				assert(key <= inLeft.mData->mKeys + kM6IndexPageSize);
-				mKeyOffsets[i] = static_cast<uint16>(key - inLeft.mData->mKeys);
-				key += *key + 1;
-			}
-		
-			inLeft.mData->mN += ln;
-			inLeft.mData->mFlags |= eM6IndexPageIsDirty;
-
-			inRight.mData->mN -= ln;
-			inRight.mData->mFlags |= eM6IndexPageIsDirty;
+			MoveEntries(inRight, inLeft, 0, inLeft.mData->mN, ln);
 		}
 		
 		// Move one item from right to us, but only if the new key will fit in the parent
 		M6Tuple tuple0, tuple1;
-		right.GetTuple(0, tuple0);
-		right.GetTuple(1, tuple1);
+		inRight.GetTuple(0, tuple0);
+		inRight.GetTuple(1, tuple1);
 		
-		string pKey = inParent->GetKey(inIndex + 1);						
-		if (tuple1.key.length() <= pKey.length() or inParent->Free() >= tuple1.key.length() - pKey.length())
+		if (tuple1.key.length() <= pKey.length() or inParent.Free() >= tuple1.key.length() - pKey.length())
 		{
-			InsertKeyValue(tuple0.key, tuple0.value, mData->mN);
-			right.Erase(0);
-			inParent->ReplaceKey(inIndex + 1, tuple1.key);
+			MoveEntries(inRight, inLeft, 0, inLeft.mData->mN, 1);
+			inParent.ReplaceKey(inIndex, tuple1.key);
 		}
 	}
 	
@@ -836,7 +820,7 @@ bool M6IndexPage::Erase(string& ioKey, M6IndexPage* inParent, int32 inIndex)
 
 				// first see if we can merge with the sibling
 				if (Free() + right.Free() >= kM6IndexPageKeySpace and mData->mN + right.mData->mN <= kM6MaxEntriesPerPage)
-					Join(right, inParent, inIndex + 1);
+					Join(right, *inParent, inIndex + 1);
 				else if (right.mData->mN > 1)
 				{
 					// Move one item from right to us, but only if the new key will fit in the parent
@@ -861,7 +845,7 @@ bool M6IndexPage::Erase(string& ioKey, M6IndexPage* inParent, int32 inIndex)
 				
 				// first see if we can merge with the sibling
 				if (Free() + left.Free() >= kM6IndexPageKeySpace and mData->mN + left.mData->mN <= kM6MaxEntriesPerPage)
-					left.Join(*this, inParent, inIndex);
+					left.Join(*this, *inParent, inIndex);
 				else if (left.mData->mN > 1)
 				{
 					// Move one item from left to us, but only if the new key will fit in the parent
@@ -885,39 +869,15 @@ bool M6IndexPage::Erase(string& ioKey, M6IndexPage* inParent, int32 inIndex)
 	return result;
 }
 
-void M6IndexPage::Join(M6IndexPage& inPageRight)
-{
-	M6IndexPageData& ld = *mData;
-	M6IndexPageData& rd = *inPageRight.mData;
-	
-	// copy keys
-	void* dst = ld.mKeys + mKeyOffsets[ld.mN];
-	void* src = rd.mKeys;
-	uint32 n = inPageRight.mKeyOffsets[rd.mN];
-	memcpy(dst, src, n);
-	
-	// copy data
-	dst = ld.mData + kM6IndexPageDataCount - ld.mN - rd.mN;
-	src = rd.mData + kM6IndexPageDataCount - rd.mN;
-	n = rd.mN * sizeof(int64);
-	memcpy(dst, src, n);
-	
-	// update rest
-	if (IsLeaf())
-		ld.mLink = rd.mLink;
-	ld.mN += rd.mN;
-	
-	// including the key offsets
-	uint8* key = ld.mKeys;
-	for (uint32 i = 0; i <= ld.mN; ++i)
-	{
-		mKeyOffsets[i] = static_cast<uint16>(key - ld.mKeys);
-		key += *key + 1;
-		assert(key <= ld.mKeys + kM6IndexPageSize);
-	}
-	
-	mData->mFlags |= eM6IndexPageIsDirty;
-}
+//void M6IndexPage::Join(M6IndexPage& inPageRight)
+//{
+//	MoveEntries(inPageRight, *this, 0, inPageRight.mData->mN);
+//	
+//	// update rest
+//	if (IsLeaf())
+//		inLeft.mData->mLink = mData->mLink;
+//	inLeft.mData->mN += mData->mN;
+//}
 
 void M6IndexPage::InsertKeyValue(const string& inKey, int64 inValue, uint32 inIndex)
 {

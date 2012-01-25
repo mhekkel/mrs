@@ -155,6 +155,13 @@ BOOST_AUTO_TEST_CASE(file_ix_1a)
 		if (cin.eof() or i == 0)
 			break;
 		indx.erase((nf % i).str());
+
+		foreach (auto i, indx)
+		{
+			int64 v;
+			BOOST_CHECK(indx.find(i.key, v));
+			BOOST_CHECK_EQUAL(v, i.value);
+		}
 	}
 	
 //	indx.erase("d");

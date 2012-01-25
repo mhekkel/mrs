@@ -232,7 +232,8 @@ class M6IndexPage
 						uint32 inFromOffset, uint32 inToOffset, uint32 inCount);
 
 	static bool		Underflow(M6IndexPage& inParent, M6IndexPage& inLeft, M6IndexPage& inRight, uint32 inIndex);
-	void			Join(M6IndexPage& inRight, M6IndexPage& inParent, uint32 inIndex);
+	void			JoinLeaf(M6IndexPage& inRight, M6IndexPage& inParent, uint32 inIndex);
+	void			JoinBranch(M6IndexPage& inRight, M6IndexPage& inParent, uint32 inIndex);
 
 	M6IndexImpl&	mIndexImpl;
 	M6IndexPageData*
@@ -398,7 +399,7 @@ void M6IndexPage::MoveEntries(M6IndexPage& inSrc, M6IndexPage& inDst,
 		memmove(dst, src, n);
 		
 		src = inSrc.mData->mData + kM6IndexPageDataCount - inSrc.mData->mN;
-		dst = inSrc.mData->mData + kM6IndexPageDataCount - inSrc.mData->mN - inCount;
+		dst = inSrc.mData->mData + kM6IndexPageDataCount - inSrc.mData->mN + inCount;
 		memmove(dst, src, (inSrc.mData->mN - inSrcOffset - inCount) * sizeof(int64));
 	}
 	
@@ -426,7 +427,7 @@ void M6IndexPage::MoveEntries(M6IndexPage& inSrc, M6IndexPage& inDst,
 	inDst.mData->mFlags |= eM6IndexPageIsDirty;
 }
 
-void M6IndexPage::Join(M6IndexPage& inRight, M6IndexPage& inParent, uint32 inIndex)
+void M6IndexPage::JoinLeaf(M6IndexPage& inRight, M6IndexPage& inParent, uint32 inIndex)
 {
 	MoveEntries(inRight, *this, 0, mData->mN, inRight.mData->mN);
 	
@@ -446,7 +447,7 @@ bool M6IndexPage::Underflow(M6IndexPage& inParent, M6IndexPage& inLeft, M6IndexP
 	if (inLeft.Free() + inRight.Free() >= kM6IndexPageKeySpace and
 		inLeft.mData->mN + inRight.mData->mN <= kM6MaxEntriesPerPage)
 	{
-		inLeft.Join(inRight, inParent, inIndex);
+		inLeft.JoinLeaf(inRight, inParent, inIndex);
 	}
 	else		// redistribute the data
 	{
@@ -465,12 +466,12 @@ bool M6IndexPage::Underflow(M6IndexPage& inParent, M6IndexPage& inLeft, M6IndexP
 			
 			uint8* rk = inRight.mData->mKeys;
 			uint32 n = 0, ln = 0;
-			while (n < inRight.mData->mN and needed > *rk)
+			while (n < inRight.mData->mN and n + inLeft.mData->mN < kM6IndexPageDataCount and needed > *rk)
 			{
 				++n;
 				if ((*rk - pKeyLen + pFree) > 0)	// if the new first key of right fits in the parent
 					ln = n;							// we have a candidate
-				needed -= *rk;
+				needed -= *rk + sizeof(int64);
 				rk += *rk + 1;
 			}
 			
@@ -478,16 +479,16 @@ bool M6IndexPage::Underflow(M6IndexPage& inParent, M6IndexPage& inLeft, M6IndexP
 			MoveEntries(inRight, inLeft, 0, inLeft.mData->mN, ln);
 		}
 		
-		// Move one item from right to us, but only if the new key will fit in the parent
-		M6Tuple tuple0, tuple1;
-		inRight.GetTuple(0, tuple0);
-		inRight.GetTuple(1, tuple1);
-		
-		if (tuple1.key.length() <= pKey.length() or inParent.Free() >= tuple1.key.length() - pKey.length())
-		{
-			MoveEntries(inRight, inLeft, 0, inLeft.mData->mN, 1);
-			inParent.ReplaceKey(inIndex, tuple1.key);
-		}
+		//// Move one item from right to us, but only if the new key will fit in the parent
+		//M6Tuple tuple0, tuple1;
+		//inRight.GetTuple(0, tuple0);
+		//inRight.GetTuple(1, tuple1);
+		//
+		//if (tuple1.key.length() <= pKey.length() or inParent.Free() >= tuple1.key.length() - pKey.length())
+		//{
+		//	MoveEntries(inRight, inLeft, 0, inLeft.mData->mN, 1);
+		//	inParent.ReplaceKey(inIndex, tuple1.key);
+		//}
 	}
 	
 	return not (inLeft.TooSmall() or inRight.TooSmall());
@@ -817,25 +818,27 @@ bool M6IndexPage::Erase(string& ioKey, M6IndexPage* inParent, int32 inIndex)
 			{
 				// We've lost too many entries, try to compensate using our right sibling
 				M6IndexPage right(mIndexImpl, inParent->GetValue32(inIndex + 1));
-
-				// first see if we can merge with the sibling
-				if (Free() + right.Free() >= kM6IndexPageKeySpace and mData->mN + right.mData->mN <= kM6MaxEntriesPerPage)
-					Join(right, *inParent, inIndex + 1);
-				else if (right.mData->mN > 1)
-				{
-					// Move one item from right to us, but only if the new key will fit in the parent
-					M6Tuple tuple0, tuple1;
-					right.GetTuple(0, tuple0);
-					right.GetTuple(1, tuple1);
-					
-					string pKey = inParent->GetKey(inIndex + 1);						
-					if (tuple1.key.length() <= pKey.length() or inParent->Free() >= tuple1.key.length() - pKey.length())
-					{
-						InsertKeyValue(tuple0.key, tuple0.value, mData->mN);
-						right.Erase(0);
-						inParent->ReplaceKey(inIndex + 1, tuple1.key);
-					}
-				}
+				
+				Underflow(*inParent, *this, right, inIndex + 1);
+//
+//				// first see if we can merge with the sibling
+//				if (Free() + right.Free() >= kM6IndexPageKeySpace and mData->mN + right.mData->mN <= kM6MaxEntriesPerPage)
+//					JoinLeaf(right, *inParent, inIndex + 1);
+//				else if (right.mData->mN > 1)
+//				{
+//					// Move one item from right to us, but only if the new key will fit in the parent
+//					M6Tuple tuple0, tuple1;
+//					right.GetTuple(0, tuple0);
+//					right.GetTuple(1, tuple1);
+//					
+//					string pKey = inParent->GetKey(inIndex + 1);						
+//					if (tuple1.key.length() <= pKey.length() or inParent->Free() >= tuple1.key.length() - pKey.length())
+//					{
+//						InsertKeyValue(tuple0.key, tuple0.value, mData->mN);
+//						right.Erase(0);
+//						inParent->ReplaceKey(inIndex + 1, tuple1.key);
+//					}
+//				}
 			}
 			
 			// if we're still too small, try again with the left sibling, if it exists
@@ -843,23 +846,25 @@ bool M6IndexPage::Erase(string& ioKey, M6IndexPage* inParent, int32 inIndex)
 			{
 				M6IndexPage left(mIndexImpl, inIndex > 0 ? inParent->GetValue32(inIndex - 1) : inParent->GetLink());
 				
-				// first see if we can merge with the sibling
-				if (Free() + left.Free() >= kM6IndexPageKeySpace and mData->mN + left.mData->mN <= kM6MaxEntriesPerPage)
-					left.Join(*this, *inParent, inIndex);
-				else if (left.mData->mN > 1)
-				{
-					// Move one item from left to us, but only if the new key will fit in the parent
-					M6Tuple tuple;
-					left.GetTuple(left.mData->mN - 1, tuple);
-					
-					string pKey = inParent->GetKey(inIndex);						
-					if (tuple.key.length() <= pKey.length() or inParent->Free() >= tuple.key.length() - pKey.length())
-					{
-						InsertKeyValue(tuple.key, tuple.value, 0);
-						left.Erase(left.mData->mN - 1);
-						inParent->ReplaceKey(inIndex, tuple.key);
-					}
-				}
+				Underflow(*inParent, left, *this, inIndex);
+//				
+//				// first see if we can merge with the sibling
+//				if (Free() + left.Free() >= kM6IndexPageKeySpace and mData->mN + left.mData->mN <= kM6MaxEntriesPerPage)
+//					left.JoinLeaf(*this, *inParent, inIndex);
+//				else if (left.mData->mN > 1)
+//				{
+//					// Move one item from left to us, but only if the new key will fit in the parent
+//					M6Tuple tuple;
+//					left.GetTuple(left.mData->mN - 1, tuple);
+//					
+//					string pKey = inParent->GetKey(inIndex);						
+//					if (tuple.key.length() <= pKey.length() or inParent->Free() >= tuple.key.length() - pKey.length())
+//					{
+//						InsertKeyValue(tuple.key, tuple.value, 0);
+//						left.Erase(left.mData->mN - 1);
+//						inParent->ReplaceKey(inIndex, tuple.key);
+//					}
+//				}
 			}
 			
 			result = true;
@@ -868,16 +873,6 @@ bool M6IndexPage::Erase(string& ioKey, M6IndexPage* inParent, int32 inIndex)
 	
 	return result;
 }
-
-//void M6IndexPage::Join(M6IndexPage& inPageRight)
-//{
-//	MoveEntries(inPageRight, *this, 0, inPageRight.mData->mN);
-//	
-//	// update rest
-//	if (IsLeaf())
-//		inLeft.mData->mLink = mData->mLink;
-//	inLeft.mData->mN += mData->mN;
-//}
 
 void M6IndexPage::InsertKeyValue(const string& inKey, int64 inValue, uint32 inIndex)
 {

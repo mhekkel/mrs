@@ -36,6 +36,10 @@
 //#pragma comment ( lib, "libbz2" )
 //#pragma comment ( lib, "libz" )
 
+#if defined(_DEBUG)
+#	define DEBUG	1
+#endif
+
 #endif
 
 #include <boost/cstdint.hpp>

@@ -384,8 +384,8 @@ void M6IndexPage::MoveEntries(M6IndexPage& inSrc, M6IndexPage& inDst,
 	memcpy(dst, src, byteCount);
 	
 	// and data	
-	src = inSrc.mData->mData + kM6IndexPageDataCount - inSrc.mData->mN - inSrcOffset - inCount;
-	dst = inDst.mData->mData + kM6IndexPageDataCount - inDst.mData->mN - inDstOffset - inCount;
+	src = inSrc.mData->mData + kM6IndexPageDataCount - inSrcOffset - inCount;
+	dst = inDst.mData->mData + kM6IndexPageDataCount - inDstOffset - inCount;
 	byteCount = inCount * sizeof(int64);
 	memcpy(dst, src, byteCount);
 	
@@ -1520,7 +1520,8 @@ void M6IndexPage::Dump(int inLevel)
 	{
 		cout << prefix << "leaf page at " << mPageNr << "; N = " << mData->mN << ": [";
 		for (int i = 0; i < mData->mN; ++i)
-			cout << GetKey(i) << (i + 1 < mData->mN ? ", " : "");
+			cout << GetKey(i) << '(' << GetValue(i) << ')'
+				 << (i + 1 < mData->mN ? ", " : "");
 		cout << "]" << endl;
 
 		if (mData->mLink)

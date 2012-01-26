@@ -2,6 +2,7 @@
 #include <ios>
 #include <fstream>
 #include <map>
+#include <algorithm>
 
 #include <boost/filesystem.hpp>
 #include <zeep/xml/document.hpp>
@@ -25,6 +26,8 @@
 using namespace std;
 namespace fs = boost::filesystem;
 namespace ba = boost::algorithm;
+
+const char filename[] = "test.index";
 
 //BOOST_AUTO_TEST_CASE(start_up)
 //{
@@ -77,14 +80,13 @@ namespace ba = boost::algorithm;
 //	BOOST_CHECK_EQUAL(file.Size(), 7);
 //	BOOST_CHECK_EQUAL(fs::file_size(filename), 7);
 //}
-
-const char filename[] = "test.index";
-const char* strings[] = {
-	"a", "b", "c", "d", "e", "f", "g", "h",
-	"i", "j", "k",
-	"l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v",
-};
-
+//
+//const char* strings[] = {
+//	"a", "b", "c", "d", "e", "f", "g", "h",
+//	"i", "j", "k",
+//	"l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v",
+//};
+//
 //BOOST_AUTO_TEST_CASE(file_ix_1)
 //{
 //	if (fs::exists(filename))
@@ -115,51 +117,7 @@ const char* strings[] = {
 //	indx.validate();
 //	indx.dump();
 //}
-
-BOOST_AUTO_TEST_CASE(file_ix_1a)
-{
-	if (fs::exists(filename))
-		fs::remove(filename);
-
-	int64 nr = 0;
-
-	boost::format nf("%04.4d");
-	
-	M6SortedInputIterator data = 
-		[&nr, &nf](M6Tuple& outTuple) -> bool
-		{
-			bool result = false;
-			if (++nr <= 100)
-			{
-				outTuple.key = (nf % nr).str();
-				outTuple.value = nr;
-				result = true;
-			}
-			return result;
-		};	
-
-	M6SimpleIndex indx(filename, data);
-	indx.validate();
-	
-	for (;;)
-	{
-		cout << "> "; cout.flush();
-		int i;
-		cin >> i;
-		if (cin.eof() or i == 0)
-			break;
-		indx.erase((nf % i).str());
-		indx.validate();
-
-		foreach (auto i, indx)
-		{
-			int64 v;
-			BOOST_CHECK(indx.find(i.key, v));
-			BOOST_CHECK_EQUAL(v, i.value);
-		}
-	}
-}
-
+//
 //BOOST_AUTO_TEST_CASE(file_ix_2)
 //{
 //	M6SimpleIndex indx(filename, eReadOnly);
@@ -167,87 +125,122 @@ BOOST_AUTO_TEST_CASE(file_ix_1a)
 //	int64 nr = 1;
 //	foreach (const char* key, strings)
 //	{
-//		int64 v;
-//		BOOST_CHECK(indx.find(key, v));
+//		int64 v = nr;
+//		BOOST_CHECK_EQUAL(indx.find(key, v), not (*key == 'c' or *key == 'd' or *key == 'm'));
 //		BOOST_CHECK_EQUAL(v, nr);
 //		++nr;
 //	}
 //}
-//
-//BOOST_AUTO_TEST_CASE(file_ix_3)
-//{
-//	if (fs::exists(filename))
-//		fs::remove(filename);
-//
-//	M6SimpleIndex indx(filename, eReadWrite);
-//
-//	ifstream text("test/test-doc-2.txt");
-//	BOOST_REQUIRE(text.is_open());
-//
-//	map<string,int64> testix;
-//
-//	int64 nr = 1;
-//	for (;;)
-//	{
-//		string word;
-//		text >> word;
-//
-//		if (word.empty() and text.eof())
-//			break;
-//
-//		ba::to_lower(word);
-//		
-//		if (testix.find(word) != testix.end())
-//			continue;
-//
-//		//if (indx.find(word, v))
-//		//	continue;
-//		
-//		indx.insert(word, nr);
-//		testix[word] = nr;
-//
-//		++nr;
-//	}
-//	
-//	cout << "Created tree with " << indx.size()
-//		<< " keys and a depth of " << indx.depth() << endl;
-//
-//	foreach (auto t, testix)
-//	{
-//		int64 v;
-//		BOOST_CHECK(indx.find(t.first, v));
-//		BOOST_CHECK_EQUAL(v, t.second);
-//	}
-//	
-//	nr = 0;
-//	foreach (const M6Tuple& i, indx)
-//	{
-//		BOOST_CHECK_EQUAL(testix[i.key], i.value);
-//		++nr;
-//	}
-//	
-//	BOOST_CHECK_EQUAL(nr, testix.size());
-//
-//	indx.Vacuum();
-//
-//	foreach (auto t, testix)
-//	{
-//		int64 v;
-//		BOOST_CHECK(indx.find(t.first, v));
-//		BOOST_CHECK_EQUAL(v, t.second);
-//	}
-//	
-//	nr = 0;
-//	foreach (auto i, indx)
-//	{
-//		BOOST_CHECK_EQUAL(testix[i.key], i.value);
-//		++nr;
-//	}
-//	
-//	BOOST_CHECK_EQUAL(nr, testix.size());
-//	BOOST_CHECK_EQUAL(nr, indx.size());
-//}
-//
+
+BOOST_AUTO_TEST_CASE(file_ix_3)
+{
+	if (fs::exists(filename))
+		fs::remove(filename);
+
+	M6SimpleIndex indx(filename, eReadWrite);
+
+	ifstream text("test/test-doc-2.txt");
+	BOOST_REQUIRE(text.is_open());
+
+	map<string,int64> testix;
+
+	int64 nr = 1;
+	for (;;)
+	{
+		string word;
+		text >> word;
+
+		if (word.empty() and text.eof())
+			break;
+
+		ba::to_lower(word);
+		
+		if (testix.find(word) != testix.end())
+			continue;
+
+		//if (indx.find(word, v))
+		//	continue;
+		
+		indx.insert(word, nr);
+		testix[word] = nr;
+
+		++nr;
+	}
+	
+	cout << "Created tree with " << indx.size()
+		<< " keys and a depth of " << indx.depth() << endl;
+
+	foreach (auto t, testix)
+	{
+		int64 v;
+		BOOST_CHECK(indx.find(t.first, v));
+		BOOST_CHECK_EQUAL(v, t.second);
+	}
+	
+	nr = 0;
+	foreach (const M6Tuple& i, indx)
+	{
+		BOOST_CHECK_EQUAL(testix[i.key], i.value);
+		++nr;
+	}
+	
+	BOOST_CHECK_EQUAL(nr, testix.size());
+
+	indx.Vacuum();
+	indx.validate();
+
+	foreach (auto t, testix)
+	{
+		int64 v;
+		BOOST_CHECK(indx.find(t.first, v));
+		BOOST_CHECK_EQUAL(v, t.second);
+	}
+	
+	nr = 0;
+	foreach (auto i, indx)
+	{
+		BOOST_CHECK_EQUAL(testix[i.key], i.value);
+		++nr;
+	}
+	
+	BOOST_CHECK_EQUAL(nr, testix.size());
+	BOOST_CHECK_EQUAL(nr, indx.size());
+
+	// remove tests
+
+	indx.dump();
+
+	vector<string> keys;
+	foreach (auto k, testix)
+		keys.push_back(k.first);
+	random_shuffle(keys.begin(), keys.end());
+
+	ofstream backup("order-of-the-keys.txt");
+
+	copy(keys.begin(), keys.end(), ostream_iterator<string>(backup, "\n"));
+	backup.close();
+
+	for (auto key = keys.begin(); key != keys.end(); ++key)
+	{
+		cout << "erasing " << *key << endl;
+
+		if (*key == "zwevende")
+			cout << "stop" << endl;
+
+ 		indx.erase(*key);
+		indx.validate();
+
+		for (auto test = key + 1; test != keys.end(); ++test)
+		{
+			int64 v;
+			BOOST_CHECK(indx.find(*test, v));
+			BOOST_CHECK_EQUAL(v, testix[*test]);
+		}
+	}
+
+	BOOST_CHECK_EQUAL(indx.size(), 0);
+}
+
 //BOOST_AUTO_TEST_CASE(file_ix_4)
 //{
 //	if (fs::exists(filename))
@@ -289,6 +282,7 @@ BOOST_AUTO_TEST_CASE(file_ix_1a)
 //		};
 //	
 //	M6SimpleIndex indx(filename, data);
+//	indx.validate();
 //
 //	foreach (auto t, testix)
 //	{
@@ -307,6 +301,7 @@ BOOST_AUTO_TEST_CASE(file_ix_1a)
 //	BOOST_CHECK_EQUAL(nr, testix.size());
 //
 //	indx.Vacuum();
+//	indx.validate();
 //
 //	foreach (auto t, testix)
 //	{
@@ -323,6 +318,27 @@ BOOST_AUTO_TEST_CASE(file_ix_1a)
 //	}
 //
 //	BOOST_CHECK_EQUAL(nr, testix.size());
+//
+//	// remove tests
+//
+//	vector<string> keys;
+//	foreach (auto k, testix)
+//		keys.push_back(k.first);
+//	random_shuffle(keys.begin(), keys.end());
+//
+//	for (auto key = keys.begin(); key != keys.end(); ++key)
+//	{
+//		indx.erase(*key);
+//
+//		for (auto test = key; test != keys.end(); ++test)
+//		{
+//			int64 v;
+//			BOOST_CHECK(indx.find(*test, v));
+//			BOOST_CHECK_EQUAL(v, testix[*test]);
+//		}
+//	}
+//
+//	BOOST_CHECK_EQUAL(indx.size(), 0);
 //}	
 //
 //BOOST_AUTO_TEST_CASE(file_ix_5)
@@ -347,6 +363,7 @@ BOOST_AUTO_TEST_CASE(file_ix_1a)
 //	}
 //	
 //	M6SimpleIndex indx(filename, eReadWrite);
+//	indx.validate();
 //
 //	foreach (auto t, testix)
 //	{
@@ -364,3 +381,54 @@ BOOST_AUTO_TEST_CASE(file_ix_1a)
 //	
 //	BOOST_CHECK_EQUAL(nr, testix.size());
 //}	
+//
+//BOOST_AUTO_TEST_CASE(file_ix_1a)
+//{
+//	if (fs::exists(filename))
+//		fs::remove(filename);
+//
+//	int64 nr = 0;
+//
+//	boost::format nf("%04.4d");
+//	
+//	M6SortedInputIterator data = 
+//		[&nr, &nf](M6Tuple& outTuple) -> bool
+//		{
+//			bool result = false;
+//			if (++nr <= 100)
+//			{
+//				outTuple.key = (nf % nr).str();
+//				outTuple.value = nr;
+//				result = true;
+//			}
+//			return result;
+//		};	
+//
+//	M6SimpleIndex indx(filename, data);
+//	indx.validate();
+//	indx.dump();
+//	
+//	for (;;)
+//	{
+//		cout << "> "; cout.flush();
+//		int i;
+//		cin >> i;
+//		if (cin.eof() or i == 0)
+//			break;
+//			
+//		if (i > 0)
+//			indx.insert((nf % i).str(), i);
+//		else
+//			indx.erase((nf % -i).str());
+//
+//		indx.dump();
+//		indx.validate();
+//
+//		foreach (auto i, indx)
+//		{
+//			int64 v;
+//			BOOST_CHECK(indx.find(i.key, v));
+//			BOOST_CHECK_EQUAL(v, i.value);
+//		}
+//	}
+//}

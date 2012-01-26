@@ -86,6 +86,11 @@ class M6BasicIndex
 	uint32			size() const;
 	uint32			depth() const;
 
+#if DEBUG
+	void			dump() const;
+	void			validate() const;
+#endif
+
   protected:
 	M6IndexImpl*	mImpl;
 };

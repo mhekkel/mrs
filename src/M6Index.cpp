@@ -183,6 +183,8 @@ class M6IndexPage
 
 	uint32			GetPageNr() const				{ return mPageNr; }
 	void			MoveTo(uint32 inPageNr);
+	M6IndexBranchPage*
+					GetParent() const				{ return mParent; }
 
 	bool			IsLeaf() const					{ return mData->mFlags & eM6IndexPageIsLeaf; }
 	uint32			GetN() const					{ return mData->mN; }
@@ -273,6 +275,8 @@ class M6IndexBranchPage : public M6IndexPage
 	virtual bool	Erase(string& ioKey, int32 inIndex);
 
 	virtual bool	Underflow(M6IndexPage& inRight, uint32 inIndex);
+	
+	bool			UpdateLinkKey(const string& inNewKey, uint32 inPageNr);
 };
 
 // --------------------------------------------------------------------
@@ -663,36 +667,41 @@ bool M6IndexLeafPage::Erase(string& ioKey, int32 inIndex)
 		// erase the key at ix
 		EraseEntry(ix);
 		
-		if (ix == 0 and mParent != nullptr)	// need to pass on the new key
+		if (mParent != nullptr)
 		{
-			ioKey.clear();
-			if (mData->mN > 0)
-				ioKey = GetKey(0);
-			else if (mData->mLink != 0)
+			assert(mData->mN > 0);
+			if (ix == 0 and mData->mN > 0)	// need to pass on the new key
 			{
-				M6IndexPagePtr link(mIndexImpl.Cache(mData->mLink, mParent));
-				assert(link->GetN());
-				ioKey = link->GetKey(0);
+				if (not mParent->UpdateLinkKey(GetKey(0), mPageNr))
+				{
+					THROW(("To be implemented"));
+				}
 			}
-		}
 		
-		if (mParent != nullptr and TooSmall())
-		{							// we're not the root page and we've lost too many entries
-			if (inIndex + 1 < static_cast<int32>(mParent->GetN()))
-			{
-				// try to compensate using our right sibling
-				M6IndexPagePtr right(mIndexImpl.Cache(mParent->GetValue32(inIndex + 1), mParent));
-				Underflow(*right, inIndex + 1);
+			if (TooSmall())
+			{							// we're not the root page and we've lost too many entries
+				if (inIndex + 1 < static_cast<int32>(mParent->GetN()))
+				{
+					// try to compensate using our right sibling
+					M6IndexPagePtr right(mIndexImpl.Cache(mParent->GetValue32(inIndex + 1), mParent));
+					Underflow(*right, inIndex + 1);
+				}
+				
+				if (TooSmall() and inIndex >= 0)
+				{
+					// if still too small, try with the left sibling
+					uint32 leftNr;
+					if (inIndex > 0)
+						leftNr = mParent->GetValue32(inIndex - 1);
+					else
+						leftNr = mParent->GetLink();
+
+					M6IndexPagePtr left(mIndexImpl.Cache(leftNr, mParent));
+					left->Underflow(*this, inIndex);
+				}
+				
+				result = true;
 			}
-			
-			if (TooSmall() and inIndex >= 0)
-			{
-				// if still too small, try with the left sibling
-				M6IndexPagePtr left(mIndexImpl.Cache(inIndex > 0 ? mParent->GetValue32(inIndex - 1) : mParent->GetLink(), mParent));
-				left->Underflow(*this, inIndex);
-			}
-			
-			result = true;
 		}
 	}
 	
@@ -874,6 +883,8 @@ bool M6IndexBranchPage::Erase(string& ioKey, int32 inIndex)
 	M6IndexPagePtr page(mIndexImpl.Cache(pageNr, this));
 	if (page->Erase(ioKey, ix))
 	{
+		
+		
 		if (TooSmall() and mParent != nullptr)
 		{
 			if (inIndex + 1 < static_cast<int32>(mParent->GetN()))
@@ -894,14 +905,6 @@ bool M6IndexBranchPage::Erase(string& ioKey, int32 inIndex)
 		result = true;
 	}
 
-	if (match)
-	{
-		string key = GetKey(ix);
-		if (ioKey.length() > key.length() and Free() < ioKey.length() - key.length())
-			THROW(("Need to implement"));
-		ReplaceKey(ix, ioKey);
-	}
-	
 	return result;
 }
 
@@ -969,6 +972,41 @@ bool M6IndexBranchPage::Underflow(M6IndexPage& inRight, uint32 inIndex)
 //	}
 	
 	return not (TooSmall() or inRight.TooSmall());
+}
+
+bool M6IndexBranchPage::UpdateLinkKey(const string& inNewKey, uint32 inPageNr)
+{
+	bool result = true;
+	
+	// we are called by page 'inPageNr', if it is our link page, pass it on
+	if (inPageNr == mData->mLink)
+	{
+		if (mParent != nullptr)
+			result = mParent->UpdateLinkKey(inNewKey, mPageNr);
+	}
+	else
+	{
+		uint32 index = -1;
+		
+		for (int32 i = 0; i < mData->mN; ++i)
+		{
+			if (GetValue32(i) == inPageNr)
+			{
+				index = i;
+				break;
+			}
+		}
+		assert(index >= 0);
+		
+		string oldKey = GetKey(index);
+		int32 delta = static_cast<int32>(inNewKey.length() - oldKey.length());
+		if (delta < static_cast<int32>(Free()))
+			ReplaceKey(index, inNewKey);
+		else
+			result = false;
+	}
+	
+	return result;
 }
 
 // --------------------------------------------------------------------

@@ -84,7 +84,7 @@ const char* strings[] = {
 	"i", "j", "k",
 	"l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v",
 };
-//
+
 //BOOST_AUTO_TEST_CASE(file_ix_1)
 //{
 //	if (fs::exists(filename))
@@ -96,6 +96,8 @@ const char* strings[] = {
 //	
 //	foreach (const char* key, strings)
 //		indx.insert(key, nr++);
+//
+//	indx.validate();
 //
 //	nr = 1;
 //	foreach (const char* key, strings)
@@ -109,6 +111,9 @@ const char* strings[] = {
 //	indx.erase("c");
 //	indx.erase("d");
 //	indx.erase("m");
+//
+//	indx.validate();
+//	indx.dump();
 //}
 
 BOOST_AUTO_TEST_CASE(file_ix_1a)
@@ -134,6 +139,7 @@ BOOST_AUTO_TEST_CASE(file_ix_1a)
 		};	
 
 	M6SimpleIndex indx(filename, data);
+	indx.validate();
 	
 	for (;;)
 	{
@@ -143,6 +149,7 @@ BOOST_AUTO_TEST_CASE(file_ix_1a)
 		if (cin.eof() or i == 0)
 			break;
 		indx.erase((nf % i).str());
+		indx.validate();
 
 		foreach (auto i, indx)
 		{

@@ -324,7 +324,8 @@ void M6IndexPage::MoveEntries(M6IndexPage& inSrc, M6IndexPage& inDst,
 	{
 		// make room in dst by shifting entries
 		void* src = inDst.mData->mKeys + inDst.mKeyOffsets[inDstOffset];
-		void* dst = inDst.mData->mKeys + inDst.mKeyOffsets[inDstOffset + inCount];
+		void* dst = inDst.mData->mKeys + inDst.mKeyOffsets[inDstOffset] +
+			inSrc.mKeyOffsets[inSrcOffset + inCount] - inSrc.mKeyOffsets[inSrcOffset];
 		uint32 n = inDst.mKeyOffsets[inDst.mData->mN] - inDst.mKeyOffsets[inDstOffset];
 		memmove(dst, src, n);
 		
@@ -552,7 +553,7 @@ void M6IndexPage::EraseEntry(uint32 inIndex)
 		n = (mData->mN - inIndex - 1) * sizeof(int64);
 		memmove(dst, src, n);
 
-		for (int i = inIndex + 1; i < mData->mN; ++i)
+		for (int i = inIndex + 1; i <= mData->mN; ++i)
 			mKeyOffsets[i] = mKeyOffsets[i - 1] + mData->mKeys[mKeyOffsets[i - 1]] + 1;
 	}
 	
@@ -580,7 +581,7 @@ void M6IndexPage::ReplaceKey(uint32 inIndex, const string& inKey)
 	*k = static_cast<uint8>(inKey.length());
 	memcpy(k + 1, inKey.c_str(), inKey.length());
 
-	for (int i = inIndex + 1; i < mData->mN; ++i)
+	for (int i = inIndex + 1; i <= mData->mN; ++i)
 		mKeyOffsets[i] += delta;
 	
 	mData->mFlags |= eM6IndexPageIsDirty;
@@ -883,8 +884,6 @@ bool M6IndexBranchPage::Erase(string& ioKey, int32 inIndex)
 	M6IndexPagePtr page(mIndexImpl.Cache(pageNr, this));
 	if (page->Erase(ioKey, ix))
 	{
-		
-		
 		if (TooSmall() and mParent != nullptr)
 		{
 			if (inIndex + 1 < static_cast<int32>(mParent->GetN()))
@@ -1588,6 +1587,8 @@ void M6IndexPage::Validate(const string& inKey)
 	}
 	else
 	{
+		assert(mData->mN > 0);
+
 		for (uint32 i = 0; i < mData->mN; ++i)
 		{
 			M6IndexPagePtr link(mIndexImpl.Cache(mData->mLink, static_cast<M6IndexBranchPage*>(this)));

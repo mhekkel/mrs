@@ -224,18 +224,27 @@ BOOST_AUTO_TEST_CASE(file_ix_3)
 	{
 		cout << "erasing " << *key << endl;
 
-		if (*key == "zwevende")
+		if (*key == "beelden")
+			indx.dump();
+
+		if (*key == "new")
 			cout << "stop" << endl;
 
  		indx.erase(*key);
-		indx.validate();
 
-		for (auto test = key + 1; test != keys.end(); ++test)
+		if (*key == "beelden")
 		{
-			int64 v;
-			BOOST_CHECK(indx.find(*test, v));
-			BOOST_CHECK_EQUAL(v, testix[*test]);
+			//indx.dump();
+
+			indx.validate();
 		}
+
+//		for (auto test = key + 1; test != keys.end(); ++test)
+//		{
+//			int64 v;
+//			BOOST_CHECK(indx.find(*test, v));
+//			BOOST_CHECK_EQUAL(v, testix[*test]);
+//		}
 	}
 
 	BOOST_CHECK_EQUAL(indx.size(), 0);

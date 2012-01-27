@@ -139,7 +139,7 @@ BOOST_AUTO_TEST_CASE(file_ix_3)
 
 	M6SimpleIndex indx(filename, eReadWrite);
 
-	ifstream text("test/test-doc-2.txt");
+	ifstream text("test/test-doc.txt");
 	BOOST_REQUIRE(text.is_open());
 
 	map<string,int64> testix;
@@ -161,7 +161,9 @@ BOOST_AUTO_TEST_CASE(file_ix_3)
 		//if (indx.find(word, v))
 		//	continue;
 		
+		cout << word << endl;
 		indx.insert(word, nr);
+
 		testix[word] = nr;
 
 		++nr;
@@ -186,7 +188,8 @@ BOOST_AUTO_TEST_CASE(file_ix_3)
 	
 	BOOST_CHECK_EQUAL(nr, testix.size());
 
-	indx.Vacuum();
+//	indx.Vacuum();
+
 	indx.validate();
 
 	foreach (auto t, testix)
@@ -208,8 +211,6 @@ BOOST_AUTO_TEST_CASE(file_ix_3)
 
 	// remove tests
 
-	indx.dump();
-
 	vector<string> keys;
 	foreach (auto k, testix)
 		keys.push_back(k.first);
@@ -224,20 +225,14 @@ BOOST_AUTO_TEST_CASE(file_ix_3)
 	{
 		cout << "erasing " << *key << endl;
 
-		if (*key == "beelden")
-			indx.dump();
-
-		if (*key == "new")
-			cout << "stop" << endl;
-
  		indx.erase(*key);
 
-		if (*key == "beelden")
-		{
-			//indx.dump();
+		//if (*key == "beelden")
+		//{
+		//	//indx.dump();
 
-			indx.validate();
-		}
+		indx.validate();
+		//}
 
 //		for (auto test = key + 1; test != keys.end(); ++test)
 //		{

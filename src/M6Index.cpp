@@ -307,7 +307,7 @@ M6IndexPage::~M6IndexPage()
 
 void M6IndexPage::Deallocate()
 {
-	static const M6IndexPageData kEmpty = { eM6IndexPageIsEmpty | eM6IndexPageIsDirty };
+	static const M6IndexPageData kEmpty = { eM6IndexPageIsEmpty | eM6IndexPageIsDirty | eM6IndexPageLocked };
 	*mData = kEmpty;
 }
 
@@ -637,7 +637,7 @@ bool M6IndexLeafPage::Insert(string& ioKey, int64& ioValue)
 		// create a new leaf page
 		M6IndexPagePtr next(mIndexImpl.AllocateLeaf(mParent));
 	
-		uint32 split = (mData->mN + 1) / 2;
+		uint32 split = mData->mN / 2;
 
 		MoveEntries(*this, *next, split, 0, mData->mN - split);
 		next->SetLink(mData->mLink);
@@ -653,6 +653,9 @@ bool M6IndexLeafPage::Insert(string& ioKey, int64& ioValue)
 		
 		result = true;
 	}
+
+	assert(mData->mN >= kM6MinEntriesPerPage or mParent == nullptr);
+	assert(mData->mN <= kM6MaxEntriesPerPage);
 
 	return result;
 }
@@ -844,18 +847,46 @@ bool M6IndexBranchPage::Insert(string& ioKey, int64& ioValue)
 
 			M6IndexPagePtr next(mIndexImpl.AllocateBranch(mParent));
 			
-			uint32 split = (mData->mN + 1) / 2;
-			string upKey = GetKey(split);
-			uint32 downPage = GetValue32(split);
+			uint32 split = mData->mN / 2;
+			string upKey;
+			uint32 downPage;
 
-			MoveEntries(*this, *next, split + 1, 0, mData->mN - split - 1);
-			next->SetLink(downPage);
-			mData->mN -= 1;
+			if (ix == split)
+			{
+				upKey = ioKey;
+				downPage = ioValue;
 
-			if (ix <= mData->mN)
-				InsertKeyValue(ioKey, ioValue, ix);
+				MoveEntries(*this, *next, split, 0, mData->mN - split);
+			}
+			else if (ix < split)
+			{
+				--split;
+				upKey = GetKey(split);
+				downPage = GetValue32(split);
+
+				MoveEntries(*this, *next, split + 1, 0, mData->mN - split - 1);
+				mData->mN -= 1;
+
+				if (ix <= split)
+					InsertKeyValue(ioKey, ioValue, ix);
+				else
+					next->InsertKeyValue(ioKey, ioValue, ix - split - 1);
+			}
 			else
-				next->InsertKeyValue(ioKey, ioValue, ix - mData->mN - 1);
+			{
+				upKey = GetKey(split);
+				downPage = GetValue32(split);
+
+				MoveEntries(*this, *next, split + 1, 0, mData->mN - split - 1);
+				mData->mN -= 1;
+
+				if (ix < split)
+					InsertKeyValue(ioKey, ioValue, ix);
+				else
+					next->InsertKeyValue(ioKey, ioValue, ix - split - 1);
+			}
+
+			next->SetLink(downPage);
 			
 			ioKey = upKey;
 			ioValue = next->GetPageNr();
@@ -863,6 +894,9 @@ bool M6IndexBranchPage::Insert(string& ioKey, int64& ioValue)
 			result = true;
 		}
 	}
+
+	assert(mData->mN >= kM6MinEntriesPerPage or mParent == nullptr);
+	assert(mData->mN <= kM6MaxEntriesPerPage);
 
 	return result;
 }
@@ -1563,31 +1597,49 @@ uint32 M6BasicIndex::depth() const
 
 #if DEBUG
 
+class M6ValidationException : public std::exception
+{
+  public:
+					M6ValidationException(M6IndexPage* inPage, const char* inReason)
+						: mPageNr(inPage->GetPageNr()), mReason(inReason)
+					{
+					}
+			
+	const char*		what() throw() { return mReason.c_str(); }
+		
+	uint32			mPageNr;
+	string			mReason;
+};
+
+#define M6VALID_ASSERT(cond)	do { if (not (cond)) throw M6ValidationException(this, #cond ); } while (false)
+
 void M6IndexPage::Validate(const string& inKey)
 {
 	if (IsLeaf())
 	{
-		assert(mData->mN > 0);
-		assert(inKey.empty() or GetKey(0) == inKey);
+		M6VALID_ASSERT(mData->mN >= kM6MinEntriesPerPage or mParent == nullptr);
+		M6VALID_ASSERT(mData->mN <= kM6MaxEntriesPerPage);
+		M6VALID_ASSERT(inKey.empty() or GetKey(0) == inKey);
 		
 		for (uint32 i = 0; i < mData->mN; ++i)
 		{
 			if (i > 0)
 			{
-//				assert(GetValue(i) > GetValue(i - 1));
-				assert(mIndexImpl.CompareKeys(GetKey(i - 1), GetKey(i)) < 0);
+//				M6VALID_ASSERT(GetValue(i) > GetValue(i - 1));
+				M6VALID_ASSERT(mIndexImpl.CompareKeys(GetKey(i - 1), GetKey(i)) < 0);
 			}
 		}
 		
 		if (mData->mLink != 0)
 		{
 			M6IndexPagePtr next(mIndexImpl.Cache(mData->mLink, mParent));
-			assert(mIndexImpl.CompareKeys(GetKey(mData->mN - 1), next->GetKey(0)) < 0);
+			M6VALID_ASSERT(mIndexImpl.CompareKeys(GetKey(mData->mN - 1), next->GetKey(0)) < 0);
 		}
 	}
 	else
 	{
-		assert(mData->mN > 0);
+		M6VALID_ASSERT(mData->mN >= kM6MinEntriesPerPage or mParent == nullptr);
+		M6VALID_ASSERT(mData->mN <= kM6MaxEntriesPerPage);
 
 		for (uint32 i = 0; i < mData->mN; ++i)
 		{
@@ -1599,7 +1651,7 @@ void M6IndexPage::Validate(const string& inKey)
 				M6IndexPagePtr page(mIndexImpl.Cache(GetValue32(i), static_cast<M6IndexBranchPage*>(this)));
 				page->Validate(GetKey(i));
 				if (i > 0)
-					assert(mIndexImpl.CompareKeys(GetKey(i - 1), GetKey(i)) < 0);
+					M6VALID_ASSERT(mIndexImpl.CompareKeys(GetKey(i - 1), GetKey(i)) < 0);
 			}
 		}
 	}
@@ -1625,7 +1677,7 @@ void M6IndexPage::Dump(int inLevel)
 	}
 	else
 	{
-		cout << prefix << "branch page at " << mPageNr << "; N = " << mData->mN << ": {";
+		cout << prefix << (mParent ? "branch" : "root") << " page at " << mPageNr << "; N = " << mData->mN << ": {";
 		for (int i = 0; i < mData->mN; ++i)
 			cout << GetKey(i) << (i + 1 < mData->mN ? ", " : "");
 		cout << "}" << endl;
@@ -1635,7 +1687,7 @@ void M6IndexPage::Dump(int inLevel)
 		
 		for (int i = 0; i < mData->mN; ++i)
 		{
-			cout << prefix << i << ") " << GetKey(i) << endl;
+			cout << prefix << inLevel << '.' << i << ") " << GetKey(i) << endl;
 			
 			M6IndexPagePtr sub(mIndexImpl.Cache(GetValue32(i), static_cast<M6IndexBranchPage*>(this)));
 			sub->Dump(inLevel + 1);
@@ -1645,8 +1697,21 @@ void M6IndexPage::Dump(int inLevel)
 
 void M6IndexImpl::Validate()
 {
-	M6IndexPagePtr root(Cache(mHeader.mRoot, nullptr));
-	root->Validate("");
+	try
+	{
+		M6IndexPagePtr root(Cache(mHeader.mRoot, nullptr));
+		root->Validate("");
+	}
+	catch (M6ValidationException& e)
+	{
+		cout << endl
+			 << "=================================================================" << endl
+			 << "validation failed:" << endl
+			 << "page: " << e.mPageNr << endl
+			 << e.what() << endl;
+		Dump();
+		abort();
+	}
 }
 
 void M6IndexImpl::Dump()

@@ -185,6 +185,7 @@ class M6IndexImpl
 
 	static const uint32 kM6LRUCacheSize = 10;
 	M6IndexPage*	mCache;
+	uint32			mCachedCount;
 };
 
 // --------------------------------------------------------------------
@@ -199,6 +200,7 @@ class M6IndexPage
 
 	void			Reference();
 	void			Release();
+	int32			GetRefCount() const				{ return mRefCount; }
 	
 	M6IndexPage*	GetNext() const					{ return mNext; }
 	void			SetNext(M6IndexPage* inNext)	{ mNext = inNext; }
@@ -397,6 +399,7 @@ M6IndexPage::M6IndexPage(M6IndexImpl& inIndexImpl, M6IndexPageData* inData, uint
 
 M6IndexPage::~M6IndexPage()
 {
+	assert(mRefCount == 0);
 	delete mData;
 }
 
@@ -1166,6 +1169,7 @@ M6IndexImpl::M6IndexImpl(M6BasicIndex& inIndex, const string& inPath, MOpenMode 
 	, mIndex(inIndex)
 	, mDirty(false)
 	, mCache(nullptr)
+	, mCachedCount(0)
 {
 	if (inMode == eReadWrite and mFile.Size() == 0)
 	{
@@ -1195,6 +1199,7 @@ M6IndexImpl::M6IndexImpl(M6BasicIndex& inIndex, const string& inPath,
 	, mIndex(inIndex)
 	, mDirty(false)
 	, mCache(nullptr)
+	, mCachedCount(0)
 {
 	mFile.Truncate(0);
 	
@@ -1261,6 +1266,7 @@ M6IndexPagePtr M6IndexImpl::AllocateLeaf(M6IndexBranchPage* inParent)
 	M6IndexPage* page = new M6IndexLeafPage(*this, data, pageNr, inParent);
 	page->SetNext(mCache);
 	mCache = page;
+	++mCachedCount;
 	
 	return M6IndexPagePtr(page);
 }
@@ -1278,6 +1284,7 @@ M6IndexPagePtr M6IndexImpl::AllocateBranch(M6IndexBranchPage* inParent)
 	M6IndexPage* page = new M6IndexBranchPage(*this, data, pageNr, inParent);
 	page->SetNext(mCache);
 	mCache = page;
+	++mCachedCount;
 	
 	return M6IndexPagePtr(page);
 }
@@ -1315,6 +1322,39 @@ M6IndexPagePtr M6IndexImpl::Cache(uint32 inPageNr, M6IndexBranchPage* inParent)
 
 		page->SetNext(mCache);
 		mCache = page;
+		++mCachedCount;
+	}
+	
+	// now see if we need to clean up a bit
+	if (mCachedCount > 2 * kM6LRUCacheSize)
+	{
+		deque<M6IndexPage*> candidates;
+		
+		for (M6IndexPage* p = mCache->GetNext(); p != nullptr; p = p->GetNext())
+		{
+			// only delete older, unreferenced pages 
+			if (p->GetRefCount() == 0)
+				candidates.push_back(p);
+		}
+		
+		while (candidates.size() > kM6LRUCacheSize)
+			candidates.pop_front();
+		
+		M6IndexPage* p = mCache;
+		while (p != nullptr and not candidates.empty())
+		{
+			if (p->GetNext() == candidates.front())
+			{
+				M6IndexPage* p2 = candidates.front();
+				candidates.pop_front();
+				p->SetNext(p2->GetNext());
+				delete p2;
+
+				--mCachedCount;
+				continue;
+			}
+			p = p->GetNext();
+		}
 	}
 	
 	return M6IndexPagePtr(page);
@@ -1324,14 +1364,14 @@ void M6IndexImpl::Commit()
 {
 	M6IndexPage* page = mCache;
 	M6IndexPage* last = nullptr;
-	int32 n = kM6LRUCacheSize;
+	uint32 n = 0;
 	
 	while (page != nullptr)
 	{
 		page->Flush();
 		M6IndexPage* next = page->GetNext();
 		
-		if (n-- == 0)
+		if (++n == kM6LRUCacheSize)
 		{
 			last = next;
 			page->SetNext(nullptr);
@@ -1347,6 +1387,11 @@ void M6IndexImpl::Commit()
 		delete page;
 		page = next;
 	}
+
+	assert(n == mCachedCount);
+	mCachedCount = n;
+	if (mCachedCount > kM6LRUCacheSize)
+		mCachedCount = kM6LRUCacheSize;
 }
 
 void M6IndexImpl::Rollback()
@@ -1358,6 +1403,9 @@ void M6IndexImpl::Rollback()
 		delete page;
 		page = next;
 	}
+
+	mCache = nullptr;
+	mCachedCount = 0;
 }
 
 void M6IndexImpl::Insert(const string& inKey, int64 inValue)

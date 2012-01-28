@@ -847,14 +847,14 @@ bool M6IndexBranchPage::Insert(string& ioKey, int64& ioValue)
 
 			M6IndexPagePtr next(mIndexImpl.AllocateBranch(mParent));
 			
-			uint32 split = mData->mN / 2;
+			int32 split = mData->mN / 2;
 			string upKey;
 			uint32 downPage;
 
 			if (ix == split)
 			{
 				upKey = ioKey;
-				downPage = ioValue;
+				downPage = static_cast<uint32>(ioValue);
 
 				MoveEntries(*this, *next, split, 0, mData->mN - split);
 			}
@@ -943,66 +943,54 @@ bool M6IndexBranchPage::Erase(string& ioKey, int32 inIndex)
 
 bool M6IndexBranchPage::Underflow(M6IndexPage& inRight, uint32 inIndex)
 {
-//	// Page left of right contains too few entries, see if we can fix this
-//	// first try a merge
-//	if (inLeft.Free() + inRight.Free() >= kM6IndexPageKeySpace and
-//		inLeft.mData->mN + inRight.mData->mN <= kM6MaxEntriesPerPage)
-//	{
-//		inLeft.JoinBranch(inParent, inRight, inIndex);
-//	}
-//	else		// redistribute the data
-//	{
-//		// pKey is the key in inParent at inIndex (and, since this a leaf, the first key in inRight)
-//		string pKey = inParent.GetKey(inIndex);
-//		assert(pKey == inRight.GetKey(0));
-//		int32 pKeyLen = static_cast<int32>(pKey.length());
-//		int32 pFree = inParent.Free();
-//		
-//		if (inLeft.Free() > inRight.Free())	// move items from right to left
-//		{
-//			assert(inLeft.TooSmall());
-//
-//			int32 delta = inLeft.Free() - inRight.Free();
-//			int32 needed = delta / 2;
-//			
-//			uint8* rk = inRight.mData->mKeys;
-//			uint32 n = 0, ln = 0;
-//			while (n < inRight.mData->mN and n + inLeft.mData->mN < kM6IndexPageDataCount and needed > *rk)
-//			{
-//				++n;
-//				if ((*rk - pKeyLen + pFree) > 0)	// if the new first key of right fits in the parent
-//					ln = n;							// we have a candidate
-//				needed -= *rk + sizeof(int64);
-//				rk += *rk + 1;
-//			}
-//			
-//			// move the data
-//			MoveEntries(inRight, inLeft, 0, inLeft.mData->mN, ln);
-//			inParent.ReplaceKey(inIndex, inRight.GetKey(0));
-//		}
-//		else
-//		{
-//			assert(inRight.TooSmall());
-//
-//			int32 delta = inRight.Free() - inLeft.Free();
-//			int32 needed = delta / 2;
-//			
-//			uint8* rk = inLeft.mData->mKeys + inLeft.mKeyOffsets[inLeft.mData->mN - 1];
-//			uint32 n = 0, ln = 0;
-//			while (n < inLeft.mData->mN and n + inRight.mData->mN < kM6IndexPageDataCount and needed > *rk)
-//			{
-//				++n;
-//				if ((*rk - pKeyLen + pFree) > 0)	// if the new first key of right fits in the parent
-//					ln = n;							// we have a candidate
-//				needed -= *rk + sizeof(int64);
-//				rk = inLeft.mData->mKeys + inLeft.mKeyOffsets[inLeft.mData->mN - 1 - n];
-//			}
-//			
-//			// move the data
-//			MoveEntries(inLeft, inRight, inLeft.mData->mN - ln, 0, ln);
-//			inParent.ReplaceKey(inIndex, inRight.GetKey(0));
-//		}
-//	}
+	M6IndexBranchPage& right(static_cast<M6IndexBranchPage&>(inRight));
+
+	// This page left of inRight contains too few entries, see if we can fix this
+	// first try a merge
+
+	// pKey is the key in inParent at inIndex (and, since this a leaf, the first key in inRight)
+	string pKey = mParent->GetKey(inIndex);
+	int32 pKeyLen = static_cast<int32>(pKey.length());
+
+	if (Free() + inRight.Free() - pKeyLen - sizeof(int64) >= kM6IndexPageKeySpace and
+		mData->mN + right.mData->mN + 1 <= kM6MaxEntriesPerPage)
+	{
+		InsertKeyValue(pKey, inRight.GetLink(), mData->mN);
+		
+		// join the pages
+		MoveEntries(right, *this, 0, mData->mN, right.mData->mN);
+	
+		mParent->EraseEntry(inIndex);
+		inRight.Deallocate();
+	}
+	else		// redistribute the data
+	{
+		if (Free() > inRight.Free())	// rotate an entry from right to left
+		{									// but only if it fits in the parent
+			string rKey = inRight.GetKey(0);
+			int32 delta = static_cast<int32>(rKey.length() - pKey.length());
+			if (delta <= static_cast<int32>(mParent->Free()))
+			{
+				InsertKeyValue(pKey, right.mData->mLink, mData->mN);
+				mParent->ReplaceKey(inIndex, rKey);
+				mParent->SetValue32(inIndex, right.mPageNr);
+				right.mData->mLink = inRight.GetValue32(0);
+				inRight.EraseEntry(0);
+			}
+		}
+		else
+		{
+			string lKey = GetKey(mData->mN - 1);
+			int32 delta = static_cast<int32>(lKey.length() - pKey.length());
+			if (delta <= static_cast<int32>(mParent->Free()))
+			{
+				inRight.InsertKeyValue(pKey, right.mData->mLink, 0);
+				right.mData->mLink = GetValue32(mData->mN - 1);
+				mParent->ReplaceKey(inIndex, lKey);
+				EraseEntry(mData->mN - 1);
+			}
+		}
+	}
 	
 	return not (TooSmall() or inRight.TooSmall());
 }

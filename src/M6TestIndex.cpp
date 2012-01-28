@@ -225,11 +225,11 @@ BOOST_AUTO_TEST_CASE(file_ix_3)
 	{
 		cout << "erasing " << *key << endl;
 
+		if (*key == "maand")
+			indx.dump();
+
  		indx.erase(*key);
 
-		//if (*key == "beelden")
-		//{
-		//	//indx.dump();
 
 		indx.validate();
 		//}

@@ -28,11 +28,11 @@ using namespace std::tr1;
 // this boils down to 42.
 
 const uint32
-//	kM6IndexPageSize = 8192,
-	kM6IndexPageSize = 128,
+	kM6IndexPageSize = 8192,
+//	kM6IndexPageSize = 128,
 	kM6IndexPageHeaderSize = 8,
-//	kM6MaxEntriesPerPage = (kM6IndexPageSize - kM6IndexPageHeaderSize) / 12,	// keeps code simple
-	kM6MaxEntriesPerPage = 4,
+	kM6MaxEntriesPerPage = (kM6IndexPageSize - kM6IndexPageHeaderSize) / 12,	// keeps code simple
+//	kM6MaxEntriesPerPage = 4,
 	kM6MinEntriesPerPage = 2,
 	kM6IndexPageKeySpace = kM6IndexPageSize - kM6IndexPageHeaderSize,
 	kM6IndexPageMinKeySpace = kM6IndexPageKeySpace / 4,
@@ -45,8 +45,6 @@ enum {
 	eM6IndexPageIsEmpty		= (1 << 0),		// deallocated page
 	eM6IndexPageIsLeaf		= (1 << 1),		// leaf page in B+ tree
 	eM6IndexPageIsBits		= (1 << 2),		// page containing bit streams
-//	eM6IndexPageIsDirty		= (1 << 3),		// page is modified, needs to be written
-//	eM6IndexPageLocked		= (1 << 4),		// page is in use
 };
 
 struct M6IndexPageData
@@ -198,8 +196,8 @@ class M6IndexPage
 	void			Deallocate();
 	void			Flush();
 
-	void			Reference();
-	void			Release();
+	void			Reference()						{ ++mRefCount; }
+	void			Release()						{ --mRefCount; }
 	int32			GetRefCount() const				{ return mRefCount; }
 	
 	M6IndexPage*	GetNext() const					{ return mNext; }
@@ -224,14 +222,8 @@ class M6IndexPage
 	uint32			Free() const					{ return kM6IndexPageKeySpace - mKeyOffsets[mData->mN] - mData->mN * sizeof(int64); }
 	bool			CanStore(const string& inKey)	{ return mData->mN < kM6MaxEntriesPerPage and Free() >= inKey.length() + 1 + sizeof(int64); }
 	
-	bool			TooSmall() const
-					{
-#if DEBUG
-						return mData->mN < kM6MinEntriesPerPage;
-#else
-
-#endif
-					}
+	bool			TooSmall() const				{ return Free() > (kM6IndexPageKeySpace / 2); }
+//	bool			TooSmall() const				{ return mData->mN < kM6MinEntriesPerPage; }
 	
 	void			SetLink(int64 inLink);
 	uint32			GetLink() const					{ return mData->mLink; }
@@ -318,32 +310,32 @@ class M6IndexBranchPage : public M6IndexPage
 
 // --------------------------------------------------------------------
 
-M6IndexPagePtr::M6IndexPagePtr()
+inline M6IndexPagePtr::M6IndexPagePtr()
 	: mPage(nullptr)
 {
 }
 
-M6IndexPagePtr::M6IndexPagePtr(M6IndexPage* inPage)
+inline M6IndexPagePtr::M6IndexPagePtr(M6IndexPage* inPage)
 	: mPage(inPage)
 {
 	if (mPage != nullptr)
 		mPage->Reference();
 }
 
-M6IndexPagePtr::M6IndexPagePtr(const M6IndexPagePtr& inPtr)
+inline M6IndexPagePtr::M6IndexPagePtr(const M6IndexPagePtr& inPtr)
 	: mPage(inPtr.mPage)
 {
 	if (mPage != nullptr)
 		mPage->Reference();
 }
 
-M6IndexPagePtr::~M6IndexPagePtr()
+inline M6IndexPagePtr::~M6IndexPagePtr()
 {
 	if (mPage != nullptr)
 		mPage->Release();
 }
 
-M6IndexPagePtr&	M6IndexPagePtr::operator=(const M6IndexPagePtr& inPtr)
+inline M6IndexPagePtr&	M6IndexPagePtr::operator=(const M6IndexPagePtr& inPtr)
 {
 	if (this != &inPtr and mPage != inPtr.mPage)
 	{
@@ -359,14 +351,14 @@ M6IndexPagePtr&	M6IndexPagePtr::operator=(const M6IndexPagePtr& inPtr)
 	return *this;
 }
 
-M6IndexPage* M6IndexPagePtr::release()
+inline M6IndexPage* M6IndexPagePtr::release()
 {
 	M6IndexPage* result = mPage;
 	mPage = nullptr;
 	return result;
 }
 
-void M6IndexPagePtr::reset(M6IndexPage* inPage)
+inline void M6IndexPagePtr::reset(M6IndexPage* inPage)
 {
 	if (mPage != nullptr)
 		mPage->Release();
@@ -401,26 +393,6 @@ M6IndexPage::~M6IndexPage()
 {
 	assert(mRefCount == 0);
 	delete mData;
-}
-
-void M6IndexPage::Reference()
-{
-	++mRefCount;
-}
-
-void M6IndexPage::Release()
-{
-	--mRefCount;
-//	if (--mRefCount == 0)
-//	{
-//		if (mDirty)
-//			THROW(("Page still dirty!"));
-//	
-//		if (mLocked)
-//			THROW(("Page still locked!"));
-//
-//		delete this;
-//	}
 }
 
 void M6IndexPage::Flush()

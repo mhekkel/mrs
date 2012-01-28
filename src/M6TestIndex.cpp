@@ -131,114 +131,114 @@ const char filename[] = "test.index";
 //		++nr;
 //	}
 //}
-
-BOOST_AUTO_TEST_CASE(file_ix_3)
-{
-	if (fs::exists(filename))
-		fs::remove(filename);
-
-	M6SimpleIndex indx(filename, eReadWrite);
-
-	ifstream text("test/test-doc.txt");
-	BOOST_REQUIRE(text.is_open());
-
-	map<string,int64> testix;
-
-	int64 nr = 1;
-	for (;;)
-	{
-		string word;
-		text >> word;
-
-		if (word.empty() and text.eof())
-			break;
-
-		ba::to_lower(word);
-		
-		if (testix.find(word) != testix.end())
-			continue;
-
-		//if (indx.find(word, v))
-		//	continue;
-		
-		cout << word << endl;
-		indx.insert(word, nr);
-
-		testix[word] = nr;
-
-		++nr;
-	}
-	
-	cout << "Created tree with " << indx.size()
-		<< " keys and a depth of " << indx.depth() << endl;
-
-	foreach (auto t, testix)
-	{
-		int64 v;
-		BOOST_CHECK(indx.find(t.first, v));
-		BOOST_CHECK_EQUAL(v, t.second);
-	}
-	
-	nr = 0;
-	foreach (const M6Tuple& i, indx)
-	{
-		BOOST_CHECK_EQUAL(testix[i.key], i.value);
-		++nr;
-	}
-	
-	BOOST_CHECK_EQUAL(nr, testix.size());
-
-//	indx.Vacuum();
-
-	indx.validate();
-
-	foreach (auto t, testix)
-	{
-		int64 v;
-		BOOST_CHECK(indx.find(t.first, v));
-		BOOST_CHECK_EQUAL(v, t.second);
-	}
-	
-	nr = 0;
-	foreach (auto i, indx)
-	{
-		BOOST_CHECK_EQUAL(testix[i.key], i.value);
-		++nr;
-	}
-	
-	BOOST_CHECK_EQUAL(nr, testix.size());
-	BOOST_CHECK_EQUAL(nr, indx.size());
-
-	// remove tests
-
-	vector<string> keys;
-	foreach (auto k, testix)
-		keys.push_back(k.first);
-	random_shuffle(keys.begin(), keys.end());
-
-	ofstream backup("order-of-the-keys.txt");
-
-	copy(keys.begin(), keys.end(), ostream_iterator<string>(backup, "\n"));
-	backup.close();
-
-	for (auto key = keys.begin(); key != keys.end(); ++key)
-	{
-		cout << "erasing " << *key << endl;
-
- 		indx.erase(*key);
-		//indx.validate();
-
-		for (auto test = key + 1; test != keys.end(); ++test)
-		{
-			int64 v;
-			BOOST_CHECK(indx.find(*test, v));
-			BOOST_CHECK_EQUAL(v, testix[*test]);
-		}
-	}
-
-	BOOST_CHECK_EQUAL(indx.size(), 0);
-}
-
+//
+//BOOST_AUTO_TEST_CASE(file_ix_3)
+//{
+//	if (fs::exists(filename))
+//		fs::remove(filename);
+//
+//	M6SimpleIndex indx(filename, eReadWrite);
+//
+//	ifstream text("test/test-doc.txt");
+//	BOOST_REQUIRE(text.is_open());
+//
+//	map<string,int64> testix;
+//
+//	int64 nr = 1;
+//	for (;;)
+//	{
+//		string word;
+//		text >> word;
+//
+//		if (word.empty() and text.eof())
+//			break;
+//
+//		ba::to_lower(word);
+//		
+//		if (testix.find(word) != testix.end())
+//			continue;
+//
+//		//if (indx.find(word, v))
+//		//	continue;
+//		
+//		cout << word << endl;
+//		indx.insert(word, nr);
+//
+//		testix[word] = nr;
+//
+//		++nr;
+//	}
+//	
+//	cout << "Created tree with " << indx.size()
+//		<< " keys and a depth of " << indx.depth() << endl;
+//
+//	foreach (auto t, testix)
+//	{
+//		int64 v;
+//		BOOST_CHECK(indx.find(t.first, v));
+//		BOOST_CHECK_EQUAL(v, t.second);
+//	}
+//	
+//	nr = 0;
+//	foreach (const M6Tuple& i, indx)
+//	{
+//		BOOST_CHECK_EQUAL(testix[i.key], i.value);
+//		++nr;
+//	}
+//	
+//	BOOST_CHECK_EQUAL(nr, testix.size());
+//
+////	indx.Vacuum();
+//
+//	indx.validate();
+//
+//	foreach (auto t, testix)
+//	{
+//		int64 v;
+//		BOOST_CHECK(indx.find(t.first, v));
+//		BOOST_CHECK_EQUAL(v, t.second);
+//	}
+//	
+//	nr = 0;
+//	foreach (auto i, indx)
+//	{
+//		BOOST_CHECK_EQUAL(testix[i.key], i.value);
+//		++nr;
+//	}
+//	
+//	BOOST_CHECK_EQUAL(nr, testix.size());
+//	BOOST_CHECK_EQUAL(nr, indx.size());
+//
+//	// remove tests
+//
+//	vector<string> keys;
+//	foreach (auto k, testix)
+//		keys.push_back(k.first);
+//	random_shuffle(keys.begin(), keys.end());
+//
+//	ofstream backup("order-of-the-keys.txt");
+//
+//	copy(keys.begin(), keys.end(), ostream_iterator<string>(backup, "\n"));
+//	backup.close();
+//
+//	for (auto key = keys.begin(); key != keys.end(); ++key)
+//	{
+//		cout << "erasing " << *key << endl;
+//
+// 		indx.erase(*key);
+//		//indx.validate();
+//
+//		for (auto test = key + 1; test != keys.end(); ++test)
+//		{
+//			int64 v;
+//			BOOST_CHECK(indx.find(*test, v));
+//			BOOST_CHECK_EQUAL(v, testix[*test]);
+//		}
+//	}
+//
+//	BOOST_CHECK_EQUAL(indx.size(), 0);
+//}
+//
 //BOOST_AUTO_TEST_CASE(file_ix_4)
 //{
 //	if (fs::exists(filename))
@@ -326,9 +326,11 @@ BOOST_AUTO_TEST_CASE(file_ix_3)
 //
 //	for (auto key = keys.begin(); key != keys.end(); ++key)
 //	{
+//		cout << "erasing key " << *key << endl;
+//
 //		indx.erase(*key);
 //
-//		for (auto test = key; test != keys.end(); ++test)
+//		for (auto test = key + 1; test != keys.end(); ++test)
 //		{
 //			int64 v;
 //			BOOST_CHECK(indx.find(*test, v));
@@ -338,48 +340,92 @@ BOOST_AUTO_TEST_CASE(file_ix_3)
 //
 //	BOOST_CHECK_EQUAL(indx.size(), 0);
 //}	
-//
-//BOOST_AUTO_TEST_CASE(file_ix_5)
-//{
-//	ifstream text("test/test-doc-2.txt");
-//	BOOST_REQUIRE(text.is_open());
-//
-//	map<string,int64> testix;
-//
-//	int64 nr = 1;
-//	for (;;)
-//	{
-//		string word;
-//		text >> word;
-//
-//		if (word.empty() and text.eof())
-//			break;
-//
-//		ba::to_lower(word);
-//		
-//		testix[word] = nr++;
-//	}
-//	
-//	M6SimpleIndex indx(filename, eReadWrite);
-//	indx.validate();
-//
-//	foreach (auto t, testix)
-//	{
-//		int64 v;
-//		BOOST_CHECK(indx.find(t.first, v));
-//		BOOST_CHECK_EQUAL(v, t.second);
-//	}
-//	
-//	nr = 0;
-//	foreach (auto i, indx)
-//	{
-//		BOOST_CHECK_EQUAL(testix[i.key], i.value);
-//		++nr;
-//	}
-//	
-//	BOOST_CHECK_EQUAL(nr, testix.size());
-//}	
-//
+
+BOOST_AUTO_TEST_CASE(file_ix_5a)
+{
+	if (fs::exists(filename))
+		fs::remove(filename);
+
+	ifstream text("test/test-doc-2.txt");
+	BOOST_REQUIRE(text.is_open());
+
+	map<string,int64> testix;
+
+	int64 nr = 1;
+	for (;;)
+	{
+		string word;
+		text >> word;
+
+		if (word.empty() and text.eof())
+			break;
+
+		ba::to_lower(word);
+		
+		testix[word] = nr++;
+	}
+	
+	map<string,int64>::iterator i = testix.begin();
+
+	M6SortedInputIterator data = 
+		[&testix, &i](M6Tuple& outTuple) -> bool
+		{
+			bool result = false;
+			if (i != testix.end())
+			{
+				outTuple.key = i->first;
+				outTuple.value = i->second;
+				++i;
+				result = true;
+			}
+			return result;
+		};
+	
+	M6SimpleIndex indx(filename, data);
+	indx.validate();
+}
+
+BOOST_AUTO_TEST_CASE(file_ix_5)
+{
+	ifstream text("test/test-doc-2.txt");
+	BOOST_REQUIRE(text.is_open());
+
+	map<string,int64> testix;
+
+	int64 nr = 1;
+	for (;;)
+	{
+		string word;
+		text >> word;
+
+		if (word.empty() and text.eof())
+			break;
+
+		ba::to_lower(word);
+		
+		testix[word] = nr++;
+	}
+	
+	M6SimpleIndex indx(filename, eReadWrite);
+	indx.validate();
+
+	foreach (auto t, testix)
+	{
+		int64 v;
+		BOOST_CHECK(indx.find(t.first, v));
+		BOOST_CHECK_EQUAL(v, t.second);
+	}
+	
+	nr = 0;
+	foreach (auto i, indx)
+	{
+		BOOST_CHECK_EQUAL(testix[i.key], i.value);
+		++nr;
+	}
+	
+	BOOST_CHECK_EQUAL(nr, testix.size());
+}	
+
 //BOOST_AUTO_TEST_CASE(file_ix_1a)
 //{
 //	if (fs::exists(filename))

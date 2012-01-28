@@ -392,6 +392,7 @@ M6IndexPage::M6IndexPage(M6IndexImpl& inIndexImpl, M6IndexPageData* inData, uint
 M6IndexPage::~M6IndexPage()
 {
 	assert(mRefCount == 0);
+	assert(not mDirty);
 	delete mData;
 }
 
@@ -1208,6 +1209,8 @@ M6IndexImpl::M6IndexImpl(M6BasicIndex& inIndex, const string& inPath,
 	
 	// all data is written in the leafs, now construct branch pages
 	CreateUpLevels(up);
+
+	Commit();
 }
 
 M6IndexImpl::~M6IndexImpl()
@@ -1450,79 +1453,89 @@ bool M6IndexImpl::Find(const string& inKey, int64& outValue)
 
 void M6IndexImpl::Vacuum()
 {
-	// start by locating the first leaf node.
-	// Then compact the nodes and shift them to the start
-	// of the file. Truncate the file and reconstruct the
-	// branch nodes.
-	
-	uint32 pageNr = mHeader.mRoot;
-	for (;;)
+	try
 	{
-		M6IndexPagePtr page(Cache(pageNr, nullptr));
-		if (page->IsLeaf())
-			break;
-		pageNr = page->GetLink();
-	}
+		// start by locating the first leaf node.
+		// Then compact the nodes and shift them to the start
+		// of the file. Truncate the file and reconstruct the
+		// branch nodes.
 	
-	// keep an indirect array of reordered pages
-	size_t pageCount = (mFile.Size() / kM6IndexPageSize) + 1;
-	vector<uint32> ix1(pageCount);
-	iota(ix1.begin(), ix1.end(), 0);
-	vector<uint32> ix2(ix1);
-
-	deque<M6Tuple> up;
-	uint32 n = 1;
-
-	for (;;)
-	{
-		pageNr = ix1[pageNr];
-		M6IndexPagePtr page(Cache(pageNr, nullptr));
-		if (pageNr != n)
+		uint32 pageNr = mHeader.mRoot;
+		for (;;)
 		{
-			swap(ix1[ix2[pageNr]], ix1[ix2[n]]);
-			swap(ix2[pageNr], ix2[n]);
-			page->MoveTo(n);
+			M6IndexPagePtr page(Cache(pageNr, nullptr));
+			if (page->IsLeaf())
+				break;
+			pageNr = page->GetLink();
 		}
+	
+		// keep an indirect array of reordered pages
+		size_t pageCount = (mFile.Size() / kM6IndexPageSize) + 1;
+		vector<uint32> ix1(pageCount);
+		iota(ix1.begin(), ix1.end(), 0);
+		vector<uint32> ix2(ix1);
 
-		up.push_back(M6Tuple(page->GetKey(0), page->GetPageNr()));
-		uint32 link = page->GetLink();
-		
-		while (link != 0)
+		deque<M6Tuple> up;
+		uint32 n = 1;
+
+		for (;;)
 		{
-			M6IndexPagePtr next(Cache(ix1[link], nullptr));
-			if (next->GetN() == 0)
+			pageNr = ix1[pageNr];
+			M6IndexPagePtr page(Cache(pageNr, nullptr));
+			if (pageNr != n)
 			{
-				link = next->GetLink();
-				continue;
+				swap(ix1[ix2[pageNr]], ix1[ix2[n]]);
+				swap(ix2[pageNr], ix2[n]);
+				page->MoveTo(n);
 			}
 
-			string key = next->GetKey(0);
-			assert(key.compare(page->GetKey(page->GetN() - 1)) > 0);
-			if (not page->CanStore(key))
-				break;
-			
-			page->InsertKeyValue(key, next->GetValue(0), page->GetN());
-			next->EraseEntry(0);
-		}
+			up.push_back(M6Tuple(page->GetKey(0), page->GetPageNr()));
+			uint32 link = page->GetLink();
 		
-		if (link == 0)
-		{
-			page->SetLink(0);
-			break;
+			while (link != 0)
+			{
+				M6IndexPagePtr next(Cache(ix1[link], nullptr));
+				if (next->GetN() == 0)
+				{
+					link = next->GetLink();
+					continue;
+				}
+
+				string key = next->GetKey(0);
+				assert(key.compare(page->GetKey(page->GetN() - 1)) > 0);
+				if (not page->CanStore(key))
+					break;
+			
+				page->InsertKeyValue(key, next->GetValue(0), page->GetN());
+				next->EraseEntry(0);
+			}
+		
+			if (link == 0)
+			{
+				page->SetLink(0);
+				break;
+			}
+
+			pageNr = link;
+
+			++n;
+			page->SetLink(n);
 		}
+	
+		// OK, so we have all the pages on disk, in order.
+		// truncate the file (erasing the remaining pages)
+		// and rebuild the branches.
+		mFile.Truncate((n + 1) * kM6IndexPageSize);
+	
+		CreateUpLevels(up);
 
-		pageNr = link;
-
-		++n;
-		page->SetLink(n);
+		Commit();
 	}
-	
-	// OK, so we have all the pages on disk, in order.
-	// truncate the file (erasing the remaining pages)
-	// and rebuild the branches.
-	mFile.Truncate((n + 1) * kM6IndexPageSize);
-	
-	CreateUpLevels(up);
+	catch (...)
+	{
+		Rollback();
+		throw;
+	}
 }
 
 void M6IndexImpl::CreateUpLevels(deque<M6Tuple>& up)

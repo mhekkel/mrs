@@ -225,21 +225,15 @@ BOOST_AUTO_TEST_CASE(file_ix_3)
 	{
 		cout << "erasing " << *key << endl;
 
-		if (*key == "maand")
-			indx.dump();
-
  		indx.erase(*key);
+		//indx.validate();
 
-
-		indx.validate();
-		//}
-
-//		for (auto test = key + 1; test != keys.end(); ++test)
-//		{
-//			int64 v;
-//			BOOST_CHECK(indx.find(*test, v));
-//			BOOST_CHECK_EQUAL(v, testix[*test]);
-//		}
+		for (auto test = key + 1; test != keys.end(); ++test)
+		{
+			int64 v;
+			BOOST_CHECK(indx.find(*test, v));
+			BOOST_CHECK_EQUAL(v, testix[*test]);
+		}
 	}
 
 	BOOST_CHECK_EQUAL(indx.size(), 0);

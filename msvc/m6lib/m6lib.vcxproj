@@ -129,6 +129,7 @@
     <ClCompile Include="..\..\src\M6Error.cpp" />
     <ClCompile Include="..\..\src\M6File.cpp" />
     <ClCompile Include="..\..\src\M6Index.cpp" />
+    <ClCompile Include="..\..\src\M6Tokenizer.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

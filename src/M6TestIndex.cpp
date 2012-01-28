@@ -1,4 +1,4 @@
-#include <iostream>
+﻿#include <iostream>
 #include <ios>
 #include <fstream>
 #include <map>
@@ -14,6 +14,7 @@
 #include "M6Lib.h"
 #include "M6File.h"
 #include "M6Index.h"
+#include "M6Tokenizer.h"
 #include "M6Error.h"
 
 #define BOOST_TEST_MAIN
@@ -340,6 +341,55 @@ const char filename[] = "test.index";
 //
 //	BOOST_CHECK_EQUAL(indx.size(), 0);
 //}	
+
+BOOST_AUTO_TEST_CASE(test_tokenizer)
+{
+	if (fs::exists(filename))
+		fs::remove(filename);
+
+	ifstream text("test/test-doc.txt");
+	BOOST_REQUIRE(text.is_open());
+
+	for (;;)
+	{
+		string line;
+		getline(text, line);
+		
+		if (line.empty())
+		{
+			if (text.eof())
+				break;
+			continue;
+		}
+		
+		M6Tokenizer tokenizer(line.c_str(), line.length());
+		for (;;)
+		{
+			M6Token token = tokenizer.GetToken();
+			if (token == eM6TokenEOF)
+				break;
+			
+			switch (token)
+			{
+				case eM6TokenWord:
+					cout << "word:   '" << tokenizer.GetTokenString() << '\'' << endl;
+					break;
+				
+				case eM6TokenNumber:
+					cout << "number: '" << tokenizer.GetTokenString() << '\'' << endl;
+					break;
+				
+				case eM6TokenPunctuation:
+					cout << "punct:  '" << tokenizer.GetTokenString() << '\'' << endl;
+					break;
+				
+				case eM6TokenOther:
+					cout << "other:  '" << tokenizer.GetTokenString() << '\'' << endl;
+					break;
+			}
+		}
+	}
+}
 
 BOOST_AUTO_TEST_CASE(file_ix_5a)
 {

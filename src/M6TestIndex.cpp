@@ -342,54 +342,54 @@ const char filename[] = "test.index";
 //	BOOST_CHECK_EQUAL(indx.size(), 0);
 //}	
 
-BOOST_AUTO_TEST_CASE(test_tokenizer)
-{
-	if (fs::exists(filename))
-		fs::remove(filename);
-
-	ifstream text("test/test-doc.txt");
-	BOOST_REQUIRE(text.is_open());
-
-	for (;;)
-	{
-		string line;
-		getline(text, line);
-		
-		if (line.empty())
-		{
-			if (text.eof())
-				break;
-			continue;
-		}
-		
-		M6Tokenizer tokenizer(line.c_str(), line.length());
-		for (;;)
-		{
-			M6Token token = tokenizer.GetToken();
-			if (token == eM6TokenEOF)
-				break;
-			
-			switch (token)
-			{
-				case eM6TokenWord:
-					cout << "word:   '" << tokenizer.GetTokenString() << '\'' << endl;
-					break;
-				
-				case eM6TokenNumber:
-					cout << "number: '" << tokenizer.GetTokenString() << '\'' << endl;
-					break;
-				
-				case eM6TokenPunctuation:
-					cout << "punct:  '" << tokenizer.GetTokenString() << '\'' << endl;
-					break;
-				
-				case eM6TokenOther:
-					cout << "other:  '" << tokenizer.GetTokenString() << '\'' << endl;
-					break;
-			}
-		}
-	}
-}
+//BOOST_AUTO_TEST_CASE(test_tokenizer)
+//{
+//	if (fs::exists(filename))
+//		fs::remove(filename);
+//
+//	ifstream text("test/test-doc.txt");
+//	BOOST_REQUIRE(text.is_open());
+//
+//	for (;;)
+//	{
+//		string line;
+//		getline(text, line);
+//		
+//		if (line.empty())
+//		{
+//			if (text.eof())
+//				break;
+//			continue;
+//		}
+//		
+//		M6Tokenizer tokenizer(line.c_str(), line.length());
+//		for (;;)
+//		{
+//			M6Token token = tokenizer.GetToken();
+//			if (token == eM6TokenEOF)
+//				break;
+//			
+//			switch (token)
+//			{
+//				case eM6TokenWord:
+//					cout << "word:   '" << tokenizer.GetTokenString() << '\'' << endl;
+//					break;
+//				
+//				case eM6TokenNumber:
+//					cout << "number: '" << tokenizer.GetTokenString() << '\'' << endl;
+//					break;
+//				
+//				case eM6TokenPunctuation:
+//					cout << "punct:  '" << tokenizer.GetTokenString() << '\'' << endl;
+//					break;
+//				
+//				case eM6TokenOther:
+//					cout << "other:  '" << tokenizer.GetTokenString() << '\'' << endl;
+//					break;
+//			}
+//		}
+//	}
+//}
 
 BOOST_AUTO_TEST_CASE(file_ix_5a)
 {
@@ -435,7 +435,7 @@ BOOST_AUTO_TEST_CASE(file_ix_5a)
 	indx.validate();
 }
 
-BOOST_AUTO_TEST_CASE(file_ix_5)
+BOOST_AUTO_TEST_CASE(file_ix_5b)
 {
 	ifstream text("test/test-doc-2.txt");
 	BOOST_REQUIRE(text.is_open());
@@ -474,6 +474,41 @@ BOOST_AUTO_TEST_CASE(file_ix_5)
 	}
 	
 	BOOST_CHECK_EQUAL(nr, testix.size());
+}	
+
+BOOST_AUTO_TEST_CASE(file_ix_5c)
+{
+	ifstream text("test/test-doc-2.txt");
+	BOOST_REQUIRE(text.is_open());
+
+	map<string,int64> testix;
+
+	int64 nr = 1;
+	for (;;)
+	{
+		string word;
+		text >> word;
+
+		if (word.empty() and text.eof())
+			break;
+
+		ba::to_lower(word);
+		
+		testix[word] = nr++;
+	}
+	
+	M6SimpleIndex indx(filename, eReadWrite);
+	indx.validate();
+
+	foreach (auto t, testix)
+	{
+		indx.erase(t.first);
+		indx.validate();
+		int64 v;
+		BOOST_CHECK_EQUAL(indx.find(t.first, v), false);
+	}
+	
+	BOOST_CHECK_EQUAL(indx.size(), 0);
 }	
 
 //BOOST_AUTO_TEST_CASE(file_ix_1a)

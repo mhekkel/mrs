@@ -3,20 +3,13 @@
 #include <deque>
 #include <vector>
 #include <numeric>
-#include <memory>
 
 #include <boost/static_assert.hpp>
-#include <boost/tr1/tuple.hpp>
-#include <boost/foreach.hpp>
-#define foreach BOOST_FOREACH
 
 #include "M6Index.h"
 #include "M6Error.h"
 
-// --------------------------------------------------------------------
-
 using namespace std;
-using namespace std::tr1;
 
 // --------------------------------------------------------------------
 
@@ -35,7 +28,7 @@ const uint32
 //	kM6MaxEntriesPerPage = 4,
 	kM6MinEntriesPerPage = 2,
 	kM6IndexPageKeySpace = kM6IndexPageSize - kM6IndexPageHeaderSize,
-	kM6IndexPageMinKeySpace = kM6IndexPageKeySpace / 4,
+	kM6IndexPageMinKeySpace = kM6IndexPageKeySpace / 2,
 	kM6MaxKeyLength = (255 < kM6IndexPageMinKeySpace ? 255 : kM6IndexPageMinKeySpace),
 	kM6IndexPageDataCount = (kM6IndexPageKeySpace / sizeof(int64));
 
@@ -212,17 +205,17 @@ class M6IndexPage
 
 	bool			IsLeaf() const					{ return mData->mFlags & eM6IndexPageIsLeaf; }
 	
-	bool			IsLocked() const				{ return mLocked; }
-	void			SetLock(bool inLocked)			{ mLocked = inLocked; }
-	
-	bool			IsDirty() const					{ return mDirty; }
-	void			SetDirty(bool inDirty)			{ mDirty = inDirty; }
+//	bool			IsLocked() const				{ return mLocked; }
+//	void			SetLock(bool inLocked)			{ mLocked = inLocked; }
+//	
+//	bool			IsDirty() const					{ return mDirty; }
+//	void			SetDirty(bool inDirty)			{ mDirty = inDirty; }
 	
 	uint32			GetN() const					{ return mData->mN; }
 	uint32			Free() const					{ return kM6IndexPageKeySpace - mKeyOffsets[mData->mN] - mData->mN * sizeof(int64); }
 	bool			CanStore(const string& inKey)	{ return mData->mN < kM6MaxEntriesPerPage and Free() >= inKey.length() + 1 + sizeof(int64); }
 	
-	bool			TooSmall() const				{ return Free() > (kM6IndexPageKeySpace / 2); }
+	bool			TooSmall() const				{ return Free() > kM6IndexPageMinKeySpace; }
 //	bool			TooSmall() const				{ return mData->mN < kM6MinEntriesPerPage; }
 	
 	void			SetLink(int64 inLink);
@@ -709,10 +702,10 @@ bool M6IndexLeafPage::Find(const string& inKey, int64& outValue)
 	BinarySearch(inKey, ix, match);
 	if (match)
 		outValue = GetValue(ix);
-#if DEBUG
-	else
-		cout << "Key not found: " << inKey << endl;
-#endif
+//#if DEBUG
+//	else
+//		cout << "Key not found: " << inKey << endl;
+//#endif
 	
 	return match;
 }
@@ -783,7 +776,10 @@ bool M6IndexLeafPage::Erase(string& ioKey, int32 inIndex)
 			{
 				if (not mParent->UpdateLinkKey(GetKey(0), mPageNr))
 				{
-					THROW(("To be implemented"));
+#pragma message("UpdateLinkKey may fail, fix needed?")
+					// how bad is this anyway?
+
+//					THROW(("To be implemented"));
 				}
 			}
 		

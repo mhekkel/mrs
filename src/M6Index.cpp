@@ -1288,6 +1288,7 @@ M6IndexPagePtr M6IndexImpl::Cache(int64 inPageNr, M6IndexBranchPage* inParent)
 void M6IndexImpl::Commit()
 {
 	uint32 n = 0;
+	
 	for (auto c = mCache.begin(); c != mCache.end(); ++c)
 	{
 		M6IndexPage* p = c->second;
@@ -1296,11 +1297,14 @@ void M6IndexImpl::Commit()
 			p->Flush();
 		
 		if (n++ > kM6LRUCacheSize)
+		{
 			delete p;
+			c->first = 0;
+			c->second = nullptr;
+		}
 	}
 	
-	if (n >= kM6LRUCacheSize)
-		mCache.erase(mCache.end() + kM6LRUCacheSize, mCache.end());
+	mCache.erase(remove_if(mCache.begin(), mCache.end(), [](pair<int64,M6IndexPage*>& c) -> bool { return c.second == nullptr; }), mCache.end());
 }
 
 void M6IndexImpl::Rollback()

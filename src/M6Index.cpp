@@ -178,8 +178,8 @@ class M6IndexImpl
 	bool			mAutoCommit;
 
 	static const uint32 kM6LRUCacheSize = 25;
-	M6IndexPage*	mCache;
-	uint32			mCachedCount;
+	
+	deque<pair<int64,M6IndexPage*>>		mCache;
 };
 
 // --------------------------------------------------------------------
@@ -211,7 +211,7 @@ class M6IndexPage
 //	bool			IsLocked() const				{ return mLocked; }
 //	void			SetLock(bool inLocked)			{ mLocked = inLocked; }
 //	
-//	bool			IsDirty() const					{ return mDirty; }
+	bool			IsDirty() const					{ return mDirty; }
 //	void			SetDirty(bool inDirty)			{ mDirty = inDirty; }
 	
 	uint32			GetN() const					{ return mData->mN; }
@@ -1120,8 +1120,6 @@ M6IndexImpl::M6IndexImpl(M6BasicIndex& inIndex, const string& inPath, MOpenMode 
 	, mIndex(inIndex)
 	, mDirty(false)
 	, mAutoCommit(true)
-	, mCache(nullptr)
-	, mCachedCount(0)
 {
 	if (inMode == eReadWrite and mFile.Size() == 0)
 	{
@@ -1151,8 +1149,6 @@ M6IndexImpl::M6IndexImpl(M6BasicIndex& inIndex, const string& inPath,
 	, mIndex(inIndex)
 	, mDirty(false)
 	, mAutoCommit(true)
-	, mCache(nullptr)
-	, mCachedCount(0)
 {
 	mFile.Truncate(0);
 	
@@ -1206,13 +1202,8 @@ M6IndexImpl::~M6IndexImpl()
 	if (mDirty)
 		mFile.PWrite(mHeader, 0);
 
-	M6IndexPage* page = mCache;
-	while (page != nullptr)
-	{
-		M6IndexPage* next = page->GetNext();
-		delete page;
-		page = next;
-	}
+	for (auto c = mCache.begin(); c != mCache.end(); ++c)
+		delete c->second;
 }
 
 M6IndexPagePtr M6IndexImpl::AllocateLeaf(M6IndexBranchPage* inParent)
@@ -1227,9 +1218,10 @@ M6IndexPagePtr M6IndexImpl::AllocateLeaf(M6IndexBranchPage* inParent)
 	data->mFlags = eM6IndexPageIsLeaf;
 	
 	M6IndexPage* page = new M6IndexLeafPage(*this, data, pageNr, inParent);
-	page->SetNext(mCache);
-	mCache = page;
-	++mCachedCount;
+	mCache.push_front(make_pair(pageNr, page));
+//	page->SetNext(mCache);
+//	mCache = page;
+//	++mCachedCount;
 	
 	return M6IndexPagePtr(page);
 }
@@ -1245,9 +1237,10 @@ M6IndexPagePtr M6IndexImpl::AllocateBranch(M6IndexBranchPage* inParent)
 	memset(data, 0, kM6IndexPageSize);
 	
 	M6IndexPage* page = new M6IndexBranchPage(*this, data, pageNr, inParent);
-	page->SetNext(mCache);
-	mCache = page;
-	++mCachedCount;
+//	page->SetNext(mCache);
+//	mCache = page;
+//	++mCachedCount;
+	mCache.push_front(make_pair(pageNr, page));
 	
 	return M6IndexPagePtr(page);
 }
@@ -1257,18 +1250,17 @@ M6IndexPagePtr M6IndexImpl::Cache(int64 inPageNr, M6IndexBranchPage* inParent)
 	if (inPageNr == 0)
 		THROW(("Invalid page number"));
 
-	M6IndexPage* page = mCache;
+	M6IndexPage* page = nullptr;
 
-	while (page != nullptr and page->GetPageNr() != inPageNr)
+	for (auto c = mCache.begin(); c != mCache.end(); ++c)
 	{
-		M6IndexPage* next = page->GetNext();
-		if (next != nullptr and next->GetPageNr() == inPageNr)
+		if (c->first == inPageNr)
 		{
-			page->SetNext(next->GetNext());
-			next->SetNext(mCache);
-			mCache = next;
+			page = c->second;
+			mCache.erase(c);
+			mCache.push_front(make_pair(inPageNr, page));
+			break;
 		}
-		page = next;
 	}
 		
 	if (page != nullptr)
@@ -1283,41 +1275,25 @@ M6IndexPagePtr M6IndexImpl::Cache(int64 inPageNr, M6IndexBranchPage* inParent)
 		else
 			page = new M6IndexBranchPage(*this, data, inPageNr, inParent);
 
-		page->SetNext(mCache);
-		mCache = page;
-		++mCachedCount;
+		mCache.push_front(make_pair(inPageNr, page));
+//		page->SetNext(mCache);
+//		mCache = page;
+//		++mCachedCount;
 	}
 	
 	// now see if we need to clean up a bit
-	if (mCachedCount > 2 * kM6LRUCacheSize)
+	for (size_t ix = mCache.size() - 1; mCache.size() > kM6LRUCacheSize and ix != 0; --ix)
 	{
-		deque<M6IndexPage*> candidates;
-		
-		for (M6IndexPage* p = mCache->GetNext(); p != nullptr; p = p->GetNext())
-		{
-			// only delete older, unreferenced pages 
-			if (p->GetRefCount() == 0)
-				candidates.push_back(p);
-		}
-		
-		while (candidates.size() > kM6LRUCacheSize)
-			candidates.pop_front();
-		
-		M6IndexPage* p = mCache;
-		while (p != nullptr and not candidates.empty())
-		{
-			if (p->GetNext() == candidates.front())
-			{
-				M6IndexPage* p2 = candidates.front();
-				candidates.pop_front();
-				p->SetNext(p2->GetNext());
-				delete p2;
+		M6IndexPage* p = mCache[ix].second;
 
-				--mCachedCount;
-				continue;
-			}
-			p = p->GetNext();
-		}
+		if (p->GetRefCount() != 0)
+			continue;
+
+		if (p->IsDirty() and mAutoCommit)
+			p->Flush();
+			
+		delete p;
+		mCache.erase(mCache.end() - 1);
 	}
 	
 	return M6IndexPagePtr(page);
@@ -1325,50 +1301,69 @@ M6IndexPagePtr M6IndexImpl::Cache(int64 inPageNr, M6IndexBranchPage* inParent)
 
 void M6IndexImpl::Commit()
 {
-	M6IndexPage* page = mCache;
-	M6IndexPage* last = nullptr;
 	uint32 n = 0;
-	
-	while (page != nullptr)
+	for (auto c = mCache.begin(); c != mCache.end(); ++c)
 	{
-		page->Flush();
-		M6IndexPage* next = page->GetNext();
+		M6IndexPage* p = c->second;
+
+		if (p->IsDirty())
+			p->Flush();
 		
-		if (++n == kM6LRUCacheSize)
-		{
-			last = next;
-			page->SetNext(nullptr);
-		}
-
-		page = next;
+		if (n++ > kM6LRUCacheSize)
+			delete p;
 	}
 	
-	page = last;
-	while (page != nullptr)
-	{
-		M6IndexPage* next = page->GetNext();
-		delete page;
-		page = next;
-	}
+	if (n >= kM6LRUCacheSize)
+		mCache.erase(mCache.end() + kM6LRUCacheSize, mCache.end());
 
-	assert(n == mCachedCount);
-	mCachedCount = n;
-	if (mCachedCount > kM6LRUCacheSize)
-		mCachedCount = kM6LRUCacheSize;
+	//M6IndexPage* page = mCache;
+	//M6IndexPage* last = nullptr;
+	//uint32 n = 0;
+	//
+	//while (page != nullptr)
+	//{
+	//	page->Flush();
+	//	M6IndexPage* next = page->GetNext();
+	//	
+	//	if (++n == kM6LRUCacheSize)
+	//	{
+	//		last = next;
+	//		page->SetNext(nullptr);
+	//	}
+
+	//	page = next;
+	//}
+	//
+	//page = last;
+	//while (page != nullptr)
+	//{
+	//	M6IndexPage* next = page->GetNext();
+	//	delete page;
+	//	page = next;
+	//}
+
+	//assert(n == mCachedCount);
+	//mCachedCount = n;
+	//if (mCachedCount > kM6LRUCacheSize)
+	//	mCachedCount = kM6LRUCacheSize;
 }
 
 void M6IndexImpl::Rollback()
 {
-	M6IndexPage* page = mCache;
-	while (page != nullptr)
-	{
-		M6IndexPage* next = page->GetNext();
-		delete page;
-		page = next;
-	}
+	for (auto c = mCache.begin(); c != mCache.end(); ++c)
+		delete c->second;
+	mCache.clear();
 
-	mCache = nullptr;
-	mCachedCount = 0;
+//	M6IndexPage* page = mCache;
+//	while (page != nullptr)
+//	{
+//		M6IndexPage* next = page->GetNext();
+//		delete page;
+//		page = next;
+//	}
+//
+//	mCache = nullptr;
+//	mCachedCount = 0;
 }
 
 void M6IndexImpl::SetAutoCommit(bool inAutoCommit)

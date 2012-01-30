@@ -176,7 +176,7 @@ class M6IndexImpl
 	bool			mDirty;
 	bool			mAutoCommit;
 
-	static const uint32 kM6LRUCacheSize = 10;
+	static const uint32 kM6LRUCacheSize = 25;
 	M6IndexPage*	mCache;
 	uint32			mCachedCount;
 };
@@ -198,8 +198,8 @@ class M6IndexPage
 	M6IndexPage*	GetNext() const					{ return mNext; }
 	void			SetNext(M6IndexPage* inNext)	{ mNext = inNext; }
 
-	uint32			GetPageNr() const				{ return mPageNr; }
-	void			MoveTo(uint32 inPageNr);
+	int64			GetPageNr() const				{ return mPageNr; }
+	void			MoveTo(int64 inPageNr);
 
 	void			SetParent(M6IndexBranchPage* inParent);
 	M6IndexBranchPage*
@@ -251,7 +251,7 @@ class M6IndexPage
 	void			ReplaceKey(uint32 inIndex, const string& inKey);
 
   protected:
-					M6IndexPage(M6IndexImpl& inIndexImpl, M6IndexPageData* inData, uint32 inPageNr, 
+					M6IndexPage(M6IndexImpl& inIndexImpl, M6IndexPageData* inData, int64 inPageNr, 
 						M6IndexBranchPage* inParent);
 
 	void			BinarySearch(const string& inKey, int32& outIndex, bool& outMatch) const;
@@ -262,7 +262,7 @@ class M6IndexPage
 	M6IndexBranchPage*	mParent;	
 	M6IndexPage*		mNext;					
 	M6IndexPageData*	mData;
-	uint32				mPageNr;
+	int64				mPageNr;
 	int32				mRefCount;
 	bool				mLocked;
 	bool				mDirty;
@@ -279,7 +279,7 @@ class M6IndexLeafPage : public M6IndexPage
 {
   public:
 					M6IndexLeafPage(M6IndexImpl& inIndexImpl, M6IndexPageData* inData,
-						uint32 inPageNr, M6IndexBranchPage* inParent);
+						int64 inPageNr, M6IndexBranchPage* inParent);
 
 	virtual bool	Find(const string& inKey, int64& outValue);
 	virtual bool	Insert(string& ioKey, int64& ioValue);
@@ -292,7 +292,7 @@ class M6IndexBranchPage : public M6IndexPage
 {
   public:
 					M6IndexBranchPage(M6IndexImpl& inIndexImpl, M6IndexPageData* inData,
-						uint32 inPageNr, M6IndexBranchPage* inParent);
+						int64 inPageNr, M6IndexBranchPage* inParent);
 
 	virtual bool	Find(const string& inKey, int64& outValue);
 	virtual bool	Insert(string& ioKey, int64& ioValue);
@@ -300,7 +300,7 @@ class M6IndexBranchPage : public M6IndexPage
 
 	virtual bool	Underflow(M6IndexPage& inRight, uint32 inIndex);
 	
-	bool			UpdateLinkKey(const string& inNewKey, uint32 inPageNr);
+	bool			UpdateLinkKey(const string& inNewKey, int64 inPageNr);
 };
 
 // --------------------------------------------------------------------
@@ -362,7 +362,7 @@ inline void M6IndexPagePtr::reset(M6IndexPage* inPage)
 
 // --------------------------------------------------------------------
 
-M6IndexPage::M6IndexPage(M6IndexImpl& inIndexImpl, M6IndexPageData* inData, uint32 inPageNr,
+M6IndexPage::M6IndexPage(M6IndexImpl& inIndexImpl, M6IndexPageData* inData, int64 inPageNr,
 		M6IndexBranchPage* inParent)
 	: mIndexImpl(inIndexImpl)
 	, mPageNr(inPageNr)
@@ -500,7 +500,7 @@ void M6IndexPage::SetParent(M6IndexBranchPage* inParent)
 	mParent = inParent;
 }
 
-void M6IndexPage::MoveTo(uint32 inPageNr)
+void M6IndexPage::MoveTo(int64 inPageNr)
 {
 	if (inPageNr != mPageNr)
 	{
@@ -689,7 +689,7 @@ void M6IndexPage::ReplaceKey(uint32 inIndex, const string& inKey)
 
 // --------------------------------------------------------------------
 
-M6IndexLeafPage::M6IndexLeafPage(M6IndexImpl& inIndexImpl, M6IndexPageData* inData, uint32 inPageNr,
+M6IndexLeafPage::M6IndexLeafPage(M6IndexImpl& inIndexImpl, M6IndexPageData* inData, int64 inPageNr,
 		M6IndexBranchPage* inParent)
 	: M6IndexPage(inIndexImpl, inData, inPageNr, inParent)
 {
@@ -890,7 +890,7 @@ bool M6IndexLeafPage::Underflow(M6IndexPage& inRight, uint32 inIndex)
 
 // --------------------------------------------------------------------
 
-M6IndexBranchPage::M6IndexBranchPage(M6IndexImpl& inIndexImpl, M6IndexPageData* inData, uint32 inPageNr,
+M6IndexBranchPage::M6IndexBranchPage(M6IndexImpl& inIndexImpl, M6IndexPageData* inData, int64 inPageNr,
 		M6IndexBranchPage* inParent)
 	: M6IndexPage(inIndexImpl, inData, inPageNr, inParent)
 {
@@ -904,12 +904,12 @@ bool M6IndexBranchPage::Find(const string& inKey, int64& outValue)
 	
 	BinarySearch(inKey, ix, match);
 
-	uint32 pageNr;
+	int64 pageNr;
 	
 	if (ix < 0)
 		pageNr = mData->mLink;
 	else
-		pageNr = GetValue32(ix);
+		pageNr = GetValue(ix);
 	
 	M6IndexPagePtr page(mIndexImpl.Cache(pageNr, this));
 	return page->Find(inKey, outValue);
@@ -928,12 +928,12 @@ bool M6IndexBranchPage::Insert(string& ioKey, int64& ioValue)
 
 	BinarySearch(ioKey, ix, match);
 	
-	uint32 pageNr;
+	int64 pageNr;
 	
 	if (ix < 0)
 		pageNr = mData->mLink;
 	else
-		pageNr = GetValue32(ix);
+		pageNr = GetValue(ix);
 
 	M6IndexPagePtr page(mIndexImpl.Cache(pageNr, this));
 	if (page->Insert(ioKey, ioValue))
@@ -1011,7 +1011,7 @@ bool M6IndexBranchPage::Erase(string& ioKey, int32 inIndex)
 	
 	BinarySearch(ioKey, ix, match);
 
-	uint32 pageNr;
+	int64 pageNr;
 	
 	if (ix < 0)
 		pageNr = mData->mLink;
@@ -1238,7 +1238,11 @@ M6IndexImpl::~M6IndexImpl()
 M6IndexPagePtr M6IndexImpl::AllocateLeaf(M6IndexBranchPage* inParent)
 {
 	int64 fileSize = mFile.Size();
-	uint32 pageNr = static_cast<uint32>((fileSize - 1) / kM6IndexPageSize) + 1;
+	int64 pageNr = (fileSize - 1) / kM6IndexPageSize + 1;
+	
+	if (pageNr > numeric_limits<uint32>::max())
+		THROW(("Index too large"));
+	
 	int64 offset = pageNr * kM6IndexPageSize;
 	mFile.Truncate(offset + kM6IndexPageSize);
 	
@@ -1246,7 +1250,7 @@ M6IndexPagePtr M6IndexImpl::AllocateLeaf(M6IndexBranchPage* inParent)
 	memset(data, 0, kM6IndexPageSize);
 	data->mFlags = eM6IndexPageIsLeaf;
 	
-	M6IndexPage* page = new M6IndexLeafPage(*this, data, pageNr, inParent);
+	M6IndexPage* page = new M6IndexLeafPage(*this, data, static_cast<uint32>(pageNr), inParent);
 	page->SetNext(mCache);
 	mCache = page;
 	++mCachedCount;
@@ -1257,14 +1261,18 @@ M6IndexPagePtr M6IndexImpl::AllocateLeaf(M6IndexBranchPage* inParent)
 M6IndexPagePtr M6IndexImpl::AllocateBranch(M6IndexBranchPage* inParent)
 {
 	int64 fileSize = mFile.Size();
-	uint32 pageNr = static_cast<uint32>((fileSize - 1) / kM6IndexPageSize) + 1;
+	int64 pageNr = (fileSize - 1) / kM6IndexPageSize + 1;
+	
+	if (pageNr > numeric_limits<uint32>::max())
+		THROW(("Index too large"));
+	
 	int64 offset = pageNr * kM6IndexPageSize;
 	mFile.Truncate(offset + kM6IndexPageSize);
 	
 	M6IndexPageData* data = new M6IndexPageData;
 	memset(data, 0, kM6IndexPageSize);
 	
-	M6IndexPage* page = new M6IndexBranchPage(*this, data, pageNr, inParent);
+	M6IndexPage* page = new M6IndexBranchPage(*this, data, static_cast<uint32>(pageNr), inParent);
 	page->SetNext(mCache);
 	mCache = page;
 	++mCachedCount;
@@ -1759,6 +1767,21 @@ uint32 M6BasicIndex::depth() const
 	return mImpl->Depth();
 }
 
+void M6BasicIndex::Commit()
+{
+	mImpl->Commit();
+}
+
+void M6BasicIndex::Rollback()
+{
+	mImpl->Rollback();
+}
+
+void M6BasicIndex::SetAutoCommit(bool inAutoCommit)
+{
+	mImpl->SetAutoCommit(inAutoCommit);
+}
+
 // DEBUG code
 
 #if DEBUG
@@ -1898,16 +1921,6 @@ void M6BasicIndex::dump() const
 void M6BasicIndex::validate() const
 {
 	mImpl->Validate();
-}
-
-void M6BasicIndex::Commit()
-{
-	mImpl->Commit();
-}
-
-void M6BasicIndex::Rollback()
-{
-	mImpl->Rollback();
 }
 
 #endif

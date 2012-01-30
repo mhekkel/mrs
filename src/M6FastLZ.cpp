@@ -31,6 +31,8 @@
 
 #include "M6Lib.h"
 
+#include <cassert>
+
 namespace
 {
 
@@ -81,7 +83,7 @@ int32 FastLZCompress(const void* input, size_t length,
 		if (length > 0 and maxout >= length + 1)
 		{
 			// create literal copy only
-			*op++ = length - 1;
+			*op++ = static_cast<uint8>(length - 1);
 			
 			assert(op < op_limit);
 			
@@ -91,7 +93,7 @@ int32 FastLZCompress(const void* input, size_t length,
 
 			assert(op < op_limit);
 
-			return length + 1;
+			return static_cast<int32>(length + 1);
 		}
 		else
 			return 0;
@@ -262,7 +264,7 @@ int32 FastLZCompress(const void* input, size_t length,
 	
 	assert(op > output);
 	
-	return op - static_cast<uint8*>(output);
+	return static_cast<int32>(op - static_cast<uint8*>(output));
 }
 
 size_t FastLZDecompress(

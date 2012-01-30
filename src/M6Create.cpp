@@ -4,6 +4,7 @@
 #include <fstream>
 #include <iostream>
 
+#include <boost/filesystem/operations.hpp>
 #include <boost/program_options.hpp>
 
 using namespace std;
@@ -18,6 +19,8 @@ int main(int argc, char* argv[])
 			("help,h",								"Display help message")
 			("input,i",		po::value<string>(),	"Input file (one entry per line)")
 			("output,o",	po::value<string>(),	"Output file (defaults to input-file-name + .ix)")
+			("insert-mode",							"Use insert mode")
+//			("batch-mode",							"Use batch mode")
 //			("verbose,v",							"Be verbose")
 			;
 
@@ -62,15 +65,41 @@ int main(int argc, char* argv[])
 					result = true;
 					break;
 				}
+				
+				if ((nr % 10000) == 0)
+				{
+					cout << '.';
+					cout.flush();
+				}
 
 				return result;
 			};
 		
-		M6SimpleIndex indx(outfile, data);
-		
-		cout << "Created index with:" << endl
-			 << "  " << indx.size() << " entries" << endl
-			 << "  " << indx.depth() << " depth" << endl;
+		if (vm.count("insert-mode"))
+		{
+			if (fs::exists(filename))
+				fs::remove(filename);
+
+			M6SimpleIndex indx(outfile, eReadWrite);
+			
+			M6Tuple tuple;
+			while (data(tuple))
+				indx.insert(tuple.key, tuple.value);
+
+			cout << endl
+				 << "Created index with:" << endl
+				 << "  " << indx.size() << " entries" << endl
+				 << "  " << indx.depth() << " depth" << endl;
+		}
+		else
+		{
+			M6SimpleIndex indx(outfile, data);
+			
+			cout << endl
+				 << "Created index with:" << endl
+				 << "  " << indx.size() << " entries" << endl
+				 << "  " << indx.depth() << " depth" << endl;
+		}
 	}
 	catch (exception& e)
 	{

@@ -503,7 +503,7 @@ BOOST_AUTO_TEST_CASE(file_ix_5c)
 	foreach (auto t, testix)
 	{
 		indx.erase(t.first);
-		indx.validate();
+		//indx.validate();
 		int64 v;
 		BOOST_CHECK_EQUAL(indx.find(t.first, v), false);
 	}

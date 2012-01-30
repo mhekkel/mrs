@@ -81,10 +81,16 @@ int main(int argc, char* argv[])
 				fs::remove(filename);
 
 			M6SimpleIndex indx(outfile, eReadWrite);
+			indx.SetAutoCommit(false);
 			
 			M6Tuple tuple;
 			while (data(tuple))
 				indx.insert(tuple.key, tuple.value);
+			
+			cout << endl
+				 << "Wrote entries, now committing" << endl;
+				
+			indx.Commit();
 
 			cout << endl
 				 << "Created index with:" << endl

@@ -32,6 +32,10 @@ class M6BasicIndex
 					M6BasicIndex(const std::string& inPath, M6SortedInputIterator& inData);
 
 	virtual			~M6BasicIndex();
+
+	void			Commit();
+	void			Rollback();
+	void			SetAutoCommit(bool inAutoCommit);
 	
 	void			Vacuum();
 	

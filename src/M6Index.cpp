@@ -155,6 +155,7 @@ class M6IndexImpl
 
 	void			Commit();
 	void			Rollback();
+	void			SetAutoCommit(bool inAutoCommit);
 
 	// page cache
 	M6IndexPagePtr	AllocateLeaf(M6IndexBranchPage* inParent);
@@ -173,6 +174,7 @@ class M6IndexImpl
 	M6BasicIndex&	mIndex;
 	M6IxFileHeader	mHeader;
 	bool			mDirty;
+	bool			mAutoCommit;
 
 	static const uint32 kM6LRUCacheSize = 10;
 	M6IndexPage*	mCache;
@@ -1137,6 +1139,7 @@ M6IndexImpl::M6IndexImpl(M6BasicIndex& inIndex, const string& inPath, MOpenMode 
 	: mFile(inPath, inMode)
 	, mIndex(inIndex)
 	, mDirty(false)
+	, mAutoCommit(true)
 	, mCache(nullptr)
 	, mCachedCount(0)
 {
@@ -1167,6 +1170,7 @@ M6IndexImpl::M6IndexImpl(M6BasicIndex& inIndex, const string& inPath,
 	: mFile(inPath, eReadWrite)
 	, mIndex(inIndex)
 	, mDirty(false)
+	, mAutoCommit(true)
 	, mCache(nullptr)
 	, mCachedCount(0)
 {
@@ -1387,6 +1391,11 @@ void M6IndexImpl::Rollback()
 	mCachedCount = 0;
 }
 
+void M6IndexImpl::SetAutoCommit(bool inAutoCommit)
+{
+	mAutoCommit = inAutoCommit;
+}
+
 void M6IndexImpl::Insert(const string& inKey, int64 inValue)
 {
 	try
@@ -1407,7 +1416,8 @@ void M6IndexImpl::Insert(const string& inKey, int64 inValue)
 			mHeader.mRoot = newRoot->GetPageNr();
 		}
 	
-		Commit();
+		if (mAutoCommit)
+			Commit();
 	
 		++mHeader.mSize;
 		mDirty = true;
@@ -1437,7 +1447,8 @@ void M6IndexImpl::Erase(const string& inKey)
 			}
 		}
 		
-		Commit();
+		if (mAutoCommit)
+			Commit();
 	
 		--mHeader.mSize;
 		mDirty = true;
@@ -1887,6 +1898,16 @@ void M6BasicIndex::dump() const
 void M6BasicIndex::validate() const
 {
 	mImpl->Validate();
+}
+
+void M6BasicIndex::Commit()
+{
+	mImpl->Commit();
+}
+
+void M6BasicIndex::Rollback()
+{
+	mImpl->Rollback();
 }
 
 #endif

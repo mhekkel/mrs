@@ -1178,33 +1178,41 @@ M6IndexImpl::M6IndexImpl(M6BasicIndex& inIndex, const string& inPath,
 	mHeader = data.mHeader;
 	mFile.PWrite(mHeader, 0);
 	
-	// inData is sorted, so we start by writing out leaf pages:
-	M6IndexPagePtr page(AllocateLeaf(nullptr));
-	
-	deque<M6Tuple> up;		// keep track of the nodes we have to create for the next levels
-	M6Tuple tuple;
-	
-	tuple.value = page->GetPageNr();
-	up.push_back(tuple);
-	
-	while (inData(tuple))
+	try
 	{
-		if (not page->CanStore(tuple.key))
+		// inData is sorted, so we start by writing out leaf pages:
+		M6IndexPagePtr page(AllocateLeaf(nullptr));
+		
+		deque<M6Tuple> up;		// keep track of the nodes we have to create for the next levels
+		M6Tuple tuple;
+		
+		tuple.value = page->GetPageNr();
+		up.push_back(tuple);
+		
+		while (inData(tuple))
 		{
-			M6IndexPagePtr next(AllocateLeaf(nullptr));
-			page->SetLink(next->GetPageNr());
-			page.reset(next.release());
-
-			up.push_back(tuple);
-			up.back().value = page->GetPageNr();
+			if (not page->CanStore(tuple.key))
+			{
+				M6IndexPagePtr next(AllocateLeaf(nullptr));
+				page->SetLink(next->GetPageNr());
+				page.reset(next.release());
+	
+				up.push_back(tuple);
+				up.back().value = page->GetPageNr();
+			}
+			
+			page->InsertKeyValue(tuple.key, tuple.value, page->GetN());
+			++mHeader.mSize;
 		}
 		
-		page->InsertKeyValue(tuple.key, tuple.value, page->GetN());
-		++mHeader.mSize;
+		// all data is written in the leafs, now construct branch pages
+		CreateUpLevels(up);
 	}
-	
-	// all data is written in the leafs, now construct branch pages
-	CreateUpLevels(up);
+	catch (...)
+	{
+		Rollback();
+		throw;
+	}
 
 	Commit();
 }

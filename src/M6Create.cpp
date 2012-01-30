@@ -2,6 +2,7 @@
 #include "M6Index.h"
 
 #include <fstream>
+#include <iostream>
 
 #include <boost/program_options.hpp>
 

@@ -66,10 +66,10 @@ class M6BasicIndex
 	  private:
 		friend class M6IndexImpl;
 
-						iterator(M6IndexImpl* inIndex, uint32 inPageNr, uint32 inKeyNr);
+						iterator(M6IndexImpl* inIndex, int64 inPageNr, uint32 inKeyNr);
 
 		M6IndexImpl*	mIndex;
-		uint32			mPage;
+		int64			mPage;
 		uint32			mKeyNr;
 		M6Tuple			mCurrent;
 	};

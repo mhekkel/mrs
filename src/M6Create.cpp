@@ -24,9 +24,8 @@ int main(int argc, char* argv[])
 			("help,h",								"Display help message")
 			("input,i",		po::value<string>(),	"Input file (one entry per line)")
 			("output,o",	po::value<string>(),	"Output file (defaults to input-file-name + .ix)")
-			("insert-mode",							"Use insert mode")
-			("test-mode",	po::value<string>(),	"Test instead of create")
-//			("batch-mode",							"Use batch mode")
+			("insert",								"Use insert mode")
+			("test",		po::value<string>(),	"Test instead of create")
 			("verbose,v",							"Be verbose")
 			;
 
@@ -91,14 +90,16 @@ int main(int argc, char* argv[])
 				return result;
 			};
 		
-		if (vm.count("test-mode"))
+		if (vm.count("test"))
 		{
 			M6SimpleIndex indx(outfile, eReadOnly);
 			
 			uint32 n = 0;
 			M6Tuple tuple;
 			
-			if (vm["test-mode"].as<string>() == "iterator")
+			if (vm["test"].as<string>() == "validate")
+				indx.validate();
+			else if (vm["test"].as<string>() == "iterator")
 			{
 				M6SimpleIndex::iterator i = indx.begin();
 				while (data(tuple) and i != indx.end())
@@ -132,7 +133,7 @@ int main(int argc, char* argv[])
 			if (n != indx.size())
 				THROW(("Invalid index size: %ld != %ld", n, indx.size()));
 		}
-		else if (vm.count("insert-mode"))
+		else if (vm.count("insert"))
 		{
 			if (fs::exists(outfile))
 				fs::remove(outfile);

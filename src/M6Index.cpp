@@ -7,6 +7,7 @@
 #include "M6Lib.h"
 
 #include <deque>
+#include <list>
 #include <vector>
 #include <numeric>
 
@@ -27,11 +28,11 @@ using namespace std;
 // this boils down to 42.
 
 const uint32
-//	kM6IndexPageSize = 8192,
-	kM6IndexPageSize = 128,
+	kM6IndexPageSize = 8192,
+//	kM6IndexPageSize = 128,
 	kM6IndexPageHeaderSize = 16,
-//	kM6MaxEntriesPerPage = (kM6IndexPageSize - kM6IndexPageHeaderSize) / 12,	// keeps code simple
-	kM6MaxEntriesPerPage = 4,
+	kM6MaxEntriesPerPage = (kM6IndexPageSize - kM6IndexPageHeaderSize) / 12,	// keeps code simple
+//	kM6MaxEntriesPerPage = 4,
 	kM6MinEntriesPerPage = 2,
 	kM6IndexPageKeySpace = kM6IndexPageSize - kM6IndexPageHeaderSize,
 	kM6IndexPageMinKeySpace = kM6IndexPageKeySpace / 2,
@@ -117,6 +118,8 @@ class M6IndexPagePtr
 	M6IndexPage*	operator->() const			{ return mPage; }
 					operator bool() const		{ return mPage != nullptr; }
 
+	void			swap(M6IndexPagePtr& ptr)	{ std::swap(mPage, ptr.mPage); }
+
   private:
 	M6IndexPage*	mPage;	
 };
@@ -179,9 +182,9 @@ class M6IndexImpl
 	bool			mDirty;
 	bool			mAutoCommit;
 
-	static const uint32 kM6LRUCacheSize = 25;
+	static const uint32 kM6LRUCacheSize = 10;
 	
-	deque<M6IndexPagePtr>		mCache;
+	list<M6IndexPagePtr>		mCache;
 };
 
 // --------------------------------------------------------------------
@@ -210,8 +213,8 @@ class M6IndexPage
 	uint32			Free() const					{ return kM6IndexPageKeySpace - mKeyOffsets[mData->mN] - mData->mN * sizeof(int64); }
 	bool			CanStore(const string& inKey)	{ return static_cast<uint32>(mData->mN) < kM6MaxEntriesPerPage and Free() >= inKey.length() + 1 + sizeof(int64); }
 	
-//	bool			TooSmall() const				{ return Free() > kM6IndexPageMinKeySpace; }
-	bool			TooSmall() const				{ return mData->mN < kM6MinEntriesPerPage; }
+	bool			TooSmall() const				{ return Free() > kM6IndexPageMinKeySpace; }
+//	bool			TooSmall() const				{ return mData->mN < kM6MinEntriesPerPage; }
 	
 	void			SetLink(int64 inLink);
 	int64			GetLink() const					{ return mData->mLink; }
@@ -347,6 +350,15 @@ inline void M6IndexPagePtr::reset(M6IndexPage* inPage)
 	mPage = inPage;
 	if (mPage != nullptr)
 		mPage->Reference();
+}
+
+namespace std
+{
+	template<>
+	void swap(M6IndexPagePtr& a, M6IndexPagePtr& b)
+	{
+		a.swap(b);
+	}	
 }
 
 // --------------------------------------------------------------------
@@ -1219,17 +1231,6 @@ M6IndexPagePtr M6IndexImpl::Cache(int64 inPageNr)
 			page.reset(new M6IndexBranchPage(*this, data, inPageNr));
 
 		mCache.push_front(page);
-	}
-	
-	if (mCache.size() > kM6LRUCacheSize)
-	{
-		mCache.erase(
-			remove_if(mCache.begin() + kM6LRUCacheSize, mCache.end(),
-				[](M6IndexPagePtr& ptr) -> bool
-				{
-					return not ptr->IsDirty() and ptr->GetRefCount() == 1;
-				}),
-			mCache.end());
 	}
 	
 	return page;

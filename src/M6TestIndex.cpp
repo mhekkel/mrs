@@ -511,53 +511,53 @@ BOOST_AUTO_TEST_CASE(file_ix_5c)
 	BOOST_CHECK_EQUAL(indx.size(), 0);
 }	
 
-//BOOST_AUTO_TEST_CASE(file_ix_1a)
-//{
-//	if (fs::exists(filename))
-//		fs::remove(filename);
-//
-//	int64 nr = 0;
-//
-//	boost::format nf("%04.4d");
-//	
-//	M6SortedInputIterator data = 
-//		[&nr, &nf](M6Tuple& outTuple) -> bool
-//		{
-//			bool result = false;
-//			if (++nr <= 100)
-//			{
-//				outTuple.key = (nf % nr).str();
-//				outTuple.value = nr;
-//				result = true;
-//			}
-//			return result;
-//		};	
-//
-//	M6SimpleIndex indx(filename, data);
-//	indx.validate();
-//	indx.dump();
-//	
-//	for (;;)
-//	{
-//		cout << "> "; cout.flush();
-//		int i;
-//		cin >> i;
-//		if (cin.eof() or i == 0)
-//			break;
-//			
-//		if (i > 0)
-//			indx.insert((nf % i).str(), i);
-//		else
-//			indx.erase((nf % -i).str());
-//
-//		indx.dump();
-//		indx.validate();
-//
-//		foreach (auto i, indx)
-//		{
-//			int64 v;
-//			BOOST_CHECK(indx.find(i.key, v));
-//			BOOST_CHECK_EQUAL(v, i.value);
-//		}
-//	}
-//}
+BOOST_AUTO_TEST_CASE(file_ix_1a)
+{
+	if (fs::exists(filename))
+		fs::remove(filename);
+
+	int64 nr = 0;
+
+	boost::format nf("%04.4d");
+	
+	M6SortedInputIterator data = 
+		[&nr, &nf](M6Tuple& outTuple) -> bool
+		{
+			bool result = false;
+			if (++nr <= 100)
+			{
+				outTuple.key = (nf % nr).str();
+				outTuple.value = nr;
+				result = true;
+			}
+			return result;
+		};	
+
+	M6SimpleIndex indx(filename, data);
+	indx.validate();
+	indx.dump();
+	
+	for (;;)
+	{
+		cout << "> "; cout.flush();
+		int i;
+		cin >> i;
+		if (cin.eof() or i == 0)
+			break;
+			
+		if (i > 0)
+			indx.insert((nf % i).str(), i);
+		else
+			indx.erase((nf % -i).str());
+
+		indx.dump();
+		indx.validate();
+
+		foreach (auto i, indx)
+		{
+			int64 v;
+			BOOST_CHECK(indx.find(i.key, v));
+			BOOST_CHECK_EQUAL(v, i.value);
+		}
+	}
+}

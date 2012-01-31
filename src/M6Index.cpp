@@ -1651,14 +1651,15 @@ class M6ValidationException : public std::exception
 {
   public:
 					M6ValidationException(M6IndexPage* inPage, const char* inReason)
-						: mPageNr(inPage->GetPageNr()), mReason(inReason)
+						: mPageNr(inPage->GetPageNr())
 					{
+						snprintf(mReason, sizeof(mReason), "%s", inReason);
 					}
 			
-	const char*		what() throw() { return mReason.c_str(); }
+	const char*		what() throw() { return mReason; }
 		
 	int64			mPageNr;
-	string			mReason;
+	char			mReason[512];
 };
 
 #define M6VALID_ASSERT(cond)	do { if (not (cond)) throw M6ValidationException(this, #cond ); } while (false)

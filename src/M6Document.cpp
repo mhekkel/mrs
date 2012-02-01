@@ -23,7 +23,7 @@ void M6Document::Compress(vector<uint8>& outData) const
 
 void M6Document::Decompress(const vector<uint8>& inData)
 {
-	mText.assign(reinterpret_cast<const char*>(inData[0]), inData.size());
+	mText.assign(reinterpret_cast<const char*>(&inData[0]), inData.size());
 }
 
 //M6IndexTokenList::iterator M6Document::GetIndexTokens(

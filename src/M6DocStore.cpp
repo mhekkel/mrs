@@ -33,9 +33,9 @@ enum M6DataPageType
 
 struct M6DocStoreIndexEntry
 {
-	uint32	mDocNr;
-	uint32	mPageNr;
-	uint32	mDocSize;
+	uint32	mDocNr_;
+	uint32	mDocPage_;
+	uint32	mDocSize_;
 };
 
 struct M6DocStorePageData
@@ -92,7 +92,7 @@ class M6DocStorePage
   public:
 					M6DocStorePage(M6DocStoreImpl& inStore, M6DocStorePageData* inData, uint32 inPageNr)
 						: mStore(inStore), mData(inData), mPageNr(inPageNr), mDirty(false) {}
-	virtual			~M6DocStorePage() {}
+	virtual			~M6DocStorePage();
 
 	void			SetPageType(uint8 inType)		{ mData->mType = inType; }
 
@@ -177,6 +177,14 @@ class M6DocStoreIndexPage : public M6DocStorePage
   public:
 					M6DocStoreIndexPage(M6DocStoreImpl& inStore, M6DocStorePageData* inData, uint32 inPageNr);
 	virtual			~M6DocStoreIndexPage();
+
+	uint32			GetKey(uint32 inIndex) const		{ return swap_bytes(mData->mData[inIndex].mDocNr_); }
+	uint32			GetDocPage(uint32 inIndex) const	{ return swap_bytes(mData->mData[inIndex].mDocPage_); }
+	uint32			GetDocSize(uint32 inIndex) const	{ return swap_bytes(mData->mData[inIndex].mDocSize_); }
+
+	void			SetKey(uint32 inIndex, uint32 inValue)		{ mData->mData[inIndex].mDocNr_ = swap_bytes(inValue); }
+	void			SetDocPage(uint32 inIndex, uint32 inValue)	{ mData->mData[inIndex].mDocPage_ = swap_bytes(inValue); }
+	void			SetDocSize(uint32 inIndex, uint32 inValue)	{ mData->mData[inIndex].mDocSize_ = swap_bytes(inValue); }
 
 	bool			Insert(uint32& ioDocNr, uint32& ioPageNr, uint32& ioDocSize);
 	void			Erase(uint32 inDocNr);
@@ -335,6 +343,11 @@ M6DocStorePagePtr<T>& M6DocStorePagePtr<T>::operator=(const M6DocStorePagePtr& i
 
 // --------------------------------------------------------------------
 
+M6DocStorePage::~M6DocStorePage()
+{
+	delete mData;
+}
+
 void M6DocStorePage::Flush(M6File& inFile)
 {
 	if (mDirty)
@@ -353,7 +366,6 @@ M6DocStoreDataPage::M6DocStoreDataPage(M6DocStoreImpl& inStore, M6DocStorePageDa
 
 M6DocStoreDataPage::~M6DocStoreDataPage()
 {
-	delete mData;
 }
 
 uint32 M6DocStoreDataPage::Store(uint32 inDocNr, const uint8* inData, uint32 inSize)
@@ -374,7 +386,7 @@ uint32 M6DocStoreDataPage::Store(uint32 inDocNr, const uint8* inData, uint32 inS
 		
 		memcpy(dst, inData, result);
 
-		mData->mN += result + sizeof(uint32) + sizeof(uint16);
+		mData->mN += static_cast<uint16>(result + sizeof(uint32) + sizeof(uint16));
 	}
 	
 	mDirty = true;
@@ -422,9 +434,9 @@ M6DocStoreIndexPage::~M6DocStoreIndexPage()
 void M6DocStoreIndexPage::Insert(uint32 inDocNr, uint32 inPageNr, uint32 inDocSize, uint32 inIndex)
 {
 	memmove(mData->mData + inIndex + 1, mData->mData + inIndex, sizeof(M6DocStoreIndexEntry) * (mData->mN - inIndex));
-	mData->mData[inIndex].mDocNr = inDocNr;
-	mData->mData[inIndex].mPageNr = inPageNr;
-	mData->mData[inIndex].mDocSize = inDocSize;
+	SetKey(inIndex, inDocNr);
+	SetDocPage(inIndex, inPageNr);
+	SetDocSize(inIndex, inDocSize);
 	++mData->mN;
 	mDirty = true;
 }
@@ -454,14 +466,13 @@ bool M6DocStoreIndexPage::Insert(uint32& ioDocNr, uint32& ioPageNr, uint32& ioDo
 	assert(mData->mType == eM6DocStoreIndexBranchPage or mData->mType == eM6DocStoreIndexLeafPage);
 
 	bool result = false;
-	M6DocStoreIndexEntry* data = mData->mData;
 	
 	int32 L = 0, R = mData->mN - 1;
 	while (L <= R)
 	{
 		int32 i = (L + R) / 2;
 		
-		if (ioDocNr < data[i].mDocNr)
+		if (ioDocNr < GetKey(i))
 			R = i - 1;
 		else
 			L = i + 1;
@@ -471,10 +482,10 @@ bool M6DocStoreIndexPage::Insert(uint32& ioDocNr, uint32& ioPageNr, uint32& ioDo
 	{
 		int32 ix = R + 1;
 		
-		if (data[ix].mDocNr == ioDocNr)
+		if (GetKey(ix) == ioDocNr)
 		{
-			data[ix].mPageNr = ioPageNr;
-			data[ix].mDocSize = ioDocSize;
+			SetDocPage(ix, ioPageNr);
+			SetDocSize(ix, ioDocSize);
 		}
 		else if (mData->mN < kM6DataPageIndexCount)
 			Insert(ioDocNr, ioPageNr, ioDocSize, ix);
@@ -494,7 +505,7 @@ bool M6DocStoreIndexPage::Insert(uint32& ioDocNr, uint32& ioPageNr, uint32& ioDo
 			else
 				next->Insert(ioDocNr, ioPageNr, ioDocSize, ix - mData->mN);
 			
-			ioDocNr = next->mData->mData[0].mDocNr;
+			ioDocNr = next->GetKey(0);
 			ioPageNr = next->GetPageNr();
 			
 			result = true;
@@ -508,7 +519,7 @@ bool M6DocStoreIndexPage::Insert(uint32& ioDocNr, uint32& ioPageNr, uint32& ioDo
 		if (R < 0)
 			pageNr = mData->mLink;
 		else
-			pageNr = data[R].mPageNr;
+			pageNr = GetDocPage(R);
 		
 		M6DocStoreIndexPagePtr page(mStore.Load<M6DocStoreIndexPage>(pageNr));
 		if (page->Insert(ioDocNr, ioPageNr, ioDocSize))
@@ -537,13 +548,13 @@ bool M6DocStoreIndexPage::Insert(uint32& ioDocNr, uint32& ioPageNr, uint32& ioDo
 					if (ix < split)
 						--split;
 
-					upDocNr = data[split].mDocNr;
-					downPageNr = data[split].mPageNr;
+					upDocNr = GetKey(split);
+					downPageNr = GetDocPage(split);
 					
 					Move(*this, *next, split + 1, 0, mData->mN - split - 1);
 					mData->mN -= 1;
 					
-					if (ioDocNr < next->mData->mData[0].mDocNr)
+					if (ioDocNr < next->GetKey(0))
 						Insert(ioDocNr, ioPageNr, ioDocSize, ix);
 					else
 						next->Insert(ioDocNr, ioPageNr, ioDocSize, ix - split - 1);
@@ -569,14 +580,13 @@ void M6DocStoreIndexPage::Erase(uint32 inDocNr)
 bool M6DocStoreIndexPage::Find(uint32 inDocNr, uint32& outPageNr, uint32& outDocSize)
 {
 	bool result = false;
-	M6DocStoreIndexEntry* data = mData->mData;
 	
 	int32 L = 0, R = mData->mN - 1;
 	while (L <= R)
 	{
 		int32 i = (L + R) / 2;
 		
-		if (inDocNr < data[i].mDocNr)
+		if (inDocNr < GetKey(i))
 			R = i - 1;
 		else
 			L = i + 1;
@@ -584,10 +594,10 @@ bool M6DocStoreIndexPage::Find(uint32 inDocNr, uint32& outPageNr, uint32& outDoc
 	
 	if (mData->mType == eM6DocStoreIndexLeafPage)
 	{
-		if (R >= 0 and data[R].mDocNr == inDocNr)
+		if (R >= 0 and GetKey(R) == inDocNr)
 		{
-			outPageNr = data[R].mPageNr;
-			outDocSize = data[R].mDocSize;
+			outPageNr = GetDocPage(R);
+			outDocSize = GetDocSize(R);
 			result = true;
 		}
 	}
@@ -598,7 +608,7 @@ bool M6DocStoreIndexPage::Find(uint32 inDocNr, uint32& outPageNr, uint32& outDoc
 		if (R < 0)
 			pageNr = mData->mLink;
 		else
-			pageNr = data[R].mPageNr;
+			pageNr = GetDocPage(R);
 		
 		M6DocStoreIndexPagePtr page(mStore.Load<M6DocStoreIndexPage>(pageNr));
 		return page->Find(inDocNr, outPageNr, outDocSize);
@@ -613,18 +623,18 @@ void M6DocStoreIndexPage::Validate(uint32 inKey, M6DocStoreIndexPage* inParent)
 	{
 //		M6VALID_ASSERT(mData->mN >= kM6MinEntriesPerPage or inParent == nullptr);
 		//M6VALID_ASSERT(inParent == nullptr or not TooSmall());
-		assert(inKey == 0 or mData->mData[0].mDocNr == inKey);
+		assert(inKey == 0 or GetKey(0) == inKey);
 		
 		for (uint32 i = 0; i < mData->mN; ++i)
 		{
 			if (i > 0)
-				assert(mData->mData[i].mDocNr > mData->mData[i - 1].mDocNr);
+				assert(GetKey(i) > GetKey(i - 1));
 		}
 		
 		if (mData->mLink != 0)
 		{
 			M6DocStoreIndexPagePtr next(mStore.Load<M6DocStoreIndexPage>(mData->mLink));
-			assert(mData->mData[mData->mN - 1].mDocNr < next->mData->mData[0].mDocNr);
+			assert(GetKey(mData->mN - 1) < next->GetKey(0));
 		}
 	}
 	else
@@ -641,10 +651,10 @@ void M6DocStoreIndexPage::Validate(uint32 inKey, M6DocStoreIndexPage* inParent)
 			
 			for (uint32 i = 0; i < mData->mN; ++i)
 			{
-				M6DocStoreIndexPagePtr page(mStore.Load<M6DocStoreIndexPage>(mData->mData[i].mPageNr));
-				page->Validate(mData->mData[i].mDocNr, this);
+				M6DocStoreIndexPagePtr page(mStore.Load<M6DocStoreIndexPage>(GetDocPage(i)));
+				page->Validate(GetKey(i), this);
 				if (i > 0)
-					assert(mData->mData[i].mDocNr > mData->mData[i - 1].mDocNr);
+					assert(GetKey(i) > GetKey(i - 1));
 			}
 		}
 	}
@@ -658,21 +668,21 @@ void M6DocStoreIndexPage::Dump(int inLevel)
 	{
 		cout << prefix << "leaf page at " << mPageNr << "; N = " << mData->mN << ": [";
 		for (int i = 0; i < mData->mN; ++i)
-			cout << mData->mData[i].mDocNr << '(' << mData->mData[i].mPageNr << ')'
+			cout << GetKey(i) << '(' << GetDocPage(i) << ')'
 				 << (i + 1 < mData->mN ? ", " : "");
 		cout << "]" << endl;
 
 		if (mData->mLink)
 		{
 			M6DocStoreIndexPagePtr next(mStore.Load<M6DocStoreIndexPage>(mData->mLink));
-			cout << prefix << "  " << "link: " << next->mData->mData[0].mDocNr << endl;
+			cout << prefix << "  " << "link: " << next->GetKey(0) << endl;
 		}
 	}
 	else if (mData->mType == eM6DocStoreIndexBranchPage)
 	{
 		cout << prefix << "branch" << " page at " << mPageNr << "; N = " << mData->mN << ": {";
 		for (int i = 0; i < mData->mN; ++i)
-			cout << mData->mData[i].mDocNr << (i + 1 < mData->mN ? ", " : "");
+			cout << GetKey(i) << (i + 1 < mData->mN ? ", " : "");
 		cout << "}" << endl;
 
 		M6DocStoreIndexPagePtr link(mStore.Load<M6DocStoreIndexPage>(mData->mLink));
@@ -680,9 +690,9 @@ void M6DocStoreIndexPage::Dump(int inLevel)
 		
 		for (int i = 0; i < mData->mN; ++i)
 		{
-			cout << prefix << inLevel << '.' << i << ") " << mData->mData[i].mDocNr << endl;
+			cout << prefix << inLevel << '.' << i << ") " << GetKey(i) << endl;
 			
-			M6DocStoreIndexPagePtr sub(mStore.Load<M6DocStoreIndexPage>(mData->mData[i].mPageNr));
+			M6DocStoreIndexPagePtr sub(mStore.Load<M6DocStoreIndexPage>(GetDocPage(i)));
 			sub->Dump(inLevel + 1);
 		}
 	}
@@ -725,11 +735,14 @@ M6DocStoreImpl::M6DocStoreImpl(const string& inPath, MOpenMode inMode)
 
 M6DocStoreImpl::~M6DocStoreImpl()
 {
-	 if (mDirty)
-	 	mFile.PWrite(mHeader, 0);
-	 
+	if (mDirty)
+		mFile.PWrite(mHeader, 0);
+	
+	mRoot = M6DocStoreIndexPagePtr();
+
 	for (uint32 ix = 0; ix < mCacheCount; ++ix)
 		delete mCache[ix].mPage;
+	delete[] mCache;
 }
 
 uint32 M6DocStoreImpl::StoreDocument(M6Document* inDocument)
@@ -753,6 +766,7 @@ uint32 M6DocStoreImpl::StoreDocument(M6Document* inDocument)
 		dataPage = Allocate<M6DocStoreDataPage>();
 		dataPage->SetPageType(eM6DocStoreDataPage);
 		pageNr = dataPage->GetPageNr();
+		mHeader.mLastDataPage = pageNr;
 	}
 	else
 		dataPage = Load<M6DocStoreDataPage>(pageNr);

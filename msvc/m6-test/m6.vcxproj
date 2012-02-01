@@ -144,8 +144,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\M6TestDocStore.cpp" />
-    <ClCompile Include="..\..\src\M6TestIndex.cpp" />
-    <ClCompile Include="..\..\src\M6TestLex.cpp" />
+    <ClCompile Include="..\..\src\M6TestMain.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

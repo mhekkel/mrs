@@ -18,6 +18,7 @@
 #include "M6Error.h"
 #include "M6Lexicon.h"
 #include "M6DocStore.h"
+#include "M6Document.h"
 
 #include <boost/test/unit_test.hpp>
 
@@ -31,6 +32,9 @@ BOOST_AUTO_TEST_CASE(test_store_1)
 
 	ifstream text("test/pdbfind2-head.txt");
 	BOOST_REQUIRE(text.is_open());
+
+	if (fs::exists("test/pdbfind2.docs"))
+		fs::remove("test/pdbfind2.docs");
 	
 	M6DocStore store("test/pdbfind2.docs", eReadWrite);
 	stringstream doc;
@@ -52,8 +56,9 @@ BOOST_AUTO_TEST_CASE(test_store_1)
 		
 		if (line == "//")
 		{
-			M6Document document(doc.str());
-			store.StoreDocument(document);
+			M6Document document;
+			document.SetText(doc.str());
+			store.StoreDocument(&document);
 			++n;
 			
 			doc.str("");

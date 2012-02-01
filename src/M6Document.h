@@ -43,6 +43,7 @@ class M6Document
 	Archive&			serialize(Archive& ar);
 
 	void				Compress(std::vector<uint8>& outData) const;
+	void				Decompress(const std::vector<uint8>& inData);
 	
   private:
 

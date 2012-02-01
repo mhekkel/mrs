@@ -143,6 +143,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\src\M6TestDocStore.cpp" />
     <ClCompile Include="..\..\src\M6TestIndex.cpp" />
     <ClCompile Include="..\..\src\M6TestLex.cpp" />
   </ItemGroup>

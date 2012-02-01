@@ -16,6 +16,16 @@ M6Document::~M6Document()
 	
 }
 
+void M6Document::Compress(vector<uint8>& outData) const
+{
+	copy(mText.begin(), mText.end(), back_inserter(outData));
+}
+
+void M6Document::Decompress(const vector<uint8>& inData)
+{
+	mText.assign(reinterpret_cast<const char*>(inData[0]), inData.size());
+}
+
 //M6IndexTokenList::iterator M6Document::GetIndexTokens(
 //	const std::string& inIndex, M6IndexKind inIndexKind)
 //{
@@ -44,10 +54,10 @@ M6Document::~M6Document()
 //	
 //	return result;
 //}
-//
-//void M6Document::IndexText(const string& inIndex,
-//	M6IndexKind inIndexKind, const string& inText, bool inIndexNumbers)
-//{
+
+void M6Document::IndexText(const string& inIndex,
+	M6IndexKind inIndexKind, const string& inText, bool inIndexNumbers)
+{
 //	M6IndexTokens::iterator ix = GetIndexTokens(inIndex, inIndexKind);
 //	
 //	M6Tokenizer tokenizer(inText.c_str(), inText.length());
@@ -78,9 +88,9 @@ M6Document::~M6Document()
 //		
 //		ix->mTokens.push_back(t);
 //	}
-//}
-//
-//void M6Document::Tokenize(M6Lexicon& inLexicon)
-//{
-//	
-//}
+}
+
+void M6Document::Tokenize(M6Lexicon& inLexicon)
+{
+	
+}

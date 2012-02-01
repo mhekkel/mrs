@@ -36,5 +36,8 @@
     <ClCompile Include="..\..\src\M6Lexicon.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\M6DocStore.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

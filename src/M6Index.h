@@ -43,7 +43,7 @@ class M6BasicIndex
 						const char* inKeyB, size_t inKeyLengthB) const = 0;
 
 	// TODO: rewrite iterator to be able to mutate value's directly
-	class iterator : public std::iterator<std::bidirectional_iterator_tag,const M6Tuple>
+	class iterator : public std::iterator<std::forward_iterator_tag,const M6Tuple>
 	{
 	  public:
 		typedef std::iterator<std::forward_iterator_tag, const M6Tuple>	base_type;

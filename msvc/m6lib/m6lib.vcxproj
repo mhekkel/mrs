@@ -126,6 +126,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\src\M6DocStore.cpp" />
     <ClCompile Include="..\..\src\M6Document.cpp" />
     <ClCompile Include="..\..\src\M6Error.cpp" />
     <ClCompile Include="..\..\src\M6FastLZ.cpp" />

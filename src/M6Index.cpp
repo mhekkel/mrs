@@ -179,6 +179,7 @@ class M6IndexImpl
 	M6File			mFile;
 	M6BasicIndex&	mIndex;
 	M6IxFileHeader	mHeader;
+#pragma warning("TODO: mRoot gaan gebruiken")
 	M6IndexPagePtr	mRoot;
 	bool			mDirty;
 	bool			mAutoCommit;
@@ -188,6 +189,8 @@ class M6IndexImpl
 
 	struct M6CachedPage
 	{
+#pragma warning("TODO: Uitbreiden met dirty, refcount")
+
 		int64			mPageNr;
 		M6IndexPagePtr	mPage;
 		M6CachedPagePtr	mNext;

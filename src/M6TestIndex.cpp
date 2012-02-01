@@ -391,6 +391,37 @@ const char filename[] = "test.index";
 //	}
 //}
 
+BOOST_AUTO_TEST_CASE(file_ix_5)
+{
+	if (fs::exists(filename))
+		fs::remove(filename);
+
+	ifstream text("test/test-doc-2.txt");
+	BOOST_REQUIRE(text.is_open());
+
+	M6SimpleIndex indx(filename, eReadWrite);
+
+	map<string,int64> testix;
+
+	int64 nr = 1;
+	for (;;)
+	{
+		string word;
+		text >> word;
+
+		if (word.empty() and text.eof())
+			break;
+
+		ba::to_lower(word);
+		
+		indx.insert(word, nr);
+		testix[word] = nr++;
+	}
+	
+	indx.validate();
+	indx.dump();
+}
+
 BOOST_AUTO_TEST_CASE(file_ix_5a)
 {
 	if (fs::exists(filename))

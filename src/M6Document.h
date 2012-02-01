@@ -20,9 +20,6 @@ class M6Document
 						M6Document();
 	virtual 			~M6Document();
 	
-	void				SetID(const std::string& inID)		{ mID = inID; }
-	const std::string&	GetID() const						{ return mID; }
-
 	void				SetText(const std::string& inText)	{ mText = inText; }
 	const std::string&	GetText() const						{ return mText; }
 	
@@ -44,6 +41,8 @@ class M6Document
 	
 	template<class Archive>
 	Archive&			serialize(Archive& ar);
+
+	void				Compress(std::vector<uint8>& outData) const;
 	
   private:
 
@@ -70,7 +69,7 @@ class M6Document
 
 	typedef std::map<std::string,std::string>	M6MetaData;
 
-	std::string			mText, mID;
+	std::string			mText;
 	M6MetaData			mMetaData;
 	M6IndexTokenList	mTokens;
 	M6Lexicon			mDocLexicon;

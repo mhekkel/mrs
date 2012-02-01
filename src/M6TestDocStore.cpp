@@ -98,7 +98,12 @@ BOOST_AUTO_TEST_CASE(test_store_2)
 		{
 			M6Document document;
 			BOOST_CHECK(store.FetchDocument(n, document));
-			BOOST_CHECK_EQUAL(document.GetText(), doc.str());
+
+			string docA = document.GetText();
+			string docB = doc.str();
+
+			BOOST_CHECK_EQUAL(docA.length(), docB.length());
+			BOOST_CHECK_EQUAL(docA, docB);
 
 			++n;
 			

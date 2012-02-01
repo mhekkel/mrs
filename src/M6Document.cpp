@@ -3,6 +3,7 @@
 #include "M6Document.h"
 #include "M6Tokenizer.h"
 #include "M6Error.h"
+#include "M6FastLZ.h"
 
 using namespace std;
 
@@ -18,12 +19,35 @@ M6Document::~M6Document()
 
 void M6Document::Compress(vector<uint8>& outData) const
 {
-	copy(mText.begin(), mText.end(), back_inserter(outData));
+	size_t l = mText.length() + mText.length() / 20;
+	if (l < mText.length() + 5)
+		l = mText.length() + 5;
+	
+	outData = vector<uint8>(l + 4);
+	size_t r = FastLZCompress(mText.c_str(), mText.length(),
+		&outData[4], l);
+	outData.erase(outData.begin() + r + 4, outData.end());
+
+	l = mText.length();
+	outData[0] = static_cast<uint8>(l >> 24);
+	outData[1] = static_cast<uint8>(l >> 16);
+	outData[2] = static_cast<uint8>(l >>  8);
+	outData[3] = static_cast<uint8>(l >>  0);
 }
 
 void M6Document::Decompress(const vector<uint8>& inData)
 {
-	mText.assign(reinterpret_cast<const char*>(&inData[0]), inData.size());
+	uint32 l = 0;
+	l = l << 8 | inData[0];
+	l = l << 8 | inData[1];
+	l = l << 8 | inData[2];
+	l = l << 8 | inData[3];
+	
+	mText.assign(l, 0);
+	FastLZDecompress(&inData[4], inData.size() - 4,
+		const_cast<char*>(mText.c_str()), l);
+
+//	mText.assign(reinterpret_cast<const char*>(&inData[0]), inData.size());
 }
 
 //M6IndexTokenList::iterator M6Document::GetIndexTokens(

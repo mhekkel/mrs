@@ -62,7 +62,7 @@ inline uint16 mfastlz_hash(const uint8* p)
 
 }
 
-int32 FastLZCompress(const void* input, size_t length,
+size_t FastLZCompress(const void* input, size_t length,
 	void* output, size_t maxout)
 {
 	const uint8* ip = static_cast<const uint8*>(input);
@@ -267,11 +267,8 @@ int32 FastLZCompress(const void* input, size_t length,
 	return static_cast<int32>(op - static_cast<uint8*>(output));
 }
 
-size_t FastLZDecompress(
-	const void*		input,
-	uint32			length,
-	void*			output,
-	uint32			maxout)
+size_t FastLZDecompress(const void* input, size_t length,
+	void* output, uint32 maxout)
 {
 	const uint8* ip = static_cast<const uint8*>(input);
 	const uint8* ip_limit = ip + length;

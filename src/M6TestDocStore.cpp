@@ -18,13 +18,14 @@
 #include "M6Error.h"
 #include "M6Lexicon.h"
 #include "M6DocStore.h"
-#include "M6Document.h"
+//#include "M6Document.h"
 
 #include <boost/test/unit_test.hpp>
 
 using namespace std;
 namespace fs = boost::filesystem;
 namespace ba = boost::algorithm;
+namespace io = boost::iostreams;
 
 BOOST_AUTO_TEST_CASE(test_store_1)
 {
@@ -56,9 +57,12 @@ BOOST_AUTO_TEST_CASE(test_store_1)
 		
 		if (line == "//")
 		{
-			M6Document document;
-			document.SetText(doc.str());
-			store.StoreDocument(&document);
+//			M6Document document;
+//			document.SetText(doc.str());
+//			store.StoreDocument(&document);
+
+			string document(doc.str());
+			store.StoreDocument(document.c_str(), document.length());
 			++n;
 			
 			doc.str("");
@@ -96,10 +100,25 @@ BOOST_AUTO_TEST_CASE(test_store_2)
 		
 		if (line == "//")
 		{
-			M6Document document;
-			BOOST_CHECK(store.FetchDocument(n, document));
+//			M6Document document;
+//			BOOST_CHECK(store.FetchDocument(n, document));
+			
+			uint32 docPage, docSize;
+			BOOST_CHECK(store.FetchDocument(n, docPage, docSize));
+			
+			io::filtering_stream<io::input> is;
+			store.OpenDataStream(n, docPage, docSize, is);
+			
+			string docA;
+			for (;;)
+			{
+				string line;
+				getline(is, line);
+				if (line.empty() and is.eof())
+					break;
+				docA += line + "\n";
+			}
 
-			string docA = document.GetText();
 			string docB = doc.str();
 
 			BOOST_CHECK_EQUAL(docA.length(), docB.length());

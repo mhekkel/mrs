@@ -5,12 +5,15 @@
 #include "M6Lib.h"
 
 #include <cassert>
+#include <vector>
+
+#include <boost/iostreams/categories.hpp>
 
 #include "M6DocStore.h"
-#include "M6Document.h"
 #include "M6Error.h"
 
 using namespace std;
+namespace io = boost::iostreams;
 
 // --------------------------------------------------------------------
 
@@ -128,7 +131,7 @@ class M6DocStoreDataPage : public M6DocStorePage
 
 	uint32			Store(uint32 inDocNr, const uint8* inData, uint32 inSize);
 	uint32			Load(uint32 inDocNr, uint8* outData, uint32 inSize);
-
+	
   private:
 	
 	void			Write16(uint8*& ioPtr, uint16 inValue)
@@ -243,9 +246,11 @@ class M6DocStoreImpl
 
 	uint32			Size() const					{ return mHeader.mDocCount; }
 
-	uint32			StoreDocument(M6Document* inDocument);
+	uint32			StoreDocument(const char* inData, size_t inSize);
 	void			EraseDocument(uint32 inDocNr);
-	bool			FetchDocument(uint32 inDocNr, M6Document& outDocument);
+	bool			FetchDocument(uint32 inDocNr, uint32& outPageNr, uint32& outDocSize);
+	void			OpenDataStream(uint32 inDocNr, uint32 inPageNr, uint32 inDocSize,
+						io::filtering_stream<io::input>& ioStream);
 
 	template<class T>
 	M6DocStorePagePtr<T>	Allocate();
@@ -702,6 +707,108 @@ void M6DocStoreIndexPage::Dump(int inLevel)
 
 // --------------------------------------------------------------------
 
+struct M6DocSource : public io::source
+{
+	typedef char			char_type;
+	typedef io::source_tag	category;
+
+					M6DocSource(M6DocStoreImpl& inStore, uint32 inPageNr,
+						uint32 inDocNr, uint32 inDocSize);
+					M6DocSource(const M6DocSource& inSource);
+	M6DocSource&	operator=(const M6DocSource& inSource);
+
+	streamsize		read(char* s, streamsize n);
+
+	M6DocStoreImpl&	mStore;
+	uint32			mPageNr, mDocNr, mDocSize;
+	char			mBuffer[kM6DataPageTextSize];
+	char*			mBufferStart;
+	char*			mBufferEnd;
+};
+
+M6DocSource::M6DocSource(M6DocStoreImpl& inStore, uint32 inPageNr,
+	uint32 inDocNr, uint32 inDocSize)
+	: mStore(inStore)
+	, mPageNr(inPageNr)
+	, mDocNr(inDocNr)
+	, mDocSize(inDocSize)
+	, mBufferStart(mBuffer)
+	, mBufferEnd(mBuffer)
+{
+}
+
+M6DocSource::M6DocSource(const M6DocSource& inSource)
+	: mStore(inSource.mStore)
+	, mPageNr(inSource.mPageNr)
+	, mDocNr(inSource.mDocNr)
+	, mDocSize(inSource.mDocSize)
+	, mBufferStart(mBuffer)
+	, mBufferEnd(mBuffer)
+{
+	size_t n = inSource.mBufferEnd - inSource.mBufferStart;
+	memcpy(mBuffer, inSource.mBufferStart, n);
+	mBufferEnd = mBuffer + n;
+}
+
+M6DocSource& M6DocSource::operator=(const M6DocSource& inSource)
+{
+	if (this != &inSource)
+	{
+		mStore = inSource.mStore;
+		mPageNr = inSource.mPageNr;
+		mDocNr = inSource.mDocNr;
+		mDocSize = inSource.mDocSize;
+		
+		size_t n = inSource.mBufferEnd - inSource.mBufferStart;
+		memcpy(mBuffer, inSource.mBufferStart, n);
+
+		mBufferStart = mBuffer;
+		mBufferEnd = mBuffer + n;
+	}
+	
+	return *this;
+}
+
+streamsize M6DocSource::read(char* s, streamsize n)
+{
+	streamsize result = 0;
+
+	while (n > 0)
+	{
+		if (mBufferStart == mBufferEnd)
+		{
+			if (mDocSize == 0)
+				break;
+			
+			M6DocStoreDataPagePtr page(mStore.Load<M6DocStoreDataPage>(mPageNr));
+			
+			uint32 n = page->Load(mDocNr, reinterpret_cast<uint8*>(mBuffer), sizeof(mBuffer));
+			mPageNr = page->GetLink();
+			mDocSize -= n;
+	
+			mBufferStart = mBuffer;
+			mBufferEnd = mBuffer + n;
+		}
+		
+		streamsize k = mBufferEnd - mBufferStart;
+		if (k > n)
+			k = n;
+		memcpy(s, mBufferStart, k);
+		
+		mBufferStart += k;
+		s += k;
+		n -= k;
+		result += k;
+	}
+	
+	if (result == 0 and mDocSize == 0)
+		result = -1;
+
+	return result;
+}
+
+// --------------------------------------------------------------------
+
 M6DocStoreImpl::M6DocStoreImpl(const string& inPath, MOpenMode inMode)
 	: mFile(inPath, inMode)
 	, mDirty(false)
@@ -745,19 +852,16 @@ M6DocStoreImpl::~M6DocStoreImpl()
 	delete[] mCache;
 }
 
-uint32 M6DocStoreImpl::StoreDocument(M6Document* inDocument)
+uint32 M6DocStoreImpl::StoreDocument(const char* inData, size_t inSize)
 {
-	vector<uint8> data;
-	inDocument->Compress(data);
-
-	if (data.empty())
+	if (inSize == 0 or inData == nullptr)
 		THROW(("Empty document"));
 	
-	if (data.size() > numeric_limits<uint32>::max())
+	if (inSize > numeric_limits<uint32>::max())
 		THROW(("Document too large"));
 
-	uint8* ptr = &data[0];
-	uint32 size = static_cast<uint32>(data.size());
+	const uint8* ptr = reinterpret_cast<const uint8*>(inData);
+	uint32 size = static_cast<uint32>(inSize);
 	uint32 pageNr = mHeader.mLastDataPage;
 
 	M6DocStoreDataPagePtr dataPage;
@@ -833,33 +937,15 @@ void M6DocStoreImpl::EraseDocument(uint32 inDocNr)
 	THROW(("unimplemented"));
 }
 
-bool M6DocStoreImpl::FetchDocument(uint32 inDocNr, M6Document& outDocument)
+bool M6DocStoreImpl::FetchDocument(uint32 inDocNr, uint32& outPageNr, uint32& outDocSize)
 {
-	uint32 pageNr, size;
-	bool result = false;
-	
-	if (mRoot->Find(inDocNr, pageNr, size))
-	{
-		vector<uint8> data(size);
-		uint8* ptr = &data[0];
-		
-		while (size > 0)
-		{
-			M6DocStoreDataPagePtr dataPage(Load<M6DocStoreDataPage>(pageNr));
-			
-			uint32 read = dataPage->Load(inDocNr, ptr, size);
-			ptr += read;
-			size -= read;
-			
-			pageNr = dataPage->GetLink();
-		}
-		
-		outDocument.Decompress(data);
-		
-		result = true;
-	}
-	
-	return result;
+	return mRoot->Find(inDocNr, outPageNr, outDocSize);
+}
+
+void M6DocStoreImpl::OpenDataStream(uint32 inDocNr,
+	uint32 inPageNr, uint32 inDocSize, io::filtering_stream<io::input>& ioStream)
+{
+	ioStream.push(M6DocSource(*this, inDocNr, inPageNr, inDocSize));
 }
 
 template<class T>
@@ -1100,9 +1186,9 @@ M6DocStore::~M6DocStore()
 	delete mImpl;
 }
 
-uint32 M6DocStore::StoreDocument(M6Document* inDocument)
+uint32 M6DocStore::StoreDocument(const char* inData, size_t inSize)
 {
-	return mImpl->StoreDocument(inDocument);
+	return mImpl->StoreDocument(inData, inSize);
 }
 
 void M6DocStore::EraseDocument(uint32 inDocNr)
@@ -1110,9 +1196,15 @@ void M6DocStore::EraseDocument(uint32 inDocNr)
 	mImpl->EraseDocument(inDocNr);
 }
 
-bool M6DocStore::FetchDocument(uint32 inDocNr, M6Document& outDocument)
+bool M6DocStore::FetchDocument(uint32 inDocNr, uint32& outPageNr, uint32& outDocSize)
 {
-	return mImpl->FetchDocument(inDocNr, outDocument);
+	return mImpl->FetchDocument(inDocNr, outPageNr, outDocSize);
+}
+
+void M6DocStore::OpenDataStream(uint32 inDocNr, uint32 inPageNr, uint32 inDocSize,
+	io::filtering_stream<io::input>& ioStream)
+{
+	mImpl->OpenDataStream(inDocNr, inPageNr, inDocSize, ioStream);
 }
 
 uint32 M6DocStore::size() const

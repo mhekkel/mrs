@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE m6-config SYSTEM "http://mrs.cmbi.ru.nl/dtd/m6-config.dtd">
+<m6-config>
+	
+	
+	<databank id="pdbfinder">
+		<name>PDBFINDER</name>
+		<file>C:\Users\maarten\projects\m6\test\pdbfinder.m6</file>
+		
+		<!-- source type can be path, glob or regex -->
+		<source type="path">C:\Users\maarten\projects\m6\test\pdbfind2-head.txt</source>
+		
+		<!-- parser info -->
+		<!-- if no header-line or document-separator element is specified, the
+			 entire file is considered to be one document. -->
+		
+		<!-- header-line's will be stripped off each file. If document-separator
+			 below is specified as first-line-matches then this header is not needed. -->
+		<header-line>^//.*</header-line>
+
+		<!-- document-separator indicates either the start or the end of a document.
+			 The content is interpreted based on the type attribute.
+			 If type is last-line-equals (default) then a line equal to the content
+			 indicates the end of a document.
+			 The other types are last-line-matches (content is a regex), first-line-equal
+			 and first-line-matches.
+		-->
+		<document-separator type="last-line-equals">//</document-separator>
+
+		<!-- document-attributes are collected from the document text -->
+		<document-attributes>
+			<document-attribute name="id" match="^ID\s+: (.{4})$" repeat="once" index="true" />
+			<document-attribute name="title" match="^Header\s+: (.+)" repeat="concatenate" />
+		</document-attributes>
+	</databank>
+	
+</m6-config>

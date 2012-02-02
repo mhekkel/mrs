@@ -41,15 +41,30 @@ const uint32
 
 BOOST_STATIC_ASSERT(kM6IndexPageDataCount >= kM6MaxEntriesPerPage);
 
-enum {
-	eM6IndexPageIsEmpty		= (1 << 0),		// deallocated page
-	eM6IndexPageIsLeaf		= (1 << 1),		// leaf page in B+ tree
-	eM6IndexPageIsBits		= (1 << 2),		// page containing bit streams
+//enum {
+//	eM6IndexPageIsEmpty		= (1 << 0),		// deallocated page
+//	eM6IndexPageIsLeaf		= (1 << 1),		// leaf page in B+ tree
+//	eM6IndexPageIsBits		= (1 << 2),		// page containing bit streams
+//};
+
+enum M6IndexPageType
+{
+	eM6IndexEmptyPage,
+	eM6IndexBranchPage,
+	eM6IndexSimpleLeafPage,
+	eM6IndexMultiLeafPage
+};
+
+struct M6WeightedData
+{
+	uint32		mCount;
+	int64		mBitOffset;
 };
 
 struct M6IndexPageData
 {
-	uint16		mFlags;
+	uint8		mFlags_;
+	uint8		mType;
 	uint16		mN;
 	uint32		mFiller;
 	int64		mLink;		// Used to link leaf pages or to store page[0]
@@ -62,7 +77,7 @@ struct M6IndexPageData
 	template<class Archive>
 	void serialize(Archive& ar)
 	{
-		ar & mFlags & mN & mLink & mKeys;
+		ar & mFlags & mType & mN & mLink & mKeys;
 	}
 };
 
@@ -1164,6 +1179,8 @@ M6IndexImpl::M6IndexImpl(M6BasicIndex& inIndex, const string& inPath,
 	mHeader = data.mHeader;
 	mFile.PWrite(mHeader, 0);
 	
+	string last;
+	
 	try
 	{
 		// inData is sorted, so we start by writing out leaf pages:
@@ -1177,6 +1194,10 @@ M6IndexImpl::M6IndexImpl(M6BasicIndex& inIndex, const string& inPath,
 		
 		while (inData(tuple))
 		{
+			// sanity check
+			if (CompareKeys(last, tuple.key) >= 0)
+				THROW(("Trying to build index from unsorted data"));
+			
 			if (not page->CanStore(tuple.key))
 			{
 				M6IndexPagePtr next(Allocate<M6IndexLeafPage>());

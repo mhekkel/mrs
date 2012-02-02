@@ -14,10 +14,17 @@ class M6DocStore
 	virtual			~M6DocStore();
 	
 	uint32			StoreDocument(const char* inData, size_t inSize);
-	void			EraseDocument(uint32 inDocNr);
 	bool			FetchDocument(uint32 inDocNr, uint32& outPageNr, uint32& outDocSize);
 	void			OpenDataStream(uint32 inDocNr, uint32 inPageNr, uint32 inDocSize,
 						boost::iostreams::filtering_stream<boost::iostreams::input>& ioStream);
+	void			EraseDocument(uint32 inDocNr);
+
+	struct M6DocSpecifier
+	{
+		uint32		docnr;
+		uint32		pagenr;
+		uint32		size;
+	};
 
 	//class iterator : public std::iterator<std::forward_iterator_tag, const M6Document>
 	//{

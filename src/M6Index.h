@@ -27,7 +27,6 @@ typedef boost::function<bool(M6Tuple&)>		M6SortedInputIterator;
 class M6BasicIndex
 {
   public:
-
 					M6BasicIndex(const std::string& inPath, MOpenMode inMode);
 					M6BasicIndex(const std::string& inPath, M6SortedInputIterator& inData);
 
@@ -96,19 +95,21 @@ class M6BasicIndex
 #endif
 
   protected:
+					M6BasicIndex(M6IndexImpl* inImpl);
+
 	M6IndexImpl*	mImpl;
 };
 
-template<class COMPARATOR> class M6Index : public M6BasicIndex
+template<class INDEX, class COMPARATOR> class M6Index : public INDEX
 {
   public:
 	typedef COMPARATOR			M6Comparator;
 
 					M6Index(const std::string& inPath, MOpenMode inMode)
-						: M6BasicIndex(inPath, inMode) {}
+						: INDEX(inPath, inMode) {}
 
-					M6Index(const std::string& inPath, M6SortedInputIterator& inData)
-						: M6BasicIndex(inPath, inData) {}
+//					M6Index(const std::string& inPath, M6SortedInputIterator& inData)
+//						: INDEX(inPath, inData) {}
 
 	virtual int		CompareKeys(const char* inKeyA, size_t inKeyLengthA,
 								const char* inKeyB, size_t inKeyLengthB) const
@@ -133,4 +134,46 @@ struct M6BasicComparator
 	}
 };
 
-typedef M6Index<M6BasicComparator>	M6SimpleIndex;
+typedef M6Index<M6BasicIndex, M6BasicComparator>	M6SimpleIndex;
+
+// --------------------------------------------------------------------
+
+class M6MultiBasicIndex : public M6BasicIndex
+{
+  public:
+					M6MultiBasicIndex(const std::string& inPath, MOpenMode inMode);
+
+	class multi_iterator
+	{
+	  public:
+		uint32		size() const;
+		bool		next(uint32& outDocNr);
+	};
+
+	void			Insert(const std::string& inKey, const std::vector<uint32>& inDocuments);
+	bool			Find(const std::string& inKey, iterator& outIterator);
+};
+
+typedef M6Index<M6MultiBasicIndex, M6BasicComparator>	M6SimpleMultiIndex;
+
+// --------------------------------------------------------------------
+
+class M6WeightedBasicIndex : public M6BasicIndex
+{
+  public:
+					M6WeightedBasicIndex(const std::string& inPath, MOpenMode inMode);
+
+	class weighted_iterator
+	{
+	  public:
+		uint32		size() const;
+		float		idf_correction(uint32 inDocCount) const;
+		bool		next(uint32& outDocNr, uint8& outFrequency);
+	};
+	
+	void			Insert(const std::string& inKey, const std::vector<std::pair<uint32,uint8>>& inDocuments);
+	bool			Find(const std::string& inKey, weighted_iterator& outIterator);
+};
+
+typedef M6Index<M6WeightedBasicIndex, M6BasicComparator>	M6SimpleWeightedIndex;
+

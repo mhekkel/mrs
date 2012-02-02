@@ -12,7 +12,7 @@ M6Databank::M6Databank(const string& inPath, MOpenMode inMode)
 
 M6Databank::~M6Databank()
 {
-	delete mImpl;
+	//delete mImpl;
 }
 
 M6Databank* M6Databank::CreateNew(const std::string& inPath)

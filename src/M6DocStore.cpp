@@ -712,25 +712,25 @@ struct M6DocSource : public io::source
 	typedef char			char_type;
 	typedef io::source_tag	category;
 
-					M6DocSource(M6DocStoreImpl& inStore, uint32 inPageNr,
-						uint32 inDocNr, uint32 inDocSize);
+					M6DocSource(M6DocStoreImpl& inStore, uint32 inDocNr,
+						uint32 inPageNr, uint32 inDocSize);
 					M6DocSource(const M6DocSource& inSource);
 	M6DocSource&	operator=(const M6DocSource& inSource);
 
 	streamsize		read(char* s, streamsize n);
 
 	M6DocStoreImpl&	mStore;
-	uint32			mPageNr, mDocNr, mDocSize;
+	uint32			mDocNr, mPageNr, mDocSize;
 	char			mBuffer[kM6DataPageTextSize];
 	char*			mBufferStart;
 	char*			mBufferEnd;
 };
 
-M6DocSource::M6DocSource(M6DocStoreImpl& inStore, uint32 inPageNr,
-	uint32 inDocNr, uint32 inDocSize)
+M6DocSource::M6DocSource(M6DocStoreImpl& inStore, 
+	uint32 inDocNr, uint32 inPageNr, uint32 inDocSize)
 	: mStore(inStore)
-	, mPageNr(inPageNr)
 	, mDocNr(inDocNr)
+	, mPageNr(inPageNr)
 	, mDocSize(inDocSize)
 	, mBufferStart(mBuffer)
 	, mBufferEnd(mBuffer)
@@ -739,8 +739,8 @@ M6DocSource::M6DocSource(M6DocStoreImpl& inStore, uint32 inPageNr,
 
 M6DocSource::M6DocSource(const M6DocSource& inSource)
 	: mStore(inSource.mStore)
-	, mPageNr(inSource.mPageNr)
 	, mDocNr(inSource.mDocNr)
+	, mPageNr(inSource.mPageNr)
 	, mDocSize(inSource.mDocSize)
 	, mBufferStart(mBuffer)
 	, mBufferEnd(mBuffer)
@@ -755,8 +755,8 @@ M6DocSource& M6DocSource::operator=(const M6DocSource& inSource)
 	if (this != &inSource)
 	{
 		mStore = inSource.mStore;
-		mPageNr = inSource.mPageNr;
 		mDocNr = inSource.mDocNr;
+		mPageNr = inSource.mPageNr;
 		mDocSize = inSource.mDocSize;
 		
 		size_t n = inSource.mBufferEnd - inSource.mBufferStart;

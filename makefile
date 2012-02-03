@@ -35,14 +35,20 @@ endif
 VPATH += src
 
 OBJECTS = \
+	obj/M6Databank.o \
+	obj/M6DocStore.o \
+	obj/M6Document.o \
 	obj/M6Error.o \
+	obj/M6FastLZ.o \
 	obj/M6File.o \
 	obj/M6Index.o \
+	obj/M6Lexicon.o \
+	obj/M6Tokenizer.o \
 
-m6-create: $(OBJECTS) obj/M6Create.o
+m6-build: $(OBJECTS) obj/M6Builder.o
 	$(CC) $(BOOST_INC_DIR:%=-I%) -o $@ -I. $^ $(LDFLAGS)
 
-m6-test: $(OBJECTS) obj/M6TestIndex.o
+m6-test: $(OBJECTS) obj/M6TestMain.o obj/M6TestDocStore.o
 	$(CC) $(BOOST_INC_DIR:%=-I%) -o $@ -I. $^ $(LDFLAGS) /usr/lib/libboost_unit_test_framework.a
 
 obj/%.o: %.cpp
@@ -53,4 +59,4 @@ include $(OBJECTS:%.o=%.d)
 $(OBJECTS:.o=.d):
 
 clean:
-	rm -rf obj/* m6-create
+	rm -rf obj/* m6-build m6-create m6-test

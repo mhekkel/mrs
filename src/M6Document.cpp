@@ -18,6 +18,8 @@
 using namespace std;
 namespace io = boost::iostreams;
 
+// --------------------------------------------------------------------
+
 M6Document::M6Document(M6Databank& inDatabank)
 	: mDatabank(inDatabank)
 {
@@ -101,63 +103,6 @@ void M6InputDocument::Store()
 	mDocNr = store.StoreDocument(&buffer[0], buffer.size());
 }
 
-//void M6Document::SetText(const string& inText)
-//{
-//	mText = inText;
-//}
-//
-//const string& M6Document::GetText() const
-//{
-//	return mText;
-//}
-//
-//void M6Document::SetAttribute(const string& inName, const string& inData)
-//{
-//	if (inData.length() > 255)
-//		THROW(("Length of attribute %s is too large (limit is 255)", inName.c_str()));
-//	
-//	mAttributes[inName] = inData;
-//}
-//
-//string M6Document::GetAttribute(const string& inName)
-//{
-//	return mAttributes[inName];
-//}
-//
-//void M6Document::Compress(vector<uint8>& outData) const
-//{
-//	// set-up the compression machine
-//	io::zlib_params params(io::zlib::best_speed);
-//	params.noheader = true;
-//	params.calculate_crc = true;
-//	
-//	io::zlib_compressor z_stream(params);
-//	
-//	io::filtering_stream<io::output> out;
-//	out.push(z_stream);
-//	out.push(io::back_inserter(outData));
-//	
-//	out << mText;
-//}
-//
-//void M6Document::Decompress(const vector<char>& inData)
-//{
-//	// set-up the decompression machine
-//	io::zlib_params params;
-//	params.noheader = true;
-//	params.calculate_crc = true;
-//	
-//	io::zlib_decompressor z_stream(params);
-//	
-//	io::stream<io::array_source> in(&inData[0], inData.size());
-//	
-//	io::filtering_stream<io::input> is;
-//	is.push(z_stream);
-//	is.push(in);
-//	
-//	is >> mText;
-//}
-//
 ////M6IndexTokenList::iterator M6Document::GetIndexTokens(
 ////	const std::string& inIndex, M6IndexKind inIndexKind)
 ////{

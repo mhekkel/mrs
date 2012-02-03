@@ -13,10 +13,6 @@ class M6Databank
 						MOpenMode inMode);
 	virtual			~M6Databank();
 
-					// attributes are accessed by name but stored
-					// by number.
-	uint8			RegisterAttribute(const std::string& inName);
-
 	static M6Databank*
 					CreateNew(const std::string& inPath);
 	void			Commit();

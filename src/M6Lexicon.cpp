@@ -61,7 +61,7 @@ struct M6LexPage
 					assert(e[inEntry + 1] < e[inEntry]);
 					assert(e[inEntry] <= kLexDataSize);
 					
-					static const M6BasicComparator comp;
+					static const M6BasicComparator comp = M6BasicComparator();
 					return comp(inWord, inWordLength, s + e[inEntry + 1], e[inEntry] - e[inEntry + 1]);
 				}
 
@@ -76,7 +76,7 @@ struct M6LexPage
 					uint32 l1 = e1[inPEntry] - e1[inPEntry + 1];
 					uint32 l2 = e2[inEntry] - e2[inEntry + 1];
 					
-					static const M6BasicComparator comp;
+					static const M6BasicComparator comp = M6BasicComparator();
 					return comp(inPage->s + e1[inPEntry + 1], l1, s + e2[inEntry + 1], l2);
 				}
 

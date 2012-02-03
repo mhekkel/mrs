@@ -97,9 +97,10 @@ int main(int argc, char* argv[])
 			uint32 n = 0;
 			M6Tuple tuple;
 			
-			if (vm["test"].as<string>() == "validate")
-				indx.validate();
-			else if (vm["test"].as<string>() == "iterator")
+//			if (vm["test"].as<string>() == "validate")
+//				indx.validate();
+//			else
+			if (vm["test"].as<string>() == "iterator")
 			{
 				M6SimpleIndex::iterator i = indx.begin();
 				while (data(tuple) and i != indx.end())

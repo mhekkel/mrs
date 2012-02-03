@@ -6,6 +6,7 @@
 
 #include <cassert>
 #include <vector>
+#include <iostream>
 
 #include <boost/iostreams/categories.hpp>
 

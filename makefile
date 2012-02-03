@@ -17,9 +17,9 @@ LIBDIR				?= $(PREFIX)/lib
 INCDIR				?= $(PREFIX)/include
 MANDIR				?= $(PREFIX)/man/man3
 
-BOOST_LIBS			= system thread filesystem regex math_c99 math_c99f program_options
+BOOST_LIBS			= system thread filesystem regex math_c99 math_c99f program_options iostreams
 BOOST_LIBS			:= $(BOOST_LIBS:%=boost_%$(BOOST_LIB_SUFFIX))
-LIBS				= m pthread
+LIBS				= m pthread z
 LDFLAGS				+= $(BOOST_LIB_DIR:%=-L%) $(LIBS:%=-l%) -g $(BOOST_LIBS:%=/usr/lib/lib%.a) \
 						/usr/lib/gcc/x86_64-linux-gnu/4.6/libstdc++.a
 

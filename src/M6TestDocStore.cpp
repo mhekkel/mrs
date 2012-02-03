@@ -10,7 +10,7 @@
 #define foreach BOOST_FOREACH
 #include <boost/algorithm/string.hpp>
 #include <boost/format.hpp>
-#include <boost/timer/timer.hpp>
+//#include <boost/timer/timer.hpp>
 #include <boost/regex.hpp>
 
 #include "M6Lib.h"
@@ -71,7 +71,7 @@ BOOST_AUTO_TEST_CASE(test_store_1)
 	if (fs::exists("test/pdbfind2.docs"))
 		fs::remove("test/pdbfind2.docs");
 	
-	boost::timer::auto_cpu_timer t;
+//	boost::timer::auto_cpu_timer t;
 
 	M6DocStore store("test/pdbfind2.docs", eReadWrite);
 
@@ -85,7 +85,7 @@ BOOST_AUTO_TEST_CASE(test_store_2)
 {
 	cout << "testing document store (retrieve-1)" << endl;
 
-	boost::timer::auto_cpu_timer t;
+//	boost::timer::auto_cpu_timer t;
 
 	M6DocStore store("test/pdbfind2.docs", eReadOnly);
 
@@ -118,7 +118,7 @@ BOOST_AUTO_TEST_CASE(test_store_3)
 {
 	cout << "testing document store (retrieve-2 one line only)" << endl;
 
-	boost::timer::auto_cpu_timer t;
+//	boost::timer::auto_cpu_timer t;
 
 	M6DocStore store("test/pdbfind2.docs", eReadOnly);
 
@@ -141,7 +141,7 @@ BOOST_AUTO_TEST_CASE(test_store_4)
 
 	boost::regex re("^ID\\s*:\\s+(.{4})");
 
-	boost::timer::auto_cpu_timer t;
+//	boost::timer::auto_cpu_timer t;
 
 	if (fs::exists("test/pdbfind2.m6"))
 		fs::remove_all("test/pdbfind2.m6");
@@ -166,7 +166,7 @@ BOOST_AUTO_TEST_CASE(test_store_5)
 {
 	cout << "testing document store (retrieve using M6Databank)" << endl;
 
-	boost::timer::auto_cpu_timer t;
+//	boost::timer::auto_cpu_timer t;
 
 	M6Databank db("test/pdbfind2.m6", eReadOnly);
 	BOOST_CHECK_EQUAL(db.size(), testdocs.size());
@@ -192,7 +192,7 @@ BOOST_AUTO_TEST_CASE(test_store_6)
 
 	boost::regex re("^ID\\s*:\\s+(.{4})");
 
-	boost::timer::auto_cpu_timer t;
+//	boost::timer::auto_cpu_timer t;
 
 	M6Databank db("test/pdbfind2.m6", eReadOnly);
 	BOOST_CHECK_EQUAL(db.size(), testdocs.size());

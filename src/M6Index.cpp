@@ -63,7 +63,7 @@ struct M6WeightedData
 
 struct M6IndexPageData
 {
-	uint8		mFlags_;
+	uint8		mFlags;
 	uint8		mType;
 	uint16		mN;
 	uint32		mFiller;
@@ -238,7 +238,7 @@ class M6IndexPage
 	int64			GetPageNr() const				{ return mPageNr; }
 	void			MoveTo(int64 inPageNr);
 
-	bool			IsLeaf() const					{ return mData->mFlags & eM6IndexPageIsLeaf; }
+	bool			IsLeaf() const					{ return mData->mType == eM6IndexSimpleLeafPage; }
 	
 	bool			IsDirty() const					{ return mDirty; }
 	void			SetDirty(bool inDirty)			{ mDirty = inDirty; }
@@ -441,7 +441,7 @@ void M6IndexPage::Flush(M6File& inFile)
 
 void M6IndexPage::Deallocate()
 {
-	static const M6IndexPageData kEmpty = { eM6IndexPageIsEmpty };
+	static const M6IndexPageData kEmpty = {};
 	*mData = kEmpty;
 	mDirty = true;
 }
@@ -711,7 +711,7 @@ void M6IndexPage::ReplaceKey(uint32 inIndex, const string& inKey)
 M6IndexLeafPage::M6IndexLeafPage(M6IndexImpl& inIndexImpl, M6IndexPageData* inData, int64 inPageNr)
 	: M6IndexPage(inIndexImpl, inData, inPageNr)
 {
-	mData->mFlags |= eM6IndexPageIsLeaf;
+	mData->mType = eM6IndexSimpleLeafPage;
 }
 
 bool M6IndexLeafPage::Find(const string& inKey, int64& outValue)
@@ -919,7 +919,7 @@ bool M6IndexLeafPage::Underflow(M6IndexPage& inRight, uint32 inIndex, M6IndexBra
 M6IndexBranchPage::M6IndexBranchPage(M6IndexImpl& inIndexImpl, M6IndexPageData* inData, int64 inPageNr)
 	: M6IndexPage(inIndexImpl, inData, inPageNr)
 {
-	assert((mData->mFlags & eM6IndexPageIsLeaf) == 0);
+	mData->mType = eM6IndexBranchPage;
 }
 
 bool M6IndexBranchPage::Find(const string& inKey, int64& outValue)
@@ -1343,10 +1343,10 @@ M6IndexPagePtr M6IndexImpl::Load(int64 inPageNr)
 		M6IndexPageData* data = new M6IndexPageData;
 		mFile.PRead(*data, inPageNr * kM6IndexPageSize);
 
-		if (data->mFlags & eM6IndexPageIsLeaf)
-			cp->mPage.reset(new M6IndexLeafPage(*this, data, inPageNr));
-		else
+		if (data->mType == eM6IndexBranchPage)
 			cp->mPage.reset(new M6IndexBranchPage(*this, data, inPageNr));
+		else
+			cp->mPage.reset(new M6IndexLeafPage(*this, data, inPageNr));
 	}
 	
 	return cp->mPage;

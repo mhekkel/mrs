@@ -33,7 +33,6 @@ enum M6DataPageType
 	eM6DocStoreIndexBranchPage,
 };
 
-
 struct M6DocStoreIndexEntry
 {
 	uint32	mDocNr_;
@@ -66,27 +65,30 @@ BOOST_STATIC_ASSERT(sizeof(M6DocStorePageData) == kM6DataPageSize);
 struct M6DocStoreHdr
 {
 	uint32			mSignature;
-	uint32			mHeaderSize;
 	uint32			mDocCount;
 	uint32			mIndexRoot;
 	uint32			mNextDocNumber;
 	uint32			mFirstDataPage;
 	uint32			mLastDataPage;
 	uint32			mFirstFreeDataPage;
+	uint32			mAttributeOffset;
+
+	static const uint32
+		kHeaderSize = 8 * sizeof(uint32),
+		kTextSize = kM6DataPageSize - kHeaderSize;
+
+	uint8			mText[kTextSize];
 
 	template<class Archive>
 	void serialize(Archive& ar)
 	{
-		ar & mSignature & mHeaderSize & mDocCount & mIndexRoot & mNextDocNumber
-		   & mFirstDataPage & mLastDataPage & mFirstFreeDataPage;
+		ar & mSignature & mDocCount & mIndexRoot & mNextDocNumber
+		   & mFirstDataPage & mLastDataPage & mFirstFreeDataPage
+		   & mAttributeOffset & mText;
 	}
 };
 
-union M6DocStoreHdrPage
-{
-	M6DocStoreHdr	mHeader;
-	uint8			mFiller[kM6DataPageSize];
-};
+BOOST_STATIC_ASSERT(sizeof(M6DocStoreHdr) == kM6DataPageSize);
 
 // --------------------------------------------------------------------
 
@@ -251,6 +253,9 @@ class M6DocStoreImpl
 	bool			FetchDocument(uint32 inDocNr, uint32& outPageNr, uint32& outDocSize);
 	void			OpenDataStream(uint32 inDocNr, uint32 inPageNr, uint32 inDocSize,
 						io::filtering_stream<io::input>& ioStream);
+
+	uint8			RegisterAttribute(const string& inName);
+	string			GetAttributeName(uint8 inAttrNr) const;
 
 	template<class T>
 	M6DocStorePagePtr<T>	Allocate();
@@ -818,15 +823,11 @@ M6DocStoreImpl::M6DocStoreImpl(const string& inPath, MOpenMode inMode)
 
 	if (inMode == eReadWrite and mFile.Size() == 0)
 	{
-		uint8 data[kM6DataPageSize] = "";
-		mFile.PWrite(data, sizeof(data), 0);
-
 		memset(&mHeader, 0, sizeof(mHeader));
 
 		mHeader.mSignature = kM6DocStoreSignature;
-		mHeader.mHeaderSize = sizeof(mHeader);
 		mHeader.mNextDocNumber = 1;
-		mDirty = true;
+		mHeader.mAttributeOffset = M6DocStoreHdr::kTextSize;
 		
 		mFile.PWrite(mHeader, 0);
 	}
@@ -837,7 +838,7 @@ M6DocStoreImpl::M6DocStoreImpl(const string& inPath, MOpenMode inMode)
 	}
 	
 	assert(mHeader.mSignature == kM6DocStoreSignature);
-	assert(mHeader.mHeaderSize == sizeof(mHeader));
+//	assert(mHeader.mHeaderSize == sizeof(mHeader));
 }
 
 M6DocStoreImpl::~M6DocStoreImpl()
@@ -850,6 +851,68 @@ M6DocStoreImpl::~M6DocStoreImpl()
 	for (uint32 ix = 0; ix < mCacheCount; ++ix)
 		delete mCache[ix].mPage;
 	delete[] mCache;
+}
+
+uint8 M6DocStoreImpl::RegisterAttribute(const string& inName)
+{
+	uint8 result = 0, n = 1;
+	
+	uint32 l = static_cast<uint32>(inName.length());
+	if (l > 255)
+		THROW(("Attribute name too long (%s)", inName.c_str()));
+	
+	uint8* attr = mHeader.mText + mHeader.mAttributeOffset;
+	while (attr < mHeader.mText + M6DocStoreHdr::kTextSize)
+	{
+		if (l == *attr and memcmp(attr + 1, inName.c_str(), l) == 0)
+		{
+			result = n;
+			break;
+		}
+		
+		attr += *attr + 1;
+		++n;
+	}
+	
+	if (result == 0)
+	{
+		if (l + 1 > mHeader.mAttributeOffset)
+			THROW(("No space left for new attribute (%s)", inName.c_str()));
+		
+		result = n;
+
+		uint32 o = mHeader.mAttributeOffset;
+		memmove(mHeader.mText + o - l - 1, mHeader.mText + o, M6DocStoreHdr::kTextSize - o);
+		mHeader.mAttributeOffset -= l + 1;
+
+		uint8* attr = mHeader.mText + M6DocStoreHdr::kTextSize - l - 1;
+		*attr = static_cast<uint8>(inName.length());
+		memcpy(attr + 1, inName.c_str(), inName.length());
+	
+		mDirty = true;
+	}
+	
+	return result;
+}
+
+string M6DocStoreImpl::GetAttributeName(uint8 inAttrNr) const
+{
+	uint8 n = 1;
+	string result;
+	
+	const uint8* attr = mHeader.mText + mHeader.mAttributeOffset;
+	while (n < inAttrNr and attr < mHeader.mText + M6DocStoreHdr::kTextSize)
+	{
+		attr += *attr + 1;
+		++n;
+	}
+	
+	if (n == inAttrNr and attr < mHeader.mText + M6DocStoreHdr::kTextSize)
+		result.assign(reinterpret_cast<const char*>(attr + 1), *attr);
+	else
+		THROW(("Attribute not registered: %d", inAttrNr));
+
+	return result;
 }
 
 uint32 M6DocStoreImpl::StoreDocument(const char* inData, size_t inSize)
@@ -1184,6 +1247,16 @@ M6DocStore::M6DocStore(const string& inPage, MOpenMode inMode)
 M6DocStore::~M6DocStore()
 {
 	delete mImpl;
+}
+
+uint8 M6DocStore::RegisterAttribute(const string& inName)
+{
+	return mImpl->RegisterAttribute(inName);
+}
+
+string M6DocStore::GetAttributeName(uint8 inAttrNr) const
+{
+	return mImpl->GetAttributeName(inAttrNr);
 }
 
 uint32 M6DocStore::StoreDocument(const char* inData, size_t inSize)

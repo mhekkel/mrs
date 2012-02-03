@@ -4,6 +4,7 @@
 
 class M6Document;
 class M6DatabankImpl;
+class M6DocStore;
 
 class M6Databank
 {
@@ -21,6 +22,12 @@ class M6Databank
 	void			Commit();
 
 	void			Store(M6Document* inDocument);
+	M6Document*		Fetch(uint32 inDocNr);
+	
+	M6DocStore&		GetDocStore();
+	
+	
+	uint32			size() const;
 
   private:
 	M6DatabankImpl*	mImpl;

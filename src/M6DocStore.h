@@ -19,6 +19,9 @@ class M6DocStore
 						boost::iostreams::filtering_stream<boost::iostreams::input>& ioStream);
 	void			EraseDocument(uint32 inDocNr);
 
+	uint8			RegisterAttribute(const std::string& inName);
+	std::string		GetAttributeName(uint8 inAttrNr) const;
+
 	struct M6DocSpecifier
 	{
 		uint32		docnr;

@@ -84,6 +84,7 @@ class M6InputDocument : public M6Document
 	M6DocAttributes		mAttributes;
 	M6IndexTokenList	mTokens;
 	M6Lexicon			mDocLexicon;
+	uint32				mDocNr;
 };
 
 // Output document, this is returned by the M6Databank object

@@ -214,3 +214,25 @@ BOOST_AUTO_TEST_CASE(test_store_6)
 	}
 }
 
+BOOST_AUTO_TEST_CASE(test_store_7)
+{
+	cout << "dumping pdbfinder" << endl;
+
+	M6Databank db("test/pdbfinder.m6", eReadOnly);
+	uint32 size = db.size();
+
+	for (uint32 i = 1; i <= size; ++i)
+	{
+		M6Document* doc = db.Fetch(i);
+		
+		BOOST_CHECK(doc != nullptr);
+		
+		if (doc == nullptr)
+			continue;
+		
+		cout << doc->GetAttribute("id") << ' ' << doc->GetAttribute("title") << endl;
+		
+		delete doc;
+	}
+}
+

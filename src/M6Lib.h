@@ -111,7 +111,7 @@ struct swapper<T, 8, true>
 	}
 };
 
-#if BIGENDIAN
+#if 1 //BIGENDIAN
 template<class T>
 inline
 T swap_bytes(T v)

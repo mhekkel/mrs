@@ -67,6 +67,8 @@ class M6DocStore
 
 	uint32				size() const;
 
+	void				Commit();
+
   protected:
 	M6DocStoreImpl*		mImpl;
 };

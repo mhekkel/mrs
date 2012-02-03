@@ -1285,3 +1285,9 @@ uint32 M6DocStore::size() const
 {
 	return mImpl->Size();
 }
+
+void M6DocStore::Commit()
+{
+	mImpl->Validate();
+	mImpl->Commit();
+}

@@ -12,6 +12,7 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/regex.hpp>
 #include <boost/tr1/tuple.hpp>
+#include <boost/timer/timer.hpp>
 
 #include <zeep/xml/document.hpp>
 
@@ -56,7 +57,7 @@ typedef vector<M6AttributeParser> M6AttributeParsers;
 void Store(M6Databank& inDatabank, const string& inDocument,
 	M6AttributeParsers& inAttributes)
 {
-	M6Document* doc = new M6Document(inDocument);
+	M6InputDocument* doc = new M6InputDocument(inDatabank, inDocument);
 	
 	foreach (M6AttributeParser& p, inAttributes)
 	{
@@ -93,6 +94,16 @@ void Store(M6Databank& inDatabank, const string& inDocument,
 	}
 	
 	inDatabank.Store(doc);
+
+	static int n = 0;
+	if (++n % 1000 == 0)
+	{
+		cout << '.';
+		if (n % 60000 == 0)
+			cout << endl;
+		else
+			cout.flush();
+	}
 }
 
 void Parse(M6Databank& inDatabank, zx::element* inConfig,
@@ -165,6 +176,8 @@ void Parse(M6Databank& inDatabank, zx::element* inConfig,
 
 void Build(zx::element* inConfig)
 {
+	boost::timer::auto_cpu_timer t;
+
 	zx::element* file = inConfig->find_first("file");
 	if (not file)
 		THROW(("Invalid config-file, file is missing"));
@@ -202,6 +215,7 @@ void Build(zx::element* inConfig)
 	}
 	
 	databank->Commit();
+	cout << endl << "done" << endl;
 }
 
 int main(int argc, char* argv[])

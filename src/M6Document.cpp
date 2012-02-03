@@ -81,7 +81,7 @@ void M6InputDocument::Store()
 		io::zlib_compressor z_stream(params);
 
 		io::filtering_stream<io::output> out;
-		out.push(z_stream);
+//		out.push(z_stream);
 		out.push(io::back_inserter(buffer));
 	
 		foreach (auto attr, mAttributes)
@@ -239,7 +239,7 @@ string M6OutputDocument::GetAttribute(const string& inName)
 	io::zlib_decompressor z_stream(params);
 	
 	io::filtering_stream<io::input> is;
-	is.push(z_stream);
+//	is.push(z_stream);
 	store.OpenDataStream(mDocNr, mDocPage, mDocSize, is);
 	
 	string result;

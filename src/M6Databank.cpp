@@ -48,7 +48,7 @@ M6DatabankImpl::M6DatabankImpl(M6Databank& inDatabank, const string& inPath, MOp
 
 M6DatabankImpl::~M6DatabankImpl()
 {
-//	mStore->Commit();
+	mStore->Commit();
 	delete mStore;
 }
 	

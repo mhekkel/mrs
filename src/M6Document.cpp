@@ -196,7 +196,7 @@ string M6OutputDocument::GetText()
 	io::zlib_decompressor z_stream(params);
 	
 	io::filtering_stream<io::input> is;
-	is.push(z_stream);
+	//is.push(z_stream);
 	store.OpenDataStream(mDocNr, mDocPage, mDocSize, is);
 	
 	// skip over the attributes first

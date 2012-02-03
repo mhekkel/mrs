@@ -12,20 +12,77 @@ namespace fs = boost::filesystem;
 
 // --------------------------------------------------------------------
 
+class M6BatchIndexProcessor
+{
+  public:
+				M6BatchIndexProcessor();
+				~M6BatchIndexProcessor();
+
+	void		IndexTokens(const string& inIndexName, M6IndexKind inIndexKind,
+					const M6InputDocument::M6TokenList& inTokens);
+	void		FlushDoc();
+
+
+  private:
+	M6FullTextIndex&	mFullTextIndex;
+	uint32				mEntries;
+};
+
+void M6BatchIndexProcessor::IndexTokens(const string& inIndexName,
+	M6IndexKind inIndexKind, const M6InputDocument::M6TokenList& inTokens)
+{
+	if (not inTokens.empty())
+	{
+		M6IndexBase* index = nullptr;
+	
+		switch (inIndexKind)
+		{
+			case eM6TextIndex:		index = GetIndexBase<CTextIndex>(inIndexName); break;
+			case eM6NumberIndex:	index = GetIndexBase<CNumberIndex>(inIndexName); break;
+			case eM6ValueIndex:		index = GetIndexBase<CValueIndex>(inIndexName); break;
+			case eM6DateIndex:		index = GetIndexBase<CDateIndex>(inIndexName); break;
+			default:				THROW(("Runtime error, unsupport index kind"));
+		}
+	
+		if (index == nullptr)
+			THROW(("Runtime error"));
+	
+		foreach (M6InputDocument::M6TokenData& t, inTokens)
+		{
+			if (t.mGlobalToken != 0)
+				index->AddWord(t.mGlobalToken);
+			else
+				mFullTextIndex->Stop();
+		}
+	}
+}
+
+void M6BatchIndexProcessor::FlushDoc()
+{
+	mFullTextIndex->FlushDoc(mEntries);
+	mEntries += 1;
+}
+
+// --------------------------------------------------------------------
+
 class M6DatabankImpl
 {
   public:
 				M6DatabankImpl(M6Databank& inDatabank, const string& inPath, MOpenMode inMode);
 	virtual		~M6DatabankImpl();
-	
+
+	void		StartBatchImport();
+	void		CommitBatchImport();
+		
 	void		Store(M6Document* inDocument);
 	M6Document* Fetch(uint32 inDocNr);
 
 	M6DocStore&	GetDocStore()						{ return *mStore; }
 
   protected:
-	M6Databank&	mDatabank;
-	M6DocStore*	mStore;
+	M6Databank&				mDatabank;
+	M6DocStore*				mStore;
+	M6BatchIndexProcessor*	mBatch;
 };
 
 M6DatabankImpl::M6DatabankImpl(M6Databank& inDatabank, const string& inPath, MOpenMode inMode)
@@ -59,6 +116,11 @@ void M6DatabankImpl::Store(M6Document* inDocument)
 		THROW(("Invalid document"));
 
 	doc->Store();
+	
+	foreach (M6Document::M6IndexTokens& d, doc->GetIndexTokens())
+		mBatch->IndexTokens(d->index_name, d->index_kind, d.mTokens);
+	mBatch->FlushDoc();
+	
 	delete inDocument;
 }
 
@@ -87,12 +149,20 @@ M6Databank::~M6Databank()
 
 M6Databank* M6Databank::CreateNew(const std::string& inPath)
 {
+	if (fs::exists(inPath))
+		fs::remove_all(inPath);
+
 	return new M6Databank(inPath, eReadWrite);
 }
 
-void M6Databank::Commit()
+void M6Databank::StartBatchImport()
 {
-	//mImpl->Commit();
+	mImpl->StartBatchImport();
+}
+
+void M6Databank::CommitBatchImport()
+{
+	mImpl->CommitBatchImport();
 }
 
 void M6Databank::Store(M6Document* inDocument)

@@ -5,8 +5,11 @@
 #include <boost/iostreams/device/back_inserter.hpp>
 #include <boost/iostreams/device/array.hpp>
 #include <boost/iostreams/stream.hpp>
+#include <boost/iostreams/copy.hpp>
 #include <boost/foreach.hpp>
 #define foreach BOOST_FOREACH
+#include <boost/algorithm/string.hpp>
+//#include <boost/locale.hpp>
 
 #include "M6Document.h"
 #include "M6DocStore.h"
@@ -14,9 +17,19 @@
 #include "M6Error.h"
 //#include "M6FastLZ.h"
 #include "M6Databank.h"
+#include "M6Index.h"
 
 using namespace std;
 namespace io = boost::iostreams;
+namespace ba = boost::algorithm;
+
+namespace
+{
+
+const uint32
+	kUndefinedTokenValue = ~0;
+
+}
 
 // --------------------------------------------------------------------
 
@@ -58,13 +71,6 @@ void M6InputDocument::SetAttribute(const string& inName, const string& inData)
 	mAttributes[inName] = inData;
 }
 
-//void M6InputDocument::IndexText(const string& inIndex, M6IndexKind inIndexKind,
-//						const string& inText, bool inIndexNumbers);
-
-void M6InputDocument::Tokenize(M6Lexicon& inLexicon)
-{
-}
-
 void M6InputDocument::Store()
 {
 	M6DocStore& store(mDatabank.GetDocStore());
@@ -81,7 +87,7 @@ void M6InputDocument::Store()
 		io::zlib_compressor z_stream(params);
 
 		io::filtering_stream<io::output> out;
-//		out.push(z_stream);
+		out.push(z_stream);
 		out.push(io::back_inserter(buffer));
 	
 		foreach (auto attr, mAttributes)
@@ -103,75 +109,148 @@ void M6InputDocument::Store()
 	mDocNr = store.StoreDocument(&buffer[0], buffer.size());
 }
 
-////M6IndexTokenList::iterator M6Document::GetIndexTokens(
-////	const std::string& inIndex, M6IndexKind inIndexKind)
-////{
-////	if (inIndexName.empty())
-////		THROW(("Empty index name"));
-////	
-////	if (inIndexName.length() > 31)
-////	{
-////		cerr << "Index name is limited to 31 characters, truncating (\""
-////			 << inIndexName << "\")" << endl;
-////		inIndexName.erase(inIndexName.begin() + 31, inIndexName.end());
-////	}
-////	
-////	M6IndexTokenList::iterator result = mTokens.begin();
-////	while (result != mTokens.end() and result->mIndexName != inIndexName)
-////		++result;
-////	
-////	if (result == mTokens.end())
-////	{
-////		M6IndexTokens tokens = { inIndexKind, inIndexName };
-////		mTokens.push_back(tokens);
-////		result = mTokens.end() - 1;
-////	}
-////	else if (result->mIndexKind != inIndexKind)
-////		THROW(("Inconsistent use of indices for index %s", inIndexName.c_str()));
-////	
-////	return result;
-////}
-//
-//void M6Document::IndexText(const string& inIndex,
-//	M6IndexKind inIndexKind, const string& inText, bool inIndexNumbers)
-//{
-////	M6IndexTokens::iterator ix = GetIndexTokens(inIndex, inIndexKind);
-////	
-////	M6Tokenizer tokenizer(inText.c_str(), inText.length());
-////	for (;;)
-////	{
-////		M6Token token = tokenizer.GetToken();
-////		if (token == eM6TokenEOF)
-////			break;
-////		
-////		M6TokenData t = {};
-////		
-////		uint32 l = tokenizer.GetTokenLength();
-////		if (l == 0)
-////			continue;
-////		
-////		if ((token == eM6TokenNumber and not inIndexNumbers) or
-////			token == eM6TokenPunctuation or
-////			l > kM6MaxKeyLength)
-////		{
-////			ix->mTokens.push_back(t);
-////			continue;
-////		}
-////		
-////		if (token != eM6TokenNumber and token != eM6TokenWord)
-////			continue;
-////		
-////		t.mDocToken = mDocLexicon.Store(tokenizer.GetTokenValue(), l);
-////		
-////		ix->mTokens.push_back(t);
-////	}
-//}
-//
-//void M6Document::Tokenize(M6Lexicon& inLexicon)
-//{
-//	
-//}
-//
+M6InputDocument::M6IndexTokenList::iterator M6InputDocument::GetIndexTokens(
+	const std::string& inIndex, M6IndexKind inIndexKind)
+{
+	if (inIndex.empty())
+		THROW(("Empty index name"));
+	
+	//if (inIndex.length() > 31)
+	//{
+	//	cerr << "Index name is limited to 31 characters, truncating (\""
+	//		 << inIndex<< "\")" << endl;
+	//	inIndex.erase(inIndex.begin() + 31, inIndex.end());
+	//}
+	
+	M6IndexTokenList::iterator result = mTokens.begin();
+	while (result != mTokens.end() and result->mIndexName != inIndex)
+		++result;
+	
+	if (result == mTokens.end())
+	{
+		M6IndexTokens tokens = { inIndexKind, inIndex };
+		mTokens.push_back(tokens);
+		result = mTokens.end() - 1;
+	}
+	else if (result->mIndexKind != inIndexKind)
+		THROW(("Inconsistent use of indices for index %s", inIndex.c_str()));
+	
+	return result;
+}
+
+void M6InputDocument::IndexText(const string& inIndex, M6IndexKind inIndexKind,
+	const string& inText, bool inIndexNumbers)
+{
+	auto ix = GetIndexTokens(inIndex, inIndexKind);
+	
+	M6Tokenizer tokenizer(inText.c_str(), inText.length());
+	for (;;)
+	{
+		M6Token token = tokenizer.GetToken();
+		if (token == eM6TokenEOF)
+			break;
+		
+		uint32 t = 0, l = tokenizer.GetTokenLength();
+		if (l == 0)
+			continue;
+		
+		if ((token == eM6TokenNumber and not inIndexNumbers) or
+			token == eM6TokenPunctuation or
+			l > kM6MaxKeyLength)
+		{
+			ix->mTokens.push_back(t);
+			continue;
+		}
+		
+		if (token != eM6TokenNumber and token != eM6TokenWord)
+			continue;
+		
+		t = mDocLexicon.Store(tokenizer.GetTokenValue(), l);
+		
+		ix->mTokens.push_back(t);
+	}
+}
+
+void M6InputDocument::IndexValue(const string& inIndex, M6IndexKind inIndexKind,
+	const string& inValue)
+{
+	auto ix = GetIndexTokens(inIndex, inIndexKind);
+	
+	string value(inValue);
+	ba::trim(value);
+	ba::to_lower(value);
+	
+	if (not value.empty())
+		ix->mTokens.push_back(mDocLexicon.Store(value));
+}
+
+void M6InputDocument::Tokenize(M6Lexicon& inLexicon, uint32 inLastStopWord)
+{
+	uint32 docTokenCount = mDocLexicon.Count();
+	vector<uint32> tokenRemap(docTokenCount, kUndefinedTokenValue);
+	tokenRemap[0] = 0;
+	
+	try
+	{
+		inLexicon.LockShared();
+		
+		for (uint32 t = 1; t < docTokenCount; ++t)
+		{
+			const char* w;
+			size_t wl;
+			
+			mDocLexicon.GetString(t, w, wl);
+			uint32 rt = inLexicon.Lookup(w, wl);
+
+			if (rt != 0)
+				tokenRemap[t] = rt;
+		}
+		
+		inLexicon.UnlockShared();
+	}
+	catch (...)
+	{
+		inLexicon.UnlockShared();
+		throw;
+	}
+	
+	try
+	{
+		inLexicon.LockUnique();
+		
+		for (uint32 t = 1; t < docTokenCount; ++t)
+		{
+			if (tokenRemap[t] == kUndefinedTokenValue)
+			{
+				const char* w;
+				size_t wl;
+				
+				mDocLexicon.GetString(t, w, wl);
+				tokenRemap[t] = inLexicon.Store(w, wl);
+			}
+		}
+		
+		inLexicon.UnlockUnique();
+	}
+	catch (...)
+	{
+		inLexicon.UnlockUnique();
+		throw;
+	}
+	
+	foreach (M6IndexTokens& tm, mTokens)
+	{
+		foreach (uint32& t, tm.mTokens)
+		{
+			if (tokenRemap[t] > inLastStopWord)
+				t = tokenRemap[t];
+			else
+				t = 0;
+
+			assert(t != kUndefinedTokenValue);
+		}
+	}
+}
 
 // --------------------------------------------------------------------
 
@@ -196,7 +275,7 @@ string M6OutputDocument::GetText()
 	io::zlib_decompressor z_stream(params);
 	
 	io::filtering_stream<io::input> is;
-	//is.push(z_stream);
+	is.push(z_stream);
 	store.OpenDataStream(mDocNr, mDocPage, mDocSize, is);
 	
 	// skip over the attributes first
@@ -213,14 +292,8 @@ string M6OutputDocument::GetText()
 	
 	string text;
 	
-	for (;;)
-	{
-		string line;
-		getline(is, line);
-		if (line.empty() and is.eof())
-			break;
-		text += line + '\n';
-	}
+	io::filtering_ostream out(io::back_inserter(text));
+	io::copy(is, out);
 	
 	return text;
 }
@@ -239,7 +312,7 @@ string M6OutputDocument::GetAttribute(const string& inName)
 	io::zlib_decompressor z_stream(params);
 	
 	io::filtering_stream<io::input> is;
-//	is.push(z_stream);
+	is.push(z_stream);
 	store.OpenDataStream(mDocNr, mDocPage, mDocSize, is);
 	
 	string result;

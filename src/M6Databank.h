@@ -15,13 +15,14 @@ class M6Databank
 
 	static M6Databank*
 					CreateNew(const std::string& inPath);
-	void			Commit();
 
+	void			StartBatchImport();
+	void			CommitBatchImport();
+	
 	void			Store(M6Document* inDocument);
 	M6Document*		Fetch(uint32 inDocNr);
 	
 	M6DocStore&		GetDocStore();
-	
 	
 	uint32			size() const;
 

@@ -39,6 +39,19 @@ class M6Document
 class M6InputDocument : public M6Document
 {
   public:
+
+	typedef std::map<std::string,std::string>	M6DocAttributes;
+	typedef std::vector<uint32>					M6TokenList;
+	
+	struct M6IndexTokens
+	{
+		M6IndexKind		mIndexKind;
+		std::string		mIndexName;
+		M6TokenList		mTokens;
+	};
+	
+	typedef std::vector<M6IndexTokens>			M6IndexTokenList;
+
 						M6InputDocument(M6Databank& inDatabank,
 							const std::string& inText);
 
@@ -48,37 +61,23 @@ class M6InputDocument : public M6Document
 	void				SetAttribute(const std::string& inName,
 							const std::string& inData);
 
-	//virtual void		IndexText(const std::string& inIndex, M6IndexKind inIndexKind,
-	//						const std::string& inText, bool inIndexNumbers);
+	virtual void		IndexText(const std::string& inIndex, M6IndexKind inIndexKind,
+							const std::string& inText, bool inIndexNumbers);
 
-	virtual void		Tokenize(M6Lexicon& inLexicon);
+	virtual void		IndexValue(const std::string& inIndex, M6IndexKind inIndexKind,
+							const std::string& inText);
+
+	virtual void		Tokenize(M6Lexicon& inLexicon, uint32 inLastStopWord);
 
 	void				Store();
+	
+	const M6IndexTokenList& GetIndexTokens() const			{ return mTokens; }
 
   private:
 
-	typedef std::map<std::string,std::string>	M6DocAttributes;
-
-	struct M6TokenData
-	{
-		uint32			mDocToken;
-		uint32			mGlobalToken;
-	};
-
-	typedef std::vector<M6TokenData>			M6TokenDataList;
-	
-	struct M6IndexTokens
-	{
-		//M6IndexKind		mIndexKind;
-		std::string		mIndexName;
-		M6TokenDataList	mTokens;
-	};
-	
-	typedef std::vector<M6IndexTokens>			M6IndexTokenList;
-
-	//M6IndexTokenList::iterator
-	//					GetIndexTokens(const std::string& inIndexName,
-	//						M6IndexKind inIndexKind);
+	M6IndexTokenList::iterator
+						GetIndexTokens(const std::string& inIndexName,
+							M6IndexKind inIndexKind);
 
 	std::string			mText;
 	M6DocAttributes		mAttributes;

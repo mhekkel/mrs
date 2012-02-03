@@ -6,6 +6,7 @@
 	<databank id="pdbfinder">
 		<name>PDBFINDER</name>
 		<file>C:\Users\maarten\projects\m6\test\pdbfinder.m6</file>
+		<locale>en_US.UTF-8</locale>
 		
 		<!-- source type can be path, glob or regex -->
 		<source type="path">C:\Users\maarten\projects\m6\test\PDBFIND2.TXT</source>
@@ -29,7 +30,15 @@
 
 		<!-- document-attributes are collected from the document text -->
 		<document-attributes>
-			<document-attribute name="id" match="^ID\s+: (.{4})$" repeat="once" index="true" />
+			<!-- document-attribute has the following attributes
+					- name 		The name to use when storing this attribute
+					- match		Regular expression that extracts the data, first capture is used as value
+					- repeat	can be 'once' or 'concatenate', the last means each occurrence is added
+								into one value
+					- index		This can be 'value' or 'text', indicating how to index this metadata field.
+			-->
+			
+			<document-attribute name="id" match="^ID\s+: (.{4})$" repeat="once" index="value" />
 			<document-attribute name="title" match="^Header\s+: (.+)" repeat="concatenate" />
 		</document-attributes>
 	</databank>

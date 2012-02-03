@@ -10,6 +10,22 @@
 //			 (((x)>>24) & 0x000000FFUL))
 //#endif
 
+// --------------------------------------------------------------------
+// some types used throughout m6
+
+// we have four kinds of indices
+enum M6IndexKind
+{
+	eM6NoIndex,			// 
+	
+	eM6TextIndex,
+	eM6ValueIndex,
+	eM6NumberIndex,
+	eM6DateIndex
+};
+
+// --------------------------------------------------------------------
+
 #if defined(_MSC_VER)
 
 #define WIN32_LEAN_AND_MEAN             // Exclude rarely-used stuff from Windows headers
@@ -111,7 +127,7 @@ struct swapper<T, 8, true>
 	}
 };
 
-#if 1 //BIGENDIAN
+#if BIGENDIAN
 template<class T>
 inline
 T swap_bytes(T v)

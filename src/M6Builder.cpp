@@ -5,6 +5,9 @@
 
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/fstream.hpp>
+#include <boost/iostreams/device/back_inserter.hpp>
+#include <boost/iostreams/filtering_stream.hpp>
+#include <boost/iostreams/copy.hpp>
 #include <boost/program_options.hpp>
 #include <boost/format.hpp>
 #include <boost/foreach.hpp>
@@ -27,10 +30,71 @@ namespace zx = zeep::xml;
 namespace po = boost::program_options;
 namespace fs = boost::filesystem;
 namespace ba = boost::algorithm;
+namespace io = boost::iostreams;
 
 int VERBOSE = 0;
 
-void Glob(zx::element* inSource, vector<fs::path>& outFiles)
+namespace
+{
+
+M6IndexKind MapIndexKind(const string& inKind)
+{
+	M6IndexKind result = eM6NoIndex;
+	if (inKind == "value")
+		result = eM6ValueIndex;
+	else if (inKind == "text")
+		result = eM6TextIndex;
+	else if (inKind == "number")
+		result = eM6NumberIndex;
+	else if (inKind == "date")
+		result = eM6DateIndex;
+	return result;
+}
+
+}
+
+class M6Builder
+{
+  public:
+						M6Builder(zx::element* inConfig);
+						~M6Builder();
+	
+	void				Build();
+
+  private:
+
+	struct M6AttributeParser
+	{
+		string			name;
+		boost::regex	re;
+		string			repeat;
+		M6IndexKind		index;
+	};
+	
+	typedef vector<M6AttributeParser> M6AttributeParsers;
+
+	void				Glob(zx::element* inSource, vector<fs::path>& outFiles);
+	void				Store(const string& inDocument);
+	void				Parse(const fs::path& inFile);
+
+	zx::element*		mConfig;
+	M6Databank*			mDatabank;
+	M6Lexicon			mLexicon;
+	M6AttributeParsers	mAttributes;
+};
+
+M6Builder::M6Builder(zx::element* inConfig)
+	: mConfig(inConfig)
+	, mDatabank(nullptr)
+{
+}
+
+M6Builder::~M6Builder()
+{
+	delete mDatabank;
+}
+
+void M6Builder::Glob(zx::element* inSource, vector<fs::path>& outFiles)
 {
 	if (inSource == nullptr)
 		THROW(("No source specified for databank"));
@@ -44,22 +108,12 @@ void Glob(zx::element* inSource, vector<fs::path>& outFiles)
 		THROW(("Unsupported source type"));
 }
 
-struct M6AttributeParser
-{
-	string			name;
-	boost::regex	re;
-	string			repeat;
-	bool			index;
-};
 
-typedef vector<M6AttributeParser> M6AttributeParsers;
-
-void Store(M6Databank& inDatabank, const string& inDocument,
-	M6AttributeParsers& inAttributes)
+void M6Builder::Store(const string& inDocument)
 {
-	M6InputDocument* doc = new M6InputDocument(inDatabank, inDocument);
+	M6InputDocument* doc = new M6InputDocument(*mDatabank, inDocument);
 	
-	foreach (M6AttributeParser& p, inAttributes)
+	foreach (M6AttributeParser& p, mAttributes)
 	{
 		string value;
 		
@@ -89,11 +143,16 @@ void Store(M6Databank& inDatabank, const string& inDocument,
 			}
 		}
 		
+		if (p.index != eM6NoIndex)
+			doc->IndexText(p.name, p.index, value, false);
+		
 		if (not value.empty())
 			doc->SetAttribute(p.name, value);
 	}
 	
-	inDatabank.Store(doc);
+	doc->Tokenize(mLexicon, 0);
+	
+	mDatabank->Store(doc);
 
 	static int n = 0;
 	if (++n % 1000 == 0)
@@ -106,14 +165,13 @@ void Store(M6Databank& inDatabank, const string& inDocument,
 	}
 }
 
-void Parse(M6Databank& inDatabank, zx::element* inConfig,
-	M6AttributeParsers& inAttributes, const fs::path& inFile)
+void M6Builder::Parse(const fs::path& inFile)
 {
 	fs::ifstream file(inFile, ios::binary);
 	string line;
 	
 	// do we need to strip off a header?
-	zx::element* header = inConfig->find_first("header-line");
+	zx::element* header = mConfig->find_first("header-line");
 	if (header != nullptr)
 	{
 		boost::regex he(header->content());
@@ -133,17 +191,12 @@ void Parse(M6Databank& inDatabank, zx::element* inConfig,
 
 	string document;
 
-	zx::element* separator = inConfig->find_first("document-separator");
+	zx::element* separator = mConfig->find_first("document-separator");
 	if (separator == nullptr)	// one file per document
 	{
-		for (;;)
-		{
-			document += line + "\n";
-			getline(file, line);
-			if (line.empty() and file.eof())
-				break;
-		}
-		Store(inDatabank, document, inAttributes);
+		io::filtering_ostream out(io::back_inserter(document));
+		io::copy(file, out);
+		Store(document);
 	}
 	else
 	{
@@ -157,7 +210,7 @@ void Parse(M6Databank& inDatabank, zx::element* inConfig,
 				document += line + "\n";
 				if (line == separatorLine)
 				{
-					Store(inDatabank, document, inAttributes);
+					Store(document);
 					document.clear();
 				}
 
@@ -174,33 +227,34 @@ void Parse(M6Databank& inDatabank, zx::element* inConfig,
 	}
 }
 
-void Build(zx::element* inConfig)
+void M6Builder::Build()
 {
 	boost::timer::auto_cpu_timer t;
 
-	zx::element* file = inConfig->find_first("file");
+	zx::element* file = mConfig->find_first("file");
 	if (not file)
 		THROW(("Invalid config-file, file is missing"));
-	unique_ptr<M6Databank> databank(M6Databank::CreateNew(file->str()));
+
+	fs::path path = file->content();
+	mDatabank = M6Databank::CreateNew(path.string());
 	
 	vector<fs::path> files;
-	Glob(inConfig->find_first("source"), files);
+	Glob(mConfig->find_first("source"), files);
 
 	// prepare the attribute parsers
-	M6AttributeParsers attributes;
-	foreach (zx::element* attr, inConfig->find("document-attributes/document-attribute"))
+	foreach (zx::element* attr, mConfig->find("document-attributes/document-attribute"))
 	{
 		M6AttributeParser p = {
 			attr->get_attribute("name"),
 			boost::regex(attr->get_attribute("match")),
 			attr->get_attribute("repeat"),
-			attr->get_attribute("index") == "true"
+			MapIndexKind(attr->get_attribute("index"))
 		};
 		
 		if (p.name.empty() or p.re.empty())
 			continue;
 		
-		attributes.push_back(p);
+		mAttributes.push_back(p);
 	}
 	
 	foreach (fs::path& file, files)
@@ -211,10 +265,10 @@ void Build(zx::element* inConfig)
 			continue;
 		}
 		
-		Parse(*databank, inConfig, attributes, file);
+		Parse(file);
 	}
 	
-	databank->Commit();
+	mDatabank->Commit();
 	cout << endl << "done" << endl;
 }
 
@@ -266,8 +320,8 @@ int main(int argc, char* argv[])
 		if (dbConfig.size() > 1)
 			THROW(("databank %s specified multiple times in config file", databank.c_str()));
 
-		Build(dbConfig.front());
-
+		M6Builder builder(dbConfig.front());
+		builder.Build();
 	}
 	catch (exception& e)
 	{

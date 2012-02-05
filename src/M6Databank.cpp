@@ -23,6 +23,8 @@ class M6BatchIndexProcessor
 	void		FlushDoc();
 
 
+	void		Finish();
+
   private:
 	M6FullTextIndex&	mFullTextIndex;
 	uint32				mEntries;
@@ -115,7 +117,7 @@ void M6DatabankImpl::Store(M6Document* inDocument)
 	if (doc == nullptr)
 		THROW(("Invalid document"));
 
-	doc->Store();
+	uint32 docNr = doc->Store();
 	
 	foreach (M6Document::M6IndexTokens& d, doc->GetIndexTokens())
 		mBatch->IndexTokens(d->index_name, d->index_kind, d.mTokens);

@@ -312,7 +312,6 @@ class M6BasicIx
 	uint32			mLastDoc;
 	uint32			mLastTerm;
 	M6OBitStream	mBits;
-	M6OBitStream	mIDLBits;
 	uint32			mDocCount;
 	uint32			mDbDocCount;
 };

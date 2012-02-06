@@ -25,20 +25,17 @@
 
 #pragma once
 
-#include <boost/thread.hpp>
-#include <boost/bind.hpp>
 #include <list>
 #include <vector>
 
-#include "HStream.h"
-#include "HBuffer.h"
+#include "M6File.h"
 
 template<class T>
 class M6RunEntryWriter
 {
   public:
 	void		PrepareForWrite(const T* inValues, uint32 inCount) {}
-	void		WriteSortedRun(M6File& inFile, const T* inValues, uint32 inCount)
+	void		WriteSortedRun(M6FileStream& inFile, const T* inValues, uint32 inCount)
 					{ inFile.Write(inValues, sizeof(T) * inCount); }
 };
 
@@ -46,13 +43,13 @@ template<class T>
 class M6RunEntryReader
 {
   public:
-				M6RunEntryReader(M6File& inFile, int64 inOffset)
-					: mFile(&inFile)
+				M6RunEntryReader(M6FileStream& inFile, int64 inOffset)
+					: mFile(inFile)
 					, mOffset(inOffset) { }
 
-	void		ReadSortedRunEntry(T& inValue)		{ mFile->PRead(&inValue, sizeof(T), mOffset); mOffset += sizeof(T); }
+	void		ReadSortedRunEntry(T& inValue)		{ mFile.PRead(&inValue, sizeof(T), mOffset); mOffset += sizeof(T); }
 
-	M6File*		mFile;
+	M6File&		mFile;
 	int64		mOffset;
 };
 
@@ -83,14 +80,6 @@ class M6SortedRunArray
 	struct M6RunEntryIterator;
 	typedef std::vector<M6RunEntryIterator>	M6QueueType;
 	
-	struct M6ThreadRunInfo
-	{
-		value_type*	run;
-		uint32		run_count;
-	};
-	
-	typedef HBuffer<M6ThreadRunInfo,2>		M6RunBuffer;
-	
 	struct M6CompareRunEntry
 	{
 						M6CompareRunEntry(compare_type&	comp)
@@ -108,53 +97,44 @@ class M6SortedRunArray
 	
   public:
 	
-				M6SortedRunArray(const fs::path& inScratchFile, C inCompare = C(), W inWriter = W())
-					: mFile(new HBufferedTempFileStream(inScratchFile))
-					, mRun(nullptr)
+				M6SortedRunArray(const std::string& inScratchFile, C inCompare = C(), W inWriter = W())
+					: mFile(inScratchFile, eReadWrite)
+					, mRun(new value_type[N])
 					, mRunCount(0)
 					, mComp(inCompare)
-					, mFlushThread(boost::bind(&M6SortedRunArray::FlushRunThread, this))
 					, mCount(0)
 					, mWriter(inWriter)
-					, mFinished(false)
 				{
 				}
 
 				~M6SortedRunArray()
 				{
-					if (not mFinished)
-						delete finish();
-					
 					delete [] mRun;
-					delete mFile;
 				}
 
-	void		push_back(const value_type&	inValue)
+	void		PushBack(const value_type&	inValue)
 				{
 					if (mRunCount >= N)
 						FlushRun();
 
-					if (mRun == nullptr)
-						mRun = new value_type[N];
-					
 					mRun[mRunCount] = inValue;
 					++mRunCount;
 					++mCount;
 				}
 
-	int64		size() const				{ return mCount; }
+	int64		Size() const				{ return mCount; }
 
 	class iterator
 	{
 	  public:
-					iterator(HStreamBase& inFile, compare_type& inComp, M6RunInfoList& inRuns)
+					iterator(M6FileStream& inFile, compare_type& inComp, M6RunInfoList& inRuns)
 						: mFile(inFile)
 						, mCompare(inComp)
 					{
 						for (typename M6RunInfoList::iterator r = inRuns.begin(); r != inRuns.end(); ++r)
 						{
 							M6RunEntryIterator re(mFile, r->offset, r->count);
-							if (re.next())
+							if (re.Next())
 								mQueue.push_back(re);
 						}
 						std::make_heap(mQueue.begin(), mQueue.end(), mCompare);
@@ -184,24 +164,19 @@ class M6SortedRunArray
 					iterator(const iterator&);
 		iterator&	operator=(const iterator&);
 	
-		HStreamBase&		mFile;
+		M6FileStream&		mFile;
 		M6CompareRunEntry	mCompare;
 		M6QueueType			mQueue;
 	};
 	
-	iterator*	finish()
+	iterator*	Finish()
 				{
 					if (mRunCount > 0 or mRun != nullptr)
 						FlushRun();
 					
-					// signal the thread to stop, mRun is now nullptr
 					assert(mRun == nullptr);
-					FlushRun();
-					
-					// and wait for the thread to finish
-					mFlushThread.join();
 
-					return new iterator(*mFile, mComp, mRuns);
+					return new iterator(mFile, mComp, mRuns);
 				}
 
   private:
@@ -210,44 +185,25 @@ class M6SortedRunArray
 
 	void		FlushRun()
 				{
-					M6ThreadRunInfo tri = { mRun, mRunCount };
-					
-					mFlushBuffer.Put(tri);
-					
-					mRun = nullptr;
-					mRunCount = 0;
-				}
-	
-	void		FlushRunThread()
-				{
-					for (;;)
-					{
-						M6ThreadRunInfo tri = mFlushBuffer.Get();
-						
-						if (tri.run == nullptr)
-							break;
-						
-						mWriter.PrepareForWrite(tri.run, tri.run_count);
+					mWriter.PrepareForWrite(mRun, mRunCount);
 
-						// don't use a quicksort here, it might take too much
-						// stack space...
-						stable_sort(tri.run, tri.run + tri.run_count, mComp);
-						
-						run_info ri;
-						ri.offset = mFile->Tell();
-						ri.count = tri.run_count;
-						mRuns.push_back(ri);
-						
-						mWriter.WriteSortedRun(*mFile, tri.run, tri.run_count);
-						
-						delete[] tri.run;
-						tri.run = nullptr;
-					}
+					// don't use a quicksort here, it might take too much
+					// stack space...
+					stable_sort(mRun, mRun + mRunCount, mComp);
+					
+					run_info ri;
+					ri.offset = mFile.Tell();
+					ri.count = mRunCount;
+					mRuns.push_back(ri);
+					
+					mWriter.WriteSortedRun(mFile, mRun, mRunCount);
+					
+					mRunCount = 0;
 				}
 	
 	struct M6RunEntryIterator
 	{
-						M6RunEntryIterator(HStreamBase& inFile, int64 inOffset, uint32 inCount)
+						M6RunEntryIterator(M6FileStream& inFile, int64 inOffset, uint32 inCount)
 							: mReader(inFile, inOffset)
 							, mCount(inCount) { }
 
@@ -269,15 +225,11 @@ class M6SortedRunArray
 		uint32			mCount;
 	};
 
-	HBufferedTempFileStream*
-						mFile;
+	M6FileStream		mFile;
 	value_type*			mRun;
 	uint32				mRunCount;
 	M6RunInfoList		mRuns;
 	compare_type		mComp;
-	M6RunBuffer			mFlushBuffer;
-	boost::thread		mFlushThread;
 	int64				mCount;
 	writer_type			mWriter;
-	bool				mFinished;
 };

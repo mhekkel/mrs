@@ -150,8 +150,30 @@ class M6MultiBasicIndex : public M6BasicIndex
 		bool		next(uint32& outDocNr);
 	};
 
-	void			Insert(const std::string& inKey, const std::vector<uint32>& inDocuments);
+	void			Insert(const std::string& inKey, const std::vector<uint32>& inDocuments,
+						int64 inMaxDocValue);
 	bool			Find(const std::string& inKey, iterator& outIterator);
+};
+
+typedef M6Index<M6MultiBasicIndex, M6BasicComparator>	M6SimpleMultiIndex;
+
+// --------------------------------------------------------------------
+
+class M6MultiIDLBasicIndex : public M6BasicIndex
+{
+  public:
+					M6MultiIDLBasicIndex(const std::string& inPath, MOpenMode inMode);
+
+	class multi_iterator
+	{
+	  public:
+		uint32		size() const;
+		bool		next(uint32& outDocNr);
+	};
+
+	void			Insert(const std::string& inKey, int64 inIDLOffset,
+						const std::vector<uint32>& inDocuments, int64 inMaxDocValue);
+	bool			Find(const std::string& inKey, iterator& outIterator, int64& outIDLOffset);
 };
 
 typedef M6Index<M6MultiBasicIndex, M6BasicComparator>	M6SimpleMultiIndex;
@@ -171,7 +193,8 @@ class M6WeightedBasicIndex : public M6BasicIndex
 		bool		next(uint32& outDocNr, uint8& outFrequency);
 	};
 	
-	void			Insert(const std::string& inKey, const std::vector<std::pair<uint32,uint8>>& inDocuments);
+	void			Insert(const std::string& inKey,
+						const std::vector<std::pair<uint32,uint8>>& inDocuments);
 	bool			Find(const std::string& inKey, weighted_iterator& outIterator);
 };
 

@@ -71,7 +71,7 @@ void M6InputDocument::SetAttribute(const string& inName, const string& inData)
 	mAttributes[inName] = inData;
 }
 
-void M6InputDocument::Store()
+uint32 M6InputDocument::Store()
 {
 	M6DocStore& store(mDatabank.GetDocStore());
 
@@ -107,6 +107,7 @@ void M6InputDocument::Store()
 	}
 
 	mDocNr = store.StoreDocument(&buffer[0], buffer.size());
+	return mDocNr;
 }
 
 M6InputDocument::M6IndexTokenList::iterator M6InputDocument::GetIndexTokens(

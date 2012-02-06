@@ -237,6 +237,7 @@ void M6Builder::Build()
 
 	fs::path path = file->content();
 	mDatabank = M6Databank::CreateNew(path.string());
+	mDatabank->StartBatchImport();
 	
 	vector<fs::path> files;
 	Glob(mConfig->find_first("source"), files);
@@ -268,7 +269,7 @@ void M6Builder::Build()
 		Parse(file);
 	}
 	
-	mDatabank->Commit();
+	mDatabank->CommitBatchImport();
 	cout << endl << "done" << endl;
 }
 

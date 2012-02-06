@@ -78,9 +78,26 @@ class M6File
 	void		Truncate(int64 inSize);
 	int64		Size() const					{ return mSize; }
 
-  private:
+  protected:
 	MHandle		mHandle;
 	int64		mSize;
+};
+
+// M6FileStream is an extension of M6File having the notion of an offset
+
+class M6FileStream : public M6File
+{
+  public:
+				M6FileStream(const std::string& inFile, MOpenMode inMode);
+	
+	int64		Seek(int64 inOffset, int inMode);
+	int64		Tell() const;
+	
+	void		Read(void* inBuffer, int64 inSize);
+	void		Write(const void* inBuffer, int64 inSize);
+
+  private:
+	int64		mOffset;
 };
 
 class M6FileReader

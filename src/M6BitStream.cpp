@@ -362,8 +362,8 @@ void M6IBitStreamFileImpl::Read()
 	if (mBufferSize > mSize / 8 + 1)
 		mBufferSize = mSize / 8 + 1;
 	
-	if (mBufferSize > mData.Size())
-		mBufferSize = mData.Size();
+	if (mBufferSize > mData.Size() - mOffset)
+		mBufferSize = mData.Size() - mOffset;
 
 	mData.PRead(mDataBuffer, mBufferSize, mOffset);
 	mOffset += mBufferSize;

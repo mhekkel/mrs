@@ -8,7 +8,6 @@
 #include <boost/iostreams/device/back_inserter.hpp>
 #include <boost/iostreams/filtering_stream.hpp>
 #include <boost/iostreams/copy.hpp>
-#include <boost/program_options.hpp>
 #include <boost/format.hpp>
 #include <boost/foreach.hpp>
 #define foreach BOOST_FOREACH
@@ -17,22 +16,19 @@
 #include <boost/tr1/tuple.hpp>
 #include <boost/timer/timer.hpp>
 
-#include <zeep/xml/document.hpp>
-
 #include "M6DocStore.h"
 #include "M6Error.h"
 #include "M6Databank.h"
 #include "M6Document.h"
+#include "M6Builder.h"
+#include "M6Config.h"
 
 using namespace std;
 using namespace std::tr1;
 namespace zx = zeep::xml;
-namespace po = boost::program_options;
 namespace fs = boost::filesystem;
 namespace ba = boost::algorithm;
 namespace io = boost::iostreams;
-
-int VERBOSE = 0;
 
 namespace
 {
@@ -53,38 +49,8 @@ M6IndexKind MapIndexKind(const string& inKind)
 
 }
 
-class M6Builder
-{
-  public:
-						M6Builder(zx::element* inConfig);
-						~M6Builder();
-	
-	void				Build();
-
-  private:
-
-	struct M6AttributeParser
-	{
-		string			name;
-		boost::regex	re;
-		string			repeat;
-		M6IndexKind		index;
-	};
-	
-	typedef vector<M6AttributeParser> M6AttributeParsers;
-
-	void				Glob(zx::element* inSource, vector<fs::path>& outFiles);
-	void				Store(const string& inDocument);
-	void				Parse(const fs::path& inFile);
-
-	zx::element*		mConfig;
-	M6Databank*			mDatabank;
-	M6Lexicon			mLexicon;
-	M6AttributeParsers	mAttributes;
-};
-
-M6Builder::M6Builder(zx::element* inConfig)
-	: mConfig(inConfig)
+M6Builder::M6Builder(const string& inDatabank)
+	: mConfig(M6Config::Instance().LoadConfig(inDatabank))
 	, mDatabank(nullptr)
 {
 }
@@ -273,70 +239,3 @@ void M6Builder::Build()
 	cout << endl << "done" << endl;
 }
 
-int main(int argc, char* argv[])
-{
-	try
-	{
-		po::options_description desc("m6-build options");
-		desc.add_options()
-			("help,h",								"Display help message")
-			("databank,d",	po::value<string>(),	"Databank to build")
-			("config-file,c", po::value<string>(),	"Configuration file")
-			("verbose,v",							"Be verbose")
-			;
-
-		po::positional_options_description p;
-		p.add("databank", 1);
-		
-		po::variables_map vm;
-		po::store(po::command_line_parser(argc, argv).options(desc).positional(p).run(), vm);
-		po::notify(vm);
-
-		if (vm.count("help") or vm.count("databank") == 0)
-		{
-			cout << desc << "\n";
-			exit(1);
-		}
-		
-		if (vm.count("verbose"))
-			VERBOSE = 1;
-		
-		string databank = vm["databank"].as<string>();
-
-		fs::path configFile("config/m6-config.xml");
-		if (vm.count("config-file"))
-			configFile = vm["config-file"].as<string>();
-		
-		if (not fs::exists(configFile))
-			THROW(("Configuration file not found (\"%s\")", configFile.string().c_str()));
-		
-		fs::ifstream configFileStream(configFile, ios::binary);
-		zx::document config(configFileStream);
-		
-		string dbConfigPath = (boost::format("/m6-config/databank[@id='%1%']") % databank).str();
-		auto dbConfig = config.find(dbConfigPath);
-		if (dbConfig.empty())
-			THROW(("databank %s not specified in config file", databank.c_str()));
-		
-		if (dbConfig.size() > 1)
-			THROW(("databank %s specified multiple times in config file", databank.c_str()));
-
-		M6Builder builder(dbConfig.front());
-		builder.Build();
-	}
-	catch (exception& e)
-	{
-		cerr << endl
-			 << "m6-builder exited with an exception:" << endl
-			 << e.what() << endl;
-		exit(1);
-	}
-	catch (...)
-	{
-		cerr << endl
-			 << "m6-builder exited with an uncaught exception" << endl;
-		exit(1);
-	}
-	
-	return 0;
-}

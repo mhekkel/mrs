@@ -867,6 +867,9 @@ void M6BatchIndexProcessor::Finish(uint32 inDocCount)
 //	fDocWeights = new CDocWeightArray*[fHeader->count];
 //	memset(fDocWeights, 0, sizeof(CDocWeightArray*) * fHeader->count);
 //	
+
+	// And clean up
+	fs::remove_all(mDatabank.GetScratchDir());
 }
 
 // --------------------------------------------------------------------

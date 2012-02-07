@@ -230,6 +230,12 @@ inline bool iscombm(uint32 c)
 	return uc::iscombm(c);
 }
 
+inline bool isspace(uint32 c)
+{
+	return c == ' ' or c == '\r' or c == '\n' or c == '\t' or
+		uc::isspace(c);
+}
+
 }
 
 M6Tokenizer::M6Tokenizer(const char* inData)
@@ -357,6 +363,8 @@ M6Token M6Tokenizer::GetToken()
 			case 10:
 				if (c == 0)	// done!
 					result = eM6TokenEOF;
+				if (fast::isspace(c))
+					mToken = mTokenText;
 				else if (fast::isdigit(c))		// first try a number
 					state = 11;
 				else if (fast::is_han(c))
@@ -403,7 +411,9 @@ M6Token M6Tokenizer::GetToken()
 				break;
 			
 			case 15:
-				if (not fast::isdigit(c))
+				if (fast::isalpha(c))
+					state = start = Restart(start);
+				else if (not fast::isdigit(c))
 				{
 					Retract();
 					result = eM6TokenNumber;

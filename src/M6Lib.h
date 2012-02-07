@@ -18,8 +18,8 @@ enum M6IndexKind
 {
 	eM6NoIndex,			// 
 	
-	eM6TextIndex,
-	eM6ValueIndex,
+	eM6FullTextIndex,
+	eM6VarCharIndex,
 	eM6NumberIndex,
 	eM6DateIndex
 };

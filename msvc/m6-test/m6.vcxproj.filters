@@ -17,9 +17,6 @@
     <ClCompile Include="..\..\src\M6TestBitStream.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\M6TestBuilder.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\src\M6TestLex.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

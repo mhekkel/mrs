@@ -36,14 +36,19 @@ namespace
 M6IndexKind MapIndexKind(const string& inKind)
 {
 	M6IndexKind result = eM6NoIndex;
-	if (inKind == "value")
-		result = eM6ValueIndex;
-	else if (inKind == "text")
-		result = eM6TextIndex;
-	else if (inKind == "number")
-		result = eM6NumberIndex;
-	else if (inKind == "date")
-		result = eM6DateIndex;
+		 if (inKind == "fulltext")	result = eM6FullTextIndex;
+	else if (inKind == "varchar")	result = eM6VarCharIndex;
+	else if (inKind == "number")	result = eM6NumberIndex;
+	else if (inKind == "date")		result = eM6DateIndex;
+	return result;
+}
+
+M6IndexProcessingAction MapIndexAction(const string& inAction)
+{
+	M6IndexProcessingAction result = eM6IndexActionIgnore;
+		 if (inAction == "stop") result = eM6IndexActionStop;
+	else if (inAction == "store") result = eM6IndexActionStore;
+	else if (inAction == "ignore") result = eM6IndexActionIgnore;
 	return result;
 }
 
@@ -83,14 +88,17 @@ void M6Builder::Store(const string& inDocument)
 	{
 		string value;
 		
-		if (p.repeat == "once")
+		if (p.repeat == eM6RepeatOnce)
 		{
 			boost::smatch m;
 			boost::match_flag_type flags = boost::match_default | boost::match_not_dot_newline;
 			if (boost::regex_search(inDocument, m, p.re, flags))
+			{
 				value = m[1];
+				ba::trim(value);
+			}
 		}
-		else if (p.repeat == "concatenate")
+		else if (p.repeat == eM6RepeatConcat)
 		{
 			string::const_iterator start = inDocument.begin();
 			string::const_iterator end = inDocument.end();
@@ -100,6 +108,7 @@ void M6Builder::Store(const string& inDocument)
 			while (regex_search(start, end, what, p.re, flags))
 			{
 				string v(what[1].first, what[1].second);
+				ba::trim(v);
 				if (not value.empty())
 					value += ' ';
 				value += v;
@@ -109,17 +118,49 @@ void M6Builder::Store(const string& inDocument)
 			}
 		}
 		
-		switch (p.index)
-		{
-#pragma warning("TODO Dit moet beter:")
-		case eM6ValueIndex:	doc->IndexValue(p.name, eM6ValueIndex, value); break;
-			case eM6NoIndex:	break;
-			default:			doc->IndexText(p.name, p.index, value, false); break;
-		}
-		
 		if (not value.empty())
 			doc->SetAttribute(p.name, value);
 	}
+
+	if (not mKeyValueRE.empty())
+	{
+		const char* start = inDocument.c_str();
+		const char* end = start + inDocument.length();
+		boost::match_results<const char*> what;
+		boost::match_flag_type flags = boost::match_default | boost::match_not_dot_newline;
+		
+		while (regex_search(start, end, what, p.re, flags))
+		{
+			string key(what[1].first, what[1].second);
+			
+			M6IndexAction action = mDefault.action;
+			
+			foreach (M6IndexParser& p, mIndices)
+			{
+				if (p.key == key)
+				{
+					if (p.action == eM6IndexActionStore)
+					{
+						doc->Index(p.index, p.kind, p.unique, what[2].first, what[2].second - what[2].first);
+						action = eM6IndexActionIgnore;
+					}
+					break;
+				}
+			}
+			
+			if (p.action == eM6IndexActionStore)
+				doc->Index(mDefault.index, mDefault.kind, mDefault.unique,
+					what[2].first, what[2].second - what[2].first);
+			else if (p.action == eM6IndexActionStop)
+				break;
+			
+			start = what[0].second;
+			flags |= boost::match_prev_avail;
+			flags |= boost::match_not_bob;
+		}
+	}
+	else
+		THROW(("unsupported"));
 	
 	doc->Tokenize(mLexicon, 0);
 	
@@ -219,14 +260,45 @@ void M6Builder::Build()
 		M6AttributeParser p = {
 			attr->get_attribute("name"),
 			boost::regex(attr->get_attribute("match")),
-			attr->get_attribute("repeat"),
-			MapIndexKind(attr->get_attribute("index"))
+			attr->get_attribute("repeat"))
 		};
 		
 		if (p.name.empty() or p.re.empty())
 			continue;
 		
 		mAttributes.push_back(p);
+	}
+	
+	// prepare the index processing actions
+	mIndexProcessingType = eM6IndexProcessingTypeNone;
+	zx::element* indexing = mConfig->find_first("indexing");
+	if (indexing != nullptr)
+	{
+		string s = indexing->get_attribute("process");
+		if (s == "line-delimited-key-value")
+			mIndexProcessingType = eM6LineDelimitedKeyValue;
+		else if (s == "line-fixed-width-key-value")
+			mIndexProcessingType = eM6LineFixedWidthKeyValue;
+		else if (not s.empty())
+			THROW(("Invalid indexing process type"));
+		
+		if (mIndexProcessingType == eM6LineDelimitedKeyValue)
+			mKeyValueDelimiter = indexing->get_attribute("separator");
+
+		mDefaultAction = MapIndexAction(indexing->get_attribute("default-action"));
+		
+		foreach (zx::element* ip, indexing->find("index"))
+		{
+			M6IndexParser p = {
+				ip->get_attribute("key"),
+				MapIndexAction(ip->get_attribute("action")),
+				ip->get_attribute("index"),
+				MapIndexKind(ip->get_attribute("index")),
+				ip->get_attribute("unique") == "true"
+			};
+			
+			mIndices.push_back(p);
+		}
 	}
 	
 	foreach (fs::path& file, files)

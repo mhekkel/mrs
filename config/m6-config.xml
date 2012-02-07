@@ -39,9 +39,24 @@
 					- index		This can be 'value' or 'text', indicating how to index this metadata field.
 			-->
 			
-			<document-attribute name="id" match="^ID\s+: (.{4})$" repeat="once" index="value" />
+			<document-attribute name="id" match="^ID\s+: (.{4})$" repeat="once" />
 			<document-attribute name="title" match="^Header\s+: (.+)" repeat="concatenate" />
 		</document-attributes>
+		
+		<!-- indexing 
+				type: 'line-delimited-key-value'		needs separator
+					  'line-fixed-width-key-value'		needs key-width, can have value-width
+					  'line-regex-key-value'			needs regex with two captures
+				
+		-->
+		<indexing type="line-delimited-key-value" separator=":"
+				default-action="store" default-index="fulltext">
+			<index key="id" index="varchar" unique="true" />
+			<index key="chain" action="stop" />
+			<index key="resolution" action="store" index="number" />
+			<index key="r-factor" action="store" index="number" />
+			<index key="date" action="store" index="date" />
+		</indexing>
 	</databank>
 	
 </m6-config>

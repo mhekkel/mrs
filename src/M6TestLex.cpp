@@ -71,41 +71,32 @@ BOOST_AUTO_TEST_CASE(test_lex_1)
 		BOOST_CHECK_EQUAL(lexicon.GetString(t), wordmap[t]);
 }
 
+struct M6TokenTest
+{
+	const char*	text;
+	M6Token		tokens[10];
+} kTestTokens[] = {
+	{ "aap", { eM6TokenWord, eM6TokenEOF } },
+	{ "aap noot", { eM6TokenWord, eM6TokenWord, eM6TokenEOF } },
+	{ "1 10 1e0 1.e0 1.0 1e+0 1e-1", { eM6TokenNumber, eM6TokenNumber, eM6TokenNumber, eM6TokenNumber, eM6TokenNumber, eM6TokenNumber, eM6TokenNumber, eM6TokenEOF } },
+	{ "10a 1e0a", { eM6TokenWord, eM6TokenWord, eM6TokenEOF } },
+};
+
 BOOST_AUTO_TEST_CASE(test_tok_1)
 {
 	cout << "testing tokenizer 1" << endl;
 	
-	M6Tokenizer tok("aap noot mies");
-	M6Token tokens[] = { eM6TokenWord, eM6TokenOther, eM6TokenWord, eM6TokenOther, eM6TokenWord, eM6TokenEOF };
-	
-	foreach (M6Token token, tokens)
-		BOOST_CHECK_EQUAL(token, tok.GetToken());
+	foreach (M6TokenTest& test, kTestTokens)
+	{
+		M6Tokenizer tok(test.text);
+		foreach (M6Token testToken, test.tokens)
+		{
+			M6Token token = tok.GetToken();
+			BOOST_CHECK_EQUAL(token, testToken);
+			if (token != testToken)
+				cerr << "  " << test.text << " != (" << string(tok.GetTokenValue(), tok.GetTokenLength()) << ')' << endl;
+			if (token == eM6TokenEOF or testToken == eM6TokenEOF)
+				break;
+		}
+	}
 }
-
-BOOST_AUTO_TEST_CASE(test_tok_2)
-{
-	M6Tokenizer tok("1 10 100");
-	M6Token tokens[] = { eM6TokenNumber, eM6TokenOther, eM6TokenNumber, eM6TokenOther, eM6TokenNumber, eM6TokenEOF };
-	
-	foreach (M6Token token, tokens)
-		BOOST_CHECK_EQUAL(token, tok.GetToken());
-}
-
-BOOST_AUTO_TEST_CASE(test_tok_3)
-{
-	M6Tokenizer tok("1. 1.0 1e+0");
-	M6Token tokens[] = { eM6TokenNumber, eM6TokenOther, eM6TokenNumber, eM6TokenOther, eM6TokenNumber, eM6TokenEOF };
-	
-	foreach (M6Token token, tokens)
-		BOOST_CHECK_EQUAL(token, tok.GetToken());
-}
-
-BOOST_AUTO_TEST_CASE(test_tok_4)
-{
-	M6Tokenizer tok("1e0a 10a 00_1");
-	M6Token tokens[] = { eM6TokenWord, eM6TokenOther, eM6TokenWord, eM6TokenOther, eM6TokenWord, eM6TokenEOF };
-	
-	foreach (M6Token token, tokens)
-		BOOST_CHECK_EQUAL(token, tok.GetToken());
-}
-

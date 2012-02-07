@@ -5,6 +5,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/foreach.hpp>
 #define foreach BOOST_FOREACH
+#include <boost/algorithm/string.hpp>
 
 #include "M6Databank.h"
 #include "M6Document.h"
@@ -16,6 +17,7 @@
 
 using namespace std;
 namespace fs = boost::filesystem;
+namespace ba = boost::algorithm;
 
 // --------------------------------------------------------------------
 
@@ -29,6 +31,8 @@ class M6BatchIndexProcessor;
 
 // --------------------------------------------------------------------
 
+typedef boost::shared_ptr<M6BasicIndex> M6BasicIndexPtr;
+
 class M6DatabankImpl
 {
   public:
@@ -40,11 +44,12 @@ class M6DatabankImpl
 		
 	void			Store(M6Document* inDocument);
 	M6Document*		Fetch(uint32 inDocNr);
-
+	M6Document*		FindDocument(const string& inIndex, const string& inValue);
+	
 	M6DocStore&		GetDocStore()						{ return *mStore; }
 	
-	M6BasicIndex*	GetIndex(const string& inName);
-	M6BasicIndex*	CreateIndex(const string& inName, M6IndexKind inKind);
+	M6BasicIndexPtr	GetIndex(const string& inName);
+	M6BasicIndexPtr	CreateIndex(const string& inName, M6IndexKind inKind);
 	
 	fs::path		GetScratchDir() const				{ return mDbDirectory / "tmp"; }
 
@@ -53,12 +58,13 @@ class M6DatabankImpl
 	struct M6IndexDesc
 	{
 		string				mName;
-		M6BasicIndex*		mIndex;
+		M6BasicIndexPtr		mIndex;
 	};
 	typedef vector<M6IndexDesc>	M6IndexDescList;
 	
 	M6Databank&				mDatabank;
 	fs::path				mDbDirectory;
+	MOpenMode				mMode;
 	M6DocStore*				mStore;
 	M6BatchIndexProcessor*	mBatch;
 	M6IndexDescList			mIndices;
@@ -326,7 +332,7 @@ class M6BasicIx
 {
   public:
 					M6BasicIx(M6FullTextIx& inFullTextIndex, M6Lexicon& inLexicon,
-						const string& inName, uint8 inIndexNr, M6BasicIndex* inIndex);
+						const string& inName, uint8 inIndexNr, M6BasicIndexPtr inIndex);
 	virtual 		~M6BasicIx();
 	
 	void			AddWord(uint32 inWord, uint32 inFrequency = 1);
@@ -348,7 +354,7 @@ class M6BasicIx
 	uint8			mIndexNr;
 	
 	// data for the second pass
-	M6BasicIndex*	mIndex;
+	M6BasicIndexPtr	mIndex;
 
 	uint32			mLastDoc;
 	uint32			mLastTerm;
@@ -362,7 +368,7 @@ class M6BasicIx
 //
 
 M6BasicIx::M6BasicIx(M6FullTextIx& inFullTextIndex, M6Lexicon& inLexicon,
-	const string& inName, uint8 inIndexNr, M6BasicIndex* inIndex)
+	const string& inName, uint8 inIndexNr, M6BasicIndexPtr inIndex)
 	: mName(inName)
 	, mFullTextIndex(inFullTextIndex)
 	, mLexicon(inLexicon)
@@ -458,7 +464,7 @@ class M6ValueIndex : public M6BasicIx
 {
   public:
 					M6ValueIndex(M6FullTextIx& inFullTextIndex, M6Lexicon& inLexicon,
-						const string& inName, uint8 inIndexNr, M6BasicIndex* inIndex);
+						const string& inName, uint8 inIndexNr, M6BasicIndexPtr inIndex);
 	
 	virtual void	AddDocTerm(uint32 inDoc, uint8 inFrequency, M6OBitStream& inIDL);
 	virtual void	FlushTerm(uint32 inTerm, uint32 inDocCount);
@@ -468,7 +474,7 @@ class M6ValueIndex : public M6BasicIx
 };
 
 M6ValueIndex::M6ValueIndex(M6FullTextIx& inFullTextIndex, M6Lexicon& inLexicon,
-		const string& inName, uint8 inIndexNr, M6BasicIndex* inIndex)
+		const string& inName, uint8 inIndexNr, M6BasicIndexPtr inIndex)
 	: M6BasicIx(inFullTextIndex, inLexicon, inName, inIndexNr, inIndex)
 {
 }
@@ -508,7 +514,7 @@ class M6TextIndex : public M6BasicIx
 {
   public:
 					M6TextIndex(M6FullTextIx& inFullTextIndex, M6Lexicon& inLexicon,
-						const string& inName, uint8 inIndexNr, M6BasicIndex* inIndex);
+						const string& inName, uint8 inIndexNr, M6BasicIndexPtr inIndex);
 
   private:
 	void			AddDocTerm(uint32 inDoc, uint8 inFrequency, M6OBitStream& inIDL);
@@ -520,7 +526,7 @@ class M6TextIndex : public M6BasicIx
 };
 
 M6TextIndex::M6TextIndex(M6FullTextIx& inFullTextIndex, M6Lexicon& inLexicon,
-		const string& inName, uint8 inIndexNr, M6BasicIndex* inIndex)
+		const string& inName, uint8 inIndexNr, M6BasicIndexPtr inIndex)
 	: M6BasicIx(inFullTextIndex, inLexicon, inName, inIndexNr, inIndex)
 	, mIDLFile(nullptr)
 	, mIDLBits(nullptr)
@@ -596,14 +602,14 @@ void M6TextIndex::FlushTerm(uint32 inTerm, uint32 inDocCount)
 //{
 //  public:
 //					M6WeightedWordIndex(M6FullTextIx& inFullTextIndex, M6Lexicon& inLexicon,
-//						const string& inName, uint8 inIndexNr, M6BasicIndex* inIndex);
+//						const string& inName, uint8 inIndexNr, M6BasicIndexPtr inIndex);
 //
 //	virtual void	AddDocTerm(uint32 inDoc, uint8 inFrequency, M6OBitStream& inIDL);
 //	virtual void	FlushTerm(uint32 inTerm, uint32 inDocCount);
 //};
 //
 //M6WeightedWordIndex::M6WeightedWordIndex(M6FullTextIx& inFullTextIndex, M6Lexicon& inLexicon,
-//		const string& inName, uint8 inIndexNr, M6BasicIndex* inIndex)
+//		const string& inName, uint8 inIndexNr, M6BasicIndexPtr inIndex)
 //	: M6BasicIx(inFullTextIndex, inLexicon, inName, inIndexNr, inIndex)
 //{
 //}
@@ -675,11 +681,11 @@ class M6DateIndex : public M6BasicIx
 {
   public:
 					M6DateIndex(M6FullTextIx& inFullTextIndex, M6Lexicon& inLexicon,
-						const string& inName, uint8 inIndexNr, M6BasicIndex* inIndex);
+						const string& inName, uint8 inIndexNr, M6BasicIndexPtr inIndex);
 };
 
 M6DateIndex::M6DateIndex(M6FullTextIx& inFullTextIndex, M6Lexicon& inLexicon,
-		const string& inName, uint8 inIndexNr, M6BasicIndex* inIndex)
+		const string& inName, uint8 inIndexNr, M6BasicIndexPtr inIndex)
 	: M6BasicIx(inFullTextIndex, inLexicon, inName, inIndexNr, inIndex)
 {
 }
@@ -691,13 +697,13 @@ class M6NumberIndex : public M6BasicIx
 {
   public:
 					M6NumberIndex(M6FullTextIx& inFullTextIndex, M6Lexicon& inLexicon,
-						const string& inName, uint8 inIndexNr, M6BasicIndex* inIndex);
+						const string& inName, uint8 inIndexNr, M6BasicIndexPtr inIndex);
 //
 //	virtual int		Compare(const char* inA, uint32 inLengthA, const char* inB, uint32 inLengthB) const;
 };
 
 M6NumberIndex::M6NumberIndex(M6FullTextIx& inFullTextIndex, M6Lexicon& inLexicon,
-		const string& inName, uint8 inIndexNr, M6BasicIndex* inIndex)
+		const string& inName, uint8 inIndexNr, M6BasicIndexPtr inIndex)
 	: M6BasicIx(inFullTextIndex, inLexicon, inName, inIndexNr, inIndex)
 {
 }
@@ -754,7 +760,7 @@ M6BasicIx* M6BatchIndexProcessor::GetIndexBase(const string& inName, M6IndexKind
 	
 	if (ix == mIndices.end())
 	{
-		M6BasicIndex* index = mDatabank.CreateIndex(inName, inKind);
+		M6BasicIndexPtr index = mDatabank.CreateIndex(inName, inKind);
 		
 		mIndices.push_back(new T(mFullTextIndex, mLexicon, inName,
 			static_cast<uint8>(mIndices.size()), index));
@@ -868,6 +874,7 @@ void M6BatchIndexProcessor::Finish(uint32 inDocCount)
 M6DatabankImpl::M6DatabankImpl(M6Databank& inDatabank, const string& inPath, MOpenMode inMode)
 	: mDatabank(inDatabank)
 	, mDbDirectory(inPath)
+	, mMode(inMode)
 	, mStore(nullptr)
 	, mBatch(nullptr)
 {
@@ -890,9 +897,9 @@ M6DatabankImpl::~M6DatabankImpl()
 	delete mStore;
 }
 
-M6BasicIndex* M6DatabankImpl::GetIndex(const string& inName)
+M6BasicIndexPtr M6DatabankImpl::GetIndex(const string& inName)
 {
-	M6BasicIndex* result = nullptr;
+	M6BasicIndexPtr result;
 	
 	foreach (M6IndexDesc& desc, mIndices)
 	{
@@ -906,15 +913,15 @@ M6BasicIndex* M6DatabankImpl::GetIndex(const string& inName)
 	return result;
 }
 
-M6BasicIndex* M6DatabankImpl::CreateIndex(const string& inName, M6IndexKind inKind)
+M6BasicIndexPtr M6DatabankImpl::CreateIndex(const string& inName, M6IndexKind inKind)
 {
-	M6BasicIndex* result = GetIndex(inName);
+	M6BasicIndexPtr result = GetIndex(inName);
 	if (result == nullptr)
 	{
 		switch (inKind)
 		{
 			case eM6ValueIndex:
-				result = new M6SimpleIndex((mDbDirectory / (inName + ".index")).string(), eReadWrite);
+				result.reset(new M6SimpleIndex((mDbDirectory / (inName + ".index")).string(), mMode));
 				break;
 			
 			default:
@@ -951,6 +958,19 @@ M6Document* M6DatabankImpl::Fetch(uint32 inDocNr)
 		result = new M6OutputDocument(mDatabank, inDocNr, docPage, docSize);
 
 	return result;
+}
+
+M6Document* M6DatabankImpl::FindDocument(const string& inIndex, const string& inValue)
+{
+	M6BasicIndexPtr index = CreateIndex(inIndex, eM6ValueIndex);
+	if (not index)
+		THROW(("Index %s not found", inIndex.c_str()));
+	
+	int64 v;
+	if (not index->find(ba::to_lower_copy(inValue), v))
+		THROW(("Value %s not found in index %s", inValue.c_str(), inIndex.c_str()));
+	
+	return Fetch(static_cast<uint32>(v));
 }
 
 void M6DatabankImpl::StartBatchImport(M6Lexicon& inLexicon)
@@ -1008,6 +1028,11 @@ M6DocStore& M6Databank::GetDocStore()
 M6Document* M6Databank::Fetch(uint32 inDocNr)
 {
 	return mImpl->Fetch(inDocNr);
+}
+
+M6Document* M6Databank::FindDocument(const string& inIndex, const string& inValue)
+{
+	return mImpl->FindDocument(inIndex, inValue);
 }
 
 uint32 M6Databank::size() const

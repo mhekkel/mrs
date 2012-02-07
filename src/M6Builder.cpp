@@ -109,8 +109,13 @@ void M6Builder::Store(const string& inDocument)
 			}
 		}
 		
-		if (p.index != eM6NoIndex)
-			doc->IndexText(p.name, p.index, value, false);
+		switch (p.index)
+		{
+#pragma warning("TODO Dit moet beter:")
+		case eM6ValueIndex:	doc->IndexValue(p.name, eM6ValueIndex, value); break;
+			case eM6NoIndex:	break;
+			default:			doc->IndexText(p.name, p.index, value, false); break;
+		}
 		
 		if (not value.empty())
 			doc->SetAttribute(p.name, value);

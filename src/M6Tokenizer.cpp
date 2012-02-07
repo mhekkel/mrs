@@ -232,6 +232,14 @@ inline bool iscombm(uint32 c)
 
 }
 
+M6Tokenizer::M6Tokenizer(const char* inData)
+	: mBuffer(reinterpret_cast<const uint8*>(inData))
+	, mBufferSize(strlen(inData))
+	, mPtr(mBuffer)
+	, mCaseSensitive(true)
+{
+}
+
 M6Tokenizer::M6Tokenizer(const char* inData, size_t inLength, bool inCaseInsensitive)
 	: mBuffer(reinterpret_cast<const uint8*>(inData))
 	, mBufferSize(inLength)

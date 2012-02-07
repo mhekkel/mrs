@@ -23,7 +23,7 @@ class M6Databank
 	void			Store(M6Document* inDocument);
 	M6Document*		Fetch(uint32 inDocNr);
 	
-	M6Document*		GetOneDocument(const std::string& inIndex,
+	M6Document*		FindDocument(const std::string& inIndex,
 						const std::string& inValue);
 	
 	M6DocStore&		GetDocStore();

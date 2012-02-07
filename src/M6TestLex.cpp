@@ -70,3 +70,42 @@ BOOST_AUTO_TEST_CASE(test_lex_1)
 	for (uint32 t = 1; t < lexicon.Count(); ++t)
 		BOOST_CHECK_EQUAL(lexicon.GetString(t), wordmap[t]);
 }
+
+BOOST_AUTO_TEST_CASE(test_tok_1)
+{
+	cout << "testing tokenizer 1" << endl;
+	
+	M6Tokenizer tok("aap noot mies");
+	M6Token tokens[] = { eM6TokenWord, eM6TokenOther, eM6TokenWord, eM6TokenOther, eM6TokenWord, eM6TokenEOF };
+	
+	foreach (M6Token token, tokens)
+		BOOST_CHECK_EQUAL(token, tok.GetToken());
+}
+
+BOOST_AUTO_TEST_CASE(test_tok_2)
+{
+	M6Tokenizer tok("1 10 100");
+	M6Token tokens[] = { eM6TokenNumber, eM6TokenOther, eM6TokenNumber, eM6TokenOther, eM6TokenNumber, eM6TokenEOF };
+	
+	foreach (M6Token token, tokens)
+		BOOST_CHECK_EQUAL(token, tok.GetToken());
+}
+
+BOOST_AUTO_TEST_CASE(test_tok_3)
+{
+	M6Tokenizer tok("1. 1.0 1e+0");
+	M6Token tokens[] = { eM6TokenNumber, eM6TokenOther, eM6TokenNumber, eM6TokenOther, eM6TokenNumber, eM6TokenEOF };
+	
+	foreach (M6Token token, tokens)
+		BOOST_CHECK_EQUAL(token, tok.GetToken());
+}
+
+BOOST_AUTO_TEST_CASE(test_tok_4)
+{
+	M6Tokenizer tok("1e0a 10a 00_1");
+	M6Token tokens[] = { eM6TokenWord, eM6TokenOther, eM6TokenWord, eM6TokenOther, eM6TokenWord, eM6TokenEOF };
+	
+	foreach (M6Token token, tokens)
+		BOOST_CHECK_EQUAL(token, tok.GetToken());
+}
+

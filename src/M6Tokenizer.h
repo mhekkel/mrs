@@ -48,6 +48,7 @@ class M6Tokenizer
 
 	static const uint32 kMaxTokenLength = 255;
 
+					M6Tokenizer(const char* inData);
 					M6Tokenizer(const char* inData, size_t inLength,
 						bool inCaseInsensitive = true);
 

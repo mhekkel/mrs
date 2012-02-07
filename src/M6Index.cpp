@@ -1228,6 +1228,7 @@ M6IndexImpl::~M6IndexImpl()
 {
 	if (mDirty)
 		mFile.PWrite(mHeader, 0);
+	delete[] mCache;
 }
 
 void M6IndexImpl::InitCache()

@@ -237,7 +237,7 @@ void M6Builder::Build()
 
 	fs::path path = file->content();
 	mDatabank = M6Databank::CreateNew(path.string());
-	mDatabank->StartBatchImport();
+	mDatabank->StartBatchImport(mLexicon);
 	
 	vector<fs::path> files;
 	Glob(mConfig->find_first("source"), files);

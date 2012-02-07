@@ -196,12 +196,12 @@ void M6FullTextIx::FlushDoc(uint32 inDoc)
 		if (e.weight < 1)
 			e.weight = 1;
 		
-		if (UsesInDocLocation(w->index))
-		{
-			DocLoc& loc = const_cast<DocLoc&>(w->loc);
-			assert(e.idl.BitSize() == 0);
-			WriteArray(e.idl, loc, kMaxInDocumentLocation);
-		}
+//		if (UsesInDocLocation(w->index))
+//		{
+//			DocLoc& loc = const_cast<DocLoc&>(w->loc);
+//			assert(e.idl.BitSize() == 0);
+//			WriteArray(e.idl, loc, kMaxInDocumentLocation);
+//		}
 
 		mEntries.PushBack(e);
 	}
@@ -212,7 +212,7 @@ void M6FullTextIx::FlushDoc(uint32 inDoc)
 
 void M6FullTextIx::BufferEntryWriter::PrepareForWrite(const BufferEntry* inValues, uint32 inCount)
 {
-	mFirstDoc = inValues[0].doc - 1;
+	mFirstDoc = inValues[0].doc;
 }
 
 void M6FullTextIx::BufferEntryWriter::WriteSortedRun(M6FileStream& inFile, const BufferEntry* inValues, uint32 inCount)
@@ -224,7 +224,7 @@ void M6FullTextIx::BufferEntryWriter::WriteSortedRun(M6FileStream& inFile, const
 	
 	uint32 idlIxMap = mFullTextIndex->GetDocLocationIxMap();
 	
-	WriteGamma(bits, d);
+	WriteGamma(bits, mFirstDoc);
 	WriteBinary(bits, 32, idlIxMap);
 
 	for (uint32 i = 0; i < inCount; ++i)
@@ -232,16 +232,16 @@ void M6FullTextIx::BufferEntryWriter::WriteSortedRun(M6FileStream& inFile, const
 		if (inValues[i].term > t)
 			d = mFirstDoc;
 
-		WriteGamma(bits, inValues[i].term - t);
-		WriteGamma(bits, inValues[i].doc - d);
-		WriteGamma(bits, inValues[i].ix);
+		WriteGamma(bits, inValues[i].term - t + 1);
+		WriteGamma(bits, inValues[i].doc - d + 1);
+		WriteGamma(bits, inValues[i].ix + 1);
 		WriteBinary(bits, kWeightBitCount, inValues[i].weight);
 
 		if (idlIxMap & (1 << inValues[i].ix))
 			WriteBits(bits, inValues[i].idl);
 
-		t = inValues[i].term - 1;
-		d = inValues[i].doc - 1;
+		t = inValues[i].term;
+		d = inValues[i].doc;
 	}
 	
 	bits.Sync();
@@ -261,6 +261,8 @@ void M6FullTextIx::BufferEntryReader::ReadSortedRunEntry(BufferEntry& outValue)
 	uint32 delta;
 	
 	ReadGamma(bits, delta);
+	delta -= 1;
+
 	if (delta)
 	{
 		term += delta;
@@ -269,9 +271,11 @@ void M6FullTextIx::BufferEntryReader::ReadSortedRunEntry(BufferEntry& outValue)
 	
 	outValue.term = term;
 	ReadGamma(bits, delta);
+	delta -= 1;
 	doc += delta;
 	outValue.doc = doc;
 	ReadGamma(bits, outValue.ix);
+	outValue.ix -= 1;
 	ReadBinary(bits, kWeightBitCount, outValue.weight);
 	
 	if (idlIxMap & (1 << outValue.ix))
@@ -291,7 +295,7 @@ class M6BasicIx
 	void			SetDbDocCount(uint32 inDbDocCount);
 	void			AddDocTerm(uint32 inDoc, uint32 inTerm, uint8 inFrequency, M6OBitStream& inIDL);
 
-	bool			Empty() const							{ return mLastDoc > 0; }
+	bool			Empty() const							{ return mLastDoc == 0; }
 	uint8			GetIxNr() const							{ return mIndexNr; }
 	string			GetName() const							{ return mName; }
 
@@ -327,6 +331,7 @@ M6BasicIx::M6BasicIx(M6FullTextIx& inFullTextIndex, M6Lexicon& inLexicon,
 	, mFullTextIndex(inFullTextIndex)
 	, mLexicon(inLexicon)
 	, mIndexNr(inIndexNr)
+	, mIndex(nullptr)
 	, mLastDoc(0)
 	, mDocCount(0)
 	, mDbDocCount(0)
@@ -400,7 +405,7 @@ void M6BasicIx::FlushTerm(uint32 inTerm, uint32 inDocCount)
 			docs.push_back(docNr);
 		}
 
-		static_cast<M6MultiBasicIndex*>(mIndex)->Insert(mLexicon.GetString(inTerm), docs, inDocCount);
+//		static_cast<M6MultiBasicIndex*>(mIndex)->Insert(mLexicon.GetString(inTerm), docs, inDocCount);
 	}
 
 	mBits.Clear();
@@ -436,6 +441,7 @@ M6ValueIndex::M6ValueIndex(M6FullTextIx& inFullTextIndex, M6Lexicon& inLexicon,
 void M6ValueIndex::AddDocTerm(uint32 inDoc, uint8 inFrequency, M6OBitStream& inIDL)
 {
 	mDocs.push_back(inDoc);
+	mLastDoc = inDoc;
 }
 
 void M6ValueIndex::FlushTerm(uint32 inTerm, uint32 inDocCount)
@@ -455,7 +461,12 @@ void M6ValueIndex::FlushTerm(uint32 inTerm, uint32 inDocCount)
 	}
 	
 	if (mDocs.size() > 0)
+	{
+		if (mIndex == nullptr)
+			mIndex = new M6SimpleIndex(mName + ".ix", eReadWrite);
+		
 		mIndex->insert(mLexicon.GetString(inTerm), mDocs.back());
+	}
 	
 	mDocs.clear();
 }
@@ -536,7 +547,7 @@ void M6TextIndex::FlushTerm(uint32 inTerm, uint32 inDocCount)
 			docs.push_back(docNr);
 		}
 
-		static_cast<M6MultiIDLBasicIndex*>(mIndex)->Insert(mLexicon.GetString(inTerm), mIDLOffset, docs, inDocCount);
+//		static_cast<M6MultiIDLBasicIndex*>(mIndex)->Insert(mLexicon.GetString(inTerm), mIDLOffset, docs, inDocCount);
 	}
 
 	mBits.Clear();
@@ -678,9 +689,8 @@ class M6BatchIndexProcessor
 
 	void		IndexTokens(const string& inIndexName, M6IndexKind inIndexKind,
 					const M6InputDocument::M6TokenList& inTokens);
-	void		FlushDoc();
-
-	void		Finish();
+	void		FlushDoc(uint32 inDocNr);
+	void		Finish(uint32 inDocCount);
 
   private:
 
@@ -690,7 +700,6 @@ class M6BatchIndexProcessor
 	M6FullTextIx		mFullTextIndex;
 	M6Lexicon&			mLexicon;
 	vector<M6BasicIx*>	mIndices;
-	uint32				mEntries;
 };
 
 M6BatchIndexProcessor::M6BatchIndexProcessor(M6Lexicon& inLexicon)
@@ -749,19 +758,18 @@ void M6BatchIndexProcessor::IndexTokens(const string& inIndexName,
 	}
 }
 
-void M6BatchIndexProcessor::FlushDoc()
+void M6BatchIndexProcessor::FlushDoc(uint32 inDocNr)
 {
-	mFullTextIndex.FlushDoc(mEntries);
-	mEntries += 1;
+	mFullTextIndex.FlushDoc(inDocNr);
 }
 
-void M6BatchIndexProcessor::Finish()
+void M6BatchIndexProcessor::Finish(uint32 inDocCount)
 {
 //	// add the required 'alltext' index
 //	mIndices.push_back(new M6WeightedWordIndex(mFullTextIndex, mLexicon, kAllTextIndexName, mIndices.size(), url));
 	
 	// tell indices about the doc count
-	for_each(mIndices.begin(), mIndices.end(), [this](M6BasicIx* ix) { ix->SetDbDocCount(this->mEntries); });
+	for_each(mIndices.begin(), mIndices.end(), [&inDocCount](M6BasicIx* ix) { ix->SetDbDocCount(inDocCount); });
 	
 	// get the iterator for all index entries
 	auto_ptr<M6FullTextIx::M6EntryIterator> iter(mFullTextIndex.Finish());
@@ -830,7 +838,7 @@ class M6DatabankImpl
 				M6DatabankImpl(M6Databank& inDatabank, const string& inPath, MOpenMode inMode);
 	virtual		~M6DatabankImpl();
 
-	void		StartBatchImport();
+	void		StartBatchImport(M6Lexicon& inLexicon);
 	void		CommitBatchImport();
 		
 	void		Store(M6Document* inDocument);
@@ -847,6 +855,7 @@ class M6DatabankImpl
 M6DatabankImpl::M6DatabankImpl(M6Databank& inDatabank, const string& inPath, MOpenMode inMode)
 	: mDatabank(inDatabank)
 	, mStore(nullptr)
+	, mBatch(nullptr)
 {
 	fs::path path(inPath);
 	
@@ -876,9 +885,12 @@ void M6DatabankImpl::Store(M6Document* inDocument)
 
 	uint32 docNr = doc->Store();
 	
-	foreach (const M6InputDocument::M6IndexTokens& d, doc->GetIndexTokens())
-		mBatch->IndexTokens(d.mIndexName, d.mIndexKind, d.mTokens);
-	mBatch->FlushDoc();
+	if (mBatch != nullptr)
+	{
+		foreach (const M6InputDocument::M6IndexTokens& d, doc->GetIndexTokens())
+			mBatch->IndexTokens(d.mIndexName, d.mIndexKind, d.mTokens);
+		mBatch->FlushDoc(docNr);
+	}
 	
 	delete inDocument;
 }
@@ -892,6 +904,18 @@ M6Document* M6DatabankImpl::Fetch(uint32 inDocNr)
 		result = new M6OutputDocument(mDatabank, inDocNr, docPage, docSize);
 
 	return result;
+}
+
+void M6DatabankImpl::StartBatchImport(M6Lexicon& inLexicon)
+{
+	mBatch = new M6BatchIndexProcessor(inLexicon);
+}
+
+void M6DatabankImpl::CommitBatchImport()
+{
+	mBatch->Finish(mStore->size());
+	delete mBatch;
+	mBatch = nullptr;
 }
 
 // --------------------------------------------------------------------
@@ -914,9 +938,9 @@ M6Databank* M6Databank::CreateNew(const std::string& inPath)
 	return new M6Databank(inPath, eReadWrite);
 }
 
-void M6Databank::StartBatchImport()
+void M6Databank::StartBatchImport(M6Lexicon& inLexicon)
 {
-	mImpl->StartBatchImport();
+	mImpl->StartBatchImport(inLexicon);
 }
 
 void M6Databank::CommitBatchImport()

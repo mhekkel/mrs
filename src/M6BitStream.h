@@ -2,6 +2,8 @@
 
 class M6IBitStream;
 class M6OBitStream;
+class M6File;
+class M6FileStream;
 
 // --------------------------------------------------------------------
 
@@ -29,6 +31,7 @@ class M6OBitStream
 //	void				GetBits(int64& outBits) const;
 
 	friend class M6IBitStream;
+	friend struct M6IBitStreamOBitImpl;
 	friend void ReadBits(M6IBitStream& inBits, M6OBitStream& outValue);
 	friend void WriteBits(M6OBitStream& inBits, const M6OBitStream& inValue);
 	friend void CopyBits(M6OBitStream& inBits, const M6OBitStream& inValue);
@@ -62,13 +65,14 @@ class M6IBitStream
 						M6IBitStream();
 						M6IBitStream(M6File& inFile, int64 inOffset);
 //						M6IBitStream(const void* inData, size_t inSize);
+						M6IBitStream(const M6IBitStream& inBits);
 	explicit			M6IBitStream(const M6OBitStream& inBits);
 	M6IBitStream&		operator=(const M6IBitStream& inStream);
 						~M6IBitStream();
 	
 	// 
 	
-	int					operator()() const;
+	int					operator()();
 	void				Sync();
 	bool				Eof() const					{ return (7 - mBitOffset) >= (8 + mImpl->mSize); }
 	void				Underflow();
@@ -81,25 +85,33 @@ class M6IBitStream
 
   private:
 
+	friend struct M6IBitStreamFileImpl;
+	friend struct M6IBitStreamOBitImpl;
+
 	struct M6IBitStreamImpl
 	{
 						M6IBitStreamImpl(size_t inSize);
 		virtual			~M6IBitStreamImpl() {}
 		
+		void			Reference();
+		void			Release();
+
 		void			Get(uint8& outByte);
 		
-		size_t			mSize;
-		size_t			mByteOffset;
+		int64			mSize;
+		int64			mByteOffset;
 		
 	  protected:
 		virtual void	Read() = 0;
 
 		uint8*			mBufferPtr;
-		size_t			mBufferSize;
+		int64			mBufferSize;
+		int32			mRefCount;
 	};
 
 	void				NextByte(uint8& outByte);
 	
+	M6IBitStreamImpl*	mImpl;
 	int32				mBitOffset;
 	uint8				mByte;
 };
@@ -176,13 +188,11 @@ template<class T> void WriteGamma(M6OBitStream& inBits, const T& inValue)
 	}
 	inBits << 0;
 	
-	v = inValue - (1LL << e);
-	
-	uint64 b = 1ULL << (e - 1);
-	while (b)
+	uint64 b = 1ULL << e;
+	while (e-- > 0)
 	{
-		inBits << (v & b);
 		b >>= 1;
+		inBits << (inValue & b);
 	}
 }
 
@@ -224,7 +234,7 @@ inline M6OBitStream& M6OBitStream::operator<<(bool inBit)
 
 // --------------------------------------------------------------------
 
-void M6IBitStream::M6IBitStreamImpl::Get(uint8& outByte)
+inline void M6IBitStream::M6IBitStreamImpl::Get(uint8& outByte)
 {
 	if (mBufferSize <= 0)
 		Read();
@@ -240,7 +250,7 @@ void M6IBitStream::M6IBitStreamImpl::Get(uint8& outByte)
 		outByte = 0;
 }
 
-inline bool M6IBitStream::Underflow()
+inline void M6IBitStream::Underflow()
 {
 	if (not Eof())
 	{

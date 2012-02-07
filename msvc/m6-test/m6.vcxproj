@@ -144,6 +144,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\src\M6TestBitStream.cpp" />
     <ClCompile Include="..\..\src\M6TestDocStore.cpp" />
     <ClCompile Include="..\..\src\M6TestMain.cpp" />
   </ItemGroup>

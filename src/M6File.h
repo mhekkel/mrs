@@ -55,32 +55,32 @@ class M6FileWriter;
 class M6File
 {
   public:
-				M6File(const std::string& inFile, MOpenMode inMode);
-	virtual		~M6File();
+					M6File(const std::string& inFile, MOpenMode inMode);
+	virtual			~M6File();
 	
-	void		PRead(void* inBuffer, int64 inSize, int64 inOffset);
-	void		PWrite(const void* inBuffer, int64 inSize, int64 inOffset);
-	
-	template<class S>
-	void		PRead(S& outStruct, int64 inOffset)
-				{
-					M6FileReader data(this, inOffset);
-					outStruct.serialize(data);
-				}
+	void			PRead(void* inBuffer, int64 inSize, int64 inOffset);
+	void			PWrite(const void* inBuffer, int64 inSize, int64 inOffset);
 	
 	template<class S>
-	void		PWrite(S& outStruct, int64 inOffset)
-				{
-					M6FileWriter data(this, inOffset);
-					outStruct.serialize(data);
-				}
+	void			PRead(S& outStruct, int64 inOffset)
+					{
+						M6FileReader data(this, inOffset);
+						outStruct.serialize(data);
+					}
 	
-	void		Truncate(int64 inSize);
-	int64		Size() const					{ return mSize; }
+	template<class S>
+	void			PWrite(S& outStruct, int64 inOffset)
+					{
+						M6FileWriter data(this, inOffset);
+						outStruct.serialize(data);
+					}
+	
+	virtual void	Truncate(int64 inSize);
+	int64			Size() const					{ return mSize; }
 
   protected:
-	MHandle		mHandle;
-	int64		mSize;
+	MHandle			mHandle;
+	int64			mSize;
 };
 
 // M6FileStream is an extension of M6File having the notion of an offset
@@ -88,16 +88,18 @@ class M6File
 class M6FileStream : public M6File
 {
   public:
-				M6FileStream(const std::string& inFile, MOpenMode inMode);
+					M6FileStream(const std::string& inFile, MOpenMode inMode);
 	
-	int64		Seek(int64 inOffset, int inMode);
-	int64		Tell() const;
+	int64			Seek(int64 inOffset, int inMode);
+	int64			Tell() const;
 	
-	void		Read(void* inBuffer, int64 inSize);
-	void		Write(const void* inBuffer, int64 inSize);
+	void			Read(void* inBuffer, int64 inSize);
+	void			Write(const void* inBuffer, int64 inSize);
+
+	virtual void	Truncate(int64 inSize);
 
   private:
-	int64		mOffset;
+	int64			mOffset;
 };
 
 class M6FileReader

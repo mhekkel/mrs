@@ -5,6 +5,7 @@
 class M6Document;
 class M6DatabankImpl;
 class M6DocStore;
+class M6Lexicon;
 
 class M6Databank
 {
@@ -16,7 +17,7 @@ class M6Databank
 	static M6Databank*
 					CreateNew(const std::string& inPath);
 
-	void			StartBatchImport();
+	void			StartBatchImport(M6Lexicon& inLexicon);
 	void			CommitBatchImport();
 	
 	void			Store(M6Document* inDocument);

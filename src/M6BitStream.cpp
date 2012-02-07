@@ -1,6 +1,9 @@
 #include "M6Lib.h"
 
+#include <cassert>
+
 #include "M6BitStream.h"
+#include "M6File.h"
 
 using namespace std;
 
@@ -22,7 +25,7 @@ struct M6OBitStreamImpl
 	uint32			mRefCount;
 
 					M6OBitStreamImpl() : mRefCount(1)	{ }
-	virtual 		~M6OBitStreamImpl()					{ assert(ref_count == 0); }
+	virtual 		~M6OBitStreamImpl()					{ assert(mRefCount == 0); }
 	void			Reference()							{ ++mRefCount; }
 	void			Release()							{ if (--mRefCount == 0) delete this; }
 
@@ -52,9 +55,9 @@ struct M6OBitStreamMemImpl : public M6OBitStreamImpl
 					M6OBitStreamMemImpl();
 	virtual			~M6OBitStreamMemImpl();
 
-	virtual size_t	Size() const;
+	virtual size_t	Size() const								{ return mBufferPtr - mBuffer; }
 	virtual void	Write(const void* inData, size_t inSize);
-	virtual void	Truncate();
+	virtual void	Truncate()									{ mBufferPtr = mBuffer; }
 
 	uint8*			mBuffer;
 	uint8*			mBufferPtr;
@@ -72,14 +75,9 @@ M6OBitStreamMemImpl::~M6OBitStreamMemImpl()
 	delete[] mBuffer;
 }
 
-size_t M6OBitStreamMemImpl::Size() const
-{
-	return mBufferPtr - mBuffer;
-}
-
 void M6OBitStreamMemImpl::Write(const void* inData, size_t inSize)
 {
-	uint32 size = Size();
+	size_t size = Size();
 	if (size + inSize > mBufferSize)
 	{
 		uint8* t = new uint8[2 * mBufferSize];
@@ -94,11 +92,6 @@ void M6OBitStreamMemImpl::Write(const void* inData, size_t inSize)
 	mBufferPtr += inSize;
 }
 
-void M6OBitStreamMemImpl::Truncate()
-{
-	mBufferPtr = mBuffer;
-}
-
 // --------------------------------------------------------------------
 
 M6OBitStream::M6OBitStream()
@@ -110,7 +103,7 @@ M6OBitStream::M6OBitStream()
 }
 
 M6OBitStream::M6OBitStream(M6FileStream& inFile)
-	: impl(new M6OBitStreamImpl(&inFile))
+	: mImpl(new M6OBitStreamFileImpl(inFile))
 	, mByteOffset(0)
 	, mBitOffset(7)
 {
@@ -124,11 +117,11 @@ M6OBitStream::~M6OBitStream()
 }
 
 M6OBitStream::M6OBitStream(const M6OBitStream& inStream)
-	: mImpl(rhs.mImpl)
-	, mByteOffset(rhs.mByteOffset)
-	, mBitOffset(rhs.mBitOffset)
+	: mImpl(inStream.mImpl)
+	, mByteOffset(inStream.mByteOffset)
+	, mBitOffset(inStream.mBitOffset)
 {
-	memcpy(mData, rhs.mData, mByteOffset + 1);
+	memcpy(mData, inStream.mData, mByteOffset + 1);
 
 	if (mImpl != nullptr)
 		mImpl->Reference();
@@ -136,20 +129,20 @@ M6OBitStream::M6OBitStream(const M6OBitStream& inStream)
 
 M6OBitStream& M6OBitStream::operator=(const M6OBitStream& inStream)
 {
-	if (this != &rhs)
+	if (this != &inStream)
 	{
 		if (mImpl != nullptr)
 			mImpl->Release();
 	
-		mImpl = rhs.mImpl;
+		mImpl = inStream.mImpl;
 	
 		if (mImpl != nullptr)
 			mImpl->Reference();
 	
-		mByteOffset = rhs.mByteOffset;
-		mBitOffset = rhs.mBitOffset;
+		mByteOffset = inStream.mByteOffset;
+		mBitOffset = inStream.mBitOffset;
 		assert(mByteOffset < kBufferSize);
-		memcpy(mData, rhs.mData, mByteOffset + 1);
+		memcpy(mData, inStream.mData, mByteOffset + 1);
 	}
 
 	return *this;
@@ -239,25 +232,25 @@ inline void M6OBitStream::Add(uint8 byte)
 //		inFile.Write(mData, mByteOffset);
 //}
 
-void M6OBitStream::GetBits(int64& outBits) const
-{
-	assert(BitSize() <= 63);
-
-	uint64 value = 0x8000000000000000ULL |
-		((int64(mData[0]) << 55) & 0x7F80000000000000ULL) |
-		((int64(mData[1]) << 47) & 0x007F800000000000ULL) |
-		((int64(mData[2]) << 39) & 0x00007F8000000000ULL) |
-		((int64(mData[3]) << 31) & 0x0000007F80000000ULL) |
-		((int64(mData[4]) << 23) & 0x000000007F800000ULL) |
-		((int64(mData[5]) << 15) & 0x00000000007F8000ULL) |
-		((int64(mData[6]) <<  7) & 0x0000000000007F80ULL) |
-		((int64(mData[7]) >>  1) & 0x000000000000007FULL);
-
-	uint64 mask = ~0ULL;
-	mask <<= (63 - BitSize());
-	
-	outBits = (int64)(value & mask);
-}
+//void M6OBitStream::GetBits(int64& outBits) const
+//{
+//	assert(BitSize() <= 63);
+//
+//	uint64 value = 0x8000000000000000ULL |
+//		((int64(mData[0]) << 55) & 0x7F80000000000000ULL) |
+//		((int64(mData[1]) << 47) & 0x007F800000000000ULL) |
+//		((int64(mData[2]) << 39) & 0x00007F8000000000ULL) |
+//		((int64(mData[3]) << 31) & 0x0000007F80000000ULL) |
+//		((int64(mData[4]) << 23) & 0x000000007F800000ULL) |
+//		((int64(mData[5]) << 15) & 0x00000000007F8000ULL) |
+//		((int64(mData[6]) <<  7) & 0x0000000000007F80ULL) |
+//		((int64(mData[7]) >>  1) & 0x000000000000007FULL);
+//
+//	uint64 mask = ~0ULL;
+//	mask <<= (63 - BitSize());
+//	
+//	outBits = (int64)(value & mask);
+//}
 
 size_t M6OBitStream::Size() const
 {
@@ -272,7 +265,7 @@ size_t M6OBitStream::Size() const
 // --------------------------------------------------------------------
 //	M6IBitStream
 
-M6IBitStream::M6IBitStreamImpl::M6IBitStreamImpl(int64 inSize)
+M6IBitStream::M6IBitStreamImpl::M6IBitStreamImpl(size_t inSize)
 	: mSize(inSize)
 	, mByteOffset(0)
 	, mRefCount(1)
@@ -329,15 +322,15 @@ void M6IBitStream::M6IBitStreamImpl::Release()
 
 struct M6IBitStreamFileImpl : public M6IBitStream::M6IBitStreamImpl
 {
-					M6IBitStreamFileImpl(M6FileStream& inData, int64 inOffset, int64 inSize = -1);
+					M6IBitStreamFileImpl(M6File& inData, int64 inOffset, int64 inSize = -1);
 	virtual void	Read();
 	
-	M6FileStream&	mData;
+	M6File&			mData;
 	int64			mOffset;
 	char			mDataBuffer[kBitBufferExtend];
 };
 
-M6IBitStreamFileImpl::M6IBitStreamFileImpl(M6FileStream& inData, int64 inOffset, int64 inSize)
+M6IBitStreamFileImpl::M6IBitStreamFileImpl(M6File& inData, int64 inOffset, int64 inSize)
 	: M6IBitStreamImpl(inSize)
 	, mData(inData)
 	, mOffset(inOffset)
@@ -361,20 +354,20 @@ M6IBitStreamFileImpl::M6IBitStreamFileImpl(M6FileStream& inData, int64 inOffset,
 
 void M6IBitStreamFileImpl::Read()
 {
-	if (mData.Tell() == 0)				// avoid reading excess bytes in the first call
+	//if (mData.Tell() == 0)				// avoid reading excess bytes in the first call
 		mBufferSize = kBitBufferSize;
-	else
-		mBufferSize = kBitBufferExtend;
+	//else
+	//	mBufferSize = kBitBufferExtend;
 
-	if (mBufferSize > size / 8 + 1)
-		mBufferSize = size / 8 + 1;
+	if (mBufferSize > mSize / 8 + 1)
+		mBufferSize = mSize / 8 + 1;
 	
-	int64 r = mData.Read(mDataBuffer, mBufferSize);
-	if (r < 0)
-		THROW(("IO Error in reading bits"));
+	if (mBufferSize > mData.Size())
+		mBufferSize = mData.Size();
 
-	mBufferSize = r;
-	mBufferPtr = mDataBuffer;
+	mData.PRead(mDataBuffer, mBufferSize, mOffset);
+	mOffset += mBufferSize;
+	mBufferPtr = reinterpret_cast<uint8*>(mDataBuffer);
 }
 
 // --------------------------------------------------------------------
@@ -437,30 +430,25 @@ struct M6IBitStreamOBitImpl : public M6IBitStream::M6IBitStreamImpl
 					M6IBitStreamOBitImpl(const M6OBitStream& inData)
 						: M6IBitStreamImpl(inData.BitSize())
 						, mData(&inData)
-						, mByteOffset(0)
 					{
-					}
-
-	virtual void	Read()
-					{
-						if (mData->mImpl != nullptr and mByteOffset < mData->mImpl->file->Size())
-							mData->mImpl->file->PRead(bytes, 1, mByteOffset);
+						assert(mData->mBitOffset == 7);
+						if (mData->mImpl == nullptr)
+						{
+							mBufferPtr = const_cast<uint8*>(mData->mData);
+							mBufferSize = mData->mByteOffset;
+						}
 						else
 						{
-							int64 offset = mByteOffset;
-							if (mData->mImpl != nullptr)
-								offset -= mData->mImpl->file->Size();
-							bytes[0] = mData->mData[offset];
+							M6OBitStreamMemImpl* impl = dynamic_cast<M6OBitStreamMemImpl*>(mData->mImpl);
+							assert(impl);
+							mBufferPtr = impl->mBuffer;
+							mBufferSize = impl->Size();
 						}
-						++mByteOffset;
-						
-						mBufferPtr = bytes;
-						mBufferSize = 1;
 					}
 
+	virtual void	Read() { assert(false); }
+
 	const M6OBitStream*	mData;
-	char				mBytes[1];
-	int64				mByteOffset;
 };
 
 // --------------------------------------------------------------------
@@ -491,7 +479,7 @@ struct M6IBitStreamOBitImpl : public M6IBitStream::M6IBitStreamImpl
 
 // --------------------------------------------------------------------
 
-M6IBitStream::M6IBitStream(M6FileStream& inData, int64 inOffset)
+M6IBitStream::M6IBitStream(M6File& inData, int64 inOffset)
 	: mBitOffset(7)
 {
 //	assert(inOffset >= 0);
@@ -534,7 +522,7 @@ M6IBitStream::M6IBitStream(M6FileStream& inData, int64 inOffset)
 //}
 
 M6IBitStream::M6IBitStream(const M6OBitStream& inData)
-	: mImpl(new M6IBitStreamOBitImpl(inData.mImpl))
+	: mImpl(new M6IBitStreamOBitImpl(inData))
 	, mBitOffset(7)
 {
 	mImpl->Get(mByte);
@@ -555,8 +543,8 @@ M6IBitStream& M6IBitStream::operator=(const M6IBitStream& inStream)
 		mImpl->Release();
 		mImpl = inStream.mImpl;
 		mImpl->Reference();
-		mBitOffset = rhs.mBitOffset;
-		mByte = rhs.mByte;
+		mBitOffset = inStream.mBitOffset;
+		mByte = inStream.mByte;
 	}
 	
 	return *this;
@@ -571,11 +559,11 @@ void M6IBitStream::Sync()
 {
 	// replay the sync from an obit stream's sync
 	
-	int bit = operator();
+	int bit = operator()();
 	assert(bit == 0);
 	
 	while (mBitOffset != 7)
-		bit = operator();
+		bit = operator()();
 }
 
 // skip forward as fast as possible
@@ -594,7 +582,7 @@ void M6IBitStream::Skip(uint32 inBits)
 	while (inBits >= 8)
 	{
 		inBits -= 8;
-		mImpl->get(mByte);
+		mImpl->Get(mByte);
 	}
 	
 	mBitOffset -= inBits;

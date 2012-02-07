@@ -308,4 +308,47 @@ void M6File::Truncate(int64 inSize)
 	mSize = inSize;
 }
 
+// --------------------------------------------------------------------
+
+M6FileStream::M6FileStream(const string& inFile, MOpenMode inMode)
+	: M6File(inFile, inMode)
+	, mOffset(0)
+{
+}
+
+int64 M6FileStream::Seek(int64 inOffset, int inMode)
+{
+	switch (inMode)
+	{
+		case SEEK_SET:	mOffset = inOffset; break;
+		case SEEK_CUR:	mOffset += inOffset; break;
+		case SEEK_END:	mOffset = mSize + inOffset; break;
+	}
+	
+	return mOffset;
+}
+
+int64 M6FileStream::Tell() const
+{
+	return mOffset;
+}
+
+void M6FileStream::Read(void* inBuffer, int64 inSize)
+{
+	PRead(inBuffer, inSize, mOffset);
+	mOffset += inSize;
+}
+
+void M6FileStream::Write(const void* inBuffer, int64 inSize)
+{
+	PWrite(inBuffer, inSize, mOffset);
+	mOffset += inSize;
+}
+
+void M6FileStream::Truncate(int64 inSize)
+{
+	M6File::Truncate(inSize);
+	if (mOffset > mSize)
+		mOffset = mSize;
+}
 

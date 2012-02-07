@@ -171,10 +171,10 @@ class M6SortedRunArray
 	
 	iterator*	Finish()
 				{
-					if (mRunCount > 0 or mRun != nullptr)
+					if (mRunCount > 0)
 						FlushRun();
 					
-					assert(mRun == nullptr);
+					assert(mRunCount == 0);
 
 					return new iterator(mFile, mComp, mRuns);
 				}

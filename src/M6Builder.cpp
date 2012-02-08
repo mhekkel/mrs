@@ -33,22 +33,13 @@ namespace io = boost::iostreams;
 namespace
 {
 
-M6IndexKind MapIndexKind(const string& inKind)
+M6DataType MapDataType(const string& inKind)
 {
-	M6IndexKind result = eM6NoIndex;
-		 if (inKind == "fulltext")	result = eM6FullTextIndex;
-	else if (inKind == "varchar")	result = eM6VarCharIndex;
-	else if (inKind == "number")	result = eM6NumberIndex;
-	else if (inKind == "date")		result = eM6DateIndex;
-	return result;
-}
-
-M6IndexProcessingAction MapIndexAction(const string& inAction)
-{
-	M6IndexProcessingAction result = eM6IndexActionIgnore;
-		 if (inAction == "stop") result = eM6IndexActionStop;
-	else if (inAction == "store") result = eM6IndexActionStore;
-	else if (inAction == "ignore") result = eM6IndexActionIgnore;
+	M6DataType result = eM6NoData;
+		 if (inKind == "text")		result = eM6TextData;
+	else if (inKind == "string")	result = eM6StringData;
+	else if (inKind == "numeric")	result = eM6NumberData;
+	else if (inKind == "date")		result = eM6DateData;
 	return result;
 }
 
@@ -80,87 +71,61 @@ void M6Builder::Glob(zx::element* inSource, vector<fs::path>& outFiles)
 }
 
 
-void M6Builder::Store(const string& inDocument)
+void M6Builder::Process(const string& inDocument)
 {
 	M6InputDocument* doc = new M6InputDocument(*mDatabank, inDocument);
 	
-	foreach (M6AttributeParser& p, mAttributes)
+	const char* start = inDocument.c_str();
+	const char* end = start + inDocument.length();
+	boost::cmatch m;
+	boost::match_flag_type flags = boost::match_default | boost::match_not_dot_newline;
+	
+	map<string,string> attributes;
+	
+	while (regex_search(start, end, m, mProcessorRE, flags))
 	{
-		string value;
+		string key(m[1].first, m[1].second);
+		ba::to_lower(key);
+		ba::trim(key);
+		bool stop = false;
 		
-		if (p.repeat == eM6RepeatOnce)
+		foreach (M6Processor& p, mProcessors)
 		{
-			boost::smatch m;
-			boost::match_flag_type flags = boost::match_default | boost::match_not_dot_newline;
-			if (boost::regex_search(inDocument, m, p.re, flags))
-			{
-				value = m[1];
-				ba::trim(value);
-			}
-		}
-		else if (p.repeat == eM6RepeatConcat)
-		{
-			string::const_iterator start = inDocument.begin();
-			string::const_iterator end = inDocument.end();
-			boost::match_results<string::const_iterator> what;
-			boost::match_flag_type flags = boost::match_default | boost::match_not_dot_newline;
-			
-			while (regex_search(start, end, what, p.re, flags))
-			{
-				string v(what[1].first, what[1].second);
-				ba::trim(v);
-				if (not value.empty())
-					value += ' ';
-				value += v;
-				start = what[0].second;
-				flags |= boost::match_prev_avail;
-				flags |= boost::match_not_bob;
-			}
-		}
-		
-		if (not value.empty())
-			doc->SetAttribute(p.name, value);
-	}
+			if (p.key != key and not p.key.empty())
+				continue;
 
-	if (not mKeyValueRE.empty())
-	{
-		const char* start = inDocument.c_str();
-		const char* end = start + inDocument.length();
-		boost::match_results<const char*> what;
-		boost::match_flag_type flags = boost::match_default | boost::match_not_dot_newline;
-		
-		while (regex_search(start, end, what, p.re, flags))
-		{
-			string key(what[1].first, what[1].second);
+			stop = p.stop;
 			
-			M6IndexAction action = mDefault.action;
+			string value(m[2].first, m[2].second);
+			ba::trim(value);
 			
-			foreach (M6IndexParser& p, mIndices)
+			if (value.empty() and stop == false)
+				continue;
+			
+			if (p.attr)
 			{
-				if (p.key == key)
-				{
-					if (p.action == eM6IndexActionStore)
-					{
-						doc->Index(p.index, p.kind, p.unique, what[2].first, what[2].second - what[2].first);
-						action = eM6IndexActionIgnore;
-					}
-					break;
-				}
+				string attr = attributes[p.name];
+				if (not attr.empty())
+					attr += ' ';
+				attributes[p.name] = attr + value;
 			}
 			
-			if (p.action == eM6IndexActionStore)
-				doc->Index(mDefault.index, mDefault.kind, mDefault.unique,
-					what[2].first, what[2].second - what[2].first);
-			else if (p.action == eM6IndexActionStop)
-				break;
+			if (p.index)
+				doc->Index(p.name, p.type, p.unique, value);
 			
-			start = what[0].second;
-			flags |= boost::match_prev_avail;
-			flags |= boost::match_not_bob;
+			break;
 		}
+		
+		if (stop)
+			break;
+		
+		start = m[0].second;
+		flags |= boost::match_prev_avail;
+		flags |= boost::match_not_bob;
 	}
-	else
-		THROW(("unsupported"));
+	
+	foreach (auto attr, attributes)
+		doc->SetAttribute(attr.first, attr.second);
 	
 	doc->Tokenize(mLexicon, 0);
 	
@@ -208,7 +173,7 @@ void M6Builder::Parse(const fs::path& inFile)
 	{
 		io::filtering_ostream out(io::back_inserter(document));
 		io::copy(file, out);
-		Store(document);
+		Process(document);
 	}
 	else
 	{
@@ -222,7 +187,7 @@ void M6Builder::Parse(const fs::path& inFile)
 				document += line + "\n";
 				if (line == separatorLine)
 				{
-					Store(document);
+					Process(document);
 					document.clear();
 				}
 
@@ -236,6 +201,55 @@ void M6Builder::Parse(const fs::path& inFile)
 		}
 		else
 			THROW(("Unknown document separator type"));
+	}
+}
+
+void M6Builder::SetupProcessor(zx::element* inConfig)
+{
+	if (inConfig == nullptr)
+		THROW(("No processing information for databank in config file, cannot continue"));
+	
+	// fetch the processor type
+		 if (inConfig->get_attribute("type") == "delimited")	mProcessorType = eM6ProcessDelimited;
+	else if (inConfig->get_attribute("type") == "fixed-width")	mProcessorType = eM6ProcessFixedWidth;
+	else if (inConfig->get_attribute("type") == "regex")		mProcessorType = eM6ProcessRegex;
+	else THROW(("unsupported processing type"));
+	
+	if (mProcessorType == eM6ProcessDelimited)
+	{
+		string delimiter = inConfig->get_attribute("delimiter");
+		boost::format fre("(.+?)%1%(.+)$");
+		mProcessorRE = boost::regex((fre % delimiter).str());
+	}
+	
+	foreach (zx::element* p, inConfig->find("process"))
+	{
+		string action = p->get_attribute("action");
+		M6Processor proc = {
+			p->get_attribute("key"),
+			p->get_attribute("name"),
+			MapDataType(p->get_attribute("type")),
+			ba::contains(action, "attr"),
+			ba::contains(action, "index"),
+			ba::contains(action, "unique"),
+			ba::contains(action, "stop")
+		};
+		
+		if (proc.name.empty())
+			proc.name = proc.key;
+		
+		foreach (zx::element* pp, p->find("postprocess"))
+		{
+			M6PostProcessor post = {
+				boost::regex(pp->get_attribute("what")),
+				pp->get_attribute("with"),
+				ba::contains(pp->get_attribute("flags"), "global")
+			};
+			
+			proc.post.push_back(post);
+		}
+		
+		mProcessors.push_back(proc);
 	}
 }
 
@@ -254,53 +268,8 @@ void M6Builder::Build()
 	vector<fs::path> files;
 	Glob(mConfig->find_first("source"), files);
 
-	// prepare the attribute parsers
-	foreach (zx::element* attr, mConfig->find("document-attributes/document-attribute"))
-	{
-		M6AttributeParser p = {
-			attr->get_attribute("name"),
-			boost::regex(attr->get_attribute("match")),
-			attr->get_attribute("repeat"))
-		};
-		
-		if (p.name.empty() or p.re.empty())
-			continue;
-		
-		mAttributes.push_back(p);
-	}
-	
-	// prepare the index processing actions
-	mIndexProcessingType = eM6IndexProcessingTypeNone;
-	zx::element* indexing = mConfig->find_first("indexing");
-	if (indexing != nullptr)
-	{
-		string s = indexing->get_attribute("process");
-		if (s == "line-delimited-key-value")
-			mIndexProcessingType = eM6LineDelimitedKeyValue;
-		else if (s == "line-fixed-width-key-value")
-			mIndexProcessingType = eM6LineFixedWidthKeyValue;
-		else if (not s.empty())
-			THROW(("Invalid indexing process type"));
-		
-		if (mIndexProcessingType == eM6LineDelimitedKeyValue)
-			mKeyValueDelimiter = indexing->get_attribute("separator");
+	SetupProcessor(mConfig->find_first("processing"));
 
-		mDefaultAction = MapIndexAction(indexing->get_attribute("default-action"));
-		
-		foreach (zx::element* ip, indexing->find("index"))
-		{
-			M6IndexParser p = {
-				ip->get_attribute("key"),
-				MapIndexAction(ip->get_attribute("action")),
-				ip->get_attribute("index"),
-				MapIndexKind(ip->get_attribute("index")),
-				ip->get_attribute("unique") == "true"
-			};
-			
-			mIndices.push_back(p);
-		}
-	}
-	
 	foreach (fs::path& file, files)
 	{
 		if (not fs::exists(file))

@@ -1,5 +1,6 @@
 ﻿#include "M6Lib.h"
 
+#include <iostream>
 #include <boost/test/unit_test.hpp>
 
 #include "M6BitStream.h"

@@ -13,15 +13,24 @@
 // --------------------------------------------------------------------
 // some types used throughout m6
 
-// we have four kinds of indices
-enum M6IndexKind
+enum M6DataType
 {
-	eM6NoIndex,			// 
+	eM6NoData,
 	
-	eM6FullTextIndex,
-	eM6VarCharIndex,
-	eM6NumberIndex,
-	eM6DateIndex
+	eM6TextData			= 1,
+	eM6StringData,
+	eM6NumberData,
+	eM6DateData
+};
+
+enum M6IndexType
+{
+	eM6NoIndexType,
+
+	eM6FullTextIndexType	= 1,
+	eM6StringIndexType,
+	eM6NumberIndexType,
+	eM6DateIndexType
 };
 
 // --------------------------------------------------------------------

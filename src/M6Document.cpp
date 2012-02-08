@@ -111,17 +111,10 @@ uint32 M6InputDocument::Store()
 }
 
 M6InputDocument::M6IndexTokenList::iterator M6InputDocument::GetIndexTokens(
-	const std::string& inIndex, M6IndexKind inIndexKind)
+	const string& inIndex, M6DataType inDataType)
 {
 	if (inIndex.empty())
 		THROW(("Empty index name"));
-	
-	//if (inIndex.length() > 31)
-	//{
-	//	cerr << "Index name is limited to 31 characters, truncating (\""
-	//		 << inIndex<< "\")" << endl;
-	//	inIndex.erase(inIndex.begin() + 31, inIndex.end());
-	//}
 	
 	M6IndexTokenList::iterator result = mTokens.begin();
 	while (result != mTokens.end() and result->mIndexName != inIndex)
@@ -129,60 +122,58 @@ M6InputDocument::M6IndexTokenList::iterator M6InputDocument::GetIndexTokens(
 	
 	if (result == mTokens.end())
 	{
-		M6IndexTokens tokens = { inIndexKind, inIndex };
+		M6IndexTokens tokens = { inDataType, inIndex };
 		mTokens.push_back(tokens);
 		result = mTokens.end() - 1;
 	}
-	else if (result->mIndexKind != inIndexKind)
-		THROW(("Inconsistent use of indices for index %s", inIndex.c_str()));
+	else if (result->mDataType != inDataType)
+		THROW(("Inconsisted datatype for index %s", inIndex.c_str()));
 	
 	return result;
 }
 
-void M6InputDocument::IndexText(const string& inIndex, M6IndexKind inIndexKind,
-	const string& inText, bool inIndexNumbers)
+void M6InputDocument::Index(const string& inIndex, M6DataType inDataType,
+	bool isUnique, const string& inText, bool inIndexNumbers)
 {
-	auto ix = GetIndexTokens(inIndex, inIndexKind);
+	bool tokenize = true;
 	
-	M6Tokenizer tokenizer(inText.c_str(), inText.length());
-	for (;;)
+	if (inDataType != eM6TextData)
 	{
-		M6Token token = tokenizer.GetToken();
-		if (token == eM6TokenEOF)
-			break;
-		
-		uint32 t = 0, l = tokenizer.GetTokenLength();
-		if (l == 0)
-			continue;
-		
-		if ((token == eM6TokenNumber and not inIndexNumbers) or
-			token == eM6TokenPunctuation or
-			l > kM6MaxKeyLength)
-		{
-			ix->mTokens.push_back(t);
-			continue;
-		}
-		
-		if (token != eM6TokenNumber and token != eM6TokenWord)
-			continue;
-		
-		t = mDocLexicon.Store(tokenizer.GetTokenValue(), l);
-		
-		ix->mTokens.push_back(t);
+		tokenize = inDataType == eM6StringData;
+		M6IndexValue v = { inDataType, inIndex, inText, isUnique };
+		mValues.push_back(v);
 	}
-}
+	
+	if (tokenize)
+	{
+		auto ix = GetIndexTokens(inIndex, inDataType);
 
-void M6InputDocument::IndexValue(const string& inIndex, M6IndexKind inIndexKind,
-	const string& inValue)
-{
-	auto ix = GetIndexTokens(inIndex, inIndexKind);
-	
-	string value(inValue);
-	ba::trim(value);
-	ba::to_lower(value);
-	
-	if (not value.empty())
-		ix->mTokens.push_back(mDocLexicon.Store(value));
+		M6Tokenizer tokenizer(inText.c_str(), inText.length());
+		for (;;)
+		{
+			M6Token token = tokenizer.GetToken();
+			if (token == eM6TokenEOF)
+				break;
+			
+			uint32 l = tokenizer.GetTokenLength();
+			assert(l > 0);
+			
+			if ((token == eM6TokenNumber and not inIndexNumbers) or
+				token == eM6TokenPunctuation or
+				l > kM6MaxKeyLength)
+			{
+				if (ix->mTokens.empty() or ix->mTokens.back() != 0)
+					ix->mTokens.push_back(0);		// acts as stop word
+				continue;
+			}
+			
+			if (token != eM6TokenNumber and token != eM6TokenWord)
+				continue;
+			
+			uint32 t = mDocLexicon.Store(tokenizer.GetTokenValue(), l);
+			ix->mTokens.push_back(t);
+		}
+	}
 }
 
 void M6InputDocument::Tokenize(M6Lexicon& inLexicon, uint32 inLastStopWord)

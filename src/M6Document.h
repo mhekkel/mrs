@@ -45,12 +45,22 @@ class M6InputDocument : public M6Document
 	
 	struct M6IndexTokens
 	{
-		M6IndexKind		mIndexKind;
+		M6DataType		mDataType;
 		std::string		mIndexName;
 		M6TokenList		mTokens;
 	};
 	
 	typedef std::vector<M6IndexTokens>			M6IndexTokenList;
+	
+	struct M6IndexValue
+	{
+		M6DataType		mDataType;
+		std::string		mIndexName;
+		std::string		mIndexValue;
+		bool			mUnique;
+	};
+	
+	typedef std::vector<M6IndexValue>			M6IndexValueList;
 
 						M6InputDocument(M6Databank& inDatabank,
 							const std::string& inText);
@@ -61,27 +71,27 @@ class M6InputDocument : public M6Document
 	void				SetAttribute(const std::string& inName,
 							const std::string& inData);
 
-	virtual void		IndexText(const std::string& inIndex, M6IndexKind inIndexKind,
-							const std::string& inText, bool inIndexNumbers);
-
-	virtual void		IndexValue(const std::string& inIndex, M6IndexKind inIndexKind,
-							const std::string& inText);
+	virtual void		Index(const std::string& inIndex, M6DataType inDataType,
+							bool isUnique, const std::string& inText,
+							bool inIndexNumbers = false);
 
 	virtual void		Tokenize(M6Lexicon& inLexicon, uint32 inLastStopWord);
 
 	uint32				Store();
 	
 	const M6IndexTokenList& GetIndexTokens() const			{ return mTokens; }
+	const M6IndexValueList& GetIndexValues() const			{ return mValues; }
 
   private:
 
 	M6IndexTokenList::iterator
 						GetIndexTokens(const std::string& inIndexName,
-							M6IndexKind inIndexKind);
+							M6DataType inDataType);
 
 	std::string			mText;
 	M6DocAttributes		mAttributes;
 	M6IndexTokenList	mTokens;
+	M6IndexValueList	mValues;
 	M6Lexicon			mDocLexicon;
 	uint32				mDocNr;
 };

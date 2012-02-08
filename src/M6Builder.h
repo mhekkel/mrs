@@ -21,64 +21,50 @@ class M6Builder
 
   private:
 
-	enum M6AttributeRepeatOption
+	enum M6ProcessorType
 	{
-		eM6RepeatOnce,
-		eM6RepeatConcat
+		eM6ProcessNone,
+		eM6ProcessDelimited,
+		eM6ProcessFixedWidth,
+		eM6ProcessRegex
 	};
 
-	struct M6AttributeParser
+	struct M6PostProcessor
 	{
-		std::string				name;
-		boost::regex			re;
-		M6AttributeRepeatOption	repeat;
+		boost::regex			what;
+		std::string				with;
+		bool					global;
 	};
 	
-	typedef std::vector<M6AttributeParser> M6AttributeParsers;
+	typedef std::vector<M6PostProcessor> M6PostProcessors;
 
-	enum M6IndexProcessingType
-	{
-		eM6IndexProcessingTypeNone,
-		eM6LineDelimitedKeyValue,
-		eM6LineFixedWidthKeyValue
-	};
-
-	enum M6IndexProcessingAction
-	{
-		eM6IndexActionStop,
-		eM6IndexActionIgnore,
-		eM6IndexActionStoreText,
-		eM6IndexActionStoreValue,
-		eM6IndexActionStoreDate,
-		eM6IndexActionStoreNumber
-	};
-
-	struct M6IndexAction
+	struct M6Processor
 	{
 		std::string				key;
-		M6IndexProcessingAction	action;
-		std::string				index;
-		M6IndexKind				kind;
+		std::string				name;
+		M6DataType				type;
+		bool					attr;
+		bool					index;
 		bool					unique;
+		bool					stop;
+		M6PostProcessors		post;
 	};
 
-	typedef std::vector<M6IndexParser> M6IndexParsers;
-	
+	typedef std::vector<M6Processor> M6Processors;
+
 	void				Glob(zeep::xml::element* inSource,
 							std::vector<boost::filesystem::path>& outFiles);
-	void				Store(const std::string& inDocument);
+	void				Process(const std::string& inDocument);
 	void				Parse(const boost::filesystem::path& inFile);
+
+	void				SetupProcessor(zeep::xml::element* inConfig);
 
 	zeep::xml::element*	mConfig;
 	M6Databank*			mDatabank;
 	M6Lexicon			mLexicon;
 	
 	// parsing info
-	M6AttributeParsers	mAttributes;
-	M6IndexProcessingType
-						mIndexProcessingType;
-	M6IndexProcessingAction
-						mDefaultAction;
-	boost::regex		mKeyValueRE;
-	M6IndexParsers		mIndices;
+	M6ProcessorType		mProcessorType;
+	M6Processors		mProcessors;
+	boost::regex		mProcessorRE;
 };

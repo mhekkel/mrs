@@ -9,15 +9,15 @@
 		<locale>en_US.UTF-8</locale>
 		
 		<!-- source type can be path, glob or regex -->
-		<source type="path">C:\Users\maarten\projects\m6\test\PDBFIND2.TXT</source>
-<!--		<source type="path">C:\Users\maarten\projects\m6\test\pdbfind2-head.txt</source>-->
+<!--		<source type="path">C:\Users\maarten\projects\m6\test\PDBFIND2.TXT</source>-->
+		<source type="path">C:\Users\maarten\projects\m6\test\pdbfind2-head.txt</source>
 		
 		<!-- parser info -->
 		<!-- if no header-line or document-separator element is specified, the
 			 entire file is considered to be one document. -->
 		
 		<!-- header-line's will be stripped off each file. If document-separator
-			 below is specified as first-line-matches then this header is not needed. -->
+			 below is specified as first-line-matches then this header is of course not needed. -->
 		<header-line>^//.*</header-line>
 
 		<!-- document-separator indicates either the start or the end of a document.
@@ -29,34 +29,46 @@
 		-->
 		<document-separator type="last-line-equals">//</document-separator>
 
-		<!-- document-attributes are collected from the document text -->
-		<document-attributes>
-			<!-- document-attribute has the following attributes
-					- name 		The name to use when storing this attribute
-					- match		Regular expression that extracts the data, first capture is used as value
-					- repeat	can be 'once' or 'concatenate', the last means each occurrence is added
-								into one value
-					- index		This can be 'value' or 'text', indicating how to index this metadata field.
-			-->
-			
-			<document-attribute name="id" match="^ID\s+: (.{4})$" repeat="once" />
-			<document-attribute name="title" match="^Header\s+: (.+)" repeat="concatenate" />
-		</document-attributes>
-		
-		<!-- indexing 
-				type: 'line-delimited-key-value'		needs separator
-					  'line-fixed-width-key-value'		needs key-width, can have value-width
-					  'line-regex-key-value'			needs regex with two captures
+		<!--
+			There are three types of processing the document for indexing, specified by
+			the type attribute.
+
+			'delimited'					needs delimiter
+					a : value1
+					b : value2
+					etc...
+					
+			'fixed-width'				needs key-width, can have value-width
+			  		a   value1
+			  		bb  value2
+			  		etc...
+			  
+			'regex'						needs regex with two captures
+			  		Used for more 'human-readable' formats like genbank.
+			  		
+			  		a    bla bla
+			  		 b   another string
+			  		     of text for field b
+			  		c    and the value for c
+			  		
+			  		regex in this case e.g.: ^\s*(\w+)\s+((?:.+)(?:\n\s{4,}.+)*)
 				
 		-->
-		<indexing type="line-delimited-key-value" separator=":"
-				default-action="store" default-index="fulltext">
-			<index key="id" index="varchar" unique="true" />
-			<index key="chain" action="stop" />
-			<index key="resolution" action="store" index="number" />
-			<index key="r-factor" action="store" index="number" />
-			<index key="date" action="store" index="date" />
-		</indexing>
+		
+<!--		<processing type="regex" regex="^\s*([A-Z]+)\s+((?:.+\n)(?:\s{4,}.+\n)*)" >-->
+		<processing type="delimited" delimiter=":">
+			<process key="id"							type="string"		action="index attr unique" />
+			<process key="header"		name="title"	type="string"		action="index attr" />
+			<process key="chain"											action="stop" />
+			<process key="resolution"					type="numeric"		action="index" />
+			<process key="author"						type="string"		action="index">
+				<postprocess what="(\w)\.(?=\w)" with="$1. " flags="global" />
+			</process>
+			<process key="date"							type="date"			action="index" />
+			<process key="r-factor"						type="numeric"		action="index" />
+			<process					name="text"		type="text"			action="index" />
+		</processing>
+
 	</databank>
 	
 </m6-config>

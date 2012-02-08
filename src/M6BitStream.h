@@ -1,5 +1,7 @@
 #pragma once
 
+#include <vector>
+
 class M6IBitStream;
 class M6OBitStream;
 class M6File;
@@ -203,8 +205,9 @@ void CopyBits(M6OBitStream& inBits, const M6OBitStream& inValue);
 // --------------------------------------------------------------------
 //	Arrays are a bit more complex
 
-template<class T> void WriteArray(M6OBitStream& inBits, T& inArray, int64 inMax);
-template<class T> void ReadArray(M6IBitStream& inBits, T& outArray, int64 inMax);
+//template<class T> void WriteArray(M6OBitStream& inBits, T& inArray, int64 inMax);
+//template<class T> void ReadArray(M6IBitStream& inBits, T& outArray, int64 inMax);
+void WriteArray(M6OBitStream& inBits, std::vector<uint32>& inArray, int64 inMax);
 
 // --------------------------------------------------------------------
 //

@@ -143,6 +143,8 @@ class M6FullTextIx
 	M6EntryIterator*Finish()									{ return mEntries.Finish(); }
 	int64			CountEntries() const						{ return mEntries.Size(); }
 	
+	fs::path		GetScratchDir() const						{ return mScratchDir; }
+
   private:
 	
 	typedef vector<uint32>		DocLoc;
@@ -166,6 +168,7 @@ class M6FullTextIx
 
 	BufferEntryWriter
 					mBufferEntryWriter;
+	fs::path		mScratchDir;
 	M6EntryBuffer	mEntries;
 };
 
@@ -173,7 +176,8 @@ M6FullTextIx::M6FullTextIx(const fs::path& inScratchUrl)
 	: mDocLocationIxMap(0)
 	, mDocWordLocation(0)
 	, mBufferEntryWriter(*this)
-	, mEntries(inScratchUrl.string(), less<BufferEntry>(), mBufferEntryWriter)
+	, mScratchDir(inScratchUrl)
+	, mEntries((mScratchDir / "fulltext").string(), less<BufferEntry>(), mBufferEntryWriter)
 {
 }
 
@@ -507,6 +511,7 @@ class M6TextIx : public M6BasicIx
   public:
 					M6TextIx(M6FullTextIx& inFullTextIndex, M6Lexicon& inLexicon,
 						const string& inName, uint8 inIndexNr, M6BasicIndexPtr inIndex);
+	virtual			~M6TextIx();
 
   private:
 	void			AddDocTerm(uint32 inDoc, uint8 inFrequency, M6OBitStream& inIDL);
@@ -525,7 +530,13 @@ M6TextIx::M6TextIx(M6FullTextIx& inFullTextIndex, M6Lexicon& inLexicon,
 	, mIDLOffset(0)
 {
 	mFullTextIndex.SetUsesInDocLocation(mIndexNr);
-//	mIDLFile = new HBufferedTempFileStream(mScratchPath);
+	mIDLFile = new M6FileStream((mFullTextIndex.GetScratchDir().parent_path() / (inName + ".idl")).string(), eReadWrite);
+}
+
+M6TextIx::~M6TextIx()
+{
+	delete mIDLBits;
+	delete mIDLFile;
 }
 
 void M6TextIx::AddDocTerm(uint32 inDoc, uint8 inFrequency, M6OBitStream& inIDL)
@@ -734,7 +745,7 @@ class M6BatchIndexProcessor
 };
 
 M6BatchIndexProcessor::M6BatchIndexProcessor(M6DatabankImpl& inDatabank, M6Lexicon& inLexicon)
-	: mFullTextIndex(inDatabank.GetScratchDir() / "full-text.tmp")
+	: mFullTextIndex(inDatabank.GetScratchDir())
 	, mDatabank(inDatabank)
 	, mLexicon(inLexicon)
 {
@@ -890,9 +901,6 @@ void M6BatchIndexProcessor::Finish(uint32 inDocCount)
 //	fDocWeights = new CDocWeightArray*[fHeader->count];
 //	memset(fDocWeights, 0, sizeof(CDocWeightArray*) * fHeader->count);
 //	
-
-	// And clean up
-	fs::remove_all(mDatabank.GetScratchDir());
 }
 
 // --------------------------------------------------------------------
@@ -1027,6 +1035,9 @@ void M6DatabankImpl::CommitBatchImport()
 	mBatch->Finish(mStore->size());
 	delete mBatch;
 	mBatch = nullptr;
+
+	// And clean up
+	fs::remove_all(mDbDirectory / "tmp");
 }
 
 // --------------------------------------------------------------------

@@ -255,6 +255,8 @@ inline void M6OBitStream::Add(uint8 byte)
 size_t M6OBitStream::Size() const
 {
 	size_t result = mByteOffset;
+	if (mBitOffset < 7)
+		result += 1;
 
 	if (mImpl != nullptr)
 		result += mImpl->Size();
@@ -431,22 +433,28 @@ struct M6IBitStreamOBitImpl : public M6IBitStream::M6IBitStreamImpl
 						: M6IBitStreamImpl(inData.BitSize())
 						, mData(&inData)
 					{
-						assert(mData->mBitOffset == 7);
-						if (mData->mImpl == nullptr)
-						{
-							mBufferPtr = const_cast<uint8*>(mData->mData);
-							mBufferSize = mData->mByteOffset;
-						}
-						else
+						if (mData->mImpl != nullptr)
 						{
 							M6OBitStreamMemImpl* impl = dynamic_cast<M6OBitStreamMemImpl*>(mData->mImpl);
 							assert(impl);
 							mBufferPtr = impl->mBuffer;
 							mBufferSize = impl->Size();
 						}
+						else
+						{
+							mBufferPtr = const_cast<uint8*>(mData->mData);
+							mBufferSize = mData->Size();
+						}
 					}
 
-	virtual void	Read() { assert(false); }
+	virtual void	Read()
+					{
+						if (mData->mImpl != nullptr)
+						{
+							mBufferPtr = const_cast<uint8*>(mData->mData);
+							mBufferSize = mData->Size();
+						}
+					}
 
 	const M6OBitStream*	mData;
 };
@@ -641,4 +649,164 @@ void CopyBits(M6OBitStream& inBits, const M6OBitStream&	inValue)
 	
 	while (bitCount-- > 0)
 		inBits << bits();
+}
+
+// --------------------------------------------------------------------
+//	Arrays
+
+namespace
+{
+
+struct M6Selector
+{
+	int32		databits;
+	uint32		span;
+};
+
+const M6Selector kSelectors[16] = {
+	{  0, 1 },
+	{ -3, 1 },
+	{ -2, 1 }, { -2, 2 },
+	{ -1, 1 }, { -1, 2 }, { -1, 4 },
+	{  0, 1 }, {  0, 2 }, {  0, 4 },
+	{  1, 1 }, {  1, 2 }, {  1, 4 },
+	{  2, 1 }, {  2, 2 },
+	{  3, 1 }
+};
+
+inline uint32 Select(int32 inBitsNeeded[], uint32 inCount,
+	int32 inWidth, int32 inMaxWidth, const M6Selector inSelectors[])
+{
+	uint32 result = 0;
+	int32 c = inBitsNeeded[0] - inMaxWidth;
+	
+	for (uint32 i = 1; i < 16; ++i)
+	{
+		if (inSelectors[i].span > inCount)
+			continue;
+		
+		int32 w = inWidth + inSelectors[i].databits;
+		
+		if (w > inMaxWidth or w < 0)
+			continue;
+		
+		bool fits = true;
+		int32 waste = 0;
+		
+		switch (inSelectors[i].span)
+		{
+			case 4:
+				fits = fits and inBitsNeeded[3] <= w;
+				waste += w - inBitsNeeded[3];
+			case 3:
+				fits = fits and inBitsNeeded[2] <= w;
+				waste += w - inBitsNeeded[2];
+			case 2:
+				fits = fits and inBitsNeeded[1] <= w;
+				waste += w - inBitsNeeded[1];
+			case 1:
+				fits = fits and inBitsNeeded[0] <= w;
+				waste += w - inBitsNeeded[0];
+		}
+		
+		if (fits == false)
+			continue;
+		
+		int32 n = (inSelectors[i].span - 1) * 4 - waste;
+		
+		if (n > c)
+		{
+			result = i;
+			c = n;
+		}
+	}
+	
+	return result;
+}
+
+template<class T>
+inline void Shift(T& ioIterator, int64& ioLast, uint32& outDelta, int32& outWidth)
+{
+	int64 next = *ioIterator++;
+	assert(next > ioLast);
+	
+	outDelta = static_cast<uint32>(next - ioLast - 1);
+	ioLast = next;
+	
+	uint32 v = outDelta;
+	outWidth = 0;
+	while (v > 0)
+	{
+		v >>= 1;
+		++outWidth;
+	}
+}
+
+template<typename T>
+void CompressSimpleArraySelector(M6OBitStream& inBits, vector<T>& inArray, int64 inMax)
+{
+	uint32 cnt = static_cast<uint32>(inArray.size());
+
+	WriteGamma(inBits, cnt);
+
+	int32 maxWidth = 0;
+	int64 v = inMax;
+	while (v > 0)
+	{
+		v >>= 1;
+		++maxWidth;
+	}
+	
+	int32 width = maxWidth;
+	int64 last = -1;
+	
+	int32 bn[4];
+	uint32 dv[4];
+	uint32 bc = 0;
+	typename vector<T>::const_iterator a = inArray.begin();
+	typename vector<T>::const_iterator e = inArray.end();
+	
+	while (a != e or bc > 0)
+	{
+		while (bc < 4 and a != e)
+		{
+			Shift(a, last, dv[bc], bn[bc]);
+			++bc;
+		}
+		
+		uint32 s = Select(bn, bc, width, maxWidth, kSelectors);
+
+		if (s == 0)
+			width = maxWidth;
+		else
+			width += kSelectors[s].databits;
+
+		uint32 n = kSelectors[s].span;
+		
+		WriteBinary(inBits, 4, s);
+
+		if (width > 0)
+		{
+			for (uint32 i = 0; i < n; ++i)
+				WriteBinary(inBits, width, dv[i]);
+		}
+		
+		bc -= n;
+
+		if (bc > 0)
+		{
+			for (uint32 i = 0; i < (4 - n); ++i)
+			{
+				bn[i] = bn[i + n];
+				dv[i] = dv[i + n];
+			}
+		}
+	}
+}
+
+}
+
+void WriteArray(M6OBitStream& inBits, vector<uint32>& inArray, int64 inMax)
+{
+	CompressSimpleArraySelector(inBits, inArray, inMax);
 }

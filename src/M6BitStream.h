@@ -207,7 +207,29 @@ void CopyBits(M6OBitStream& inBits, const M6OBitStream& inValue);
 
 //template<class T> void WriteArray(M6OBitStream& inBits, T& inArray, int64 inMax);
 //template<class T> void ReadArray(M6IBitStream& inBits, T& outArray, int64 inMax);
+
+//class M6CompressedArrayIterator
+//{
+//  public:
+//				M6CompressedArrayIterator(M6OBitStream& inBits);
+//				~M6CompressedArrayIterator();
+//	bool		Next(uint32& outValue);
+//};
+
 void WriteArray(M6OBitStream& inBits, std::vector<uint32>& inArray, int64 inMax);
+void ReadArray(M6OBitStream& inBits, std::vector<uint32>& outArray, int64 inMax);
+
+//class M6CompressedWeightArrayIterator
+//{
+//  public:
+//				M6CompressedArrayIterator(M6OBitStream& inBits);
+//				~M6CompressedArrayIterator();
+//	bool		Next(uint32& outValue, uint8& outWeight);
+//};
+//
+//void WriteArray(M6OBitStream& inBits, std::vector<std::pair<uint32,uint8>>& inArray, int64 inMax);
+//void ReadArray(M6OBitStream& inBits, std::vector<std::pair<uint32,uint8>>& outArray, int64 inMax);
+
 
 // --------------------------------------------------------------------
 //

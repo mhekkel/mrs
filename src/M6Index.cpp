@@ -1,4 +1,4 @@
-// Code to store a B+ index with variable key length and int64 as values.
+// Code to store a B+ index with variable key length and various values.
 //
 //	TODO: - implement a way to recover deallocated pages
 //		  - store additional bit vectors
@@ -33,11 +33,11 @@ const uint32
 	kM6IndexPageHeaderSize = 16,
 	kM6MaxEntriesPerPage = (kM6IndexPageSize - kM6IndexPageHeaderSize) / 12,	// keeps code simple
 //	kM6MaxEntriesPerPage = 4,
-	kM6MinEntriesPerPage = 2,
-	kM6IndexPageKeySpace = kM6IndexPageSize - kM6IndexPageHeaderSize,
-	kM6IndexPageMinKeySpace = kM6IndexPageKeySpace / 2,
+//	kM6MinEntriesPerPage = 2,
+//	kM6IndexPageKeySpace = kM6IndexPageSize - kM6IndexPageHeaderSize,
+//	kM6IndexPageMinKeySpace = kM6IndexPageKeySpace / 2,
 	kM6MaxKeyLength = (255 < kM6IndexPageMinKeySpace ? 255 : kM6IndexPageMinKeySpace),
-	kM6IndexPageDataCount = (kM6IndexPageKeySpace / sizeof(int64));
+//	kM6IndexPageDataCount = (kM6IndexPageKeySpace / sizeof(int64));
 
 BOOST_STATIC_ASSERT(kM6IndexPageDataCount >= kM6MaxEntriesPerPage);
 
@@ -61,8 +61,37 @@ struct M6WeightedData
 	int64		mBitOffset;
 };
 
-struct M6IndexPageData
+struct M6IndexBranchPageData
 {
+	enum {
+		kM6IndexPageKeySpace	= kM6IndexPageSize - 8,
+		kM6IndexPageDataCount	= kM6IndexPageKeySpace / sizeof(uint32)
+	};
+	
+	uint8		mFlags;
+	uint8		mType;
+	uint16		mN;
+	uint32		mP0;
+	union
+	{
+		uint8	mKeys[kM6IndexPageKeySpace];
+		int64	mData[kM6IndexPageDataCount];
+	};
+	
+	template<class Archive>
+	void serialize(Archive& ar)
+	{
+		ar & mFlags & mType & mN & mLink & mKeys;
+	}
+};
+
+struct M6IndexPageSimpleLeafData
+{
+	enum {
+		kM6IndexPageKeySpace	= kM6IndexPageSize - 16,
+		kM6IndexPageDataCount	= kM6IndexPageKeySpace / sizeof(uint32)
+	};
+
 	uint8		mFlags;
 	uint8		mType;
 	uint16		mN;
@@ -71,14 +100,87 @@ struct M6IndexPageData
 	union
 	{
 		uint8	mKeys[kM6IndexPageKeySpace];
-		int64	mData[kM6IndexPageDataCount];
+		uint32	mData[kM6IndexPageDataCount];
 	};
 
 	template<class Archive>
 	void serialize(Archive& ar)
 	{
-		ar & mFlags & mType & mN & mLink & mKeys;
+		ar & mFlags & mType & mN & mFiller & mLink & mKeys;
 	}
+};
+
+struct M6IndexPageMultiLeafData
+{
+	struct M6MultiData
+	{
+		uint32	mCount;
+		int64	mBitOffset;
+	};
+	
+	enum {
+		kM6IndexPageKeySpace	= kM6IndexPageSize - 16,
+		kM6IndexPageDataCount	= kM6IndexPageKeySpace / sizeof(M6MultiData)
+	};
+
+	uint8		mFlags;
+	uint8		mType;
+	uint16		mN;
+	uint32		mFiller;
+	int64		mLink;		// Used to link leaf pages or to store page[0]
+	union
+	{
+		uint8	mKeys[kM6IndexPageKeySpace];
+		M6MultiData
+				mData[kM6IndexPageDataCount];
+	};
+
+	template<class Archive>
+	void serialize(Archive& ar)
+	{
+		ar & mFlags & mType & mN & mFiller & mLink & mKeys;
+	}
+};
+
+struct M6IndexPageMultiIDLLeafData
+{
+	struct M6MultiData
+	{
+		uint32	mCount;
+		int64	mBitOffset;
+		int64	mIDLOffset;
+	};
+	
+	enum {
+		kM6IndexPageKeySpace	= kM6IndexPageSize - 16,
+		kM6IndexPageDataCount	= kM6IndexPageKeySpace / sizeof(M6MultiData)
+	};
+
+	uint8		mFlags;
+	uint8		mType;
+	uint16		mN;
+	uint32		mFiller;
+	int64		mLink;		// Used to link leaf pages or to store page[0]
+	union
+	{
+		uint8	mKeys[kM6IndexPageKeySpace];
+		M6MultiData
+				mData[kM6IndexPageDataCount];
+	};
+
+	template<class Archive>
+	void serialize(Archive& ar)
+	{
+		ar & mFlags & mType & mN & mFiller & mLink & mKeys;
+	}
+};
+
+union M6IndexPageData
+{
+	M6IndexBranchPageData			branch;
+	M6IndexPageSimpleLeafData		simple;
+	M6IndexPageMultiLeafData		multi;
+	M6IndexPageMultiIDLLeafData		mutli_idl;
 };
 
 BOOST_STATIC_ASSERT(sizeof(M6IndexPageData) == kM6IndexPageSize);
@@ -772,7 +874,7 @@ bool M6IndexLeafPage::Insert(string& ioKey, int64& ioValue, M6IndexBranchPage* i
 		result = true;
 	}
 
-	assert(mData->mN >= kM6MinEntriesPerPage or inParent == nullptr);
+//	assert(mData->mN >= kM6MinEntriesPerPage or inParent == nullptr);
 	assert(mData->mN <= kM6MaxEntriesPerPage);
 
 	return result;
@@ -1023,7 +1125,7 @@ bool M6IndexBranchPage::Insert(string& ioKey, int64& ioValue, M6IndexBranchPage*
 		}
 	}
 
-	assert(mData->mN >= kM6MinEntriesPerPage or inParent == nullptr);
+//	assert(mData->mN >= kM6MinEntriesPerPage or inParent == nullptr);
 	assert(mData->mN <= kM6MaxEntriesPerPage);
 
 	return result;
@@ -1912,3 +2014,54 @@ void M6BasicIndex::validate() const
 }
 
 #endif
+
+// --------------------------------------------------------------------
+
+M6MultiBasicIndex::M6MultiBasicIndex(const string& inPath, MOpenMode inMode)
+	: M6BasicIndex(inPath, inMode)
+{
+}
+
+void M6MultiBasicIndex::Insert(const string& inKey, const vector<uint32>& inDocuments,
+	int64 inMaxDocValue)
+{
+}
+
+bool M6MultiBasicIndex::Find(const string& inKey, iterator& outIterator)
+{
+	return false;
+}
+
+// --------------------------------------------------------------------
+
+M6MultiIDLBasicIndex::M6MultiIDLBasicIndex(const string& inPath, MOpenMode inMode)
+	: M6BasicIndex(inPath, inMode)
+{
+}
+
+void M6MultiIDLBasicIndex::Insert(const string& inKey, int64 inIDLOffset,
+	const vector<uint32>& inDocuments, int64 inMaxDocValue)
+{
+}
+
+bool M6MultiIDLBasicIndex::Find(const string& inKey, iterator& outIterator, int64& outIDLOffset)
+{
+	return false;
+}
+
+// --------------------------------------------------------------------
+
+M6WeightedBasicIndex::M6WeightedBasicIndex(const string& inPath, MOpenMode inMode)
+	: M6BasicIndex(inPath, inMode)
+{
+}
+
+void M6WeightedBasicIndex::Insert(const string& inKey,
+	const vector<pair<uint32,uint8>>& inDocuments, int64 inMaxDocValue)
+{
+}
+
+bool M6WeightedBasicIndex::Find(const string& inKey, weighted_iterator& outIterator)
+{
+	return false;
+}

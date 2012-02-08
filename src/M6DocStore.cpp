@@ -36,9 +36,9 @@ enum M6DataPageType
 
 struct M6DocStoreIndexEntry
 {
-	uint32	mDocNr_;
-	uint32	mDocPage_;
-	uint32	mDocSize_;
+	uint32	mDocNr;
+	uint32	mDocPage;
+	uint32	mDocSize;
 };
 
 struct M6DocStorePageData
@@ -184,13 +184,13 @@ class M6DocStoreIndexPage : public M6DocStorePage
 					M6DocStoreIndexPage(M6DocStoreImpl& inStore, M6DocStorePageData* inData, uint32 inPageNr);
 	virtual			~M6DocStoreIndexPage();
 
-	uint32			GetKey(uint32 inIndex) const		{ return swap_bytes(mData->mData[inIndex].mDocNr_); }
-	uint32			GetDocPage(uint32 inIndex) const	{ return swap_bytes(mData->mData[inIndex].mDocPage_); }
-	uint32			GetDocSize(uint32 inIndex) const	{ return swap_bytes(mData->mData[inIndex].mDocSize_); }
+	uint32			GetKey(uint32 inIndex) const		{ return swap_bytes(mData->mData[inIndex].mDocNr); }
+	uint32			GetDocPage(uint32 inIndex) const	{ return swap_bytes(mData->mData[inIndex].mDocPage); }
+	uint32			GetDocSize(uint32 inIndex) const	{ return swap_bytes(mData->mData[inIndex].mDocSize); }
 
-	void			SetKey(uint32 inIndex, uint32 inValue)		{ mData->mData[inIndex].mDocNr_ = swap_bytes(inValue); }
-	void			SetDocPage(uint32 inIndex, uint32 inValue)	{ mData->mData[inIndex].mDocPage_ = swap_bytes(inValue); }
-	void			SetDocSize(uint32 inIndex, uint32 inValue)	{ mData->mData[inIndex].mDocSize_ = swap_bytes(inValue); }
+	void			SetKey(uint32 inIndex, uint32 inValue)		{ mData->mData[inIndex].mDocNr = swap_bytes(inValue); }
+	void			SetDocPage(uint32 inIndex, uint32 inValue)	{ mData->mData[inIndex].mDocPage = swap_bytes(inValue); }
+	void			SetDocSize(uint32 inIndex, uint32 inValue)	{ mData->mData[inIndex].mDocSize = swap_bytes(inValue); }
 
 	bool			Insert(uint32& ioDocNr, uint32& ioPageNr, uint32& ioDocSize);
 	void			Erase(uint32 inDocNr);

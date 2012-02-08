@@ -5,6 +5,7 @@
 #pragma once
 
 #include <boost/function.hpp>
+#include <boost/lexical_cast.hpp>
 
 #include "M6File.h"
 
@@ -134,7 +135,24 @@ struct M6BasicComparator
 	}
 };
 
+struct M6NumericComparator
+{
+	int operator()(const char* inKeyA, size_t inKeyLengthA, const char* inKeyB, size_t inKeyLengthB) const
+	{
+#pragma message("TODO improve numeric comparison")
+		int64 a = boost::lexical_cast<int64>(std::string(inKeyA, inKeyLengthA));
+		int64 b = boost::lexical_cast<int64>(std::string(inKeyB, inKeyLengthB));
+		int d = 0;	// avoid overflows
+		if (a < b)
+			d = -1;
+		else if (a > b)
+			d = 1;
+		return d;
+	}
+};
+
 typedef M6Index<M6BasicIndex, M6BasicComparator>	M6SimpleIndex;
+typedef M6Index<M6BasicIndex, M6NumericComparator>	M6NumberIndex;
 
 // --------------------------------------------------------------------
 
@@ -156,6 +174,7 @@ class M6MultiBasicIndex : public M6BasicIndex
 };
 
 typedef M6Index<M6MultiBasicIndex, M6BasicComparator>	M6SimpleMultiIndex;
+typedef M6Index<M6MultiBasicIndex, M6NumericComparator>	M6NumberMultiIndex;
 
 // --------------------------------------------------------------------
 
@@ -173,10 +192,10 @@ class M6MultiIDLBasicIndex : public M6BasicIndex
 
 	void			Insert(const std::string& inKey, int64 inIDLOffset,
 						const std::vector<uint32>& inDocuments, int64 inMaxDocValue);
-	bool			Find(const std::string& inKey, iterator& outIterator, int64& outIDLOffset);
+	bool			Find(const std::string& inKey, multi_iterator& outIterator, int64& outIDLOffset);
 };
 
-typedef M6Index<M6MultiBasicIndex, M6BasicComparator>	M6SimpleMultiIndex;
+typedef M6Index<M6MultiIDLBasicIndex, M6BasicComparator>	M6SimpleIDLMultiIndex;
 
 // --------------------------------------------------------------------
 
@@ -189,12 +208,12 @@ class M6WeightedBasicIndex : public M6BasicIndex
 	{
 	  public:
 		uint32		size() const;
-		float		idf_correction(uint32 inDocCount) const;
+//		float		idf_correction(uint32 inDocCount) const;
 		bool		next(uint32& outDocNr, uint8& outFrequency);
 	};
 	
 	void			Insert(const std::string& inKey,
-						const std::vector<std::pair<uint32,uint8>>& inDocuments);
+						const std::vector<std::pair<uint32,uint8>>& inDocuments, int64 inMaxDocValue);
 	bool			Find(const std::string& inKey, weighted_iterator& outIterator);
 };
 

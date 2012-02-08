@@ -443,7 +443,7 @@ void M6BasicIx::FlushTerm(uint32 inTerm, uint32 inDocCount)
 			docs.push_back(docNr);
 		}
 
-//		static_cast<M6MultiBasicIndex*>(mIndex)->Insert(mLexicon.GetString(inTerm), docs, inDocCount);
+		static_cast<M6MultiBasicIndex*>(mIndex.get())->Insert(mLexicon.GetString(inTerm), docs, inDocCount);
 	}
 
 	mBits.Clear();
@@ -586,7 +586,7 @@ void M6TextIx::FlushTerm(uint32 inTerm, uint32 inDocCount)
 			docs.push_back(docNr);
 		}
 
-//		static_cast<M6MultiIDLBasicIndex*>(mIndex)->Insert(mLexicon.GetString(inTerm), mIDLOffset, docs, inDocCount);
+		static_cast<M6MultiIDLBasicIndex*>(mIndex.get())->Insert(mLexicon.GetString(inTerm), mIDLOffset, docs, inDocCount);
 	}
 
 	mBits.Clear();
@@ -598,84 +598,85 @@ void M6TextIx::FlushTerm(uint32 inTerm, uint32 inDocCount)
 	mLastDoc = 0;
 }
 
-//// --------------------------------------------------------------------
-////	Weighted word index, used for ranked searching
-//
-//class M6WeightedWordIx : public M6BasicIx
-//{
-//  public:
-//					M6WeightedWordIx(M6FullTextIx& inFullTextIndex, M6Lexicon& inLexicon,
-//						const string& inName, uint8 inIndexNr, M6BasicIndexPtr inIndex);
-//
-//	virtual void	AddDocTerm(uint32 inDoc, uint8 inFrequency, M6OBitStream& inIDL);
-//	virtual void	FlushTerm(uint32 inTerm, uint32 inDocCount);
-//};
-//
-//M6WeightedWordIx::M6WeightedWordIx(M6FullTextIx& inFullTextIndex, M6Lexicon& inLexicon,
-//		const string& inName, uint8 inIndexNr, M6BasicIndexPtr inIndex)
-//	: M6BasicIx(inFullTextIndex, inLexicon, inName, inIndexNr, inIndex)
-//{
-//}
-//
-//void M6WeightedWordIx::AddDocTerm(uint32 inDoc, uint8 inFrequency, M6OBitStream& inIDL)
-//{
-//	uint32 d;
-//
-//	if (mBits.empty())
-//	{
-//		mDocCount = 0;
-//		d = inDoc;
-//	}
-//	else
-//	{
-//		assert(inDoc > mLastDoc);
-//		d = inDoc - mLastDoc;
-//	}
-//	
-//	WriteGamma(mBits, d);
-//	
-//	if (inFrequency < 1)
-//		inFrequency = 1;
-//	else if (inFrequency >= kMaxWeight)
-//		inFrequency = kMaxWeight;
-//	
-//	WriteBinary(mBits, kWeightBitCount, inFrequency);
-//	
-//	mLastDoc = inDoc;
-//	++mDocCount;
-//}
-//
-//void M6WeightedWordIx::FlushTerm(uint32 inTerm, uint32 inDocCount)
-//{
-//	if (mDocCount > 0 and not mBits.empty())
-//	{
-//		// flush the raw index bits
-//		mBits.Sync();
-//		
-//		vector<pair<uint32,uint8>> docs;
-//		
-//		M6IBitStream bits(mBits);
-//
-//		uint32 docNr = 0;
-//		for (uint32 d = 0; d < mDocCount; ++d)
-//		{
-//			uint32 delta;
-//			ReadGamma(bits, delta);
-//			docNr += delta;
-//			assert(docNr < inDocCount);
-//			ReadBinary(bits, kWeightBitCount, weight);
-//			assert(weight > 0);
-//			docs.push_back(make_pair(docNr, weight));
-//		}
-//
-//		mIndex->Insert(mLexicon.GetString(inTerm), docs, inDocCount);
-//	}
-//
-//	mBits.clear();
-//	
-//	mDocCount = 0;
-//	mLastDoc = 0;
-//}
+// --------------------------------------------------------------------
+//	Weighted word index, used for ranked searching
+
+class M6WeightedWordIx : public M6BasicIx
+{
+  public:
+					M6WeightedWordIx(M6FullTextIx& inFullTextIndex, M6Lexicon& inLexicon,
+						const string& inName, uint8 inIndexNr, M6BasicIndexPtr inIndex);
+
+	virtual void	AddDocTerm(uint32 inDoc, uint8 inFrequency, M6OBitStream& inIDL);
+	virtual void	FlushTerm(uint32 inTerm, uint32 inDocCount);
+};
+
+M6WeightedWordIx::M6WeightedWordIx(M6FullTextIx& inFullTextIndex, M6Lexicon& inLexicon,
+		const string& inName, uint8 inIndexNr, M6BasicIndexPtr inIndex)
+	: M6BasicIx(inFullTextIndex, inLexicon, inName, inIndexNr, inIndex)
+{
+}
+
+void M6WeightedWordIx::AddDocTerm(uint32 inDoc, uint8 inFrequency, M6OBitStream& inIDL)
+{
+	uint32 d;
+
+	if (mBits.Empty())
+	{
+		mDocCount = 0;
+		d = inDoc;
+	}
+	else
+	{
+		assert(inDoc > mLastDoc);
+		d = inDoc - mLastDoc;
+	}
+	
+	WriteGamma(mBits, d);
+	
+	if (inFrequency < 1)
+		inFrequency = 1;
+	else if (inFrequency >= kMaxWeight)
+		inFrequency = kMaxWeight;
+	
+	WriteBinary(mBits, kWeightBitCount, inFrequency);
+	
+	mLastDoc = inDoc;
+	++mDocCount;
+}
+
+void M6WeightedWordIx::FlushTerm(uint32 inTerm, uint32 inDocCount)
+{
+	if (mDocCount > 0 and not mBits.Empty())
+	{
+		// flush the raw index bits
+		mBits.Sync();
+		
+		vector<pair<uint32,uint8>> docs;
+		
+		M6IBitStream bits(mBits);
+
+		uint32 docNr = 0;
+		for (uint32 d = 0; d < mDocCount; ++d)
+		{
+			uint32 delta;
+			ReadGamma(bits, delta);
+			docNr += delta;
+			assert(docNr <= inDocCount);
+			uint8 weight;
+			ReadBinary(bits, kWeightBitCount, weight);
+			assert(weight > 0);
+			docs.push_back(make_pair(docNr, weight));
+		}
+
+		static_cast<M6WeightedBasicIndex*>(mIndex.get())->Insert(mLexicon.GetString(inTerm), docs, inDocCount);
+	}
+
+	mBits.Clear();
+	
+	mDocCount = 0;
+	mLastDoc = 0;
+}
 
 // --------------------------------------------------------------------
 //	Date Index, only dates
@@ -840,8 +841,9 @@ void M6BatchIndexProcessor::FlushDoc(uint32 inDocNr)
 
 void M6BatchIndexProcessor::Finish(uint32 inDocCount)
 {
-//	// add the required 'alltext' index
-//	mIndices.push_back(new M6WeightedWordIx(mFullTextIndex, mLexicon, kAllTextIndexName, mIndices.size(), url));
+	// add the required 'alltext' index
+	M6BasicIndexPtr allTextIndex(new M6SimpleWeightedIndex((mDatabank.GetScratchDir().parent_path() / "all-text.index").string(), eReadWrite));
+	mIndices.push_back(new M6WeightedWordIx(mFullTextIndex, mLexicon, "", static_cast<uint8>(mIndices.size()), allTextIndex));
 	
 	// tell indices about the doc count
 	for_each(mIndices.begin(), mIndices.end(), [&inDocCount](M6BasicIx* ix) { ix->SetDbDocCount(inDocCount); });
@@ -879,7 +881,7 @@ void M6BatchIndexProcessor::Finish(uint32 inDocCount)
 
 		if (lastDoc != ie.doc or lastTerm != ie.term)
 		{
-//			mIndices.back()->AddDocTerm(lastDoc, lastTerm, termFrequency, ie.idl);
+			mIndices.back()->AddDocTerm(lastDoc, lastTerm, termFrequency, ie.idl);
 
 			lastDoc = ie.doc;
 			lastTerm = ie.term;
@@ -960,20 +962,20 @@ M6BasicIndexPtr M6DatabankImpl::CreateIndex(const string& inName, M6IndexType in
 			{
 				case eM6StringIndexType:
 				case eM6DateIndexType:		result.reset(new M6SimpleIndex(path, mMode)); break;
-				//case eM6NumberIndexType:	result.reset(new M6NumberIndex(path, mMode)); break;
+				case eM6NumberIndexType:	result.reset(new M6NumberIndex(path, mMode)); break;
 				default:					THROW(("unsupported"));
 			}
 		}
 		else
 		{
-//			switch (inType)
-//			{
-////				case eM6StringIndexType:
-////				case eM6DateIndexType:		result.reset(new M6SimpleMultiIndex(path, mMode)); break;
-////				//case eM6NumberIndexType:	result.reset(new M6NumberMultiIndex(path, mMode)); break;
-////				case eM6FullTextIndexType:	result.reset(new M6SimpleMultiIndex(path, mMode)); break;
-//				default:					THROW(("unsupported"));
-//			}
+			switch (inType)
+			{
+				case eM6DateIndexType:		result.reset(new M6SimpleMultiIndex(path, mMode)); break;
+				case eM6NumberIndexType:	result.reset(new M6NumberMultiIndex(path, mMode)); break;
+				case eM6StringIndexType:
+				case eM6FullTextIndexType:	result.reset(new M6SimpleIDLMultiIndex(path, mMode)); break;
+				default:					THROW(("unsupported"));
+			}
 		}
 	}
 	return result;

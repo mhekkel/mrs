@@ -45,8 +45,8 @@ struct M6IndexPageHeader
 
 const uint32
 	kM6MaxKeyLength			= 255,
-//	kM6IndexPageSize		= 8192,
-	kM6IndexPageSize		= 256,
+	kM6IndexPageSize		= 8192,
+//	kM6IndexPageSize		= 256,
 	kM6IndexPageHeaderSize	= sizeof(M6IndexPageHeader),
 	kM6KeySpace				= kM6IndexPageSize - kM6IndexPageHeaderSize,
 	kM6MinKeySpace			= kM6KeySpace / 2,
@@ -67,25 +67,29 @@ struct M6IndexPageDataTraits<eM6IndexSimpleLeafPage>
 	typedef uint32 M6DataElement;
 };
 
+struct M6MultiData
+{
+	uint32	mCount;
+	int64	mBitVector;
+};
+
 template<>
 struct M6IndexPageDataTraits<eM6IndexMultiLeafPage>
 {
-	struct M6DataElement
-	{
-		uint32	mCount;
-		int64	mBitVector;
-	};
+	typedef M6MultiData M6DataElement;
+};
+
+struct M6MultiIDLData
+{
+	uint32	mCount;
+	int64	mBitVector;
+	int64	mIDLOffset;
 };
 
 template<>
 struct M6IndexPageDataTraits<eM6IndexMultiIDLLeafPage>
 {
-	struct M6DataElement
-	{
-		uint32	mCount;
-		int64	mBitVector;
-		int64	mIDLOffset;
-	};
+	typedef M6MultiIDLData M6DataElement;
 };
 
 template<M6IndexPageType T>
@@ -2165,53 +2169,50 @@ void M6BasicIndex::validate() const
 
 #endif
 
-//// --------------------------------------------------------------------
-//
-//M6MultiBasicIndex::M6MultiBasicIndex(const string& inPath, MOpenMode inMode)
-//	: M6BasicIndex(inPath, inMode)
-//{
-//}
-//
-//void M6MultiBasicIndex::Insert(const string& inKey, const vector<uint32>& inDocuments,
-//	uint32 inMaxDocValue)
-//{
-//}
-//
-//bool M6MultiBasicIndex::Find(const string& inKey, iterator& outIterator)
-//{
-//	return false;
-//}
-//
-//// --------------------------------------------------------------------
-//
-//M6MultiIDLBasicIndex::M6MultiIDLBasicIndex(const string& inPath, MOpenMode inMode)
-//	: M6BasicIndex(inPath, inMode)
-//{
-//}
-//
-//void M6MultiIDLBasicIndex::Insert(const string& inKey, int64 inIDLOffset,
-//	const vector<uint32>& inDocuments, uint32 inMaxDocValue)
-//{
-//}
-//
-//bool M6MultiIDLBasicIndex::Find(const string& inKey, iterator& outIterator, int64& outIDLOffset)
-//{
-//	return false;
-//}
-//
-//// --------------------------------------------------------------------
-//
-//M6WeightedBasicIndex::M6WeightedBasicIndex(const string& inPath, MOpenMode inMode)
-//	: M6BasicIndex(inPath, inMode)
-//{
-//}
-//
-//void M6WeightedBasicIndex::Insert(const string& inKey,
-//	const vector<pair<uint32,uint8>>& inDocuments, uint32 inMaxDocValue)
-//{
-//}
-//
-//bool M6WeightedBasicIndex::Find(const string& inKey, weighted_iterator& outIterator)
-//{
-//	return false;
-//}
+// --------------------------------------------------------------------
+
+M6MultiBasicIndex::M6MultiBasicIndex(const string& inPath, MOpenMode inMode)
+	: M6BasicIndex(new M6IndexImplT<M6MultiData>(*this, inPath, inMode))
+{
+}
+
+void M6MultiBasicIndex::Insert(const string& inKey, const vector<uint32>& inDocuments)
+{
+}
+
+bool M6MultiBasicIndex::Find(const string& inKey, iterator& outIterator)
+{
+	return false;
+}
+
+// --------------------------------------------------------------------
+
+M6MultiIDLBasicIndex::M6MultiIDLBasicIndex(const string& inPath, MOpenMode inMode)
+	: M6BasicIndex(new M6IndexImplT<M6MultiIDLData>(*this, inPath, inMode))
+{
+}
+
+void M6MultiIDLBasicIndex::Insert(const string& inKey, int64 inIDLOffset, const vector<uint32>& inDocuments)
+{
+}
+
+bool M6MultiIDLBasicIndex::Find(const string& inKey, multi_iterator& outIterator, int64& outIDLOffset)
+{
+	return false;
+}
+
+// --------------------------------------------------------------------
+
+M6WeightedBasicIndex::M6WeightedBasicIndex(const string& inPath, MOpenMode inMode)
+	: M6BasicIndex(new M6IndexImplT<M6MultiData>(*this, inPath, inMode))
+{
+}
+
+void M6WeightedBasicIndex::Insert(const string& inKey, const vector<pair<uint32,uint8>>& inDocuments)
+{
+}
+
+bool M6WeightedBasicIndex::Find(const string& inKey, weighted_iterator& outIterator)
+{
+	return false;
+}

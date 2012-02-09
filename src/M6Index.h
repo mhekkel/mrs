@@ -168,8 +168,7 @@ class M6MultiBasicIndex : public M6BasicIndex
 		bool		next(uint32& outDocNr);
 	};
 
-	void			Insert(const std::string& inKey, const std::vector<uint32>& inDocuments,
-						int64 inMaxDocValue);
+	void			Insert(const std::string& inKey, const std::vector<uint32>& inDocuments);
 	bool			Find(const std::string& inKey, iterator& outIterator);
 };
 
@@ -190,8 +189,7 @@ class M6MultiIDLBasicIndex : public M6BasicIndex
 		bool		next(uint32& outDocNr);
 	};
 
-	void			Insert(const std::string& inKey, int64 inIDLOffset,
-						const std::vector<uint32>& inDocuments, int64 inMaxDocValue);
+	void			Insert(const std::string& inKey, int64 inIDLOffset, const std::vector<uint32>& inDocuments);
 	bool			Find(const std::string& inKey, multi_iterator& outIterator, int64& outIDLOffset);
 };
 
@@ -212,8 +210,7 @@ class M6WeightedBasicIndex : public M6BasicIndex
 		bool		next(uint32& outDocNr, uint8& outFrequency);
 	};
 	
-	void			Insert(const std::string& inKey,
-						const std::vector<std::pair<uint32,uint8>>& inDocuments, int64 inMaxDocValue);
+	void			Insert(const std::string& inKey, const std::vector<std::pair<uint32,uint8>>& inDocuments);
 	bool			Find(const std::string& inKey, weighted_iterator& outIterator);
 };
 

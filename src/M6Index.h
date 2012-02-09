@@ -77,8 +77,8 @@ class M6BasicIndex
 	// lame, but works for now (needed for boost::range)
 	typedef iterator const_iterator;
 	
-	iterator		begin() const;
-	iterator		end() const;
+//	iterator		begin() const;
+//	iterator		end() const;
 	
 	iterator		lower_bound(const std::string& inKey) const;
 	iterator		upper_bound(const std::string& inKey) const;

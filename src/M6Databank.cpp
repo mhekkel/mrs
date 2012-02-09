@@ -498,7 +498,7 @@ void M6ValueIx::FlushTerm(uint32 inTerm, uint32 inDocCount)
 	}
 	
 	if (mDocs.size() > 0)
-		mIndex->insert(mLexicon.GetString(inTerm), mDocs.back());
+		mIndex->Insert(mLexicon.GetString(inTerm), mDocs.back());
 	
 	mDocs.clear();
 }
@@ -810,7 +810,7 @@ void M6BatchIndexProcessor::IndexValue(const string& inIndexName,
 			default:			THROW(("Runtime error, unexpected index type"));
 		}
 	
-		index->insert(inValue, inDocNr);
+		index->Insert(inValue, inDocNr);
 	}
 	else
 	{
@@ -1020,11 +1020,11 @@ M6Document* M6DatabankImpl::FindDocument(const string& inIndex, const string& in
 	if (not index)
 		THROW(("Index %s not found", inIndex.c_str()));
 	
-	int64 v;
-	if (not index->find(ba::to_lower_copy(inValue), v))
+	uint32 v;
+	if (not index->Find(ba::to_lower_copy(inValue), v))
 		THROW(("Value %s not found in index %s", inValue.c_str(), inIndex.c_str()));
 	
-	return Fetch(static_cast<uint32>(v));
+	return Fetch(v);
 }
 
 void M6DatabankImpl::StartBatchImport(M6Lexicon& inLexicon)

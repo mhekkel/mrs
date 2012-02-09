@@ -9,7 +9,7 @@
 
 #include "M6File.h"
 
-class M6IndexImpl;
+struct M6IndexImpl;
 
 extern const uint32 kM6MaxKeyLength;
 
@@ -64,7 +64,7 @@ class M6BasicIndex
 		bool			operator!=(const iterator& iter) const		{ return not operator==(iter); }
 
 	  private:
-		friend class M6IndexImpl;
+		friend struct M6IndexImpl;
 
 						iterator(M6IndexImpl* inIndex, int64 inPageNr, uint32 inKeyNr);
 

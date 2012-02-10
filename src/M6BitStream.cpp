@@ -1,6 +1,8 @@
 #include "M6Lib.h"
 
 #include <cassert>
+#include <limits>
+#include <cstring>
 
 #include "M6BitStream.h"
 #include "M6File.h"
@@ -20,7 +22,7 @@ const int64
 // --------------------------------------------------------------------
 //	M6OBitStream
 
-struct M6OBitStreamImpl
+struct M6OBitStream::M6OBitStreamImpl
 {
 	uint32			mRefCount;
 
@@ -38,7 +40,7 @@ struct M6OBitStreamImpl
 	M6OBitStreamImpl& operator=(const M6OBitStreamImpl&);
 };
 
-struct M6OBitStreamFileImpl : public M6OBitStreamImpl
+struct M6OBitStreamFileImpl : public M6OBitStream::M6OBitStreamImpl
 {
 					M6OBitStreamFileImpl(M6FileStream& inFile)
 						: mFile(inFile) {}
@@ -50,7 +52,7 @@ struct M6OBitStreamFileImpl : public M6OBitStreamImpl
 	M6FileStream&	mFile;
 };
 
-struct M6OBitStreamMemImpl : public M6OBitStreamImpl
+struct M6OBitStreamMemImpl : public M6OBitStream::M6OBitStreamImpl
 {
 					M6OBitStreamMemImpl();
 	virtual			~M6OBitStreamMemImpl();

@@ -108,7 +108,7 @@ struct M6IndexPageDataTraits<eM6IndexMultiIDLLeafPage>
 template<M6IndexPageType T>
 struct M6IndexPageDataT : public M6IndexPageHeader
 {
-	typedef typename M6IndexPageDataTraits<T>	traits;
+	typedef M6IndexPageDataTraits<T>			traits;
 	typedef typename traits::M6DataElement		M6DataType;
 	
 	enum {
@@ -207,7 +207,7 @@ template<class M6PageType>
 struct M6IndexPagePtr
 {
   public:
-	typedef typename M6PageType		M6IndexPage;
+	typedef M6PageType		M6IndexPage;
 
 					M6IndexPagePtr();
 					M6IndexPagePtr(M6IndexPage* inPage);
@@ -285,9 +285,9 @@ class M6IndexImplT : public M6IndexImpl
   public:
 	typedef typename M6BasicIndex::iterator	iterator;
 	
-	typedef typename M6IndexPage<M6DataType>		M6IndexPageType;
-	typedef typename M6IndexLeafPage<M6DataType>	M6LeafPageType;
-	typedef typename M6IndexBranchPage<M6DataType>	M6BranchPageType;
+	typedef M6IndexPage<M6DataType>			M6IndexPageType;
+	typedef M6IndexLeafPage<M6DataType>		M6LeafPageType;
+	typedef M6IndexBranchPage<M6DataType>	M6BranchPageType;
 
 	typedef ::M6IndexPagePtr<M6IndexPageType>		M6IndexPagePtr;
 	typedef ::M6IndexPagePtr<M6LeafPageType>		M6LeafPagePtr;
@@ -348,10 +348,10 @@ template<class M6DataType>
 class M6IndexPage
 {
   public:
-	typedef typename M6IndexImplT<M6DataType>				M6IndexImpl;
-	typedef typename M6IndexBranchPage<M6DataType>			M6IndexBranchPage;
-	typedef typename ::M6IndexPagePtr<M6IndexPage>			M6IndexPagePtr;
-	typedef typename ::M6IndexPagePtr<M6IndexBranchPage>	M6BranchPagePtr;
+	typedef M6IndexImplT<M6DataType>				M6IndexImpl;
+	typedef M6IndexBranchPage<M6DataType>			M6IndexBranchPageType;
+	typedef ::M6IndexPagePtr<M6IndexPage>			M6IndexPagePtr;
+	typedef ::M6IndexPagePtr<M6IndexBranchPageType>	M6BranchPagePtr;
 	  
 	virtual 		~M6IndexPage();
 
@@ -380,15 +380,15 @@ class M6IndexPage
 	bool			TooSmall() const				{ return Free() > kM6MinKeySpace; }
 
 	virtual bool	Find(const string& inKey, M6DataType& outValue) = 0;
-	virtual bool	Insert(string& ioKey, const M6DataType& inValue, uint32& outLink, M6IndexBranchPage* inParent) = 0;
-	virtual bool	Erase(string& ioKey, int32 inIndex, M6IndexBranchPage* inParent, M6IndexBranchPage* inLinkPage, uint32 inLinkIndex) = 0;
+	virtual bool	Insert(string& ioKey, const M6DataType& inValue, uint32& outLink, M6IndexBranchPageType* inParent) = 0;
+	virtual bool	Erase(string& ioKey, int32 inIndex, M6IndexBranchPageType* inParent, M6IndexBranchPageType* inLinkPage, uint32 inLinkIndex) = 0;
 
 #if DEBUG
-	virtual void	Validate(const string& inKey, M6IndexBranchPage* inParent) = 0;
-	virtual void	Dump(int inLevel, M6IndexBranchPage* inParent) = 0;
+	virtual void	Validate(const string& inKey, M6IndexBranchPageType* inParent) = 0;
+	virtual void	Dump(int inLevel, M6IndexBranchPageType* inParent) = 0;
 #endif
 
-	virtual bool	Underflow(M6IndexPage& inRight, uint32 inIndex, M6IndexBranchPage* inParent) = 0;
+	virtual bool	Underflow(M6IndexPage& inRight, uint32 inIndex, M6IndexBranchPageType* inParent) = 0;
 
   protected:
 					M6IndexPage(M6IndexImpl& inIndexImpl, M6IndexPageData* inData, uint32 inPageNr);
@@ -474,7 +474,7 @@ template<class M6DataType, class M6DataPage>
 class M6IndexPageT : public M6IndexPage<M6DataType>
 {
   public:
-	typedef typename M6DataPage					M6DataPageType;
+	typedef M6DataPage							M6DataPageType;
 	typedef typename M6DataPage::M6DataType		M6ValueType;
 	
 	enum {
@@ -506,7 +506,7 @@ class M6IndexPageT : public M6IndexPage<M6DataType>
 
 template<class M6DataType, class M6DataPage>
 M6IndexPageT<M6DataType,M6DataPage>::M6IndexPageT(M6IndexImpl& inIndexImpl, M6IndexPageData* inData, uint32 inPageNr)
-	: M6IndexPage(inIndexImpl, inData, inPageNr)
+	: M6IndexPage<M6DataType>(inIndexImpl, inData, inPageNr)
 	, mPageData(*reinterpret_cast<M6DataPage*>(inData))
 {
 	uint8* key = mPageData.mKeys;
@@ -793,16 +793,16 @@ class M6IndexBranchPage : public M6IndexPageT<M6DataType,M6IndexBranchPageData>
 					}
 
 	virtual bool	Find(const string& inKey, M6DataType& outValue);
-	virtual bool	Insert(string& ioKey, const M6DataType& inValue, uint32& outLink, M6IndexBranchPage* inParent);
-	virtual bool	Erase(string& ioKey, int32 inIndex, M6IndexBranchPage* inParent, M6IndexBranchPage* inLinkPage, uint32 inLinkIndex);
+	virtual bool	Insert(string& ioKey, const M6DataType& inValue, uint32& outLink, M6IndexBranchPageType* inParent);
+	virtual bool	Erase(string& ioKey, int32 inIndex, M6IndexBranchPageType* inParent, M6IndexBranchPageType* inLinkPage, uint32 inLinkIndex);
 
   protected:
 
-	virtual bool	Underflow(M6IndexPage& inRight, uint32 inIndex, M6IndexBranchPage* inParent);
+	virtual bool	Underflow(M6IndexPage& inRight, uint32 inIndex, M6IndexBranchPageType* inParent);
 
 #if DEBUG
-	virtual void	Dump(int inLevel, M6IndexBranchPage* inParent);
-	virtual void	Validate(const string& inKey, M6IndexBranchPage* inParent);
+	virtual void	Dump(int inLevel, M6IndexBranchPageType* inParent);
+	virtual void	Validate(const string& inKey, M6IndexBranchPageType* inParent);
 #endif
 };
 
@@ -834,7 +834,7 @@ bool M6IndexBranchPage<M6DataType>::Find(const string& inKey, M6DataType& outVal
 */
 
 template<class M6DataType>
-bool M6IndexBranchPage<M6DataType>::Insert(string& ioKey, const M6DataType& inValue, uint32& outLink, M6IndexBranchPage* inParent)
+bool M6IndexBranchPage<M6DataType>::Insert(string& ioKey, const M6DataType& inValue, uint32& outLink, M6IndexBranchPageType* inParent)
 {
 	bool result = false, match;
 	int32 ix;
@@ -918,7 +918,7 @@ bool M6IndexBranchPage<M6DataType>::Insert(string& ioKey, const M6DataType& inVa
 }
 
 template<class M6DataType>
-bool M6IndexBranchPage<M6DataType>::Erase(string& ioKey, int32 inIndex, M6IndexBranchPage* inParent, M6IndexBranchPage* inLinkPage, uint32 inLinkIndex)
+bool M6IndexBranchPage<M6DataType>::Erase(string& ioKey, int32 inIndex, M6IndexBranchPageType* inParent, M6IndexBranchPageType* inLinkPage, uint32 inLinkIndex)
 {
 	bool result = false, match = false;
 	int32 ix;
@@ -966,9 +966,9 @@ bool M6IndexBranchPage<M6DataType>::Erase(string& ioKey, int32 inIndex, M6IndexB
 }
 
 template<class M6DataType>
-bool M6IndexBranchPage<M6DataType>::Underflow(M6IndexPage& inRight, uint32 inIndex, M6IndexBranchPage* inParent)
+bool M6IndexBranchPage<M6DataType>::Underflow(M6IndexPage& inRight, uint32 inIndex, M6IndexBranchPageType* inParent)
 {
-	M6IndexBranchPage& right(static_cast<M6IndexBranchPage&>(inRight));
+	M6IndexBranchPageType& right(static_cast<M6IndexBranchPageType&>(inRight));
 
 	// This page left of inRight contains too few entries, see if we can fix this
 	// first try a merge
@@ -1036,14 +1036,14 @@ class M6IndexLeafPage : public M6IndexPageT<M6DataType,typename M6IndexPageDataT
 					}
 
 	virtual bool	Find(const string& inKey, M6DataType& outValue);
-	virtual bool	Insert(string& ioKey, const M6DataType& inValue, uint32& outLink, M6IndexBranchPage* inParent);
-	virtual bool	Erase(string& ioKey, int32 inIndex, M6IndexBranchPage* inParent, M6IndexBranchPage* inLinkPage, uint32 inLinkIndex);
+	virtual bool	Insert(string& ioKey, const M6DataType& inValue, uint32& outLink, M6IndexBranchPageType* inParent);
+	virtual bool	Erase(string& ioKey, int32 inIndex, M6IndexBranchPageType* inParent, M6IndexBranchPageType* inLinkPage, uint32 inLinkIndex);
 
-	virtual bool	Underflow(M6IndexPage& inRight, uint32 inIndex, M6IndexBranchPage* inParent);
+	virtual bool	Underflow(M6IndexPage& inRight, uint32 inIndex, M6IndexBranchPageType* inParent);
 
 #if DEBUG
-	virtual void	Dump(int inLevel, M6IndexBranchPage* inParent);
-	virtual void	Validate(const string& inKey, M6IndexBranchPage* inParent);
+	virtual void	Dump(int inLevel, M6IndexBranchPageType* inParent);
+	virtual void	Validate(const string& inKey, M6IndexBranchPageType* inParent);
 #endif
 };
 
@@ -1073,7 +1073,7 @@ bool M6IndexLeafPage<M6DataType>::Find(const string& inKey, M6DataType& outValue
 */
 
 template<class M6DataType>
-bool M6IndexLeafPage<M6DataType>::Insert(string& ioKey, const M6DataType& inValue, uint32& outLink, M6IndexBranchPage* inParent)
+bool M6IndexLeafPage<M6DataType>::Insert(string& ioKey, const M6DataType& inValue, uint32& outLink, M6IndexBranchPageType* inParent)
 {
 	bool result = false;
 
@@ -1116,7 +1116,7 @@ bool M6IndexLeafPage<M6DataType>::Insert(string& ioKey, const M6DataType& inValu
 }
 
 template<class M6DataType>
-bool M6IndexLeafPage<M6DataType>::Erase(string& ioKey, int32 inIndex, M6IndexBranchPage* inParent, M6IndexBranchPage* inLinkPage, uint32 inLinkIndex)
+bool M6IndexLeafPage<M6DataType>::Erase(string& ioKey, int32 inIndex, M6IndexBranchPageType* inParent, M6IndexBranchPageType* inLinkPage, uint32 inLinkIndex)
 {
 	bool result = false, match = false;
 	int32 ix;
@@ -1180,7 +1180,7 @@ bool M6IndexLeafPage<M6DataType>::Erase(string& ioKey, int32 inIndex, M6IndexBra
 }
 
 template<class M6DataType>
-bool M6IndexLeafPage<M6DataType>::Underflow(M6IndexPage& inRight, uint32 inIndex, M6IndexBranchPage* inParent)
+bool M6IndexLeafPage<M6DataType>::Underflow(M6IndexPage& inRight, uint32 inIndex, M6IndexBranchPageType* inParent)
 {
 	M6IndexLeafPage& right(dynamic_cast<M6IndexLeafPage&>(inRight));
 	
@@ -2066,7 +2066,7 @@ class M6ValidationException : public std::exception
 #define M6VALID_ASSERT(cond)	do { if (not (cond)) throw M6ValidationException(GetPageNr(), #cond ); } while (false)
 
 template<class M6DataType>
-void M6IndexLeafPage<M6DataType>::Validate(const string& inKey, M6IndexBranchPage* inParent)
+void M6IndexLeafPage<M6DataType>::Validate(const string& inKey, M6IndexBranchPageType* inParent)
 {
 //	M6VALID_ASSERT(mPageData.mN >= kM6MinEntriesPerPage or inParent == nullptr);
 	//M6VALID_ASSERT(inParent == nullptr or not TooSmall());
@@ -2089,7 +2089,7 @@ void M6IndexLeafPage<M6DataType>::Validate(const string& inKey, M6IndexBranchPag
 }
 
 template<class M6DataType>
-void M6IndexBranchPage<M6DataType>::Validate(const string& inKey, M6IndexBranchPage* inParent)
+void M6IndexBranchPage<M6DataType>::Validate(const string& inKey, M6IndexBranchPageType* inParent)
 {
 //		M6VALID_ASSERT(mPageData.mN >= kM6MinEntriesPerPage or inParent == nullptr);
 	//M6VALID_ASSERT(inParent == nullptr or not TooSmall());
@@ -2111,7 +2111,7 @@ void M6IndexBranchPage<M6DataType>::Validate(const string& inKey, M6IndexBranchP
 }
 
 template<class M6DataType>
-void M6IndexLeafPage<M6DataType>::Dump(int inLevel, M6IndexBranchPage* inParent)
+void M6IndexLeafPage<M6DataType>::Dump(int inLevel, M6IndexBranchPageType* inParent)
 {
 	string prefix(inLevel * 2, ' ');
 
@@ -2129,7 +2129,7 @@ void M6IndexLeafPage<M6DataType>::Dump(int inLevel, M6IndexBranchPage* inParent)
 }
 
 template<class M6DataType>
-void M6IndexBranchPage<M6DataType>::Dump(int inLevel, M6IndexBranchPage* inParent)
+void M6IndexBranchPage<M6DataType>::Dump(int inLevel, M6IndexBranchPageType* inParent)
 {
 	string prefix(inLevel * 2, ' ');
 

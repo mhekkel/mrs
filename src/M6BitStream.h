@@ -38,6 +38,8 @@ class M6OBitStream
 	friend void WriteBits(M6OBitStream& inBits, const M6OBitStream& inValue);
 	friend void CopyBits(M6OBitStream& inBits, const M6OBitStream& inValue);
 
+	struct M6OBitStreamImpl;
+
   private:
 
 	void				Add(uint8 inByte);
@@ -85,8 +87,6 @@ class M6IBitStream
 	friend void WriteBits(M6OBitStream& inBits, const M6OBitStream& inValue);
 	friend void CopyBits(M6OBitStream& inBits, const M6OBitStream& inValue);
 
-  private:
-
 	friend struct M6IBitStreamFileImpl;
 	friend struct M6IBitStreamOBitImpl;
 
@@ -110,6 +110,8 @@ class M6IBitStream
 		int64			mBufferSize;
 		int32			mRefCount;
 	};
+
+  private:
 
 	void				NextByte(uint8& outByte);
 	

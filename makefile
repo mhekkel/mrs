@@ -19,12 +19,12 @@ MANDIR				?= $(PREFIX)/man/man3
 
 BOOST_LIBS			= system thread filesystem regex math_c99 math_c99f program_options iostreams
 BOOST_LIBS			:= $(BOOST_LIBS:%=boost_%$(BOOST_LIB_SUFFIX))
-LIBS				= m pthread z
+LIBS				= m pthread z zeep
 LDFLAGS				+= $(BOOST_LIB_DIR:%=-L%) $(LIBS:%=-l%) -g $(BOOST_LIBS:%=/usr/lib/lib%.a) \
 						/usr/lib/gcc/x86_64-linux-gnu/4.6/libstdc++.a
 
 CC					?= c++
-CFLAGS				+= $(BOOST_INC_DIR:%=-I%) -I. -pthread -std=c++0x
+CFLAGS				+= $(BOOST_INC_DIR:%=-I%) -I. -pthread -std=c++0x -I../libzeep/
 ifneq ($(DEBUG),1)
 CFLAGS				+= -O2 -DNDEBUG
 else
@@ -35,6 +35,9 @@ endif
 VPATH += src
 
 OBJECTS = \
+	obj/M6BitStream.o \
+	obj/M6Builder.cpp \
+	obj/M6Config.cpp \
 	obj/M6Databank.o \
 	obj/M6DocStore.o \
 	obj/M6Document.o \
@@ -45,7 +48,7 @@ OBJECTS = \
 	obj/M6Lexicon.o \
 	obj/M6Tokenizer.o \
 
-m6-build: $(OBJECTS) obj/M6Builder.o
+m6-build: $(OBJECTS) obj/M6BuildDriver.o
 	$(CC) $(BOOST_INC_DIR:%=-I%) -o $@ -I. $^ $(LDFLAGS)
 
 m6-test: $(OBJECTS) obj/M6TestMain.o obj/M6TestDocStore.o

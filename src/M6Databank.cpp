@@ -1,6 +1,7 @@
 #include "M6Lib.h"
 
 #include <set>
+#include <iostream>
 
 #include <boost/filesystem.hpp>
 #include <boost/foreach.hpp>

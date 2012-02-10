@@ -46,13 +46,13 @@ struct M6IndexPageHeader
 
 const uint32
 	kM6MaxKeyLength			= 255,
-//	kM6IndexPageSize		= 8192,
-	kM6IndexPageSize		= 256,
+	kM6IndexPageSize		= 8192,
+//	kM6IndexPageSize		= 256,
 	kM6IndexPageHeaderSize	= sizeof(M6IndexPageHeader),
 	kM6KeySpace				= kM6IndexPageSize - kM6IndexPageHeaderSize,
 	kM6MinKeySpace			= kM6KeySpace / 2,
-	kM6MaxEntriesPerPage	= 4;
-//	kM6MaxEntriesPerPage	= kM6KeySpace / 8;	// see above
+//	kM6MaxEntriesPerPage	= 4;
+	kM6MaxEntriesPerPage	= kM6KeySpace / 8;	// see above
 
 template<M6IndexPageType>
 struct M6IndexPageDataTraits {};
@@ -109,8 +109,7 @@ struct M6IndexPageDataTraits<eM6IndexMultiIDLLeafPage>
 template<M6IndexPageType T>
 struct M6IndexPageDataT : public M6IndexPageHeader
 {
-	typedef M6IndexPageDataTraits<T>			traits;
-	typedef typename traits::M6DataElement		M6DataType;
+	typedef typename M6IndexPageDataTraits<T>::M6DataElement M6DataType;
 	
 	enum {
 		kM6DataCount	= kM6KeySpace / sizeof(M6DataType),
@@ -126,10 +125,18 @@ struct M6IndexPageDataT : public M6IndexPageHeader
 	};
 };
 
+template<>
+struct M6IndexPageDataT<eM6IndexBitVectorPage> : public M6IndexPageHeader
+{
+	static const M6IndexPageType kIndexPageType = eM6IndexBitVectorPage;
+	uint8	mBits[kM6KeySpace];
+};
+
 typedef M6IndexPageDataT<eM6IndexBranchPage>		M6IndexBranchPageData;
 typedef M6IndexPageDataT<eM6IndexSimpleLeafPage>	M6IndexSimpleLeafPageData;
 typedef M6IndexPageDataT<eM6IndexMultiLeafPage>		M6IndexMultiLeafPageData;
 typedef M6IndexPageDataT<eM6IndexMultiIDLLeafPage>	M6IndexMultiIDLLeafPageData;
+typedef M6IndexPageDataT<eM6IndexBitVectorPage>		M6IndexBitVectorPageData;
 
 union M6IndexPageData
 {
@@ -137,6 +144,7 @@ union M6IndexPageData
 	M6IndexSimpleLeafPageData	leaf;
 	M6IndexMultiLeafPageData	multi_leaf;
 	M6IndexMultiIDLLeafPageData	idl_leaf;
+	M6IndexBitVectorPageData	bit_vector;
 };
 
 BOOST_STATIC_ASSERT(sizeof(M6IndexPageData) == kM6IndexPageSize);

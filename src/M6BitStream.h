@@ -93,6 +93,7 @@ struct M6IBitStreamImpl
 					{
 					}
 
+	// using Clone, we can make ibitstreams copy constructable.
 	virtual M6IBitStreamImpl*
 					Clone() = 0;
 
@@ -230,10 +231,21 @@ void CopyBits(M6OBitStream& inBits, const M6OBitStream& inValue);
 // --------------------------------------------------------------------
 //	Arrays are a bit more complex
 
-void WriteArray(M6OBitStream& inBits, std::vector<uint32>& inArray);
+// ReadArray/WriteArray are simple routines to write out an array
+// of unsigned integers that are ordered, first element should be > 0
+// The size of the array is stored inside the bitstream.
+
 void ReadArray(M6OBitStream& inBits, std::vector<uint32>& outArray);
+void WriteArray(M6OBitStream& inBits, std::vector<uint32>& inArray);
+
+// Lower level access to arrays, the CompressSimpleArraySelector
+// writes out the same array as WriteArray, but without the size.
+// So you need to store that value elsewhere.
 
 void CompressSimpleArraySelector(M6OBitStream& inBits, const std::vector<uint32>& inArray);
+
+// To iterate over array elements stored in a bitstream, you can use
+// the M6CompressedArray class. It has a const_iterator for your convenience.
 
 class M6CompressedArray
 {

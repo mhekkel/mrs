@@ -45,12 +45,13 @@ struct M6IndexPageHeader
 
 const uint32
 	kM6MaxKeyLength			= 255,
-	kM6IndexPageSize		= 8192,
-//	kM6IndexPageSize		= 256,
+//	kM6IndexPageSize		= 8192,
+	kM6IndexPageSize		= 256,
 	kM6IndexPageHeaderSize	= sizeof(M6IndexPageHeader),
 	kM6KeySpace				= kM6IndexPageSize - kM6IndexPageHeaderSize,
 	kM6MinKeySpace			= kM6KeySpace / 2,
-	kM6MaxEntriesPerPage	= kM6KeySpace / 8;	// see above
+	kM6MaxEntriesPerPage	= 4;
+//	kM6MaxEntriesPerPage	= kM6KeySpace / 8;	// see above
 
 template<M6IndexPageType>
 struct M6IndexPageDataTraits {};
@@ -73,6 +74,12 @@ struct M6MultiData
 	int64	mBitVector;
 };
 
+ostream& operator<<(ostream& os, const M6MultiData& d)
+{
+	os << '<' << d.mCount << ',' << d.mBitVector << '>';
+	return os;
+}
+
 template<>
 struct M6IndexPageDataTraits<eM6IndexMultiLeafPage>
 {
@@ -86,6 +93,12 @@ struct M6MultiIDLData
 	int64	mIDLOffset;
 };
 
+ostream& operator<<(ostream& os, const M6MultiIDLData& d)
+{
+	os << '<' << d.mCount << ',' << d.mBitVector << ',' << d.mIDLOffset << '>';
+	return os;
+}
+
 template<>
 struct M6IndexPageDataTraits<eM6IndexMultiIDLLeafPage>
 {
@@ -98,7 +111,10 @@ struct M6IndexPageDataT : public M6IndexPageHeader
 	typedef typename M6IndexPageDataTraits<T>	traits;
 	typedef typename traits::M6DataElement		M6DataType;
 	
-	enum { kM6DataCount	= kM6KeySpace / sizeof(M6DataType) };
+	enum {
+		kM6DataCount	= kM6KeySpace / sizeof(M6DataType),
+		kM6EntryCount	= (kM6DataCount < kM6MaxEntriesPerPage ? kM6DataCount : kM6MaxEntriesPerPage)
+	};
 	
 	static const M6IndexPageType kIndexPageType = T;
 	
@@ -458,10 +474,12 @@ template<class M6DataType, class M6DataPage>
 class M6IndexPageT : public M6IndexPage<M6DataType>
 {
   public:
-	typedef typename M6DataPage			M6DataPageType;
+	typedef typename M6DataPage					M6DataPageType;
+	typedef typename M6DataPage::M6DataType		M6ValueType;
 	
 	enum {
-		kM6DataCount = M6DataPageType::kM6DataCount
+		kM6DataCount = M6DataPageType::kM6DataCount,
+		kM6EntryCount = M6DataPageType::kM6EntryCount
 	};
 
 					M6IndexPageT(M6IndexImpl& inIndexImpl, M6IndexPageData* inData, uint32 inPageNr);
@@ -472,10 +490,10 @@ class M6IndexPageT : public M6IndexPage<M6DataType>
 	void			BinarySearch(const string& inKey, int32& outIndex, bool& outMatch) const;
 
 	string			GetKey(uint32 inIndex) const;
-	M6DataType		GetValue(uint32 inIndex) const;
-	void			SetValue(uint32 inIndex, const M6DataType& inValue);
-	void			InsertKeyValue(const string& inKey, const M6DataType& inValue, uint32 inIndex);
-	void			GetKeyValue(uint32 inIndex, string& outKey, M6DataType& outValue) const;
+	M6ValueType		GetValue(uint32 inIndex) const;
+	void			SetValue(uint32 inIndex, const M6ValueType& inValue);
+	void			InsertKeyValue(const string& inKey, const M6ValueType& inValue, uint32 inIndex);
+	void			GetKeyValue(uint32 inIndex, string& outKey, M6ValueType& outValue) const;
 	void			EraseEntry(uint32 inIndex);
 	void			ReplaceKey(uint32 inIndex, const string& inKey);
 
@@ -483,7 +501,7 @@ class M6IndexPageT : public M6IndexPage<M6DataType>
 						uint32 inFromOffset, uint32 inToOffset, uint32 inCount);
 
 	M6DataPage&		mPageData;
-	uint16			mKeyOffsets[kM6MaxEntriesPerPage + 1];
+	uint16			mKeyOffsets[kM6EntryCount + 1];
 };
 
 template<class M6DataType, class M6DataPage>
@@ -495,7 +513,7 @@ M6IndexPageT<M6DataType,M6DataPage>::M6IndexPageT(M6IndexImpl& inIndexImpl, M6In
 	for (uint32 i = 0; i <= mPageData.mN; ++i)
 	{
 		assert(key <= mPageData.mKeys + kM6IndexPageSize);
-		assert(i <= kM6MaxEntriesPerPage);
+		assert(i <= kM6EntryCount);
 		mKeyOffsets[i] = static_cast<uint16>(key - mPageData.mKeys);
 		key += *key + 1;
 	}
@@ -504,13 +522,13 @@ M6IndexPageT<M6DataType,M6DataPage>::M6IndexPageT(M6IndexImpl& inIndexImpl, M6In
 template<class M6DataType, class M6DataPage>
 uint32 M6IndexPageT<M6DataType,M6DataPage>::Free() const
 {
-	return kM6KeySpace - mKeyOffsets[mPageData.mN] - mPageData.mN * sizeof(M6DataType);
+	return kM6KeySpace - mKeyOffsets[mPageData.mN] - mPageData.mN * sizeof(M6ValueType);
 }
 
 template<class M6DataType, class M6DataPage>
 bool M6IndexPageT<M6DataType,M6DataPage>::CanStore(const string& inKey) const
 {
-	return Free() >= inKey.length() + 1 + sizeof(M6DataType);
+	return mPageData.mN < kM6EntryCount and Free() >= inKey.length() + 1 + sizeof(M6ValueType);
 }
 
 template<class M6DataType, class M6DataPage>
@@ -552,28 +570,28 @@ inline string M6IndexPageT<M6DataType,M6DataPage>::GetKey(uint32 inIndex) const
 }
 
 template<class M6DataType, class M6DataPage>
-inline M6DataType M6IndexPageT<M6DataType,M6DataPage>::GetValue(uint32 inIndex) const
+inline typename M6IndexPageT<M6DataType,M6DataPage>::M6ValueType M6IndexPageT<M6DataType,M6DataPage>::GetValue(uint32 inIndex) const
 {
 	assert(inIndex < mPageData.mN);
 	return mPageData.mData[kM6DataCount - inIndex - 1];
 }
 
 template<class M6DataType, class M6DataPage>
-inline void M6IndexPageT<M6DataType,M6DataPage>::SetValue(uint32 inIndex, const M6DataType& inValue)
+inline void M6IndexPageT<M6DataType,M6DataPage>::SetValue(uint32 inIndex, const M6ValueType& inValue)
 {
 	assert(inIndex < mPageData.mN);
 	mPageData.mData[kM6DataCount - inIndex - 1] = inValue;
 }
 
 template<class M6DataType, class M6DataPage>
-inline void M6IndexPageT<M6DataType,M6DataPage>::GetKeyValue(uint32 inIndex, string& outKey, M6DataType& outValue) const
+inline void M6IndexPageT<M6DataType,M6DataPage>::GetKeyValue(uint32 inIndex, string& outKey, M6ValueType& outValue) const
 {
 	outKey = GetKey(inIndex);
 	outValue = GetValue(inIndex);
 }
 
 template<class M6DataType, class M6DataPage>
-void M6IndexPageT<M6DataType,M6DataPage>::InsertKeyValue(const string& inKey, const M6DataType& inValue, uint32 inIndex)
+void M6IndexPageT<M6DataType,M6DataPage>::InsertKeyValue(const string& inKey, const M6ValueType& inValue, uint32 inIndex)
 {
 	assert(inIndex <= mPageData.mN);
 	
@@ -589,7 +607,7 @@ void M6IndexPageT<M6DataType,M6DataPage>::InsertKeyValue(const string& inKey, co
 		src = mPageData.mData + kM6DataCount - mPageData.mN;
 		dst = mPageData.mData + kM6DataCount - mPageData.mN - 1;
 		
-		memmove(dst, src, (mPageData.mN - inIndex) * sizeof(M6DataType));
+		memmove(dst, src, (mPageData.mN - inIndex) * sizeof(M6ValueType));
 	}
 	
 	uint8* k = mPageData.mKeys + mKeyOffsets[inIndex];
@@ -598,7 +616,7 @@ void M6IndexPageT<M6DataType,M6DataPage>::InsertKeyValue(const string& inKey, co
 	mPageData.mData[kM6DataCount - inIndex - 1] = inValue;
 	++mPageData.mN;
 
-	assert(mPageData.mN <= kM6MaxEntriesPerPage);
+	assert(mPageData.mN <= kM6EntryCount);
 
 	// update key offsets
 	for (uint32 i = inIndex + 1; i <= mPageData.mN; ++i)
@@ -633,7 +651,7 @@ template<class M6DataType, class M6DataPage>
 void M6IndexPageT<M6DataType,M6DataPage>::EraseEntry(uint32 inIndex)
 {
 	assert(inIndex < mPageData.mN);
-	assert(mPageData.mN <= kM6MaxEntriesPerPage);
+	assert(mPageData.mN <= kM6EntryCount);
 	
 	if (mPageData.mN > 1)
 	{
@@ -644,7 +662,7 @@ void M6IndexPageT<M6DataType,M6DataPage>::EraseEntry(uint32 inIndex)
 		
 		src = mPageData.mData + kM6DataCount - mPageData.mN;
 		dst = mPageData.mData + kM6DataCount - mPageData.mN + 1;
-		n = (mPageData.mN - inIndex - 1) * sizeof(M6DataType);
+		n = (mPageData.mN - inIndex - 1) * sizeof(M6ValueType);
 		memmove(dst, src, n);
 
 		for (int i = inIndex + 1; i <= mPageData.mN; ++i)
@@ -659,7 +677,7 @@ template<class M6DataType, class M6DataPage>
 void M6IndexPageT<M6DataType,M6DataPage>::ReplaceKey(uint32 inIndex, const string& inKey)
 {
 	assert(inIndex < mPageData.mN);
-	assert(mPageData.mN <= kM6MaxEntriesPerPage);
+	assert(mPageData.mN <= kM6EntryCount);
 
 	uint8* k = mPageData.mKeys + mKeyOffsets[inIndex];
 	
@@ -704,7 +722,7 @@ void M6IndexPageT<M6DataType,M6DataPage>::MoveEntries(M6IndexPageT& inSrc, M6Ind
 		
 		src = inDst.mPageData.mData + kM6DataCount - inDst.mPageData.mN;
 		dst = inDst.mPageData.mData + kM6DataCount - inDst.mPageData.mN - inCount;
-		memmove(dst, src, (inDst.mPageData.mN - inDstOffset) * sizeof(M6DataType));
+		memmove(dst, src, (inDst.mPageData.mN - inDstOffset) * sizeof(M6ValueType));
 	}
 	
 	// copy keys
@@ -715,14 +733,14 @@ void M6IndexPageT<M6DataType,M6DataPage>::MoveEntries(M6IndexPageT& inSrc, M6Ind
 					   inSrc.mKeyOffsets[inSrcOffset];
 
 	assert(inSrc.mKeyOffsets[inSrcOffset] + byteCount <= kM6KeySpace);
-	assert(byteCount + inCount * sizeof(M6DataType) <= inDst.Free());
+	assert(byteCount + inCount * sizeof(M6ValueType) <= inDst.Free());
 
 	memcpy(dst, src, byteCount);
 	
 	// and data	
 	src = inSrc.mPageData.mData + kM6DataCount - inSrcOffset - inCount;
 	dst = inDst.mPageData.mData + kM6DataCount - inDstOffset - inCount;
-	byteCount = inCount * sizeof(M6DataType);
+	byteCount = inCount * sizeof(M6ValueType);
 	memcpy(dst, src, byteCount);
 	
 	// and finally move remaining data in src
@@ -735,7 +753,7 @@ void M6IndexPageT<M6DataType,M6DataPage>::MoveEntries(M6IndexPageT& inSrc, M6Ind
 		
 		src = inSrc.mPageData.mData + kM6DataCount - inSrc.mPageData.mN;
 		dst = inSrc.mPageData.mData + kM6DataCount - inSrc.mPageData.mN + inCount;
-		memmove(dst, src, (inSrc.mPageData.mN - inSrcOffset - inCount) * sizeof(M6DataType));
+		memmove(dst, src, (inSrc.mPageData.mN - inSrcOffset - inCount) * sizeof(M6ValueType));
 	}
 	
 	inDst.mPageData.mN += inCount;
@@ -972,7 +990,7 @@ bool M6IndexBranchPage<M6DataType>::Underflow(M6IndexPage& inRight, uint32 inInd
 	}
 	else		// redistribute the data
 	{
-		if (Free() > inRight.Free() and mPageData.mN < kM6DataCount)	// rotate an entry from right to left
+		if (Free() > inRight.Free() and mPageData.mN < kM6EntryCount)	// rotate an entry from right to left
 		{									// but only if it fits in the parent
 			string rKey = right.GetKey(0);
 			int32 delta = static_cast<int32>(rKey.length() - pKey.length());
@@ -985,7 +1003,7 @@ bool M6IndexBranchPage<M6DataType>::Underflow(M6IndexPage& inRight, uint32 inInd
 				right.EraseEntry(0);
 			}
 		}
-		else if (right.Free() > Free() and right.mPageData.mN < kM6DataCount)
+		else if (right.Free() > Free() and right.mPageData.mN < kM6EntryCount)
 		{
 			string lKey = GetKey(mPageData.mN - 1);
 			int32 delta = static_cast<int32>(lKey.length() - pKey.length());
@@ -1186,7 +1204,7 @@ bool M6IndexLeafPage<M6DataType>::Underflow(M6IndexPage& inRight, uint32 inIndex
 		int32 pKeyLen = static_cast<int32>(pKey.length());
 		int32 pFree = inParent->Free();
 		
-		if (Free() > right.Free() and mPageData.mN < kM6DataCount)	// move items from right to left
+		if (Free() > right.Free() and mPageData.mN < kM6EntryCount)	// move items from right to left
 		{
 			assert(TooSmall());
 
@@ -1195,7 +1213,7 @@ bool M6IndexLeafPage<M6DataType>::Underflow(M6IndexPage& inRight, uint32 inIndex
 			
 			uint8* rk = right.mPageData.mKeys;
 			uint32 n = 0, ln = 0;
-			while (n < right.mPageData.mN and n + mPageData.mN < kM6DataCount and needed > *rk)
+			while (n < right.mPageData.mN and n + mPageData.mN < kM6EntryCount and needed > *rk)
 			{
 				++n;
 				if ((*rk - pKeyLen + pFree) > 0)	// if the new first key of right fits in the parent
@@ -1208,7 +1226,7 @@ bool M6IndexLeafPage<M6DataType>::Underflow(M6IndexPage& inRight, uint32 inIndex
 			MoveEntries(right, *this, 0, mPageData.mN, ln);
 			inParent->ReplaceKey(inIndex, right.GetKey(0));
 		}
-		else if (right.Free() > Free() and right.mPageData.mN < kM6DataCount)
+		else if (right.Free() > Free() and right.mPageData.mN < kM6EntryCount)
 		{
 			assert(right.TooSmall());
 
@@ -1217,7 +1235,7 @@ bool M6IndexLeafPage<M6DataType>::Underflow(M6IndexPage& inRight, uint32 inIndex
 			
 			uint8* rk = mPageData.mKeys + mKeyOffsets[mPageData.mN - 1];
 			uint32 n = 0, ln = 0;
-			while (n < mPageData.mN and n + right.mPageData.mN < kM6DataCount and needed > *rk)
+			while (n < mPageData.mN and n + right.mPageData.mN < kM6EntryCount and needed > *rk)
 			{
 				++n;
 				if ((*rk - pKeyLen + pFree) > 0)	// if the new first key of right fits in the parent
@@ -1622,6 +1640,7 @@ void M6IndexImplT<M6DataType>::Insert(const string& inKey, const M6DataType& inV
 		{
 			M6LeafPagePtr root(AllocateLeaf());
 			mHeader.mRoot = root->GetPageNr();
+			mHeader.mDepth = 1;
 		}
 		
 		M6IndexPagePtr root(Load(mHeader.mRoot));
@@ -1952,6 +1971,11 @@ M6BasicIndex::M6BasicIndex(const string& inPath, MOpenMode inMode)
 //	: mImpl(new M6IndexImplT<uint32>(*this, inPath, inData))
 //{
 //}
+
+M6BasicIndex::M6BasicIndex(M6IndexImpl* inImpl)
+	: mImpl(inImpl)
+{
+}
 
 M6BasicIndex::~M6BasicIndex()
 {

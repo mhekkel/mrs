@@ -410,6 +410,7 @@ BOOST_AUTO_TEST_CASE(file_ix_5)
 		ba::to_lower(word);
 		
 		indx.Insert(word, nr);
+		//indx.validate();
 
 		testix[word] = nr++;
 	}

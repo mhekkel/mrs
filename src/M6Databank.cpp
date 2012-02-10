@@ -443,7 +443,8 @@ void M6BasicIx::FlushTerm(uint32 inTerm, uint32 inDocCount)
 			docs.push_back(docNr);
 		}
 
-		static_cast<M6MultiBasicIndex*>(mIndex.get())->Insert(mLexicon.GetString(inTerm), docs, inDocCount);
+		//static_cast<M6MultiBasicIndex*>(mIndex.get())->Insert(mLexicon.GetString(inTerm), docs, inDocCount);
+		static_cast<M6MultiBasicIndex*>(mIndex.get())->Insert(mLexicon.GetString(inTerm), docs);
 	}
 
 	mBits.Clear();
@@ -586,7 +587,8 @@ void M6TextIx::FlushTerm(uint32 inTerm, uint32 inDocCount)
 			docs.push_back(docNr);
 		}
 
-		static_cast<M6MultiIDLBasicIndex*>(mIndex.get())->Insert(mLexicon.GetString(inTerm), mIDLOffset, docs, inDocCount);
+//		static_cast<M6MultiIDLBasicIndex*>(mIndex.get())->Insert(mLexicon.GetString(inTerm), mIDLOffset, docs, inDocCount);
+		static_cast<M6MultiIDLBasicIndex*>(mIndex.get())->Insert(mLexicon.GetString(inTerm), mIDLOffset, docs);
 	}
 
 	mBits.Clear();
@@ -669,7 +671,8 @@ void M6WeightedWordIx::FlushTerm(uint32 inTerm, uint32 inDocCount)
 			docs.push_back(make_pair(docNr, weight));
 		}
 
-		static_cast<M6WeightedBasicIndex*>(mIndex.get())->Insert(mLexicon.GetString(inTerm), docs, inDocCount);
+//		static_cast<M6WeightedBasicIndex*>(mIndex.get())->Insert(mLexicon.GetString(inTerm), docs, inDocCount);
+		static_cast<M6WeightedBasicIndex*>(mIndex.get())->Insert(mLexicon.GetString(inTerm), docs);
 	}
 
 	mBits.Clear();

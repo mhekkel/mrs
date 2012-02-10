@@ -82,14 +82,19 @@ namespace std {
 struct M6IBitStreamImpl
 {
 					M6IBitStreamImpl(size_t inSize)
-						: mSize(inSize), mByteOffset(0), mBufferPtr(nullptr), mBufferSize(0), mRefCount(1)
+						: mSize(inSize), mByteOffset(0), mBufferPtr(nullptr), mBufferSize(0)
 					{
 						if (inSize > 0)
 							mSize *= 8;		// size is for bits 
 					}
-	virtual 		~M6IBitStreamImpl()					{ assert(mRefCount == 0); }
-	void			Reference()							{ ++mRefCount; }
-	void			Release()							{ if (--mRefCount == 0) delete this; }
+					
+					M6IBitStreamImpl(const M6IBitStreamImpl& inImpl)
+						: mSize(inImpl.mSize), mByteOffset(inImpl.mByteOffset), mBufferPtr(inImpl.mBufferPtr), mBufferSize(inImpl.mBufferSize)
+					{
+					}
+
+	virtual M6IBitStreamImpl*
+					Clone() = 0;
 
 	void			Get(uint8& outByte);
 	
@@ -101,9 +106,6 @@ struct M6IBitStreamImpl
 
 	uint8*			mBufferPtr;
 	int64			mBufferSize;
-
-  private:
-	int32			mRefCount;
 };
 
 class M6IBitStream
@@ -111,7 +113,6 @@ class M6IBitStream
   public:
 						M6IBitStream();
 						M6IBitStream(M6File& inFile, int64 inOffset);
-//						M6IBitStream(const void* inData, size_t inSize);
 						M6IBitStream(const M6IBitStream& inBits);
 	explicit			M6IBitStream(const M6OBitStream& inBits);
 	M6IBitStream&		operator=(const M6IBitStream& inStream);
@@ -121,9 +122,9 @@ class M6IBitStream
 	
 	int					operator()();
 	void				Sync();
-	bool				Eof() const					{ return (7 - mBitOffset) >= (8 + mImpl->mSize); }
+	bool				Eof() const					{ return mImpl == nullptr or (7 - mBitOffset) >= (8 + mImpl->mSize); }
 	void				Underflow();
-	size_t				BytesRead() const			{ return mImpl->mByteOffset; }
+	size_t				BytesRead() const			{ return mImpl ? mImpl->mByteOffset : 0; }
 	void				Skip(uint32 inBits);
 	
 	friend void ReadBits(M6IBitStream& inBits, M6OBitStream& outValue);
@@ -237,7 +238,7 @@ void CompressSimpleArraySelector(M6OBitStream& inBits, const std::vector<uint32>
 class M6CompressedArray
 {
   public:
-				M6CompressedArray(M6IBitStream& inBits, uint32 inLength);
+				M6CompressedArray(const M6IBitStream& inBits, uint32 inLength);
 	
 	struct const_iterator : public std::iterator<std::forward_iterator_tag, const uint32>
 	{
@@ -247,7 +248,7 @@ class M6CompressedArray
 		
 						const_iterator();
 						const_iterator(const const_iterator& iter);
-						const_iterator(M6IBitStream* inBits, uint32 inCount);
+						const_iterator(const M6CompressedArray* inArray, const M6IBitStream& inBits, uint32 inCount);
 		const_iterator&	operator=(const const_iterator& iter);
 
 		reference		operator*() const								{ return mCurrent; }
@@ -256,11 +257,13 @@ class M6CompressedArray
 		const_iterator&	operator++();
 		const_iterator	operator++(int)									{ const_iterator iter(*this); operator++(); return iter; }
 
-		bool			operator==(const const_iterator& iter) const	{ return mBits == iter.mBits and mCount == iter.mCount; }
+		bool			operator==(const const_iterator& iter) const	{ return mArray == iter.mArray and mCount == iter.mCount; }
 		bool			operator!=(const const_iterator& iter) const	{ return not operator==(iter); }
 
 	  private:
-		M6IBitStream*	mBits;
+		const M6CompressedArray*
+						mArray;
+		M6IBitStream	mBits;
 		uint32			mCount;
 		int32			mWidth;
 		uint32			mSpan;
@@ -277,18 +280,6 @@ class M6CompressedArray
 	M6IBitStream		mBits;
 	uint32				mSize;
 };
-
-//class M6CompressedWeightArrayIterator
-//{
-//  public:
-//				M6CompressedArrayIterator(M6OBitStream& inBits);
-//				~M6CompressedArrayIterator();
-//	bool		Next(uint32& outValue, uint8& outWeight);
-//};
-//
-//void WriteArray(M6OBitStream& inBits, std::vector<std::pair<uint32,uint8>>& inArray, int64 inMax);
-//void ReadArray(M6OBitStream& inBits, std::vector<std::pair<uint32,uint8>>& outArray, int64 inMax);
-
 
 // --------------------------------------------------------------------
 //

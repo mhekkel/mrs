@@ -212,36 +212,6 @@ class M6IndexLeafPage;
 template<class M6DataType>
 class M6IndexBranchPage;
 
-template<class M6PageType>
-struct M6IndexPagePtr
-{
-  public:
-	typedef M6PageType		M6IndexPage;
-
-					M6IndexPagePtr();
-					M6IndexPagePtr(M6IndexPage* inPage);
-	template<class M6PageType2>
-					M6IndexPagePtr(M6PageType2* inPage);
-					M6IndexPagePtr(const M6IndexPagePtr& inPtr);
-					~M6IndexPagePtr();
-
-	template<class M6PageType2>
-	M6IndexPagePtr&	operator=(const M6PageType2& inPtr);
-
-	M6IndexPagePtr&	operator=(const M6IndexPagePtr& inPtr);
-
-	M6IndexPage*	release();
-	void			reset(M6IndexPage* inPage);
-
-	M6IndexPage&	operator*() const			{ return *mPage; }
-	M6IndexPage*	operator->() const			{ return mPage; }
-					operator bool() const		{ return mPage != nullptr; }
-
-	void			swap(M6IndexPagePtr& ptr)	{ std::swap(mPage, ptr.mPage); }
-
-	M6IndexPage*	mPage;
-};
-
 // --------------------------------------------------------------------
 
 struct M6IndexImpl
@@ -298,9 +268,9 @@ class M6IndexImplT : public M6IndexImpl
 	typedef M6IndexLeafPage<M6DataType>		M6LeafPageType;
 	typedef M6IndexBranchPage<M6DataType>	M6BranchPageType;
 
-	typedef ::M6IndexPagePtr<M6IndexPageType>		M6IndexPagePtr;
-	typedef ::M6IndexPagePtr<M6LeafPageType>		M6LeafPagePtr;
-	typedef ::M6IndexPagePtr<M6BranchPageType>		M6BranchPagePtr;
+	typedef M6IndexPageType*				M6IndexPagePtr;
+	typedef M6LeafPageType*					M6LeafPagePtr;
+	typedef M6BranchPageType*				M6BranchPagePtr;
 
 					M6IndexImplT(M6BasicIndex& inIndex, const string& inPath, MOpenMode inMode);
 //					M6IndexImplT(M6BasicIndex& inIndex, const string& inPath,
@@ -319,6 +289,7 @@ class M6IndexImplT : public M6IndexImpl
 	M6LeafPagePtr	AllocateLeaf();
 	M6BranchPagePtr	AllocateBranch();
 	M6IndexPagePtr	Load(uint32 inPageNr);
+	void			Release(M6IndexPageType*& inPage);
 
 	void			CreateUpLevels(deque<pair<string,M6DataType>>& up);
 
@@ -336,7 +307,7 @@ class M6IndexImplT : public M6IndexImpl
 	{
 #pragma message("TODO: Uitbreiden met dirty, refcount")
 		uint32			mPageNr;
-		M6IndexPagePtr	mPage;
+		M6IndexPageType*mPage;
 		uint32			mRefCount;
 		M6CachedPagePtr	mNext;
 		M6CachedPagePtr	mPrev;
@@ -360,18 +331,14 @@ class M6IndexPage
 	typedef M6IndexImplT<M6DataType>				M6IndexImplType;
 	typedef M6IndexPage<M6DataType>					M6IndexPageType;
 	typedef M6IndexBranchPage<M6DataType>			M6IndexBranchPageType;
-	typedef ::M6IndexPagePtr<M6IndexPage>			M6IndexPagePtr;
-	typedef ::M6IndexPagePtr<M6IndexBranchPageType>	M6BranchPagePtr;
+	typedef M6IndexPageType*						M6IndexPagePtr;
+	typedef M6IndexBranchPageType*					M6BranchPagePtr;
 	  
 	virtual 		~M6IndexPage();
 
 	void			Deallocate();
 	void			Flush(M6File& inFile);
 
-	void			Reference()						{ ++mRefCount; }
-	void			Release();
-	int32			GetRefCount() const				{ return mRefCount; }
-	
 	uint32			GetPageNr() const				{ return mPageNr; }
 	void			MoveTo(uint32 inPageNr);
 
@@ -408,7 +375,6 @@ class M6IndexPage
 	M6IndexPageHeader*
 					mData;
 	uint32			mPageNr;
-	int32			mRefCount;
 	bool			mLocked;
 	bool			mDirty;
 
@@ -424,7 +390,6 @@ template<class M6DataType>
 M6IndexPage<M6DataType>::M6IndexPage(M6IndexImplType& inIndexImpl, M6IndexPageData* inData, uint32 inPageNr)
 	: mIndexImpl(inIndexImpl)
 	, mPageNr(inPageNr)
-	, mRefCount(0)
 	, mData(&inData->branch)
 	, mLocked(false)
 	, mDirty(false)
@@ -434,16 +399,8 @@ M6IndexPage<M6DataType>::M6IndexPage(M6IndexImplType& inIndexImpl, M6IndexPageDa
 template<class M6DataType>
 M6IndexPage<M6DataType>::~M6IndexPage()
 {
-	assert(mRefCount == 0);
 	assert(not mDirty);
 	delete mData;
-}
-
-template<class M6DataType>
-void M6IndexPage<M6DataType>::Release()
-{
-	if (--mRefCount == 0)
-		delete this;
 }
 
 template<class M6DataType>
@@ -476,6 +433,8 @@ void M6IndexPage<M6DataType>::MoveTo(uint32 inPageNr)
 		
 		mPageNr = inPageNr;
 		mDirty = true;
+		
+		Release(page);
 	}
 }
 
@@ -832,7 +791,9 @@ bool M6IndexBranchPage<M6DataType>::Find(const string& inKey, M6DataType& outVal
 		pageNr = GetValue(ix);
 	
 	M6IndexPagePtr page(mIndexImpl.Load(pageNr));
-	return page->Find(inKey, outValue);
+	bool result = page->Find(inKey, outValue);
+	Release(page);
+	return result;
 }
 
 /*
@@ -915,12 +876,16 @@ bool M6IndexBranchPage<M6DataType>::Insert(string& ioKey, const M6DataType& inVa
 			ioKey = upKey;
 			outLink = next->GetPageNr();
 			
+			Release(next);
+			
 			result = true;
 		}
 	}
 
 //	assert(mPageData.mN >= kM6MinEntriesPerPage or inParent == nullptr);
 	assert(mPageData.mN <= kM6MaxEntriesPerPage);
+
+	Release(page);
 
 	return result;
 }
@@ -959,6 +924,7 @@ bool M6IndexBranchPage<M6DataType>::Erase(string& ioKey, int32 inIndex, M6IndexB
 				// try to compensate using our right sibling
 				M6IndexPagePtr right(mIndexImpl.Load(inParent->GetValue(inIndex + 1)));
 				Underflow(*right, inIndex + 1, inParent);
+				Release(right);
 			}
 			
 			if (TooSmall() and inIndex >= 0)
@@ -966,9 +932,12 @@ bool M6IndexBranchPage<M6DataType>::Erase(string& ioKey, int32 inIndex, M6IndexB
 				// if still too small, try with the left sibling
 				M6IndexPagePtr left(mIndexImpl.Load(inIndex > 0 ? inParent->GetValue(inIndex - 1) : inParent->GetLink()));
 				left->Underflow(*this, inIndex, inParent);
+				Release(left);
 			}
 		}
 	}
+	
+	Release(page);
 
 	return result;
 }
@@ -1035,7 +1004,7 @@ class M6IndexLeafPage : public M6IndexPageT<M6DataType,typename M6IndexPageDataT
 {
   public:
 	typedef typename M6IndexPageDataTypeFactory<M6DataType>::M6LeafPageDataType	M6DataPageType;
-	typedef typename ::M6IndexPagePtr<M6IndexLeafPage>							M6LeafPagePtr;
+//	typedef typename M6IndexLeafPage*							M6LeafPagePtr;
 
 					M6IndexLeafPage(M6IndexImplType& inIndexImpl, M6IndexPageData* inData, uint32 inPageNr)
 						: M6IndexPageT(inIndexImpl, inData, inPageNr)
@@ -1114,6 +1083,8 @@ bool M6IndexLeafPage<M6DataType>::Insert(string& ioKey, const M6DataType& inValu
 		ioKey = next->GetKey(0);
 		outLink = next->GetPageNr();
 		
+		Release(next);
+		
 		result = true;
 	}
 
@@ -1164,6 +1135,7 @@ bool M6IndexLeafPage<M6DataType>::Erase(string& ioKey, int32 inIndex, M6IndexBra
 					// try to compensate using our right sibling
 					M6IndexPagePtr right(mIndexImpl.Load(inParent->GetValue(inIndex + 1)));
 					Underflow(*right, inIndex + 1, inParent);
+					Release(right);
 				}
 				
 				if (TooSmall() and inIndex >= 0)
@@ -1177,6 +1149,7 @@ bool M6IndexLeafPage<M6DataType>::Erase(string& ioKey, int32 inIndex, M6IndexBra
 
 					M6IndexPagePtr left(mIndexImpl.Load(leftNr));
 					left->Underflow(*this, inIndex, inParent);
+					Release(left);
 				}
 				
 				result = true;
@@ -1259,103 +1232,6 @@ bool M6IndexLeafPage<M6DataType>::Underflow(M6IndexPageType& inRight, uint32 inI
 	}
 	
 	return not (TooSmall() or right.TooSmall());
-}
-
-// --------------------------------------------------------------------
-
-template<class M6DataType>
-inline M6IndexPagePtr<M6DataType>::M6IndexPagePtr()
-	: mPage(nullptr)
-{
-}
-
-template<class M6DataType>
-inline M6IndexPagePtr<M6DataType>::M6IndexPagePtr(M6IndexPage* inPage)
-	: mPage(inPage)
-{
-	if (mPage != nullptr)
-		mPage->Reference();
-}
-
-template<class M6DataType>
-inline M6IndexPagePtr<M6DataType>::M6IndexPagePtr(const M6IndexPagePtr& inPtr)
-	: mPage(inPtr.mPage)
-{
-	if (mPage != nullptr)
-		mPage->Reference();
-}
-
-template<class M6DataType>
-inline M6IndexPagePtr<M6DataType>::~M6IndexPagePtr()
-{
-	if (mPage != nullptr)
-		mPage->Release();
-}
-
-template<class M6DataType>
-template<class M6PageType>
-inline M6IndexPagePtr<M6DataType>& M6IndexPagePtr<M6DataType>::operator=(const M6PageType& inPtr)
-{
-	if (mPage != inPtr.mPage)
-	{
-		if (mPage != nullptr)
-			mPage->Release();
-
-		mPage = inPtr.mPage;
-
-		if (mPage != nullptr)
-			mPage->Reference();
-	}
-	
-	return *this;
-}
-
-template<class M6DataType>
-inline M6IndexPagePtr<M6DataType>& M6IndexPagePtr<M6DataType>::operator=(const M6IndexPagePtr& inPtr)
-{
-	if (this != &inPtr and mPage != inPtr.mPage)
-	{
-		if (mPage != nullptr)
-			mPage->Release();
-
-		mPage = inPtr.mPage;
-
-		if (mPage != nullptr)
-			mPage->Reference();
-	}
-	
-	return *this;
-}
-
-template<class M6DataType>
-inline typename M6IndexPagePtr<M6DataType>::M6IndexPage* M6IndexPagePtr<M6DataType>::release()
-{
-	M6IndexPage<M6DataType>* result = mPage;
-	
-	if (mPage != nullptr)
-		mPage->Release();
-	
-	mPage = nullptr;
-	return result;
-}
-
-template<class M6DataType>
-inline void M6IndexPagePtr<M6DataType>::reset(M6IndexPage* inPage)
-{
-	if (mPage != nullptr)
-		mPage->Release();
-	mPage = inPage;
-	if (mPage != nullptr)
-		mPage->Reference();
-}
-
-namespace std
-{
-	template<class M6DataType>
-	void swap(M6IndexPagePtr<M6DataType>& a, M6IndexPagePtr<M6DataType>& b)
-	{
-		a.swap(b);
-	}	
 }
 
 // --------------------------------------------------------------------
@@ -1481,6 +1357,7 @@ void M6IndexImplT<M6DataType>::InitCache()
 	for (uint32 ix = 0; ix < mCacheCount; ++ix)
 	{
 		mCache[ix].mPageNr = 0;
+		mCache[ix].mRefCount = 0;
 		mCache[ix].mNext = mCache + ix + 1;
 		mCache[ix].mPrev = mCache + ix - 1;
 	}
@@ -1498,7 +1375,7 @@ typename M6IndexImplT<M6DataType>::M6CachedPagePtr M6IndexImplT<M6DataType>::Get
 	// now search backwards for a cached page that can be recycled
 	uint32 n = 0;
 	while (result != nullptr and result->mPage and 
-		(result->mPage->GetRefCount() > 1 or result->mPage->IsDirty()))
+		(result->mRefCount > 1 or result->mPage->IsDirty()))
 	{
 		result = result->mPrev;
 		++n;
@@ -1524,6 +1401,7 @@ typename M6IndexImplT<M6DataType>::M6CachedPagePtr M6IndexImplT<M6DataType>::Get
 		{
 			b->mPageNr = a->mPageNr;
 			b->mPage = a->mPage;
+			b->mRefCount = a->mRefCount;
 		}
 		
 		delete[] mCache;
@@ -1552,6 +1430,11 @@ typename M6IndexImplT<M6DataType>::M6CachedPagePtr M6IndexImplT<M6DataType>::Get
 	}
 	
 	result->mPageNr = inPageNr;
+	
+	if (result->mPage != nullptr)
+		delete result->mPage;
+	result->mPage = nullptr;
+	
 	return result;
 }
 
@@ -1569,6 +1452,7 @@ typename M6IndexImplT<M6DataType>::M6LeafPagePtr M6IndexImplT<M6DataType>::Alloc
 	M6CachedPagePtr cp = GetCachePage(pageNr);
 	M6LeafPagePtr page(new M6LeafPageType(*this, data, pageNr));
 	cp->mPage = page;
+	cp->mRefCount = 1;
 	return page;
 }
 
@@ -1586,6 +1470,7 @@ typename M6IndexImplT<M6DataType>::M6BranchPagePtr M6IndexImplT<M6DataType>::All
 	M6CachedPagePtr cp = GetCachePage(pageNr);
 	M6BranchPagePtr page(new M6BranchPageType(*this, data, pageNr));
 	cp->mPage = page;
+	cp->mRefCount = 1;
 	return page;
 }
 
@@ -1607,12 +1492,30 @@ typename M6IndexImplT<M6DataType>::M6IndexPagePtr M6IndexImplT<M6DataType>::Load
 		mFile.PRead(data, kM6IndexPageSize, inPageNr * kM6IndexPageSize);
 
 		if (data->leaf.mType == eM6IndexBranchPage)
-			cp->mPage.reset(new M6BranchPageType(*this, data, inPageNr));
+			cp->mPage = new M6BranchPageType(*this, data, inPageNr);
 		else
-			cp->mPage.reset(new M6LeafPageType(*this, data, inPageNr));
+			cp->mPage = new M6LeafPageType(*this, data, inPageNr);
+		cp->mRefCount = 1;
 	}
 	
 	return cp->mPage;
+}
+
+template<class M6DataType>
+typename void M6IndexImplT<M6DataType>::Release(M6IndexPageType*& inPage)
+{
+	assert(inPage != nullptr);
+	
+	M6CachedPagePtr cp = mLRUHead;
+	while (cp != nullptr and cp->mPage != inPage)
+		cp = cp->mNext;
+	
+	if (cp == nullptr)
+		THROW(("Invalid page in Release"));
+	
+	cp->mRefCount -= 1;
+	
+	inPage = nullptr;
 }
 
 template<class M6DataType>
@@ -1649,6 +1552,7 @@ void M6IndexImplT<M6DataType>::Insert(const string& inKey, const M6DataType& inV
 			M6LeafPagePtr root(AllocateLeaf());
 			mHeader.mRoot = root->GetPageNr();
 			mHeader.mDepth = 1;
+			Release(root);
 		}
 		
 		M6IndexPagePtr root(Load(mHeader.mRoot));
@@ -1665,7 +1569,10 @@ void M6IndexImplT<M6DataType>::Insert(const string& inKey, const M6DataType& inV
 			newRoot->SetLink(mHeader.mRoot);
 			newRoot->InsertKeyValue(key, link, 0);
 			mHeader.mRoot = newRoot->GetPageNr();
+			Release(newRoot);
 		}
+		
+		Release(root);
 	
 		if (mAutoCommit)
 			Commit();
@@ -1706,6 +1613,8 @@ bool M6IndexImplT<M6DataType>::Erase(const string& inKey)
 			}
 		}
 		
+		Release(root);
+		
 		if (mAutoCommit)
 			Commit();
 	
@@ -1729,6 +1638,7 @@ bool M6IndexImplT<M6DataType>::Find(const string& inKey, M6DataType& outValue)
 	{
 		M6IndexPagePtr root(Load(mHeader.mRoot));
 		result = root->Find(inKey, outValue);
+		Release(root);
 	}
 	return result;
 }
@@ -2093,6 +2003,7 @@ void M6IndexLeafPage<M6DataType>::Validate(const string& inKey, M6IndexBranchPag
 	{
 		M6IndexPagePtr next(mIndexImpl.Load(mPageData.mLink));
 		//M6VALID_ASSERT(mIndexImpl.CompareKeys(GetKey(mPageData.mN - 1), next->GetKey(0)) < 0);
+		Release(next);
 	}
 }
 
@@ -2107,11 +2018,13 @@ void M6IndexBranchPage<M6DataType>::Validate(const string& inKey, M6IndexBranchP
 	{
 		M6IndexPagePtr link(mIndexImpl.Load(mPageData.mLink));
 		link->Validate(inKey, this);
+		Release(link);
 		
 		for (uint32 i = 0; i < mPageData.mN; ++i)
 		{
 			M6IndexPagePtr page(mIndexImpl.Load(GetValue(i)));
 			page->Validate(GetKey(i), this);
+			Release(page);
 			if (i > 0)
 				M6VALID_ASSERT(mIndexImpl.CompareKeys(GetKey(i - 1), GetKey(i)) < 0);
 		}
@@ -2133,6 +2046,7 @@ void M6IndexLeafPage<M6DataType>::Dump(int inLevel, M6IndexBranchPageType* inPar
 	{
 		M6IndexPagePtr next(mIndexImpl.Load(mPageData.mLink));
 		//cout << prefix << "  " << "link: " << next->GetKey(0) << endl;
+		Release(next);
 	}
 }
 
@@ -2148,6 +2062,7 @@ void M6IndexBranchPage<M6DataType>::Dump(int inLevel, M6IndexBranchPageType* inP
 
 	M6IndexPagePtr link(mIndexImpl.Load(mPageData.mLink));
 	link->Dump(inLevel + 1, this);
+	Release(link);
 	
 	for (int i = 0; i < mPageData.mN; ++i)
 	{
@@ -2155,6 +2070,7 @@ void M6IndexBranchPage<M6DataType>::Dump(int inLevel, M6IndexBranchPageType* inP
 		
 		M6IndexPagePtr sub(mIndexImpl.Load(GetValue(i)));
 		sub->Dump(inLevel + 1, this);
+		Release(sub);
 	}
 }
 
@@ -2165,6 +2081,7 @@ void M6IndexImplT<M6DataType>::Validate()
 	{
 		M6IndexPagePtr root(Load(mHeader.mRoot));
 		root->Validate("", nullptr);
+		Release(root);
 	}
 	catch (M6ValidationException& e)
 	{
@@ -2187,6 +2104,7 @@ void M6IndexImplT<M6DataType>::Dump()
 
 	M6IndexPagePtr root(Load(mHeader.mRoot));
 	root->Dump(0, nullptr);
+	Release(root);
 }
 
 void M6BasicIndex::dump() const

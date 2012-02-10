@@ -387,6 +387,17 @@ const char filename[] = "test.index";
 //	}
 //}
 
+BOOST_AUTO_TEST_CASE(file_ix_comparator)
+{
+	M6NumericComparator nc;
+	BOOST_CHECK_LT(nc("1", 1, "2", 1), 0);
+	BOOST_CHECK_LT(nc("01", 2, "2", 1), 0);
+	BOOST_CHECK_GT(nc("11", 2, "01", 2), 0);
+	BOOST_CHECK_GT(nc("2", 1, "1", 1), 0);
+	BOOST_CHECK_EQUAL(nc("01", 2, "1", 1), 0);
+	BOOST_CHECK_EQUAL(nc("01000", 5, "1000", 4), 0);
+}
+
 BOOST_AUTO_TEST_CASE(file_ix_5)
 {
 	if (fs::exists(filename))

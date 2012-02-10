@@ -14,8 +14,7 @@ using namespace std;
 //	constants
 
 const uint32
-	kBitBufferSize = 64,
-	kBitBufferExtend = 512;
+	kBitBufferSize = 64;
 
 const int64
 	kUnboundedBufferSize = numeric_limits<int64>::max();
@@ -296,7 +295,7 @@ struct M6IBitStreamFileImpl : public M6IBitStreamImpl
 
 	M6File&			mData;
 	int64			mOffset;
-	char			mDataBuffer[kBitBufferExtend];
+	char			mDataBuffer[kBitBufferSize];
 };
 
 M6IBitStreamFileImpl::M6IBitStreamFileImpl(M6File& inData, int64 inOffset, int64 inSize)
@@ -324,15 +323,13 @@ M6IBitStreamFileImpl::M6IBitStreamFileImpl(M6File& inData, int64 inOffset, int64
 M6IBitStreamFileImpl::M6IBitStreamFileImpl(const M6IBitStreamFileImpl& inImpl)
 	: M6IBitStreamImpl(inImpl), mData(inImpl.mData), mOffset(inImpl.mOffset)
 {
-	memcpy(mDataBuffer, inImpl.mDataBuffer, mBufferSize);
+	memcpy(mDataBuffer, inImpl.mBufferPtr, mBufferSize);
+	mBufferPtr = reinterpret_cast<uint8*>(mDataBuffer);
 }
 
 void M6IBitStreamFileImpl::Read()
 {
-	//if (mData.Tell() == 0)				// avoid reading excess bytes in the first call
-		mBufferSize = kBitBufferSize;
-	//else
-	//	mBufferSize = kBitBufferExtend;
+	mBufferSize = kBitBufferSize;
 
 	if (mBufferSize > mSize / 8 + 1)
 		mBufferSize = mSize / 8 + 1;
@@ -525,8 +522,6 @@ void CopyBits(M6OBitStream& inBits, const M6OBitStream&	inValue)
 //	This is a simplified version of the array compression routines in MRS
 //	Only supported datatype is now uint32 and only supported width it 32 bit.
 
-const uint32 kMaxWidth = 32;
-
 struct M6Selector
 {
 	int32		databits;
@@ -543,6 +538,9 @@ const M6Selector kSelectors[16] = {
 	{  2, 1 }, {  2, 2 },
 	{  3, 1 }
 };
+
+const uint32
+	kMaxWidth = 32, kStartWidth = 29;
 
 inline uint32 Select(int32 inBitsNeeded[], uint32 inCount,
 	int32 inWidth, const M6Selector inSelectors[])
@@ -614,7 +612,7 @@ inline void Shift(std::vector<uint32>::const_iterator& ioIterator,
 
 void CompressSimpleArraySelector(M6OBitStream& inBits, const vector<uint32>& inArray)
 {
-	int32 width = kMaxWidth;
+	int32 width = kStartWidth;
 	uint32 last = 0;
 	
 	int32 bn[4];
@@ -661,110 +659,6 @@ void CompressSimpleArraySelector(M6OBitStream& inBits, const vector<uint32>& inA
 	}
 }
 
-//template<typename T, uint32 K>
-//class IteratorBase
-//{
-//  public:
-//					IteratorBase(CIBitStream& inData, int64 inMax)
-//						: fBits(&inData)
-//						, fRead(0)
-//						, fValue(-1)
-//						, fMax(inMax)
-//					{
-//						int64 v = fMax;
-//						fMaxWidth = 0;
-//						while (v > 0)
-//						{
-//							v >>= 1;
-//							++fMaxWidth;
-//						}
-//
-//						Reset();
-//					}
-//
-//	virtual			~IteratorBase() {}
-//
-//	virtual bool	Next()
-//					{
-//						bool done = false;
-//					
-//						if (fRead < fCount)
-//						{
-//							if (fSpan == 0)
-//							{
-//								uint32 selector;
-//								ReadBinary(*fBits, 4, selector);
-//								fSpan = kSelectors[selector].span;
-//								
-//								if (selector == 0)
-//									fWidth = fMaxWidth;
-//								else
-//									fWidth += kSelectors[selector].databits;
-//							}
-//					
-//							if (fWidth > 0)
-//							{
-//								int64 delta;
-//								ReadBinary(*fBits, fWidth, delta);
-//								fValue += delta;
-//							}
-//
-//							fValue += 1;
-//					
-//							--fSpan;
-//							++fRead;
-//							
-//							done = true;
-//						}
-//					
-//						return done;
-//					}
-//	
-//	T				Value() const					{ return static_cast<T>(fValue); }
-//	virtual uint32	Weight() const					{ return 1; }
-//	
-//	virtual uint32	Count() const					{ return fCount; }
-//	virtual uint32	Read() const					{ return fRead; }
-//
-//  protected:
-//					IteratorBase(CIBitStream& inData, int64 inMax, bool)
-//						: fBits(&inData)
-//						, fRead(0)
-//						, fValue(-1)
-//						, fMax(inMax)
-//					{
-//						int64 v = fMax;
-//						fMaxWidth = 0;
-//						while (v > 0)
-//						{
-//							v >>= 1;
-//							++fMaxWidth;
-//						}
-//					}
-//
-//					IteratorBase(const IteratorBase& inOther);
-//	IteratorBase&		operator=(const IteratorBase& inOther);
-//
-//	void			Reset()
-//					{
-//						fValue = -1;
-//						ReadGamma(*fBits, fCount);
-//						fRead = 0;
-//						fSpan = 0;
-//						fWidth = fMaxWidth;			// backwards compatible
-//					}
-//
-//	CIBitStream*	fBits;
-//	uint32			fCount;
-//	uint32			fRead;
-//	int32			fWidth;
-//	uint32			fMaxWidth;
-//	uint32			fSpan;
-//
-//	int64			fValue;
-//	int64			fMax;
-//};
-
 // --------------------------------------------------------------------
 //	Array Routines
 
@@ -793,7 +687,7 @@ M6CompressedArray::const_iterator::const_iterator()
 }
 
 M6CompressedArray::const_iterator::const_iterator(const M6CompressedArray* inArray, const M6IBitStream& inBits, uint32 inLength)
-	: mArray(inArray), mBits(inBits), mCount(inLength), mWidth(kMaxWidth), mSpan(0), mCurrent(0)
+	: mArray(inArray), mBits(inBits), mCount(inLength), mWidth(kStartWidth), mSpan(0), mCurrent(0)
 {
 	operator++();
 }

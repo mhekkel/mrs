@@ -14,6 +14,7 @@
 
 #include "M6Index.h"
 #include "M6Error.h"
+#include "M6BitStream.h"
 
 using namespace std;
 
@@ -289,7 +290,9 @@ class M6IndexImplT : public M6IndexImpl
 	M6LeafPagePtr	AllocateLeaf();
 	M6BranchPagePtr	AllocateBranch();
 	M6IndexPagePtr	Load(uint32 inPageNr);
-	void			Release(M6IndexPageType*& inPage);
+	
+	template<class PageType>
+	void			Release(PageType*& ioPage);
 
 	void			CreateUpLevels(deque<pair<string,M6DataType>>& up);
 
@@ -792,7 +795,7 @@ bool M6IndexBranchPage<M6DataType>::Find(const string& inKey, M6DataType& outVal
 	
 	M6IndexPagePtr page(mIndexImpl.Load(pageNr));
 	bool result = page->Find(inKey, outValue);
-	Release(page);
+	mIndexImpl.Release(page);
 	return result;
 }
 
@@ -876,7 +879,7 @@ bool M6IndexBranchPage<M6DataType>::Insert(string& ioKey, const M6DataType& inVa
 			ioKey = upKey;
 			outLink = next->GetPageNr();
 			
-			Release(next);
+			mIndexImpl.Release(next);
 			
 			result = true;
 		}
@@ -885,7 +888,7 @@ bool M6IndexBranchPage<M6DataType>::Insert(string& ioKey, const M6DataType& inVa
 //	assert(mPageData.mN >= kM6MinEntriesPerPage or inParent == nullptr);
 	assert(mPageData.mN <= kM6MaxEntriesPerPage);
 
-	Release(page);
+	mIndexImpl.Release(page);
 
 	return result;
 }
@@ -924,7 +927,7 @@ bool M6IndexBranchPage<M6DataType>::Erase(string& ioKey, int32 inIndex, M6IndexB
 				// try to compensate using our right sibling
 				M6IndexPagePtr right(mIndexImpl.Load(inParent->GetValue(inIndex + 1)));
 				Underflow(*right, inIndex + 1, inParent);
-				Release(right);
+				mIndexImpl.Release(right);
 			}
 			
 			if (TooSmall() and inIndex >= 0)
@@ -932,12 +935,12 @@ bool M6IndexBranchPage<M6DataType>::Erase(string& ioKey, int32 inIndex, M6IndexB
 				// if still too small, try with the left sibling
 				M6IndexPagePtr left(mIndexImpl.Load(inIndex > 0 ? inParent->GetValue(inIndex - 1) : inParent->GetLink()));
 				left->Underflow(*this, inIndex, inParent);
-				Release(left);
+				mIndexImpl.Release(left);
 			}
 		}
 	}
 	
-	Release(page);
+	mIndexImpl.Release(page);
 
 	return result;
 }
@@ -1067,7 +1070,7 @@ bool M6IndexLeafPage<M6DataType>::Insert(string& ioKey, const M6DataType& inValu
 		ix += 1;	// we need to insert at ix + 1
 
 		// create a new leaf page
-		M6LeafPagePtr next(mIndexImpl.AllocateLeaf());
+		M6IndexLeafPage* next(mIndexImpl.AllocateLeaf());
 	
 		uint32 split = mPageData.mN / 2;
 
@@ -1083,7 +1086,7 @@ bool M6IndexLeafPage<M6DataType>::Insert(string& ioKey, const M6DataType& inValu
 		ioKey = next->GetKey(0);
 		outLink = next->GetPageNr();
 		
-		Release(next);
+		mIndexImpl.Release(next);
 		
 		result = true;
 	}
@@ -1135,7 +1138,7 @@ bool M6IndexLeafPage<M6DataType>::Erase(string& ioKey, int32 inIndex, M6IndexBra
 					// try to compensate using our right sibling
 					M6IndexPagePtr right(mIndexImpl.Load(inParent->GetValue(inIndex + 1)));
 					Underflow(*right, inIndex + 1, inParent);
-					Release(right);
+					mIndexImpl.Release(right);
 				}
 				
 				if (TooSmall() and inIndex >= 0)
@@ -1149,7 +1152,7 @@ bool M6IndexLeafPage<M6DataType>::Erase(string& ioKey, int32 inIndex, M6IndexBra
 
 					M6IndexPagePtr left(mIndexImpl.Load(leftNr));
 					left->Underflow(*this, inIndex, inParent);
-					Release(left);
+					mIndexImpl.Release(left);
 				}
 				
 				result = true;
@@ -1345,6 +1348,9 @@ M6IndexImplT<M6DataType>::M6IndexImplT(M6BasicIndex& inIndex, const string& inPa
 template<class M6DataType>
 M6IndexImplT<M6DataType>::~M6IndexImplT()
 {
+	for (uint32 ix = 0; ix < mCacheCount; ++ix)
+		delete mCache[ix].mPage;
+
 	delete[] mCache;
 }
 
@@ -1356,6 +1362,7 @@ void M6IndexImplT<M6DataType>::InitCache()
 	
 	for (uint32 ix = 0; ix < mCacheCount; ++ix)
 	{
+		mCache[ix].mPage = nullptr;
 		mCache[ix].mPageNr = 0;
 		mCache[ix].mRefCount = 0;
 		mCache[ix].mNext = mCache + ix + 1;
@@ -1390,6 +1397,7 @@ typename M6IndexImplT<M6DataType>::M6CachedPagePtr M6IndexImplT<M6DataType>::Get
 		
 		for (uint32 ix = 0; ix < mCacheCount; ++ix)
 		{
+			tmp[ix].mPage = nullptr;
 			tmp[ix].mPageNr = 0;
 			tmp[ix].mNext = tmp + ix + 1;
 			tmp[ix].mPrev = tmp + ix - 1;
@@ -1502,12 +1510,13 @@ typename M6IndexImplT<M6DataType>::M6IndexPagePtr M6IndexImplT<M6DataType>::Load
 }
 
 template<class M6DataType>
-typename void M6IndexImplT<M6DataType>::Release(M6IndexPageType*& inPage)
+template<class PageType>
+typename void M6IndexImplT<M6DataType>::Release(PageType*& ioPage)
 {
-	assert(inPage != nullptr);
+	assert(ioPage != nullptr);
 	
 	M6CachedPagePtr cp = mLRUHead;
-	while (cp != nullptr and cp->mPage != inPage)
+	while (cp != nullptr and cp->mPage != ioPage)
 		cp = cp->mNext;
 	
 	if (cp == nullptr)
@@ -1515,7 +1524,7 @@ typename void M6IndexImplT<M6DataType>::Release(M6IndexPageType*& inPage)
 	
 	cp->mRefCount -= 1;
 	
-	inPage = nullptr;
+	ioPage = nullptr;
 }
 
 template<class M6DataType>
@@ -1536,8 +1545,10 @@ void M6IndexImplT<M6DataType>::Rollback()
 		if (mCache[ix].mPage and mCache[ix].mPage->IsDirty())
 		{
 			mCache[ix].mPage->SetDirty(false);
-			mCache[ix].mPage->Release();
+			delete mCache[ix].mPage;
+			mCache[ix].mPage = nullptr;
 			mCache[ix].mPageNr = 0;
+			mCache[ix].mRefCount = 0;
 		}
 	}
 }
@@ -1549,7 +1560,7 @@ void M6IndexImplT<M6DataType>::Insert(const string& inKey, const M6DataType& inV
 	{
 		if (mHeader.mRoot == 0)	// empty index?
 		{
-			M6LeafPagePtr root(AllocateLeaf());
+			M6IndexPagePtr root(AllocateLeaf());
 			mHeader.mRoot = root->GetPageNr();
 			mHeader.mDepth = 1;
 			Release(root);
@@ -2003,7 +2014,7 @@ void M6IndexLeafPage<M6DataType>::Validate(const string& inKey, M6IndexBranchPag
 	{
 		M6IndexPagePtr next(mIndexImpl.Load(mPageData.mLink));
 		//M6VALID_ASSERT(mIndexImpl.CompareKeys(GetKey(mPageData.mN - 1), next->GetKey(0)) < 0);
-		Release(next);
+		mIndexImpl.Release(next);
 	}
 }
 
@@ -2018,13 +2029,13 @@ void M6IndexBranchPage<M6DataType>::Validate(const string& inKey, M6IndexBranchP
 	{
 		M6IndexPagePtr link(mIndexImpl.Load(mPageData.mLink));
 		link->Validate(inKey, this);
-		Release(link);
+		mIndexImpl.Release(link);
 		
 		for (uint32 i = 0; i < mPageData.mN; ++i)
 		{
 			M6IndexPagePtr page(mIndexImpl.Load(GetValue(i)));
 			page->Validate(GetKey(i), this);
-			Release(page);
+			mIndexImpl.Release(page);
 			if (i > 0)
 				M6VALID_ASSERT(mIndexImpl.CompareKeys(GetKey(i - 1), GetKey(i)) < 0);
 		}
@@ -2046,7 +2057,7 @@ void M6IndexLeafPage<M6DataType>::Dump(int inLevel, M6IndexBranchPageType* inPar
 	{
 		M6IndexPagePtr next(mIndexImpl.Load(mPageData.mLink));
 		//cout << prefix << "  " << "link: " << next->GetKey(0) << endl;
-		Release(next);
+		mIndexImpl.Release(next);
 	}
 }
 
@@ -2062,7 +2073,7 @@ void M6IndexBranchPage<M6DataType>::Dump(int inLevel, M6IndexBranchPageType* inP
 
 	M6IndexPagePtr link(mIndexImpl.Load(mPageData.mLink));
 	link->Dump(inLevel + 1, this);
-	Release(link);
+	mIndexImpl.Release(link);
 	
 	for (int i = 0; i < mPageData.mN; ++i)
 	{
@@ -2070,7 +2081,7 @@ void M6IndexBranchPage<M6DataType>::Dump(int inLevel, M6IndexBranchPageType* inP
 		
 		M6IndexPagePtr sub(mIndexImpl.Load(GetValue(i)));
 		sub->Dump(inLevel + 1, this);
-		Release(sub);
+		mIndexImpl.Release(sub);
 	}
 }
 
@@ -2129,6 +2140,12 @@ M6MultiBasicIndex::M6MultiBasicIndex(const string& inPath, MOpenMode inMode)
 void M6MultiBasicIndex::Insert(const string& inKey, const vector<uint32>& inDocuments)
 {
 	M6MultiData data = { inDocuments.size(), inDocuments.front() };
+	
+	M6OBitStream bits;
+	CompressSimpleArraySelector(bits, inDocuments);
+	
+	cout << inKey << '\t' << inDocuments.size() << '\t' << bits.Size() << '\t' << inDocuments.front() << '\t' << endl;
+	
 	static_cast<M6IndexImplT<M6MultiData>*>(mImpl)->Insert(inKey, data);
 }
 
@@ -2147,6 +2164,12 @@ M6MultiIDLBasicIndex::M6MultiIDLBasicIndex(const string& inPath, MOpenMode inMod
 void M6MultiIDLBasicIndex::Insert(const string& inKey, int64 inIDLOffset, const vector<uint32>& inDocuments)
 {
 	M6MultiIDLData data = { inDocuments.size(), 0, inIDLOffset };
+
+	M6OBitStream bits;
+	CompressSimpleArraySelector(bits, inDocuments);
+	
+	cout << inKey << '\t' << inDocuments.size() << '\t' << bits.Size() << '\t' << inDocuments.front() << '\t' << endl;
+
 	static_cast<M6IndexImplT<M6MultiIDLData>*>(mImpl)->Insert(inKey, data);
 }
 

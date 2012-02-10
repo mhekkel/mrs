@@ -140,13 +140,36 @@ struct M6NumericComparator
 	int operator()(const char* inKeyA, size_t inKeyLengthA, const char* inKeyB, size_t inKeyLengthB) const
 	{
 #pragma message("TODO improve numeric comparison")
-		int64 a = boost::lexical_cast<int64>(std::string(inKeyA, inKeyLengthA));
-		int64 b = boost::lexical_cast<int64>(std::string(inKeyB, inKeyLengthB));
-		int d = 0;	// avoid overflows
-		if (a < b)
-			d = -1;
-		else if (a > b)
-			d = 1;
+		int d = 0;
+		const char* ai = inKeyA + inKeyLengthA;
+		const char* bi = inKeyB + inKeyLengthB;
+		while (ai > inKeyA and bi > inKeyB)
+		{
+			--ai; --bi;
+			if (*ai != *bi)
+				d = *ai - *bi;
+		}
+
+		while (ai > inKeyA)
+		{
+			--ai;
+			if (*ai != '0')
+			{
+				d = 1;
+				break;
+			}
+		}
+
+		while (bi > inKeyB)
+		{
+			--bi;
+			if (*bi != '0')
+			{
+				d = -1;
+				break;
+			}
+		}
+
 		return d;
 	}
 };

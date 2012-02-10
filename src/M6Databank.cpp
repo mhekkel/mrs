@@ -175,7 +175,7 @@ class M6FullTextIx
 
 M6FullTextIx::M6FullTextIx(const fs::path& inScratchUrl)
 	: mDocLocationIxMap(0)
-	, mDocWordLocation(0)
+	, mDocWordLocation(1)
 	, mBufferEntryWriter(*this)
 	, mScratchDir(inScratchUrl)
 	, mEntries((mScratchDir / "fulltext").string(), less<BufferEntry>(), mBufferEntryWriter)
@@ -248,7 +248,7 @@ void M6FullTextIx::FlushDoc(uint32 inDoc)
 	}
 	
 	mDocWords.clear();
-	mDocWordLocation = 0;
+	mDocWordLocation = 1;
 }
 
 void M6FullTextIx::BufferEntryWriter::PrepareForWrite(const BufferEntry* inValues, uint32 inCount)
@@ -847,7 +847,8 @@ void M6BatchIndexProcessor::Finish(uint32 inDocCount)
 {
 	// add the required 'alltext' index
 	M6BasicIndexPtr allTextIndex(new M6SimpleWeightedIndex((mDatabank.GetScratchDir().parent_path() / "all-text.index").string(), eReadWrite));
-	mIndices.push_back(new M6WeightedWordIx(mFullTextIndex, mLexicon, "", static_cast<uint8>(mIndices.size()), allTextIndex));
+	mIndices.push_back(new M6WeightedWordIx(mFullTextIndex, mLexicon, "all-text",
+		static_cast<uint8>(mIndices.size() + 1), allTextIndex));
 	
 	// tell indices about the doc count
 	for_each(mIndices.begin(), mIndices.end(), [&inDocCount](M6BasicIx* ix) { ix->SetDbDocCount(inDocCount); });
@@ -892,7 +893,8 @@ void M6BatchIndexProcessor::Finish(uint32 inDocCount)
 			termFrequency = 0;
 		}
 		
-		mIndices[ie.ix]->AddDocTerm(ie.doc, ie.term, ie.weight, ie.idl);
+		if (ie.ix > 0)
+			mIndices[ie.ix - 1]->AddDocTerm(ie.doc, ie.term, ie.weight, ie.idl);
 		termFrequency += ie.weight;
 		
 		if (termFrequency > numeric_limits<uint8>::max())

@@ -348,7 +348,8 @@ template<class M6DataType>
 class M6IndexPage
 {
   public:
-	typedef M6IndexImplT<M6DataType>				M6IndexImpl;
+	typedef M6IndexImplT<M6DataType>				M6IndexImplType;
+	typedef M6IndexPage<M6DataType>					M6IndexPageType;
 	typedef M6IndexBranchPage<M6DataType>			M6IndexBranchPageType;
 	typedef ::M6IndexPagePtr<M6IndexPage>			M6IndexPagePtr;
 	typedef ::M6IndexPagePtr<M6IndexBranchPageType>	M6BranchPagePtr;
@@ -388,12 +389,13 @@ class M6IndexPage
 	virtual void	Dump(int inLevel, M6IndexBranchPageType* inParent) = 0;
 #endif
 
-	virtual bool	Underflow(M6IndexPage& inRight, uint32 inIndex, M6IndexBranchPageType* inParent) = 0;
+	virtual bool	Underflow(M6IndexPageType& inRight, uint32 inIndex, M6IndexBranchPageType* inParent) = 0;
 
   protected:
-					M6IndexPage(M6IndexImpl& inIndexImpl, M6IndexPageData* inData, uint32 inPageNr);
+					M6IndexPage(M6IndexImplType& inIndexImpl, M6IndexPageData* inData, uint32 inPageNr);
 
-	M6IndexImpl&	mIndexImpl;
+	M6IndexImplType&
+					mIndexImpl;
 	M6IndexPageHeader*
 					mData;
 	uint32			mPageNr;
@@ -410,7 +412,7 @@ class M6IndexPage
 // --------------------------------------------------------------------
 
 template<class M6DataType>
-M6IndexPage<M6DataType>::M6IndexPage(M6IndexImpl& inIndexImpl, M6IndexPageData* inData, uint32 inPageNr)
+M6IndexPage<M6DataType>::M6IndexPage(M6IndexImplType& inIndexImpl, M6IndexPageData* inData, uint32 inPageNr)
 	: mIndexImpl(inIndexImpl)
 	, mPageNr(inPageNr)
 	, mRefCount(0)
@@ -482,7 +484,7 @@ class M6IndexPageT : public M6IndexPage<M6DataType>
 		kM6EntryCount = M6DataPageType::kM6EntryCount
 	};
 
-					M6IndexPageT(M6IndexImpl& inIndexImpl, M6IndexPageData* inData, uint32 inPageNr);
+					M6IndexPageT(M6IndexImplType& inIndexImpl, M6IndexPageData* inData, uint32 inPageNr);
 
 	virtual uint32	Free() const;
 	virtual bool	CanStore(const string& inKey) const;
@@ -505,14 +507,13 @@ class M6IndexPageT : public M6IndexPage<M6DataType>
 };
 
 template<class M6DataType, class M6DataPage>
-M6IndexPageT<M6DataType,M6DataPage>::M6IndexPageT(M6IndexImpl& inIndexImpl, M6IndexPageData* inData, uint32 inPageNr)
+M6IndexPageT<M6DataType,M6DataPage>::M6IndexPageT(M6IndexImplType& inIndexImpl, M6IndexPageData* inData, uint32 inPageNr)
 	: M6IndexPage<M6DataType>(inIndexImpl, inData, inPageNr)
 	, mPageData(*reinterpret_cast<M6DataPage*>(inData))
 {
 	uint8* key = mPageData.mKeys;
 	for (uint32 i = 0; i <= mPageData.mN; ++i)
 	{
-		assert(key <= mPageData.mKeys + kM6IndexPageSize);
 		assert(i <= kM6EntryCount);
 		mKeyOffsets[i] = static_cast<uint16>(key - mPageData.mKeys);
 		key += *key + 1;
@@ -763,7 +764,6 @@ void M6IndexPageT<M6DataType,M6DataPage>::MoveEntries(M6IndexPageT& inSrc, M6Ind
 	uint8* key = inSrc.mPageData.mKeys + inSrc.mKeyOffsets[inSrcOffset];
 	for (int32 i = inSrcOffset; i <= inSrc.mPageData.mN; ++i)
 	{
-		assert(key <= inSrc.mPageData.mKeys + kM6IndexPageSize);
 		inSrc.mKeyOffsets[i] = static_cast<uint16>(key - inSrc.mPageData.mKeys);
 		key += *key + 1;
 	}
@@ -771,7 +771,6 @@ void M6IndexPageT<M6DataType,M6DataPage>::MoveEntries(M6IndexPageT& inSrc, M6Ind
 	key = inDst.mPageData.mKeys + inDst.mKeyOffsets[inDstOffset];
 	for (int32 i = inDstOffset; i <= inDst.mPageData.mN; ++i)
 	{
-		assert(key <= inDst.mPageData.mKeys + kM6IndexPageSize);
 		inDst.mKeyOffsets[i] = static_cast<uint16>(key - inDst.mPageData.mKeys);
 		key += *key + 1;
 	}
@@ -786,7 +785,7 @@ template<class M6DataType>
 class M6IndexBranchPage : public M6IndexPageT<M6DataType,M6IndexBranchPageData>
 {
   public:
-					M6IndexBranchPage(M6IndexImpl& inIndexImpl, M6IndexPageData* inData, uint32 inPageNr)
+					M6IndexBranchPage(M6IndexImplType& inIndexImpl, M6IndexPageData* inData, uint32 inPageNr)
 						: M6IndexPageT(inIndexImpl, inData, inPageNr)
 					{
 						mPageData.mType = eM6IndexBranchPage;
@@ -798,7 +797,7 @@ class M6IndexBranchPage : public M6IndexPageT<M6DataType,M6IndexBranchPageData>
 
   protected:
 
-	virtual bool	Underflow(M6IndexPage& inRight, uint32 inIndex, M6IndexBranchPageType* inParent);
+	virtual bool	Underflow(M6IndexPageType& inRight, uint32 inIndex, M6IndexBranchPageType* inParent);
 
 #if DEBUG
 	virtual void	Dump(int inLevel, M6IndexBranchPageType* inParent);
@@ -966,7 +965,7 @@ bool M6IndexBranchPage<M6DataType>::Erase(string& ioKey, int32 inIndex, M6IndexB
 }
 
 template<class M6DataType>
-bool M6IndexBranchPage<M6DataType>::Underflow(M6IndexPage& inRight, uint32 inIndex, M6IndexBranchPageType* inParent)
+bool M6IndexBranchPage<M6DataType>::Underflow(M6IndexPageType& inRight, uint32 inIndex, M6IndexBranchPageType* inParent)
 {
 	M6IndexBranchPageType& right(static_cast<M6IndexBranchPageType&>(inRight));
 
@@ -1029,7 +1028,7 @@ class M6IndexLeafPage : public M6IndexPageT<M6DataType,typename M6IndexPageDataT
 	typedef typename M6IndexPageDataTypeFactory<M6DataType>::M6LeafPageDataType	M6DataPageType;
 	typedef typename ::M6IndexPagePtr<M6IndexLeafPage>							M6LeafPagePtr;
 
-					M6IndexLeafPage(M6IndexImpl& inIndexImpl, M6IndexPageData* inData, uint32 inPageNr)
+					M6IndexLeafPage(M6IndexImplType& inIndexImpl, M6IndexPageData* inData, uint32 inPageNr)
 						: M6IndexPageT(inIndexImpl, inData, inPageNr)
 					{
 						mPageData.mType = M6DataPageType::kIndexPageType;
@@ -1039,7 +1038,7 @@ class M6IndexLeafPage : public M6IndexPageT<M6DataType,typename M6IndexPageDataT
 	virtual bool	Insert(string& ioKey, const M6DataType& inValue, uint32& outLink, M6IndexBranchPageType* inParent);
 	virtual bool	Erase(string& ioKey, int32 inIndex, M6IndexBranchPageType* inParent, M6IndexBranchPageType* inLinkPage, uint32 inLinkIndex);
 
-	virtual bool	Underflow(M6IndexPage& inRight, uint32 inIndex, M6IndexBranchPageType* inParent);
+	virtual bool	Underflow(M6IndexPageType& inRight, uint32 inIndex, M6IndexBranchPageType* inParent);
 
 #if DEBUG
 	virtual void	Dump(int inLevel, M6IndexBranchPageType* inParent);
@@ -1180,7 +1179,7 @@ bool M6IndexLeafPage<M6DataType>::Erase(string& ioKey, int32 inIndex, M6IndexBra
 }
 
 template<class M6DataType>
-bool M6IndexLeafPage<M6DataType>::Underflow(M6IndexPage& inRight, uint32 inIndex, M6IndexBranchPageType* inParent)
+bool M6IndexLeafPage<M6DataType>::Underflow(M6IndexPageType& inRight, uint32 inIndex, M6IndexBranchPageType* inParent)
 {
 	M6IndexLeafPage& right(dynamic_cast<M6IndexLeafPage&>(inRight));
 	

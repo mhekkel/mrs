@@ -140,6 +140,23 @@
     <ClCompile Include="..\..\src\M6Lexicon.cpp" />
     <ClCompile Include="..\..\src\M6Tokenizer.cpp" />
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\src\M6BitStream.h" />
+    <ClInclude Include="..\..\src\M6Builder.h" />
+    <ClInclude Include="..\..\src\M6Config.h" />
+    <ClInclude Include="..\..\src\M6Databank.h" />
+    <ClInclude Include="..\..\src\M6DocStore.h" />
+    <ClInclude Include="..\..\src\M6Document.h" />
+    <ClInclude Include="..\..\src\M6Error.h" />
+    <ClInclude Include="..\..\src\M6FastLZ.h" />
+    <ClInclude Include="..\..\src\M6File.h" />
+    <ClInclude Include="..\..\src\M6Index.h" />
+    <ClInclude Include="..\..\src\M6Lexicon.h" />
+    <ClInclude Include="..\..\src\M6Lib.h" />
+    <ClInclude Include="..\..\src\M6SortedRunArray.h" />
+    <ClInclude Include="..\..\src\M6Tokenizer.h" />
+    <ClInclude Include="..\..\src\M6UnicodeTables.h" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

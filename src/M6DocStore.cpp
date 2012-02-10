@@ -974,6 +974,8 @@ uint32 M6DocStoreImpl::StoreDocument(const char* inData, size_t inSize)
 			mRoot = Load<M6DocStoreIndexPage>(mHeader.mIndexRoot);
 	}
 	
+	uint32 result = docNr;
+	
 	if (mRoot->Insert(docNr, docPageNr, docSize))
 	{
 		M6DocStoreIndexPagePtr newRoot(Allocate<M6DocStoreIndexPage>());
@@ -993,7 +995,7 @@ uint32 M6DocStoreImpl::StoreDocument(const char* inData, size_t inSize)
 	if (mAutoCommit)
 		Commit();
 
-	return docNr;
+	return result;
 }
 
 void M6DocStoreImpl::EraseDocument(uint32 inDocNr)

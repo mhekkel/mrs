@@ -86,7 +86,9 @@ class M6FullTextIx
 		uint32			doc;
 		
 		bool			operator<(const BufferEntry& inOther) const
-							{ return term < inOther.term or (term == inOther.term and doc < inOther.doc); }
+							{ return term < inOther.term or
+									(term == inOther.term and doc < inOther.doc) or
+									(term == inOther.term and doc == inOther.doc and ix < inOther.ix); }
 	};
 	
 	struct BufferEntryWriter
@@ -118,6 +120,7 @@ class M6FullTextIx
 	// The value chosen here seems to be a reasonable tradeoff.
 	enum {
 		kBufferEntryCount = 800000
+//		kBufferEntryCount = 800
 	};
 	
 	typedef M6SortedRunArray
@@ -172,6 +175,15 @@ class M6FullTextIx
 	fs::path		mScratchDir;
 	M6EntryBuffer	mEntries;
 };
+
+ostream& operator<<(ostream& os, const M6FullTextIx::BufferEntry& e)
+{
+	os << e.term << '\t'
+	   << e.doc << '\t'
+	   << uint32(e.ix) << '\t'
+	   << uint32(e.weight);
+	return os;
+}
 
 M6FullTextIx::M6FullTextIx(const fs::path& inScratchUrl)
 	: mDocLocationIxMap(0)
@@ -262,6 +274,7 @@ void M6FullTextIx::BufferEntryWriter::WriteSortedRun(M6FileStream& inFile, const
 	
 	uint32 t = 0;
 	uint32 d = mFirstDoc;	// the first doc in this run
+	int32 ix = -1;
 	
 	uint32 idlIxMap = mFullTextIndex->GetDocLocationIxMap();
 	
@@ -270,6 +283,10 @@ void M6FullTextIx::BufferEntryWriter::WriteSortedRun(M6FileStream& inFile, const
 
 	for (uint32 i = 0; i < inCount; ++i)
 	{
+		assert(inValues[i].term > t or inValues[i].doc > d or inValues[i].ix > ix);
+		
+cout << inValues[i] << endl;
+
 		if (inValues[i].term > t)
 			d = mFirstDoc;
 
@@ -283,6 +300,7 @@ void M6FullTextIx::BufferEntryWriter::WriteSortedRun(M6FileStream& inFile, const
 
 		t = inValues[i].term;
 		d = inValues[i].doc;
+		ix = inValues[i].ix;
 	}
 	
 	bits.Sync();
@@ -879,6 +897,8 @@ void M6BatchIndexProcessor::Finish(uint32 inDocCount)
 
 	do
 	{
+cout << ie << endl;
+
 		++entriesRead;
 	
 //		if (inProgress != nullptr and (entriesRead % 1000000) == 0)

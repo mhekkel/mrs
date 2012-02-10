@@ -2144,7 +2144,7 @@ void M6MultiBasicIndex::Insert(const string& inKey, const vector<uint32>& inDocu
 	M6OBitStream bits;
 	CompressSimpleArraySelector(bits, inDocuments);
 	
-	cout << inKey << '\t' << inDocuments.size() << '\t' << bits.Size() << '\t' << inDocuments.front() << '\t' << endl;
+//	cout << inKey << '\t' << inDocuments.size() << '\t' << bits.Size() << '\t' << inDocuments.front() << '\t' << endl;
 	
 	static_cast<M6IndexImplT<M6MultiData>*>(mImpl)->Insert(inKey, data);
 }
@@ -2168,7 +2168,7 @@ void M6MultiIDLBasicIndex::Insert(const string& inKey, int64 inIDLOffset, const 
 	M6OBitStream bits;
 	CompressSimpleArraySelector(bits, inDocuments);
 	
-	cout << inKey << '\t' << inDocuments.size() << '\t' << bits.Size() << '\t' << inDocuments.front() << '\t' << endl;
+//	cout << inKey << '\t' << inDocuments.size() << '\t' << bits.Size() << '\t' << inDocuments.front() << '\t' << endl;
 
 	static_cast<M6IndexImplT<M6MultiIDLData>*>(mImpl)->Insert(inKey, data);
 }

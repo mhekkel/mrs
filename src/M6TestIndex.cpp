@@ -3,6 +3,7 @@
 #include <fstream>
 #include <map>
 #include <algorithm>
+#include <numeric>
 
 #include <boost/filesystem.hpp>
 #include <zeep/xml/document.hpp>
@@ -416,7 +417,7 @@ BOOST_AUTO_TEST_CASE(file_ix_5)
 	}
 	
 	indx.validate();
-	indx.dump();
+//	indx.dump();
 }
 
 BOOST_AUTO_TEST_CASE(file_ix_5a)
@@ -589,3 +590,42 @@ BOOST_AUTO_TEST_CASE(file_ix_5c)
 //		}
 //	}
 //}
+
+BOOST_AUTO_TEST_CASE(file_ix_6)
+{
+	cout << "test vector version" << endl;
+
+	if (fs::exists(filename))
+		fs::remove(filename);
+
+	ifstream text("test/test-doc-2.txt");
+	BOOST_REQUIRE(text.is_open());
+
+	M6SimpleMultiIndex indx(filename, eReadWrite);
+
+	map<string,int64> testix;
+
+	uint32 nr = 1;
+	for (;;)
+	{
+		string word;
+		text >> word;
+
+		vector<uint32> loc(100);
+		iota(loc.begin(), loc.end(), nr);
+
+		if (word.empty() and text.eof())
+			break;
+
+		ba::to_lower(word);
+		
+		indx.Insert(word, loc);
+		//indx.validate();
+
+		testix[word] = nr++;
+	}
+	
+	indx.validate();
+//	indx.dump();
+}
+

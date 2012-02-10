@@ -6,6 +6,7 @@
 
 #include "M6BitStream.h"
 #include "M6File.h"
+#include "M6Error.h"
 
 using namespace std;
 
@@ -22,25 +23,7 @@ const int64
 // --------------------------------------------------------------------
 //	M6OBitStream
 
-struct M6OBitStream::M6OBitStreamImpl
-{
-	uint32			mRefCount;
-
-					M6OBitStreamImpl() : mRefCount(1)	{ }
-	virtual 		~M6OBitStreamImpl()					{ assert(mRefCount == 0); }
-	void			Reference()							{ ++mRefCount; }
-	void			Release()							{ if (--mRefCount == 0) delete this; }
-
-	virtual size_t	Size() const = 0;
-	virtual void	Write(const void* inData, size_t inSize) = 0;
-	virtual void	Truncate() = 0;
-
-  private:
-					M6OBitStreamImpl(const M6OBitStreamImpl&);
-	M6OBitStreamImpl& operator=(const M6OBitStreamImpl&);
-};
-
-struct M6OBitStreamFileImpl : public M6OBitStream::M6OBitStreamImpl
+struct M6OBitStreamFileImpl : public M6OBitStreamImpl
 {
 					M6OBitStreamFileImpl(M6FileStream& inFile)
 						: mFile(inFile) {}
@@ -52,7 +35,7 @@ struct M6OBitStreamFileImpl : public M6OBitStream::M6OBitStreamImpl
 	M6FileStream&	mFile;
 };
 
-struct M6OBitStreamMemImpl : public M6OBitStream::M6OBitStreamImpl
+struct M6OBitStreamMemImpl : public M6OBitStreamImpl
 {
 					M6OBitStreamMemImpl();
 	virtual			~M6OBitStreamMemImpl();
@@ -269,31 +252,9 @@ size_t M6OBitStream::Size() const
 // --------------------------------------------------------------------
 //	M6IBitStream
 
-M6IBitStream::M6IBitStreamImpl::M6IBitStreamImpl(size_t inSize)
-	: mSize(inSize)
-	, mByteOffset(0)
-	, mRefCount(1)
-	, mBufferPtr(nullptr)
-	, mBufferSize(0)
-{
-	if (inSize > 0)
-		mSize *= 8;		// size is for bits 
-}
-
-void M6IBitStream::M6IBitStreamImpl::Reference()
-{
-	++mRefCount;
-}
-
-void M6IBitStream::M6IBitStreamImpl::Release()
-{
-	if (--mRefCount == 0)
-		delete this;
-}
-
 // --------------------------------------------------------------------
 //
-//struct M6IBitStreamConstImpl : public M6IBitStream::M6IBitStreamImpl
+//struct M6IBitStreamConstImpl : public M6IBitStreamImpl
 //{
 //					M6IBitStreamConstImp(const uint8* inData, int64 inSize = -1);
 //	virtual void	Read()			{ assert(false); }	// should never be called
@@ -324,7 +285,7 @@ void M6IBitStream::M6IBitStreamImpl::Release()
 
 // --------------------------------------------------------------------
 
-struct M6IBitStreamFileImpl : public M6IBitStream::M6IBitStreamImpl
+struct M6IBitStreamFileImpl : public M6IBitStreamImpl
 {
 					M6IBitStreamFileImpl(M6File& inData, int64 inOffset, int64 inSize = -1);
 	virtual void	Read();
@@ -376,7 +337,7 @@ void M6IBitStreamFileImpl::Read()
 
 // --------------------------------------------------------------------
 //
-//struct M6IBitStreamMemoryImpl : public M6IBitStream::M6IBitStreamImpl
+//struct M6IBitStreamMemoryImpl : public M6IBitStreamImpl
 //{
 //					M6IBitStreamMemoryImpl(
 //						HStreamBase&		inData,
@@ -429,7 +390,7 @@ void M6IBitStreamFileImpl::Read()
 
 // --------------------------------------------------------------------
 
-struct M6IBitStreamOBitImpl : public M6IBitStream::M6IBitStreamImpl
+struct M6IBitStreamOBitImpl : public M6IBitStreamImpl
 {
 					M6IBitStreamOBitImpl(const M6OBitStream& inData)
 						: M6IBitStreamImpl(inData.BitSize())
@@ -463,7 +424,7 @@ struct M6IBitStreamOBitImpl : public M6IBitStream::M6IBitStreamImpl
 
 // --------------------------------------------------------------------
 
-//struct M6IBitStreamValueImp : public M6IBitStream::M6IBitStreamImpl
+//struct M6IBitStreamValueImp : public M6IBitStreamImpl
 //{
 //					M6IBitStreamValueImp(
 //						int64				inValue)
@@ -655,9 +616,10 @@ void CopyBits(M6OBitStream& inBits, const M6OBitStream&	inValue)
 
 // --------------------------------------------------------------------
 //	Arrays
+//	This is a simplified version of the array compression routines in MRS
+//	Only supported datatype is now uint32 and only supported width it 32 bit.
 
-namespace
-{
+const uint32 kMaxWidth = 32;
 
 struct M6Selector
 {
@@ -677,10 +639,10 @@ const M6Selector kSelectors[16] = {
 };
 
 inline uint32 Select(int32 inBitsNeeded[], uint32 inCount,
-	int32 inWidth, int32 inMaxWidth, const M6Selector inSelectors[])
+	int32 inWidth, const M6Selector inSelectors[])
 {
 	uint32 result = 0;
-	int32 c = inBitsNeeded[0] - inMaxWidth;
+	int32 c = inBitsNeeded[0] - kMaxWidth;
 	
 	for (uint32 i = 1; i < 16; ++i)
 	{
@@ -689,7 +651,7 @@ inline uint32 Select(int32 inBitsNeeded[], uint32 inCount,
 		
 		int32 w = inWidth + inSelectors[i].databits;
 		
-		if (w > inMaxWidth or w < 0)
+		if (w > kMaxWidth or w < 0)
 			continue;
 		
 		bool fits = true;
@@ -726,13 +688,13 @@ inline uint32 Select(int32 inBitsNeeded[], uint32 inCount,
 	return result;
 }
 
-template<class T>
-inline void Shift(T& ioIterator, int64& ioLast, uint32& outDelta, int32& outWidth)
+inline void Shift(std::vector<uint32>::const_iterator& ioIterator,
+	uint32& ioLast, uint32& outDelta, int32& outWidth)
 {
-	int64 next = *ioIterator++;
+	uint32 next = *ioIterator++;
 	assert(next > ioLast);
 	
-	outDelta = static_cast<uint32>(next - ioLast - 1);
+	outDelta = next - ioLast - 1;
 	ioLast = next;
 	
 	uint32 v = outDelta;
@@ -744,29 +706,16 @@ inline void Shift(T& ioIterator, int64& ioLast, uint32& outDelta, int32& outWidt
 	}
 }
 
-template<typename T>
-void CompressSimpleArraySelector(M6OBitStream& inBits, vector<T>& inArray, int64 inMax)
+void CompressSimpleArraySelector(M6OBitStream& inBits, const vector<uint32>& inArray)
 {
-	uint32 cnt = static_cast<uint32>(inArray.size());
-
-	WriteGamma(inBits, cnt);
-
-	int32 maxWidth = 0;
-	int64 v = inMax;
-	while (v > 0)
-	{
-		v >>= 1;
-		++maxWidth;
-	}
-	
-	int32 width = maxWidth;
-	int64 last = -1;
+	int32 width = kMaxWidth;
+	uint32 last = 0;
 	
 	int32 bn[4];
 	uint32 dv[4];
 	uint32 bc = 0;
-	typename vector<T>::const_iterator a = inArray.begin();
-	typename vector<T>::const_iterator e = inArray.end();
+	vector<uint32>::const_iterator a = inArray.begin();
+	vector<uint32>::const_iterator e = inArray.end();
 	
 	while (a != e or bc > 0)
 	{
@@ -776,10 +725,10 @@ void CompressSimpleArraySelector(M6OBitStream& inBits, vector<T>& inArray, int64
 			++bc;
 		}
 		
-		uint32 s = Select(bn, bc, width, maxWidth, kSelectors);
+		uint32 s = Select(bn, bc, width, kSelectors);
 
 		if (s == 0)
-			width = maxWidth;
+			width = kMaxWidth;
 		else
 			width += kSelectors[s].databits;
 
@@ -806,9 +755,204 @@ void CompressSimpleArraySelector(M6OBitStream& inBits, vector<T>& inArray, int64
 	}
 }
 
+//template<typename T, uint32 K>
+//class IteratorBase
+//{
+//  public:
+//					IteratorBase(CIBitStream& inData, int64 inMax)
+//						: fBits(&inData)
+//						, fRead(0)
+//						, fValue(-1)
+//						, fMax(inMax)
+//					{
+//						int64 v = fMax;
+//						fMaxWidth = 0;
+//						while (v > 0)
+//						{
+//							v >>= 1;
+//							++fMaxWidth;
+//						}
+//
+//						Reset();
+//					}
+//
+//	virtual			~IteratorBase() {}
+//
+//	virtual bool	Next()
+//					{
+//						bool done = false;
+//					
+//						if (fRead < fCount)
+//						{
+//							if (fSpan == 0)
+//							{
+//								uint32 selector;
+//								ReadBinary(*fBits, 4, selector);
+//								fSpan = kSelectors[selector].span;
+//								
+//								if (selector == 0)
+//									fWidth = fMaxWidth;
+//								else
+//									fWidth += kSelectors[selector].databits;
+//							}
+//					
+//							if (fWidth > 0)
+//							{
+//								int64 delta;
+//								ReadBinary(*fBits, fWidth, delta);
+//								fValue += delta;
+//							}
+//
+//							fValue += 1;
+//					
+//							--fSpan;
+//							++fRead;
+//							
+//							done = true;
+//						}
+//					
+//						return done;
+//					}
+//	
+//	T				Value() const					{ return static_cast<T>(fValue); }
+//	virtual uint32	Weight() const					{ return 1; }
+//	
+//	virtual uint32	Count() const					{ return fCount; }
+//	virtual uint32	Read() const					{ return fRead; }
+//
+//  protected:
+//					IteratorBase(CIBitStream& inData, int64 inMax, bool)
+//						: fBits(&inData)
+//						, fRead(0)
+//						, fValue(-1)
+//						, fMax(inMax)
+//					{
+//						int64 v = fMax;
+//						fMaxWidth = 0;
+//						while (v > 0)
+//						{
+//							v >>= 1;
+//							++fMaxWidth;
+//						}
+//					}
+//
+//					IteratorBase(const IteratorBase& inOther);
+//	IteratorBase&		operator=(const IteratorBase& inOther);
+//
+//	void			Reset()
+//					{
+//						fValue = -1;
+//						ReadGamma(*fBits, fCount);
+//						fRead = 0;
+//						fSpan = 0;
+//						fWidth = fMaxWidth;			// backwards compatible
+//					}
+//
+//	CIBitStream*	fBits;
+//	uint32			fCount;
+//	uint32			fRead;
+//	int32			fWidth;
+//	uint32			fMaxWidth;
+//	uint32			fSpan;
+//
+//	int64			fValue;
+//	int64			fMax;
+//};
+
+// --------------------------------------------------------------------
+//	Array Routines
+
+void WriteArray(M6OBitStream& inBits, vector<uint32>& inArray)
+{
+	uint32 cnt = static_cast<uint32>(inArray.size());
+	WriteGamma(inBits, cnt);
+	assert(cnt == 0 or inArray.front() > 0);
+	if (not inArray.empty() and inArray.front() == 0)
+		THROW(("Invalid array, should not contain zero"));
+	CompressSimpleArraySelector(inBits, inArray);
 }
 
-void WriteArray(M6OBitStream& inBits, vector<uint32>& inArray, int64 inMax)
+// --------------------------------------------------------------------
+//	M6CompressedArray
+
+M6CompressedArray::M6CompressedArray(M6IBitStream& inBits, uint32 inLength)
+	: mBits(inBits)
+	, mSize(inLength)
 {
-	CompressSimpleArraySelector(inBits, inArray, inMax);
+}
+
+M6CompressedArray::const_iterator::const_iterator()
+	: mBits(nullptr), mCount(0), mWidth(0), mSpan(0), mCurrent(0)
+{
+}
+
+M6CompressedArray::const_iterator::const_iterator(M6IBitStream* inBits, uint32 inLength)
+	: mBits(inBits), mCount(inLength), mWidth(kMaxWidth), mSpan(0), mCurrent(0)
+{
+	operator++();
+}
+
+M6CompressedArray::const_iterator::const_iterator(const const_iterator& iter)
+	: mBits(iter.mBits)
+	, mCount(iter.mCount)
+	, mWidth(iter.mWidth)
+	, mSpan(iter.mSpan)
+	, mCurrent(iter.mCurrent)
+{
+}
+
+M6CompressedArray::const_iterator& M6CompressedArray::const_iterator::operator=(const const_iterator& iter)
+{
+	if (this != &iter)
+	{
+		mBits = iter.mBits;
+		mCount = iter.mCount;
+		mWidth = iter.mWidth;
+		mSpan = iter.mSpan;
+		mCurrent = iter.mCurrent;
+	}
+	
+	return *this;
+}
+
+M6CompressedArray::const_iterator& M6CompressedArray::const_iterator::operator++()
+{
+	if (mCount > 0)
+	{
+		if (mSpan == 0)
+		{
+			uint32 selector;
+			ReadBinary(*mBits, 4, selector);
+			mSpan = kSelectors[selector].span;
+			
+			if (selector == 0)
+				mWidth = kMaxWidth;
+			else
+				mWidth += kSelectors[selector].databits;
+		}
+
+		if (mWidth > 0)
+		{
+			uint32 delta;
+			ReadBinary(*mBits, mWidth, delta);
+			mCurrent += delta;
+		}
+
+		mCurrent += 1;
+
+		--mSpan;
+		--mCount;
+	}
+	
+	return *this;
+}
+
+M6CompressedArray::const_iterator M6CompressedArray::begin() const
+{
+	return const_iterator(const_cast<M6IBitStream*>(&mBits), mSize);
+}
+
+M6CompressedArray::const_iterator M6CompressedArray::end() const
+{
+	return const_iterator(const_cast<M6IBitStream*>(&mBits), 0);
 }

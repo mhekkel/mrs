@@ -1,5 +1,6 @@
 #pragma once
 
+#include <iterator>
 #include <vector>
 
 class M6IBitStream;
@@ -8,6 +9,24 @@ class M6File;
 class M6FileStream;
 
 // --------------------------------------------------------------------
+
+struct M6OBitStreamImpl
+{
+					M6OBitStreamImpl() : mRefCount(1)	{ }
+	virtual 		~M6OBitStreamImpl()					{ assert(mRefCount == 0); }
+	void			Reference()							{ ++mRefCount; }
+	void			Release()							{ if (--mRefCount == 0) delete this; }
+
+	virtual size_t	Size() const = 0;
+	virtual void	Write(const void* inData, size_t inSize) = 0;
+	virtual void	Truncate() = 0;
+
+  private:
+					M6OBitStreamImpl(const M6OBitStreamImpl&);
+	M6OBitStreamImpl& operator=(const M6OBitStreamImpl&);
+
+	uint32			mRefCount;
+};
 
 class M6OBitStream
 {
@@ -38,8 +57,6 @@ class M6OBitStream
 	friend void WriteBits(M6OBitStream& inBits, const M6OBitStream& inValue);
 	friend void CopyBits(M6OBitStream& inBits, const M6OBitStream& inValue);
 
-	struct M6OBitStreamImpl;
-
   private:
 
 	void				Add(uint8 inByte);
@@ -49,8 +66,7 @@ class M6OBitStream
 		kBufferSize = 22
 	};
 	
-	struct M6OBitStreamImpl*
-						mImpl;
+	M6OBitStreamImpl*	mImpl;
 	uint8				mData[kBufferSize];
 	uint8				mByteOffset;
 	int8				mBitOffset;
@@ -62,6 +78,33 @@ namespace std {
 }
 
 // --------------------------------------------------------------------
+
+struct M6IBitStreamImpl
+{
+					M6IBitStreamImpl(size_t inSize)
+						: mSize(inSize), mByteOffset(0), mBufferPtr(nullptr), mBufferSize(0), mRefCount(1)
+					{
+						if (inSize > 0)
+							mSize *= 8;		// size is for bits 
+					}
+	virtual 		~M6IBitStreamImpl()					{ assert(mRefCount == 0); }
+	void			Reference()							{ ++mRefCount; }
+	void			Release()							{ if (--mRefCount == 0) delete this; }
+
+	void			Get(uint8& outByte);
+	
+	int64			mSize;
+	int64			mByteOffset;
+	
+  protected:
+	virtual void	Read() = 0;
+
+	uint8*			mBufferPtr;
+	int64			mBufferSize;
+
+  private:
+	int32			mRefCount;
+};
 
 class M6IBitStream
 {
@@ -89,27 +132,6 @@ class M6IBitStream
 
 	friend struct M6IBitStreamFileImpl;
 	friend struct M6IBitStreamOBitImpl;
-
-	struct M6IBitStreamImpl
-	{
-						M6IBitStreamImpl(size_t inSize);
-		virtual			~M6IBitStreamImpl() {}
-		
-		void			Reference();
-		void			Release();
-
-		void			Get(uint8& outByte);
-		
-		int64			mSize;
-		int64			mByteOffset;
-		
-	  protected:
-		virtual void	Read() = 0;
-
-		uint8*			mBufferPtr;
-		int64			mBufferSize;
-		int32			mRefCount;
-	};
 
   private:
 
@@ -207,19 +229,54 @@ void CopyBits(M6OBitStream& inBits, const M6OBitStream& inValue);
 // --------------------------------------------------------------------
 //	Arrays are a bit more complex
 
-//template<class T> void WriteArray(M6OBitStream& inBits, T& inArray, int64 inMax);
-//template<class T> void ReadArray(M6IBitStream& inBits, T& outArray, int64 inMax);
+void WriteArray(M6OBitStream& inBits, std::vector<uint32>& inArray);
+void ReadArray(M6OBitStream& inBits, std::vector<uint32>& outArray);
 
-//class M6CompressedArrayIterator
-//{
-//  public:
-//				M6CompressedArrayIterator(M6OBitStream& inBits);
-//				~M6CompressedArrayIterator();
-//	bool		Next(uint32& outValue);
-//};
+void CompressSimpleArraySelector(M6OBitStream& inBits, const std::vector<uint32>& inArray);
 
-void WriteArray(M6OBitStream& inBits, std::vector<uint32>& inArray, int64 inMax);
-void ReadArray(M6OBitStream& inBits, std::vector<uint32>& outArray, int64 inMax);
+class M6CompressedArray
+{
+  public:
+				M6CompressedArray(M6IBitStream& inBits, uint32 inLength);
+	
+	struct const_iterator : public std::iterator<std::forward_iterator_tag, const uint32>
+	{
+		typedef std::iterator<std::forward_iterator_tag, const uint32>	base_type;
+		typedef base_type::reference									reference;
+		typedef base_type::pointer										pointer;
+		
+						const_iterator();
+						const_iterator(const const_iterator& iter);
+						const_iterator(M6IBitStream* inBits, uint32 inCount);
+		const_iterator&	operator=(const const_iterator& iter);
+
+		reference		operator*() const								{ return mCurrent; }
+		pointer			operator->() const								{ return &mCurrent; }
+
+		const_iterator&	operator++();
+		const_iterator	operator++(int)									{ const_iterator iter(*this); operator++(); return iter; }
+
+		bool			operator==(const const_iterator& iter) const	{ return mBits == iter.mBits and mCount == iter.mCount; }
+		bool			operator!=(const const_iterator& iter) const	{ return not operator==(iter); }
+
+	  private:
+		M6IBitStream*	mBits;
+		uint32			mCount;
+		int32			mWidth;
+		uint32			mSpan;
+		uint32			mCurrent;
+	};
+	
+	const_iterator		begin() const;
+	const_iterator		end() const;
+	
+	uint32				size() const;
+	bool				empty() const;
+
+  private:
+	M6IBitStream		mBits;
+	uint32				mSize;
+};
 
 //class M6CompressedWeightArrayIterator
 //{
@@ -261,7 +318,7 @@ inline M6OBitStream& M6OBitStream::operator<<(bool inBit)
 
 // --------------------------------------------------------------------
 
-inline void M6IBitStream::M6IBitStreamImpl::Get(uint8& outByte)
+inline void M6IBitStreamImpl::Get(uint8& outByte)
 {
 	if (mBufferSize <= 0)
 		Read();
@@ -296,6 +353,3 @@ inline int M6IBitStream::operator()()
 	
 	return result;
 }
-
-// --------------------------------------------------------------------
-

@@ -38,18 +38,24 @@ BOOST_AUTO_TEST_CASE(test_bit_stream_2)
 
 	M6OBitStream bits;
 	
-	WriteArray(bits, a, 1000);
+	CompressSimpleArraySelector(bits, a);
 	
+	cout << "bitsize: " << bits.Size() << endl;
+
 //	bits.Sync();
 //	
 	M6IBitStream ibits(bits);
-	//
-	//foreach (uint32 i, a)
-	//{
-	//	uint32 v;
-	//	ReadGamma(ibits, v);
-	//	BOOST_CHECK_EQUAL(i, v);
-	//}
+	M6CompressedArray arr(ibits, 1000);
+	
+	auto ai = a.begin();
+	auto bi = arr.begin();
+
+	for (int i = 0; i < 1000; ++i)
+	{
+		BOOST_CHECK_EQUAL(*ai, *bi);
+		++ai;
+		++bi;
+	}
 
 	M6OBitStream b2;
 	CopyBits(b2, bits);

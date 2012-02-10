@@ -32,7 +32,8 @@ enum M6IndexPageType : uint8
 	eM6IndexBranchPage			= 'b',
 	eM6IndexSimpleLeafPage		= 'l',
 	eM6IndexMultiLeafPage		= 'm',
-	eM6IndexMultiIDLLeafPage	= 'i'
+	eM6IndexMultiIDLLeafPage	= 'i',
+	eM6IndexBitVectorPage		= 'v'
 };
 
 struct M6IndexPageHeader
@@ -2201,6 +2202,8 @@ M6MultiBasicIndex::M6MultiBasicIndex(const string& inPath, MOpenMode inMode)
 
 void M6MultiBasicIndex::Insert(const string& inKey, const vector<uint32>& inDocuments)
 {
+	M6MultiData data = { inDocuments.size(), inDocuments.front() };
+	static_cast<M6IndexImplT<M6MultiData>*>(mImpl)->Insert(inKey, data);
 }
 
 bool M6MultiBasicIndex::Find(const string& inKey, iterator& outIterator)
@@ -2217,6 +2220,8 @@ M6MultiIDLBasicIndex::M6MultiIDLBasicIndex(const string& inPath, MOpenMode inMod
 
 void M6MultiIDLBasicIndex::Insert(const string& inKey, int64 inIDLOffset, const vector<uint32>& inDocuments)
 {
+	M6MultiIDLData data = { inDocuments.size(), 0, inIDLOffset };
+	static_cast<M6IndexImplT<M6MultiIDLData>*>(mImpl)->Insert(inKey, data);
 }
 
 bool M6MultiIDLBasicIndex::Find(const string& inKey, multi_iterator& outIterator, int64& outIDLOffset)
@@ -2233,6 +2238,8 @@ M6WeightedBasicIndex::M6WeightedBasicIndex(const string& inPath, MOpenMode inMod
 
 void M6WeightedBasicIndex::Insert(const string& inKey, const vector<pair<uint32,uint8>>& inDocuments)
 {
+	M6MultiData data = { inDocuments.size() };
+	static_cast<M6IndexImplT<M6MultiData>*>(mImpl)->Insert(inKey, data);
 }
 
 bool M6WeightedBasicIndex::Find(const string& inKey, weighted_iterator& outIterator)

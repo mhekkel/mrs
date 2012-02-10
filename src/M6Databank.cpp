@@ -241,7 +241,7 @@ void M6FullTextIx::FlushDoc(uint32 inDoc)
 		{
 			DocLoc& loc = const_cast<DocLoc&>(w->loc);
 			assert(e.idl.BitSize() == 0);
-			WriteArray(e.idl, loc, kMaxInDocumentLocation);
+			WriteArray(e.idl, loc);
 		}
 
 		mEntries.PushBack(e);

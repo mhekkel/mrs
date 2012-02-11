@@ -284,8 +284,6 @@ void M6FullTextIx::BufferEntryWriter::WriteSortedRun(M6FileStream& inFile, const
 	for (uint32 i = 0; i < inCount; ++i)
 	{
 		assert(inValues[i].term > t or inValues[i].doc > d or inValues[i].ix > ix);
-		
-cout << inValues[i] << endl;
 
 		if (inValues[i].term > t)
 			d = mFirstDoc;
@@ -849,7 +847,7 @@ void M6BatchIndexProcessor::IndexValue(const string& inIndexName,
 		}
 
 		mLexicon.LockUnique();
-		uint32 t = mLexicon.Lookup(inValue);
+		uint32 t = mLexicon.Store(inValue);
 		mLexicon.UnlockUnique();
 		
 		index->AddWord(t);
@@ -897,8 +895,6 @@ void M6BatchIndexProcessor::Finish(uint32 inDocCount)
 
 	do
 	{
-cout << ie << endl;
-
 		++entriesRead;
 	
 //		if (inProgress != nullptr and (entriesRead % 1000000) == 0)

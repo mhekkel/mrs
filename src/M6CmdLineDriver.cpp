@@ -1,5 +1,7 @@
 #include "M6Lib.h"
 
+#include <iostream>
+
 #include <boost/program_options.hpp>
 #include <boost/filesystem/operations.hpp>
 

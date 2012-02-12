@@ -405,6 +405,7 @@ void M6BasicIx::AddWord(uint32 inWord)
 void M6BasicIx::SetDbDocCount(uint32 inDbDocCount)
 {
 	mDbDocCount = inDbDocCount;
+	mLastDoc = 0;
 	mLastTerm = 0;
 }
 

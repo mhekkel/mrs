@@ -90,10 +90,8 @@ class M6BasicIndex
 	uint32			size() const;
 	uint32			depth() const;
 
-#if DEBUG
 	void			dump() const;
 	void			validate() const;
-#endif
 
   protected:
 					M6BasicIndex(M6IndexImpl* inImpl);
@@ -233,7 +231,7 @@ class M6WeightedBasicIndex : public M6BasicIndex
 		bool		next(uint32& outDocNr, uint8& outFrequency);
 	};
 	
-	void			Insert(const std::string& inKey, const std::vector<std::pair<uint32,uint8>>& inDocuments);
+	void			Insert(const std::string& inKey, std::vector<std::pair<uint32,uint8>>& inDocuments);
 	bool			Find(const std::string& inKey, weighted_iterator& outIterator);
 };
 

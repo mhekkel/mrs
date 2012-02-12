@@ -12,6 +12,10 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libzeep", "libzeep\libzeep.vcxproj", "{8DB71094-266D-4B6B-8076-0F58A3944F4B}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "m6-cmd", "m6-cmd\m6-cmd.vcxproj", "{9E5E7747-2076-4E8C-8DCE-71C09ADD1B06}"
+	ProjectSection(ProjectDependencies) = postProject
+		{FC2A9881-F33D-4A44-A29D-D7A9F023A0DD} = {FC2A9881-F33D-4A44-A29D-D7A9F023A0DD}
+		{8DB71094-266D-4B6B-8076-0F58A3944F4B} = {8DB71094-266D-4B6B-8076-0F58A3944F4B}
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -45,10 +49,12 @@ Global
 		{8DB71094-266D-4B6B-8076-0F58A3944F4B}.Release|x64.Build.0 = Release|x64
 		{9E5E7747-2076-4E8C-8DCE-71C09ADD1B06}.Debug|Win32.ActiveCfg = Debug|Win32
 		{9E5E7747-2076-4E8C-8DCE-71C09ADD1B06}.Debug|Win32.Build.0 = Debug|Win32
-		{9E5E7747-2076-4E8C-8DCE-71C09ADD1B06}.Debug|x64.ActiveCfg = Debug|Win32
+		{9E5E7747-2076-4E8C-8DCE-71C09ADD1B06}.Debug|x64.ActiveCfg = Debug|x64
+		{9E5E7747-2076-4E8C-8DCE-71C09ADD1B06}.Debug|x64.Build.0 = Debug|x64
 		{9E5E7747-2076-4E8C-8DCE-71C09ADD1B06}.Release|Win32.ActiveCfg = Release|Win32
 		{9E5E7747-2076-4E8C-8DCE-71C09ADD1B06}.Release|Win32.Build.0 = Release|Win32
-		{9E5E7747-2076-4E8C-8DCE-71C09ADD1B06}.Release|x64.ActiveCfg = Release|Win32
+		{9E5E7747-2076-4E8C-8DCE-71C09ADD1B06}.Release|x64.ActiveCfg = Release|x64
+		{9E5E7747-2076-4E8C-8DCE-71C09ADD1B06}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

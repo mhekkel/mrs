@@ -540,7 +540,7 @@ const M6Selector kSelectors[16] = {
 };
 
 const uint32
-	kMaxWidth = 32, kStartWidth = 29;
+	kMaxWidth = 32, kStartWidth = kMaxWidth / 2;
 
 inline uint32 Select(int32 inBitsNeeded[], uint32 inCount,
 	int32 inWidth, const M6Selector inSelectors[])

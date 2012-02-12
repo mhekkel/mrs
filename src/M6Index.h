@@ -10,6 +10,7 @@
 #include "M6File.h"
 
 struct M6IndexImpl;
+class M6CompressedArray;
 
 extern const uint32 kM6MaxKeyLength;
 
@@ -182,15 +183,8 @@ class M6MultiBasicIndex : public M6BasicIndex
   public:
 					M6MultiBasicIndex(const std::string& inPath, MOpenMode inMode);
 
-	class multi_iterator
-	{
-	  public:
-		uint32		size() const;
-		bool		next(uint32& outDocNr);
-	};
-
 	void			Insert(const std::string& inKey, const std::vector<uint32>& inDocuments);
-	bool			Find(const std::string& inKey, iterator& outIterator);
+	bool			Find(const std::string& inKey, M6CompressedArray& outDocuments);
 };
 
 typedef M6Index<M6MultiBasicIndex, M6BasicComparator>	M6SimpleMultiIndex;
@@ -203,15 +197,8 @@ class M6MultiIDLBasicIndex : public M6BasicIndex
   public:
 					M6MultiIDLBasicIndex(const std::string& inPath, MOpenMode inMode);
 
-	class multi_iterator
-	{
-	  public:
-		uint32		size() const;
-		bool		next(uint32& outDocNr);
-	};
-
 	void			Insert(const std::string& inKey, int64 inIDLOffset, const std::vector<uint32>& inDocuments);
-	bool			Find(const std::string& inKey, multi_iterator& outIterator, int64& outIDLOffset);
+	bool			Find(const std::string& inKey, M6CompressedArray& outDocuments, int64& outIDLOffset);
 };
 
 typedef M6Index<M6MultiIDLBasicIndex, M6BasicComparator>	M6SimpleIDLMultiIndex;

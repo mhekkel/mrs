@@ -41,6 +41,7 @@ class M6OBitStream
 	//
 
 	M6OBitStream&		operator<<(bool inBit);
+	const uint8*		Peek() const;
 	void				Sync();
 	size_t				Size() const;
 	bool				Empty() const		{ return BitSize() == 0; }
@@ -81,15 +82,13 @@ namespace std {
 
 struct M6IBitStreamImpl
 {
-					M6IBitStreamImpl(size_t inSize)
-						: mSize(inSize), mByteOffset(0), mBufferPtr(nullptr), mBufferSize(0)
+					M6IBitStreamImpl()
+						: mBufferPtr(nullptr), mBufferSize(0)
 					{
-						if (inSize > 0)
-							mSize *= 8;		// size is for bits 
 					}
 					
 					M6IBitStreamImpl(const M6IBitStreamImpl& inImpl)
-						: mSize(inImpl.mSize), mByteOffset(inImpl.mByteOffset), mBufferPtr(inImpl.mBufferPtr), mBufferSize(inImpl.mBufferSize)
+						: mBufferPtr(inImpl.mBufferPtr), mBufferSize(inImpl.mBufferSize)
 					{
 					}
 
@@ -98,9 +97,6 @@ struct M6IBitStreamImpl
 					Clone() = 0;
 
 	void			Get(uint8& outByte);
-	
-	int64			mSize;
-	int64			mByteOffset;
 	
   protected:
 	virtual void	Read() = 0;
@@ -113,6 +109,7 @@ class M6IBitStream
 {
   public:
 						M6IBitStream();
+						M6IBitStream(M6IBitStreamImpl* inImpl);
 						M6IBitStream(M6File& inFile, int64 inOffset);
 						M6IBitStream(const M6IBitStream& inBits);
 	explicit			M6IBitStream(const M6OBitStream& inBits);
@@ -122,11 +119,9 @@ class M6IBitStream
 	// 
 	
 	int					operator()();
-	void				Sync();
-	bool				Eof() const					{ return mImpl == nullptr or (7 - mBitOffset) >= (8 + mImpl->mSize); }
+//	void				Sync();
 	void				Underflow();
-	size_t				BytesRead() const			{ return mImpl ? mImpl->mByteOffset : 0; }
-	void				Skip(uint32 inBits);
+//	void				Skip(uint32 inBits);
 	
 	friend void ReadBits(M6IBitStream& inBits, M6OBitStream& outValue);
 	friend void WriteBits(M6OBitStream& inBits, const M6OBitStream& inValue);
@@ -250,7 +245,11 @@ void CompressSimpleArraySelector(M6OBitStream& inBits, const std::vector<uint32>
 class M6CompressedArray
 {
   public:
+				M6CompressedArray();
+				M6CompressedArray(const M6CompressedArray& inArray);
 				M6CompressedArray(const M6IBitStream& inBits, uint32 inLength);
+	M6CompressedArray&
+				operator=(const M6CompressedArray& inArray);
 	
 	struct const_iterator : public std::iterator<std::forward_iterator_tag, const uint32>
 	{
@@ -329,8 +328,6 @@ inline void M6IBitStreamImpl::Get(uint8& outByte)
 	if (mBufferSize > 0)
 	{
 		outByte = *mBufferPtr++;
-		mSize -= 8;
-		++mByteOffset;
 		--mBufferSize;
 	}
 	else
@@ -339,11 +336,8 @@ inline void M6IBitStreamImpl::Get(uint8& outByte)
 
 inline void M6IBitStream::Underflow()
 {
-	if (not Eof())
-	{
-		mImpl->Get(mByte);
-		mBitOffset = 7;
-	}
+	mImpl->Get(mByte);
+	mBitOffset = 7;
 }
 
 inline int M6IBitStream::operator()()

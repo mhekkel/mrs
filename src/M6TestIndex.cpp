@@ -17,6 +17,7 @@
 #include "M6Index.h"
 #include "M6Tokenizer.h"
 #include "M6Error.h"
+#include "M6BitStream.h"
 
 #include <boost/test/unit_test.hpp>
 
@@ -638,5 +639,43 @@ BOOST_AUTO_TEST_CASE(file_ix_6)
 	
 	indx.validate();
 //	indx.dump();
+}
+
+BOOST_AUTO_TEST_CASE(file_ix_6a)
+{
+	cout << "test vector version" << endl;
+
+	ifstream text("test/test-doc-2.txt");
+	BOOST_REQUIRE(text.is_open());
+
+	M6SimpleMultiIndex indx(filename, eReadOnly);
+	indx.validate();
+
+	uint32 nr = 1;
+	for (;;)
+	{
+		string word;
+		text >> word;
+
+		vector<uint32> loc(100);
+		iota(loc.begin(), loc.end(), nr);
+
+		if (word.empty() and text.eof())
+			break;
+
+		ba::to_lower(word);
+		
+		M6CompressedArray docs;
+		BOOST_CHECK(indx.Find(word, docs));
+		
+		auto i = docs.begin();
+		auto j = loc.begin();
+		while (i != docs.end() and j != loc.end())
+			BOOST_CHECK_EQUAL(*i++, *j++);
+		BOOST_CHECK(i == docs.end());
+		BOOST_CHECK(j == loc.end()); 
+
+		++nr;
+	}
 }
 

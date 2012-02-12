@@ -48,13 +48,13 @@ struct M6IndexPageHeader
 
 const uint32
 	kM6MaxKeyLength			= 255,
-	kM6IndexPageSize		= 8192,
-//	kM6IndexPageSize		= 256,
+//	kM6IndexPageSize		= 8192,
+	kM6IndexPageSize		= 256,
 	kM6IndexPageHeaderSize	= sizeof(M6IndexPageHeader),
 	kM6KeySpace				= kM6IndexPageSize - kM6IndexPageHeaderSize,
 	kM6MinKeySpace			= kM6KeySpace / 2,
-//	kM6MaxEntriesPerPage	= 4;
-	kM6MaxEntriesPerPage	= kM6KeySpace / 8;	// see above
+	kM6MaxEntriesPerPage	= 4;
+//	kM6MaxEntriesPerPage	= kM6KeySpace / 8;	// see above
 
 template<M6IndexPageType>
 struct M6IndexPageDataTraits {};
@@ -187,11 +187,12 @@ struct M6IxFileHeader
 	uint32		mSize;
 	uint32		mDepth;
 	uint32		mRoot;
+	uint32		mLastBitsPage;
 
 	template<class Archive>
 	void serialize(Archive& ar)
 	{
-		ar & mSignature & mHeaderSize & mSize & mRoot & mDepth;
+		ar & mSignature & mHeaderSize & mSize & mDepth & mRoot & mLastBitsPage;
 	}
 };
 
@@ -220,6 +221,10 @@ class M6BasicPage
 	bool		IsDirty() const					{ return mDirty; }
 	void		SetDirty(bool inDirty)			{ mDirty = inDirty; }
 
+	uint32		GetN() const					{ return mData->mN; }
+	void		SetLink(uint32 inLink)			{ mData->mLink = inLink; mDirty = true; }
+	uint32		GetLink() const					{ return mData->mLink; }
+
   protected:
 	M6IndexImpl&		mIndexImpl;
 	M6IndexPageHeader*	mData;
@@ -241,6 +246,8 @@ class M6IndexLeafPage;
 template<class M6DataType>
 class M6IndexBranchPage;
 
+class M6IndexBitVectorPage;
+
 // --------------------------------------------------------------------
 
 struct M6IndexImpl
@@ -249,6 +256,8 @@ struct M6IndexImpl
 //					M6IndexImpl(M6BasicIndex& inIndex, const string& inPath,
 //						M6SortedInputIterator& inData);
 	virtual 		~M6IndexImpl();
+
+	void			StoreBits(M6OBitStream& inBits, uint8 outBitVector[20]);
 
 	//iterator		Begin();
 	//iterator		End();
@@ -282,7 +291,12 @@ struct M6IndexImpl
 	template<class PageType>
 	PageType*		Load(uint32 inPageNr);
 	template<class PageType>
-	void			Release(PageType*& inPage);
+	void			Reference(PageType* inPage);
+	template<class PageType>
+	void			Release(PageType*& ioPage);
+	
+	M6IndexBitVectorPage*
+					LoadBitPage(uint32 inPageNr);
 	
   protected:
 
@@ -420,13 +434,9 @@ class M6IndexPage : public M6BasicPage
 	  
 	bool			IsLeaf() const					{ return mData->mType != eM6IndexBranchPage; }
 	
-	uint32			GetN() const					{ return mData->mN; }
 	virtual uint32	Free() const = 0;
 	virtual bool	CanStore(const string& inKey) const = 0;
 
-	void			SetLink(uint32 inLink)			{ mData->mLink = inLink; mDirty = true; }
-	uint32			GetLink() const					{ return mData->mLink; }
-	
 	bool			TooSmall() const				{ return Free() > kM6MinKeySpace; }
 
 	virtual bool	Find(const string& inKey, M6DataType& outValue) = 0;
@@ -1237,54 +1247,119 @@ bool M6IndexLeafPage<M6DataType>::Underflow(M6IndexPageType& inRight, uint32 inI
 
 // --------------------------------------------------------------------
 
-//class M6IndexBitVectorPage
-//{
-//  public:
-//				M6IndexBitVectorPage(M6IndexImpl& inIndexImpl, M6IndexPageData* inData, uint32 inPageNr);
-//	
-//	
-//	void		StoreBitVector(const* void inBits, size_t inSize,
-//					uint8 outDataElement[20]);
-//	
-//	
-//	
-//	
-//  private:
-//	M6IndexBitVectorPageData&	mPageData;
-//};
-//
-//struct M6IBitVectorImpl : public M6IBitStreamImpl
-//{
-//					M6IBitVectorImpl(M6IndexImpl& inIndex, const uint8 inData[]);
-//					M6IBitVectorImpl(const M6IBitVectorImpl& inImpl);
-//					~M6IBitVectorImpl();
-//	
-//	virtual M6IBitStreamImpl*	Clone()		{ return new M6IBitStreamImpl(*this); }
-//	virtual void				Read();
-//
-//  private:
-//	M6IndexImpl&				mIndex;
-//	M6IndexBitVectorPage*		mPage;
-//};
-//
-//M6IBitVectorImpl::M6IBitVectorImpl(M6IndexImpl& inIndex, const uint8 inData[])
-//{
-//}
-//
-//M6IBitVectorImpl::M6IBitVectorImpl(const M6IBitVectorImpl& inImpl)
-//{
-//}
-//
-//M6IBitVectorImpl::~M6IBitVectorImpl()
-//{
-//	if (mPage != nullptr)
-//		mIndex.Release(mPage);
-//}
-//
-//void M6IBitVectorImpl::Read()
-//{
-//	
-//}
+class M6IndexBitVectorPage : public M6BasicPage
+{
+  public:
+				M6IndexBitVectorPage(M6IndexImpl& inIndexImpl, M6IndexPageData* inData, uint32 inPageNr)
+					: M6BasicPage(inIndexImpl, inData, inPageNr)
+					, mPageData(inData->bit_vector)
+				{
+					mDirty = true;
+					mPageData.mType = M6IndexBitVectorPageData::kIndexPageType;
+				}
+	
+	uint32		StoreBitVector(const uint8* inData, size_t inSize);
+
+	uint8*		GetData(uint32 inOffset)		{ return mPageData.mBits + inOffset; }
+	
+  private:
+	M6IndexBitVectorPageData&	mPageData;
+};
+
+uint32 M6IndexBitVectorPage::StoreBitVector(const uint8* inData, size_t inSize)
+{
+	size_t result = kM6KeySpace - mPageData.mN;
+	if (result > inSize)
+		result = inSize;
+	
+	memcpy(mPageData.mBits + mPageData.mN, inData, result);
+
+	mPageData.mN += static_cast<uint16>(result);
+	mDirty = true;
+
+	return static_cast<uint32>(result);
+}
+	
+struct M6IBitVectorImpl : public M6IBitStreamImpl
+{
+					M6IBitVectorImpl(M6IndexImpl& inIndex, const uint8 inData[]);
+					M6IBitVectorImpl(M6IndexImpl& inIndex, uint32 inPageNr, uint32 inPageOffset);
+					M6IBitVectorImpl(const M6IBitVectorImpl& inImpl);
+					~M6IBitVectorImpl();
+
+	M6IBitVectorImpl&
+					operator=(const M6IBitVectorImpl&);
+	
+	virtual M6IBitStreamImpl*	Clone()		{ return new M6IBitVectorImpl(*this); }
+	virtual void				Read();
+
+  private:
+	M6IndexImpl&	mIndex;
+	uint32			mPageNr;
+	uint32			mOffset;
+	uint8			mData[20];
+	M6IndexBitVectorPage*
+					mPage;
+};
+
+M6IBitVectorImpl::M6IBitVectorImpl(M6IndexImpl& inIndex, const uint8 inData[])
+	: mIndex(inIndex)
+	, mPageNr(0)
+	, mOffset(0)
+	, mPage(nullptr)
+{
+	memcpy(mData, inData, sizeof(mData));
+	
+	mBufferPtr = mData + 1;
+	mBufferSize = sizeof(mData) - 1;
+}
+
+M6IBitVectorImpl::M6IBitVectorImpl(M6IndexImpl& inIndex, uint32 inPageNr, uint32 inPageOffset)
+	: mIndex(inIndex)
+	, mPageNr(inPageNr)
+	, mOffset(inPageOffset)
+	, mPage(nullptr)
+{
+	Read();
+}
+
+M6IBitVectorImpl::M6IBitVectorImpl(const M6IBitVectorImpl& inImpl)
+	: M6IBitStreamImpl(inImpl)
+	, mIndex(inImpl.mIndex)
+	, mPageNr(inImpl.mPageNr)
+	, mOffset(inImpl.mOffset)
+	, mPage(inImpl.mPage)
+{
+	if (mPage != nullptr)
+		mIndex.Reference(mPage);
+	else
+		memcpy(mData, inImpl.mData, sizeof(mData));
+}
+
+M6IBitVectorImpl::~M6IBitVectorImpl()
+{
+	if (mPage != nullptr)
+		mIndex.Release(mPage);
+}
+
+void M6IBitVectorImpl::Read()
+{
+	if (mPage != nullptr)
+	{
+		mIndex.Release(mPage);
+		mPage = nullptr;
+	}
+	
+	if (mPageNr != 0)
+	{
+		mPage = mIndex.LoadBitPage(mPageNr);
+		mBufferPtr = mPage->GetData(mOffset);
+		mBufferSize = kM6KeySpace - mOffset;
+		
+		mPageNr = mPage->GetLink();
+		mOffset = 0;
+	}
+}
 
 // --------------------------------------------------------------------
 
@@ -1312,6 +1387,58 @@ M6IndexImpl::M6IndexImpl(M6BasicIndex& inIndex, const string& inPath, MOpenMode 
 	assert(mHeader.mHeaderSize == sizeof(M6IxFileHeader));
 }
 
+void M6IndexImpl::StoreBits(M6OBitStream& inBits, uint8 outBitVector[20])
+{
+	inBits.Sync();
+	const uint8* data = inBits.Peek();
+	size_t size = inBits.Size();
+
+	if (size < 20)
+	{
+		outBitVector[0] = 0x80;
+		memcpy(outBitVector + 1, data, size);
+	}
+	else
+	{
+		M6IndexBitVectorPage* page;
+		if (mHeader.mLastBitsPage == 0)
+		{
+			page = Allocate<M6IndexBitVectorPage>();
+			mHeader.mLastBitsPage = page->GetPageNr();
+		}
+		else
+			page = LoadBitPage(mHeader.mLastBitsPage);
+	
+		memset(outBitVector, 0, sizeof(outBitVector));
+		
+		uint32 pageNr = page->GetPageNr();
+		for (int i = 1; i <= 4; ++i)
+			outBitVector[i] = (pageNr >> ((4 - i) * 8));
+		
+		uint32 offset = page->GetN();
+		for (int i = 5; i <= 9; ++i)
+			outBitVector[i] = (offset >> ((9 - i) * 8));
+		
+		for (;;)
+		{
+			uint32 n = page->StoreBitVector(data, size);
+			
+			data += n;
+			size -= n;
+			
+			if (size == 0)
+				break;
+			
+			M6IndexBitVectorPage* next = Allocate<M6IndexBitVectorPage>();
+			mHeader.mLastBitsPage = next->GetPageNr();
+			page->SetLink(mHeader.mLastBitsPage);
+			Release(page);
+			page = next;
+		}
+		Release(page);
+	}
+}
+
 void M6IndexImpl::InitCache()
 {
 	mCacheCount = kM6CacheCount;
@@ -1337,7 +1464,7 @@ M6IndexImpl::M6CachedPagePtr M6IndexImpl::GetCachePage()
 	
 	// now search backwards for a cached page that can be recycled
 	uint32 n = 0;
-	while (result != nullptr and result->mRefCount > 1)
+	while (result != nullptr and result->mRefCount > 0)
 	{
 		result = result->mPrev;
 		++n;
@@ -1448,7 +1575,6 @@ Page* M6IndexImpl::Load(uint32 inPageNr)
 			case eM6IndexSimpleLeafPage:
 			case eM6IndexMultiLeafPage:
 			case eM6IndexMultiIDLLeafPage:	page = dynamic_cast<Page*>(CreateLeafPage(data, inPageNr)); break;
-//			case eM6IndexBitVectorPage:		page = new M6IndexBitVectorPage(*this, data, inPageNr); break;
 			default:						THROW(("Invalid index type in load"));
 		}
 
@@ -1469,6 +1595,37 @@ Page* M6IndexImpl::Load(uint32 inPageNr)
 	return result;
 }
 
+M6IndexBitVectorPage* M6IndexImpl::LoadBitPage(uint32 inPageNr)
+{
+	if (inPageNr == 0)
+		THROW(("Invalid page number"));
+
+	M6CachedPagePtr cp = mLRUHead;
+	while (cp != nullptr and cp->mPageNr != inPageNr)
+		cp = cp->mNext; 
+
+	if (cp == nullptr)
+	{
+		M6IndexPageData* data = new M6IndexPageData;
+		mFile.PRead(data, kM6IndexPageSize, inPageNr * kM6IndexPageSize);
+
+		if (data->leaf.mType != eM6IndexBitVectorPage)
+			THROW(("Invalid index type in load"));
+		
+		cp = GetCachePage();
+		cp->mPage = new M6IndexBitVectorPage(*this, data, inPageNr);
+		cp->mPageNr = inPageNr;
+		cp->mRefCount = 0;
+	}
+
+	cp->mRefCount += 1;
+	
+	M6IndexBitVectorPage* result = dynamic_cast<M6IndexBitVectorPage*>(cp->mPage);
+	if (result == nullptr)
+		THROW(("Error loading cache page"));
+	return result;
+}
+
 template<class Page>
 void M6IndexImpl::Release(Page*& ioPage)
 {
@@ -1484,6 +1641,21 @@ void M6IndexImpl::Release(Page*& ioPage)
 	cp->mRefCount -= 1;
 	
 	ioPage = nullptr;
+}
+
+template<class Page>
+void M6IndexImpl::Reference(Page* inPage)
+{
+	assert(inPage != nullptr);
+	
+	M6CachedPagePtr cp = mLRUHead;
+	while (cp != nullptr and cp->mPage != inPage)
+		cp = cp->mNext;
+	
+	if (cp == nullptr)
+		THROW(("Invalid page in Release"));
+	
+	cp->mRefCount += 1;
 }
 
 //M6IndexImpl::M6IndexImpl(M6BasicIndex& inIndex, const string& inPath,
@@ -2209,15 +2381,37 @@ void M6MultiBasicIndex::Insert(const string& inKey, const vector<uint32>& inDocu
 	
 	M6OBitStream bits;
 	CompressSimpleArraySelector(bits, inDocuments);
-	
-	cout << inDocuments.size() << '\t' << bits.BitSize() << '\t' << inDocuments.front() << '\t' << inKey << endl;
+	mImpl->StoreBits(bits, data.mBitVector);
 	
 	static_cast<M6IndexImplT<M6MultiData>*>(mImpl)->Insert(inKey, data);
 }
 
-bool M6MultiBasicIndex::Find(const string& inKey, iterator& outIterator)
+bool M6MultiBasicIndex::Find(const string& inKey, M6CompressedArray& outDocuments)
 {
-	return false;
+	bool result = false;
+	M6MultiData data;
+	if (static_cast<M6IndexImplT<M6MultiData>*>(mImpl)->Find(inKey, data))
+	{
+		if (data.mBitVector[0] == 0)
+		{
+			uint32 page = 0, offset = 0;
+			for (int i = 1; i <= 4; ++i)
+				page = page << 8 | data.mBitVector[i];
+			for (int i = 5; i <= 9; ++i)
+				offset = offset << 8 | data.mBitVector[i];
+			
+			M6IBitStream bits(new M6IBitVectorImpl(*mImpl, page, offset));
+			outDocuments = M6CompressedArray(bits, data.mCount);
+		}
+		else
+		{
+			M6IBitStream bits(new M6IBitVectorImpl(*mImpl, data.mBitVector));
+			outDocuments = M6CompressedArray(bits, data.mCount);
+		}
+		
+		result = true;
+	}
+	return result;
 }
 
 // --------------------------------------------------------------------
@@ -2233,13 +2427,12 @@ void M6MultiIDLBasicIndex::Insert(const string& inKey, int64 inIDLOffset, const 
 
 	M6OBitStream bits;
 	CompressSimpleArraySelector(bits, inDocuments);
-	
-	cout << inDocuments.size() << '\t' << bits.BitSize() << '\t' << inDocuments.front() << '\t' << inKey << endl;
+	mImpl->StoreBits(bits, data.mBitVector);
 
 	static_cast<M6IndexImplT<M6MultiIDLData>*>(mImpl)->Insert(inKey, data);
 }
 
-bool M6MultiIDLBasicIndex::Find(const string& inKey, multi_iterator& outIterator, int64& outIDLOffset)
+bool M6MultiIDLBasicIndex::Find(const string& inKey, M6CompressedArray& outDocuments, int64& outIDLOffset)
 {
 	return false;
 }
@@ -2293,7 +2486,7 @@ void M6WeightedBasicIndex::Insert(const string& inKey, vector<pair<uint32,uint8>
 		}
 	}
 
-	cout << inDocuments.size() << '\t' << bits.BitSize() << '\t' << inDocuments.front().first << '\t' << inKey << endl;
+	mImpl->StoreBits(bits, data.mBitVector);
 
 	static_cast<M6IndexImplT<M6MultiData>*>(mImpl)->Insert(inKey, data);
 }

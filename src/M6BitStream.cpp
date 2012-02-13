@@ -230,6 +230,7 @@ struct M6IBitStreamFileImpl : public M6IBitStreamImpl
 					M6IBitStreamFileImpl(const M6IBitStreamFileImpl& inImpl);
 
 	virtual void	Read();
+
 	virtual M6IBitStreamImpl*
 					Clone()					{ return new M6IBitStreamFileImpl(*this); }
 
@@ -332,10 +333,12 @@ M6IBitStream::M6IBitStream(const M6OBitStream& inData)
 }
 
 M6IBitStream::M6IBitStream(const M6IBitStream& inStream)
-	: mImpl(inStream.mImpl->Clone())
+	: mImpl(inStream.mImpl)
 	, mBitOffset(inStream.mBitOffset)
 	, mByte(inStream.mByte)
 {
+	if (mImpl != nullptr)
+		mImpl = mImpl->Clone();
 }
 
 M6IBitStream& M6IBitStream::operator=(const M6IBitStream& inStream)
@@ -343,7 +346,9 @@ M6IBitStream& M6IBitStream::operator=(const M6IBitStream& inStream)
 	if (this != &inStream)
 	{
 		delete mImpl;
-		mImpl = inStream.mImpl->Clone();
+		mImpl = inStream.mImpl;
+		if (mImpl != nullptr)
+			mImpl = mImpl->Clone();
 		mBitOffset = inStream.mBitOffset;
 		mByte = inStream.mByte;
 	}
@@ -626,43 +631,15 @@ M6CompressedArray& M6CompressedArray::operator=(const M6CompressedArray& inArray
 	return *this;
 }
 
-M6CompressedArray::const_iterator::const_iterator()
-	: mCount(0), mWidth(0), mSpan(0), mCurrent(0)
-{
-}
-
-M6CompressedArray::const_iterator::const_iterator(const M6CompressedArray* inArray, const M6IBitStream& inBits, uint32 inLength)
-	: mArray(inArray), mBits(inBits), mCount(inLength), mWidth(kStartWidth), mSpan(0), mCurrent(0)
+M6CompressedArray::const_iterator::const_iterator(const M6IBitStream& inBits, uint32 inLength)
+	: mBits(inBits), mCount(inLength), mWidth(kStartWidth), mSpan(0), mCurrent(0)
 {
 	operator++();
 }
 
-M6CompressedArray::const_iterator::const_iterator(const const_iterator& iter)
-	: mBits(iter.mBits)
-	, mCount(iter.mCount)
-	, mWidth(iter.mWidth)
-	, mSpan(iter.mSpan)
-	, mCurrent(iter.mCurrent)
-{
-}
-
-M6CompressedArray::const_iterator& M6CompressedArray::const_iterator::operator=(const const_iterator& iter)
-{
-	if (this != &iter)
-	{
-		mBits = iter.mBits;
-		mCount = iter.mCount;
-		mWidth = iter.mWidth;
-		mSpan = iter.mSpan;
-		mCurrent = iter.mCurrent;
-	}
-	
-	return *this;
-}
-
 M6CompressedArray::const_iterator& M6CompressedArray::const_iterator::operator++()
 {
-	if (mCount > 0)
+	if (mCount != sSentinel and mCount > 0)
 	{
 		if (mSpan == 0)
 		{
@@ -688,16 +665,8 @@ M6CompressedArray::const_iterator& M6CompressedArray::const_iterator::operator++
 		--mSpan;
 		--mCount;
 	}
-	
+	else
+		mCount = sSentinel;
+
 	return *this;
-}
-
-M6CompressedArray::const_iterator M6CompressedArray::begin() const
-{
-	return const_iterator(this, mBits, mSize);
-}
-
-M6CompressedArray::const_iterator M6CompressedArray::end() const
-{
-	return const_iterator(this, mBits, 0);
 }

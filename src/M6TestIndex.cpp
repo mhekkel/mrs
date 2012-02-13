@@ -672,7 +672,13 @@ BOOST_AUTO_TEST_CASE(file_ix_6a)
 		auto j = loc.begin();
 		while (i != docs.end() and j != loc.end())
 			BOOST_CHECK_EQUAL(*i++, *j++);
+
+		if (i != docs.end())
+			cout << "i: " << *i << endl;
 		BOOST_CHECK(i == docs.end());
+
+		if (j != loc.end())
+			cout << "j: " << *j << endl;
 		BOOST_CHECK(j == loc.end()); 
 
 		++nr;

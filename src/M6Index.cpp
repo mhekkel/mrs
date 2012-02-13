@@ -1254,7 +1254,6 @@ class M6IndexBitVectorPage : public M6BasicPage
 					: M6BasicPage(inIndexImpl, inData, inPageNr)
 					, mPageData(inData->bit_vector)
 				{
-					mDirty = true;
 					mPageData.mType = M6IndexBitVectorPageData::kIndexPageType;
 				}
 	

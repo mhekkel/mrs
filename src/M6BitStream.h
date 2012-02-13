@@ -93,8 +93,7 @@ struct M6IBitStreamImpl
 					}
 
 	// using Clone, we can make ibitstreams copy constructable.
-	virtual M6IBitStreamImpl*
-					Clone() = 0;
+	virtual M6IBitStreamImpl* Clone() = 0;
 
 	void			Get(uint8& outByte);
 	
@@ -259,7 +258,7 @@ class M6CompressedArray
 		
 						const_iterator();
 						const_iterator(const const_iterator& iter);
-						const_iterator(const M6CompressedArray* inArray, const M6IBitStream& inBits, uint32 inCount);
+						const_iterator(const M6IBitStream& inBits, uint32 inCount);
 		const_iterator&	operator=(const const_iterator& iter);
 
 		reference		operator*() const								{ return mCurrent; }
@@ -268,12 +267,12 @@ class M6CompressedArray
 		const_iterator&	operator++();
 		const_iterator	operator++(int)									{ const_iterator iter(*this); operator++(); return iter; }
 
-		bool			operator==(const const_iterator& iter) const	{ return mArray == iter.mArray and mCount == iter.mCount; }
+		bool			operator==(const const_iterator& iter) const	{ return mCount == iter.mCount; }
 		bool			operator!=(const const_iterator& iter) const	{ return not operator==(iter); }
 
 	  private:
-		const M6CompressedArray*
-						mArray;
+		static const uint32 sSentinel = ~0UL;
+
 		M6IBitStream	mBits;
 		uint32			mCount;
 		int32			mWidth;
@@ -349,4 +348,44 @@ inline int M6IBitStream::operator()()
 		Underflow();
 	
 	return result;
+}
+
+// --------------------------------------------------------------------
+
+inline M6CompressedArray::const_iterator::const_iterator()
+	: mCount(sSentinel), mWidth(0), mSpan(0), mCurrent(0)
+{
+}
+
+inline M6CompressedArray::const_iterator::const_iterator(const const_iterator& iter)
+	: mBits(iter.mBits)
+	, mCount(iter.mCount)
+	, mWidth(iter.mWidth)
+	, mSpan(iter.mSpan)
+	, mCurrent(iter.mCurrent)
+{
+}
+
+inline M6CompressedArray::const_iterator& M6CompressedArray::const_iterator::operator=(const const_iterator& iter)
+{
+	if (this != &iter)
+	{
+		mBits = iter.mBits;
+		mCount = iter.mCount;
+		mWidth = iter.mWidth;
+		mSpan = iter.mSpan;
+		mCurrent = iter.mCurrent;
+	}
+	
+	return *this;
+}
+
+inline M6CompressedArray::const_iterator M6CompressedArray::begin() const
+{
+	return const_iterator(mBits, mSize);
+}
+
+inline M6CompressedArray::const_iterator M6CompressedArray::end() const
+{
+	return const_iterator();
 }

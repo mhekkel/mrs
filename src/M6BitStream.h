@@ -283,8 +283,8 @@ class M6CompressedArray
 	const_iterator		begin() const;
 	const_iterator		end() const;
 	
-	uint32				size() const;
-	bool				empty() const;
+	uint32				size() const									{ return mSize; }
+	bool				empty() const									{ return mSize == 0; }
 
   private:
 	M6IBitStream		mBits;

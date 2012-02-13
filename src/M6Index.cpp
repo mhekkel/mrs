@@ -71,10 +71,40 @@ struct M6IndexPageDataTraits<eM6IndexSimpleLeafPage>
 	typedef uint32 M6DataElement;
 };
 
+const uint32
+	kM6BitVectorSize				= 20,
+	kM6BitVectorInlineBitsSize		= kM6BitVectorSize - 1,
+	kM6BitVectorLeadingBitsSize		= kM6BitVectorSize - 8;
+
+enum M6BitVectorType : uint8
+{
+	eM6InlineBitVector,
+	eM6OnDiskBitVector
+};
+
+union M6BitVector
+{
+	struct
+	{
+		M6BitVectorType	mType;
+		uint8			mFiller;
+		uint16			mOffset;
+		uint32			mPage;
+		uint8			mLeadingBits[kM6BitVectorLeadingBitsSize];
+	};
+	struct
+	{
+		uint8			mType2;
+		uint8			mBits[kM6BitVectorInlineBitsSize];
+	};
+};
+
+BOOST_STATIC_ASSERT(sizeof(M6BitVector) == kM6BitVectorSize);
+
 struct M6MultiData
 {
-	uint32	mCount;
-	uint8	mBitVector[20];
+	uint32			mCount;
+	M6BitVector		mBitVector;
 };
 
 ostream& operator<<(ostream& os, const M6MultiData& d)
@@ -91,9 +121,9 @@ struct M6IndexPageDataTraits<eM6IndexMultiLeafPage>
 
 struct M6MultiIDLData
 {
-	uint32	mCount;
-	uint8	mBitVector[20];
-	int64	mIDLOffset;
+	uint32			mCount;
+	M6BitVector		mBitVector;
+	int64			mIDLOffset;
 };
 
 ostream& operator<<(ostream& os, const M6MultiIDLData& d)
@@ -257,7 +287,7 @@ struct M6IndexImpl
 //						M6SortedInputIterator& inData);
 	virtual 		~M6IndexImpl();
 
-	void			StoreBits(M6OBitStream& inBits, uint8 outBitVector[20]);
+	void			StoreBits(M6OBitStream& inBits, M6BitVector& outBitVector);
 
 	//iterator		Begin();
 	//iterator		End();
@@ -1281,8 +1311,7 @@ uint32 M6IndexBitVectorPage::StoreBitVector(const uint8* inData, size_t inSize)
 	
 struct M6IBitVectorImpl : public M6IBitStreamImpl
 {
-					M6IBitVectorImpl(M6IndexImpl& inIndex, const uint8 inData[]);
-					M6IBitVectorImpl(M6IndexImpl& inIndex, uint32 inPageNr, uint32 inPageOffset);
+					M6IBitVectorImpl(M6IndexImpl& inIndex, const M6BitVector& inBitVector);
 					M6IBitVectorImpl(const M6IBitVectorImpl& inImpl);
 					~M6IBitVectorImpl();
 
@@ -1295,31 +1324,33 @@ struct M6IBitVectorImpl : public M6IBitStreamImpl
   private:
 	M6IndexImpl&	mIndex;
 	uint32			mPageNr;
-	uint32			mOffset;
-	uint8			mData[20];
+	uint16			mOffset;
+	uint8			mData[kM6BitVectorInlineBitsSize];
 	M6IndexBitVectorPage*
 					mPage;
 };
 
-M6IBitVectorImpl::M6IBitVectorImpl(M6IndexImpl& inIndex, const uint8 inData[])
+M6IBitVectorImpl::M6IBitVectorImpl(M6IndexImpl& inIndex, const M6BitVector& inBitVector)
 	: mIndex(inIndex)
 	, mPageNr(0)
 	, mOffset(0)
 	, mPage(nullptr)
 {
-	memcpy(mData, inData, sizeof(mData));
-	
-	mBufferPtr = mData + 1;
-	mBufferSize = sizeof(mData) - 1;
-}
-
-M6IBitVectorImpl::M6IBitVectorImpl(M6IndexImpl& inIndex, uint32 inPageNr, uint32 inPageOffset)
-	: mIndex(inIndex)
-	, mPageNr(inPageNr)
-	, mOffset(inPageOffset)
-	, mPage(nullptr)
-{
-	Read();
+	if (inBitVector.mType == eM6InlineBitVector)
+	{
+		memcpy(mData, inBitVector.mBits, kM6BitVectorInlineBitsSize);
+		mBufferPtr = mData;
+		mBufferSize = kM6BitVectorInlineBitsSize;
+	}
+	else
+	{
+		mPageNr = inBitVector.mPage;
+		mOffset = inBitVector.mOffset;
+		
+		memcpy(mData, inBitVector.mLeadingBits, kM6BitVectorLeadingBitsSize);
+		mBufferPtr = mData;
+		mBufferSize = kM6BitVectorLeadingBitsSize;
+	}
 }
 
 M6IBitVectorImpl::M6IBitVectorImpl(const M6IBitVectorImpl& inImpl)
@@ -1331,8 +1362,12 @@ M6IBitVectorImpl::M6IBitVectorImpl(const M6IBitVectorImpl& inImpl)
 {
 	if (mPage != nullptr)
 		mIndex.Reference(mPage);
-	else
-		memcpy(mData, inImpl.mData, sizeof(mData));
+	else if (inImpl.mBufferPtr >= inImpl.mData and inImpl.mBufferPtr < inImpl.mData + kM6BitVectorInlineBitsSize)
+	{
+		memcpy(mData, inImpl.mBufferPtr, inImpl.mBufferSize);
+		mBufferPtr = mData;
+		mBufferSize = inImpl.mBufferSize;
+	}
 }
 
 M6IBitVectorImpl::~M6IBitVectorImpl()
@@ -1386,16 +1421,16 @@ M6IndexImpl::M6IndexImpl(M6BasicIndex& inIndex, const string& inPath, MOpenMode 
 	assert(mHeader.mHeaderSize == sizeof(M6IxFileHeader));
 }
 
-void M6IndexImpl::StoreBits(M6OBitStream& inBits, uint8 outBitVector[20])
+void M6IndexImpl::StoreBits(M6OBitStream& inBits, M6BitVector& outBitVector)
 {
 	inBits.Sync();
 	const uint8* data = inBits.Peek();
 	size_t size = inBits.Size();
 
-	if (size < 20)
+	if (size <= kM6BitVectorInlineBitsSize)
 	{
-		outBitVector[0] = 0x80;
-		memcpy(outBitVector + 1, data, size);
+		outBitVector.mType = eM6InlineBitVector;
+		memcpy(outBitVector.mBits, data, size);
 	}
 	else
 	{
@@ -1408,15 +1443,22 @@ void M6IndexImpl::StoreBits(M6OBitStream& inBits, uint8 outBitVector[20])
 		else
 			page = LoadBitPage(mHeader.mLastBitsPage);
 	
-		memset(outBitVector, 0, sizeof(outBitVector));
+		if (kM6KeySpace - page->GetN() == 0)
+		{
+			M6IndexBitVectorPage* next = Allocate<M6IndexBitVectorPage>();
+			mHeader.mLastBitsPage = next->GetPageNr();
+			page->SetLink(mHeader.mLastBitsPage);
+			Release(page);
+			page = next;
+		}
+
+		outBitVector.mType = eM6OnDiskBitVector;
+		outBitVector.mOffset = page->GetN();
+		outBitVector.mPage = page->GetPageNr();
 		
-		uint32 pageNr = page->GetPageNr();
-		for (int i = 1; i <= 4; ++i)
-			outBitVector[i] = (pageNr >> ((4 - i) * 8));
-		
-		uint32 offset = page->GetN();
-		for (int i = 5; i <= 9; ++i)
-			outBitVector[i] = (offset >> ((9 - i) * 8));
+		memcpy(outBitVector.mLeadingBits, data, kM6BitVectorLeadingBitsSize);
+		data += kM6BitVectorLeadingBitsSize;
+		size -= kM6BitVectorLeadingBitsSize;
 		
 		for (;;)
 		{
@@ -2376,7 +2418,7 @@ M6MultiBasicIndex::M6MultiBasicIndex(const string& inPath, MOpenMode inMode)
 
 void M6MultiBasicIndex::Insert(const string& inKey, const vector<uint32>& inDocuments)
 {
-	M6MultiData data = { static_cast<uint32>(inDocuments.size()), inDocuments.front() };
+	M6MultiData data = { static_cast<uint32>(inDocuments.size()) };
 	
 	M6OBitStream bits;
 	CompressSimpleArraySelector(bits, inDocuments);
@@ -2391,22 +2433,8 @@ bool M6MultiBasicIndex::Find(const string& inKey, M6CompressedArray& outDocument
 	M6MultiData data;
 	if (static_cast<M6IndexImplT<M6MultiData>*>(mImpl)->Find(inKey, data))
 	{
-		if (data.mBitVector[0] == 0)
-		{
-			uint32 page = 0, offset = 0;
-			for (int i = 1; i <= 4; ++i)
-				page = page << 8 | data.mBitVector[i];
-			for (int i = 5; i <= 9; ++i)
-				offset = offset << 8 | data.mBitVector[i];
-			
-			M6IBitStream bits(new M6IBitVectorImpl(*mImpl, page, offset));
-			outDocuments = M6CompressedArray(bits, data.mCount);
-		}
-		else
-		{
-			M6IBitStream bits(new M6IBitVectorImpl(*mImpl, data.mBitVector));
-			outDocuments = M6CompressedArray(bits, data.mCount);
-		}
+		M6IBitStream bits(new M6IBitVectorImpl(*mImpl, data.mBitVector));
+		outDocuments = M6CompressedArray(bits, data.mCount);
 		
 		result = true;
 	}

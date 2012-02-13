@@ -623,7 +623,7 @@ BOOST_AUTO_TEST_CASE(file_ix_6)
 		string word;
 		text >> word;
 
-		vector<uint32> loc(100);
+		vector<uint32> loc(nr * 4);
 		iota(loc.begin(), loc.end(), nr);
 
 		if (word.empty() and text.eof())
@@ -657,7 +657,7 @@ BOOST_AUTO_TEST_CASE(file_ix_6a)
 		string word;
 		text >> word;
 
-		vector<uint32> loc(100);
+		vector<uint32> loc(nr * 4);
 		iota(loc.begin(), loc.end(), nr);
 
 		if (word.empty() and text.eof())

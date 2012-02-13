@@ -788,6 +788,8 @@ M6BasicIx* M6BatchIndexProcessor::GetIndexBase(const string& inName, M6IndexType
 	if (ix == mIndices.end())
 	{
 		M6BasicIndexPtr index = mDatabank.CreateIndex(inName, inType);
+
+		index->SetAutoCommit(false);
 		
 		mIndices.push_back(new T(mFullTextIndex, mLexicon, inName,
 			static_cast<uint8>(mIndices.size() + 1), index));
@@ -830,6 +832,8 @@ void M6BatchIndexProcessor::IndexValue(const string& inIndexName,
 			case eM6DateData:	index = mDatabank.CreateIndex(inIndexName, eM6DateIndexType, true); break;
 			default:			THROW(("Runtime error, unexpected index type"));
 		}
+		
+		index->SetAutoCommit(false);
 	
 		index->Insert(inValue, inDocNr);
 	}

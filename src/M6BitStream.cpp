@@ -16,9 +16,6 @@ using namespace std;
 const uint32
 	kBitBufferSize = 64;
 
-const int64
-	kUnboundedBufferSize = numeric_limits<int64>::max();
-
 // --------------------------------------------------------------------
 //	M6OBitStream
 
@@ -590,19 +587,6 @@ void CompressSimpleArraySelector(M6OBitStream& inBits, const vector<uint32>& inA
 }
 
 // --------------------------------------------------------------------
-//	Array Routines
-
-void WriteArray(M6OBitStream& inBits, vector<uint32>& inArray)
-{
-	uint32 cnt = static_cast<uint32>(inArray.size());
-	WriteGamma(inBits, cnt);
-	assert(cnt == 0 or inArray.front() > 0);
-	if (not inArray.empty() and inArray.front() == 0)
-		THROW(("Invalid array, should not contain zero"));
-	CompressSimpleArraySelector(inBits, inArray);
-}
-
-// --------------------------------------------------------------------
 //	M6CompressedArray
 
 M6CompressedArray::M6CompressedArray()
@@ -669,4 +653,58 @@ M6CompressedArray::const_iterator& M6CompressedArray::const_iterator::operator++
 		mCount = sSentinel;
 
 	return *this;
+}
+
+// --------------------------------------------------------------------
+//	Array Routines
+
+void WriteArray(M6OBitStream& inBits, vector<uint32>& inArray)
+{
+	uint32 cnt = static_cast<uint32>(inArray.size());
+	WriteGamma(inBits, cnt);
+	assert(cnt == 0 or inArray.front() > 0);
+	if (not inArray.empty() and inArray.front() == 0)
+		THROW(("Invalid array, should not contain zero"));
+	CompressSimpleArraySelector(inBits, inArray);
+}
+
+void ReadArray(M6IBitStream& inBits, vector<uint32>& outArray)
+{
+	outArray.clear();
+	
+	uint32 size;
+	ReadGamma(inBits, size);
+	outArray.reserve(size);
+
+	uint32 width = kStartWidth;
+	uint32 span = 0;
+	uint32 current = 0;
+
+	while (size-- > 0)
+	{
+		if (span == 0)
+		{
+			uint32 selector;
+			ReadBinary(inBits, 4, selector);
+			span = kSelectors[selector].span;
+			
+			if (selector == 0)
+				width = kMaxWidth;
+			else
+				width += kSelectors[selector].databits;
+		}
+
+		if (width > 0)
+		{
+			uint32 delta;
+			ReadBinary(inBits, width, delta);
+			current += delta;
+		}
+
+		current += 1;
+
+		outArray.push_back(current);
+
+		--span;
+	}
 }

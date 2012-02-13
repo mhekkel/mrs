@@ -229,7 +229,7 @@ void CopyBits(M6OBitStream& inBits, const M6OBitStream& inValue);
 // of unsigned integers that are ordered, first element should be > 0
 // The size of the array is stored inside the bitstream.
 
-void ReadArray(M6OBitStream& inBits, std::vector<uint32>& outArray);
+void ReadArray(M6IBitStream& inBits, std::vector<uint32>& outArray);
 void WriteArray(M6OBitStream& inBits, std::vector<uint32>& inArray);
 
 // Lower level access to arrays, the CompressSimpleArraySelector

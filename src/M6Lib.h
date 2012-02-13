@@ -1,40 +1,5 @@
 #pragma once
 
-//#if defined(BIGENDIAN)
-//#define FOUR_CHAR_INLINE(x)	x
-//#else
-//#define FOUR_CHAR_INLINE(x)     \
-//			((((x)<<24) & 0xFF000000UL)|\
-//			 (((x)<<8 ) & 0x00FF0000UL)|\
-//			 (((x)>>8 ) & 0x0000FF00UL)|\
-//			 (((x)>>24) & 0x000000FFUL))
-//#endif
-
-// --------------------------------------------------------------------
-// some types used throughout m6
-
-enum M6DataType
-{
-	eM6NoData,
-	
-	eM6TextData			= 1,
-	eM6StringData,
-	eM6NumberData,
-	eM6DateData
-};
-
-enum M6IndexType
-{
-	eM6NoIndexType,
-
-	eM6FullTextIndexType	= 1,
-	eM6StringIndexType,
-	eM6NumberIndexType,
-	eM6DateIndexType
-};
-
-// --------------------------------------------------------------------
-
 #if defined(_MSC_VER)
 
 #define WIN32_LEAN_AND_MEAN             // Exclude rarely-used stuff from Windows headers
@@ -78,6 +43,45 @@ typedef boost::int32_t		int32;
 typedef boost::uint32_t		uint32;
 typedef boost::int64_t		int64;
 typedef boost::uint64_t		uint64;
+
+//#if defined(BIGENDIAN)
+//#define FOUR_CHAR_INLINE(x)	x
+//#else
+//#define FOUR_CHAR_INLINE(x)     \
+//			((((x)<<24) & 0xFF000000UL)|\
+//			 (((x)<<8 ) & 0x00FF0000UL)|\
+//			 (((x)>>8 ) & 0x0000FF00UL)|\
+//			 (((x)>>24) & 0x000000FFUL))
+//#endif
+
+// --------------------------------------------------------------------
+// some types used throughout m6
+
+enum M6DataType
+{
+	eM6NoData,
+	
+	eM6TextData			= 1,
+	eM6StringData,
+	eM6NumberData,
+	eM6DateData
+};
+
+enum M6IndexType
+{
+	eM6NoIndexType,
+
+	eM6FullTextIndexType	= 1,
+	eM6StringIndexType,
+	eM6NumberIndexType,
+	eM6DateIndexType
+};
+
+extern const uint32
+	kM6MaxWeight, kM6WeightBitCount;
+
+// --------------------------------------------------------------------
+
 
 // Some byte swapping code
 
@@ -135,6 +139,25 @@ struct swapper<T, 8, true>
 			((static_cast<uint64>(v)>>56) & 0x00000000000000FFULL));
 	}
 };
+
+template<>
+struct swapper<float>
+{
+	float operator()(float v) const
+	{
+		union
+		{
+			uint32	vi;
+			float	vf;
+		} u;
+
+		u.vf = v;
+		u.vi = swapper<uint32>().operator()(u.vi);
+
+		return u.vf;
+	}
+};
+
 
 #if BIGENDIAN
 template<class T>

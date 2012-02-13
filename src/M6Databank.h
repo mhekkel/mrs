@@ -31,5 +31,8 @@ class M6Databank
 	uint32			size() const;
 
   private:
+
+	void			RecalculateDocumentWeights();
+	
 	M6DatabankImpl*	mImpl;
 };

@@ -210,16 +210,19 @@ class M6WeightedBasicIndex : public M6BasicIndex
   public:
 					M6WeightedBasicIndex(const std::string& inPath, MOpenMode inMode);
 
+	
+
 	class weighted_iterator
 	{
 	  public:
 		uint32		size() const;
-//		float		idf_correction(uint32 inDocCount) const;
+		float		idf_correction(uint32 inDocCount) const;
 		bool		next(uint32& outDocNr, uint8& outFrequency);
 	};
 	
 	void			Insert(const std::string& inKey, std::vector<std::pair<uint32,uint8>>& inDocuments);
 	bool			Find(const std::string& inKey, weighted_iterator& outIterator);
+	void			CalculateDocumentWeights(std::vector<float>& outWeights);
 };
 
 typedef M6Index<M6WeightedBasicIndex, M6BasicComparator>	M6SimpleWeightedIndex;

@@ -23,9 +23,8 @@ namespace ba = boost::algorithm;
 // --------------------------------------------------------------------
 
 const uint32
-	kWeightBitCount = 5,
-	kMaxWeight = (1 << kWeightBitCount) - 1,
-	kMaxInDocumentLocation = 0x7ffff,		// half a million words
+	kM6WeightBitCount = 5,
+	kM6MaxWeight = (1 << kM6WeightBitCount) - 1,
 	kMaxIndexNr = 30;
 
 class M6BatchIndexProcessor;
@@ -51,13 +50,19 @@ class M6DatabankImpl
 	
 	M6BasicIndexPtr	GetIndex(const string& inName);
 	M6BasicIndexPtr	CreateIndex(const string& inName, M6IndexType inType, bool inUnique = false);
+	M6BasicIndexPtr	GetAllTextIndex()					{ return mAllTextIndex; }
 	
 	fs::path		GetScratchDir() const				{ return mDbDirectory / "tmp"; }
 
   protected:
-	
+
+	void			RecalculateDocumentWeights();
+
 	struct M6IndexDesc
 	{
+							M6IndexDesc(const string& inName, M6BasicIndexPtr inIndex)
+								: mName(inName), mIndex(inIndex) {}
+
 		string				mName;
 		M6BasicIndexPtr		mIndex;
 	};
@@ -69,6 +74,7 @@ class M6DatabankImpl
 	M6DocStore*				mStore;
 	M6BatchIndexProcessor*	mBatch;
 	M6IndexDescList			mIndices;
+	M6BasicIndexPtr			mAllTextIndex;
 };
 
 // --------------------------------------------------------------------
@@ -201,8 +207,6 @@ M6FullTextIx::~M6FullTextIx()
 void M6FullTextIx::AddWord(uint8 inIndex, uint32 inWord)
 {
 	++mDocWordLocation;	// always increment, no matter if we do not add the word
-	if (mDocWordLocation >= kMaxInDocumentLocation)	// cycle...
-		mDocWordLocation = 1;
 	
 	if (inWord > 0)
 	{
@@ -245,7 +249,7 @@ void M6FullTextIx::FlushDoc(uint32 inDoc)
 		e.doc = inDoc;
 		e.ix = w->index;
 
-		e.weight = (w->freq * kMaxWeight) / maxFreq;
+		e.weight = (w->freq * kM6MaxWeight) / maxFreq;
 		if (e.weight < 1)
 			e.weight = 1;
 		
@@ -291,7 +295,7 @@ void M6FullTextIx::BufferEntryWriter::WriteSortedRun(M6FileStream& inFile, const
 		WriteGamma(bits, inValues[i].term - t + 1);
 		WriteGamma(bits, inValues[i].doc - d + 1);
 		WriteGamma(bits, inValues[i].ix + 1);
-		WriteBinary(bits, kWeightBitCount, inValues[i].weight);
+		WriteBinary(bits, kM6WeightBitCount, inValues[i].weight);
 
 		if (idlIxMap & (1 << inValues[i].ix))
 			WriteBits(bits, inValues[i].idl);
@@ -333,7 +337,7 @@ void M6FullTextIx::BufferEntryReader::ReadSortedRunEntry(BufferEntry& outValue)
 	outValue.doc = doc;
 	ReadGamma(bits, outValue.ix);
 	outValue.ix -= 1;
-	ReadBinary(bits, kWeightBitCount, outValue.weight);
+	ReadBinary(bits, kM6WeightBitCount, outValue.weight);
 	
 	if (idlIxMap & (1 << outValue.ix))
 		ReadBits(bits, outValue.idl);
@@ -656,10 +660,10 @@ void M6WeightedWordIx::AddDocTerm(uint32 inDoc, uint8 inFrequency, M6OBitStream&
 	
 	if (inFrequency < 1)
 		inFrequency = 1;
-	else if (inFrequency >= kMaxWeight)
-		inFrequency = kMaxWeight;
+	else if (inFrequency >= kM6MaxWeight)
+		inFrequency = kM6MaxWeight;
 	
-	WriteBinary(mBits, kWeightBitCount, inFrequency);
+	WriteBinary(mBits, kM6WeightBitCount, inFrequency);
 	
 	mLastDoc = inDoc;
 	++mDocCount;
@@ -684,7 +688,7 @@ void M6WeightedWordIx::FlushTerm(uint32 inTerm, uint32 inDocCount)
 			docNr += delta;
 			assert(docNr <= inDocCount);
 			uint8 weight;
-			ReadBinary(bits, kWeightBitCount, weight);
+			ReadBinary(bits, kM6WeightBitCount, weight);
 			assert(weight > 0);
 			docs.push_back(make_pair(docNr, weight));
 		}
@@ -867,9 +871,8 @@ void M6BatchIndexProcessor::FlushDoc(uint32 inDocNr)
 void M6BatchIndexProcessor::Finish(uint32 inDocCount)
 {
 	// add the required 'alltext' index
-	M6BasicIndexPtr allTextIndex(new M6SimpleWeightedIndex((mDatabank.GetScratchDir().parent_path() / "all-text.index").string(), eReadWrite));
 	mIndices.push_back(new M6WeightedWordIx(mFullTextIndex, mLexicon, "all-text",
-		static_cast<uint8>(mIndices.size() + 1), allTextIndex));
+		static_cast<uint8>(mIndices.size() + 1), mDatabank.GetAllTextIndex()));
 	
 	// tell indices about the doc count
 	for_each(mIndices.begin(), mIndices.end(), [&inDocCount](M6BasicIx* ix) { ix->SetDbDocCount(inDocCount); });
@@ -925,11 +928,8 @@ void M6BatchIndexProcessor::Finish(uint32 inDocCount)
 	
 	// flush
 	for_each(mIndices.begin(), mIndices.end(), [&ie](M6BasicIx* ix) { ix->AddDocTerm(0, 0, 0, ie.idl); });
-
-	// recalculate document weights
 //	fDocWeights = new CDocWeightArray*[fHeader->count];
 //	memset(fDocWeights, 0, sizeof(CDocWeightArray*) * fHeader->count);
-//	
 }
 
 // --------------------------------------------------------------------
@@ -947,11 +947,15 @@ M6DatabankImpl::M6DatabankImpl(M6Databank& inDatabank, const string& inPath, MOp
 		fs::create_directory(mDbDirectory / "tmp");
 		
 		mStore = new M6DocStore((mDbDirectory / "data").string(), eReadWrite);
+		mAllTextIndex.reset(new M6SimpleWeightedIndex((mDbDirectory / "all-text.index").string(), eReadWrite));
 	}
 	else if (not fs::is_directory(mDbDirectory))
 		THROW(("databank path is invalid (%s)", inPath.c_str()));
 	else
+	{
 		mStore = new M6DocStore((mDbDirectory / "data").string(), inMode);
+		mAllTextIndex.reset(new M6SimpleWeightedIndex((mDbDirectory / "all-text.index").string(), inMode));
+	}
 }
 
 M6DatabankImpl::~M6DatabankImpl()
@@ -1004,6 +1008,8 @@ M6BasicIndexPtr M6DatabankImpl::CreateIndex(const string& inName, M6IndexType in
 				default:					THROW(("unsupported"));
 			}
 		}
+
+		mIndices.push_back(M6IndexDesc(inName, result));
 	}
 	return result;
 }
@@ -1065,8 +1071,30 @@ void M6DatabankImpl::CommitBatchImport()
 	delete mBatch;
 	mBatch = nullptr;
 
+	foreach (M6IndexDesc& desc, mIndices)
+	{
+		desc.mIndex->Commit();
+		desc.mIndex->SetAutoCommit(false);
+	}
+	
 	// And clean up
 	fs::remove_all(mDbDirectory / "tmp");
+
+	RecalculateDocumentWeights();
+}
+
+void M6DatabankImpl::RecalculateDocumentWeights()
+{
+	uint32 docCount = mStore->size();
+	uint32 maxDocNr = mStore->NextDocumentNumber();
+	
+	// recalculate document weights
+	vector<float> dw(maxDocNr, 0);
+	M6WeightedBasicIndex* ix = dynamic_cast<M6WeightedBasicIndex*>(mAllTextIndex.get());
+	if (ix == nullptr)
+		THROW(("Invalid index"));
+	ix->CalculateDocumentWeights(dw);
+	mStore->UpdateDocWeights(&dw[0]);
 }
 
 // --------------------------------------------------------------------

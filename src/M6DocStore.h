@@ -72,6 +72,8 @@ class M6DocStore
 
 	void				Commit();
 
+	void				Validate();
+
   protected:
 	M6DocStoreImpl*		mImpl;
 };

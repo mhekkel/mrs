@@ -91,8 +91,8 @@ class M6BasicIndex
 	uint32			size() const;
 	uint32			depth() const;
 
-	void			dump() const;
-	void			validate() const;
+	void			Dump() const;
+	void			Validate() const;
 
   protected:
 					M6BasicIndex(M6IndexImpl* inImpl);

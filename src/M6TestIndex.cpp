@@ -97,7 +97,7 @@ const char filename[] = "test.index";
 //	foreach (const char* key, strings)
 //		indx.insert(key, nr++);
 //
-//	indx.validate();
+//	indx.Validate();
 //
 //	nr = 1;
 //	foreach (const char* key, strings)
@@ -112,7 +112,7 @@ const char filename[] = "test.index";
 //	indx.erase("d");
 //	indx.erase("m");
 //
-//	indx.validate();
+//	indx.Validate();
 //	indx.dump();
 //}
 //
@@ -188,7 +188,7 @@ const char filename[] = "test.index";
 //
 ////	indx.Vacuum();
 //
-//	indx.validate();
+//	indx.Validate();
 //
 //	foreach (auto t, testix)
 //	{
@@ -224,7 +224,7 @@ const char filename[] = "test.index";
 //		cout << "erasing " << *key << endl;
 //
 // 		indx.erase(*key);
-//		//indx.validate();
+//		//indx.Validate();
 //
 //		for (auto test = key + 1; test != keys.end(); ++test)
 //		{
@@ -278,7 +278,7 @@ const char filename[] = "test.index";
 //		};
 //	
 //	M6SimpleIndex indx(filename, data);
-//	indx.validate();
+//	indx.Validate();
 //
 //	foreach (auto t, testix)
 //	{
@@ -297,7 +297,7 @@ const char filename[] = "test.index";
 //	BOOST_CHECK_EQUAL(nr, testix.size());
 //
 //	indx.Vacuum();
-//	indx.validate();
+//	indx.Validate();
 //
 //	foreach (auto t, testix)
 //	{
@@ -423,12 +423,12 @@ BOOST_AUTO_TEST_CASE(file_ix_5)
 		ba::to_lower(word);
 		
 		indx.Insert(word, nr);
-		//indx.validate();
+		//indx.Validate();
 
 		testix[word] = nr++;
 	}
 	
-	indx.validate();
+	indx.Validate();
 //	indx.dump();
 }
 
@@ -473,7 +473,7 @@ BOOST_AUTO_TEST_CASE(file_ix_5a)
 	//	};
 	//
 	//M6SimpleIndex indx(filename, data);
-	//indx.validate();
+	//indx.Validate();
 }
 
 BOOST_AUTO_TEST_CASE(file_ix_5b)
@@ -498,7 +498,7 @@ BOOST_AUTO_TEST_CASE(file_ix_5b)
 	}
 	
 	M6SimpleIndex indx(filename, eReadWrite);
-	indx.validate();
+	indx.Validate();
 
 	foreach (auto t, testix)
 	{
@@ -539,12 +539,12 @@ BOOST_AUTO_TEST_CASE(file_ix_5c)
 	}
 	
 	M6SimpleIndex indx(filename, eReadWrite);
-	indx.validate();
+	indx.Validate();
 
 	foreach (auto t, testix)
 	{
 		indx.Erase(t.first);
-		//indx.validate();
+		//indx.Validate();
 		uint32 v;
 		BOOST_CHECK_EQUAL(indx.Find(t.first, v), false);
 	}
@@ -575,7 +575,7 @@ BOOST_AUTO_TEST_CASE(file_ix_5c)
 //		};	
 //
 //	M6SimpleIndex indx(filename, data);
-//	indx.validate();
+//	indx.Validate();
 //	indx.dump();
 //	
 //	for (;;)
@@ -592,7 +592,7 @@ BOOST_AUTO_TEST_CASE(file_ix_5c)
 //			indx.erase((nf % -i).str());
 //
 //		indx.dump();
-//		indx.validate();
+//		indx.Validate();
 //
 //		foreach (auto i, indx)
 //		{
@@ -632,12 +632,12 @@ BOOST_AUTO_TEST_CASE(file_ix_6)
 		ba::to_lower(word);
 		
 		indx.Insert(word, loc);
-		//indx.validate();
+		//indx.Validate();
 
 		testix[word] = nr++;
 	}
 	
-	indx.validate();
+	indx.Validate();
 //	indx.dump();
 }
 
@@ -649,7 +649,7 @@ BOOST_AUTO_TEST_CASE(file_ix_6a)
 	BOOST_REQUIRE(text.is_open());
 
 	M6SimpleMultiIndex indx(filename, eReadOnly);
-	indx.validate();
+	indx.Validate();
 
 	uint32 nr = 1;
 	for (;;)

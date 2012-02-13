@@ -20,6 +20,10 @@ class M6Databank
 	void			StartBatchImport(M6Lexicon& inLexicon);
 	void			CommitBatchImport();
 	
+	void			RecalculateDocumentWeights();
+
+	void			Validate();
+	
 	void			Store(M6Document* inDocument);
 	M6Document*		Fetch(uint32 inDocNr);
 	
@@ -32,7 +36,5 @@ class M6Databank
 
   private:
 
-	void			RecalculateDocumentWeights();
-	
 	M6DatabankImpl*	mImpl;
 };

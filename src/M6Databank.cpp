@@ -54,9 +54,11 @@ class M6DatabankImpl
 	
 	fs::path		GetScratchDir() const				{ return mDbDirectory / "tmp"; }
 
-  protected:
-
 	void			RecalculateDocumentWeights();
+
+	void			Validate();
+
+  protected:
 
 	struct M6IndexDesc
 	{
@@ -1072,10 +1074,7 @@ void M6DatabankImpl::CommitBatchImport()
 	mBatch = nullptr;
 
 	foreach (M6IndexDesc& desc, mIndices)
-	{
-		desc.mIndex->Commit();
-		desc.mIndex->SetAutoCommit(false);
-	}
+		desc.mIndex->SetAutoCommit(true);
 	
 	// And clean up
 	fs::remove_all(mDbDirectory / "tmp");
@@ -1095,6 +1094,12 @@ void M6DatabankImpl::RecalculateDocumentWeights()
 		THROW(("Invalid index"));
 	ix->CalculateDocumentWeights(dw);
 	mStore->UpdateDocWeights(&dw[0]);
+}
+
+void M6DatabankImpl::Validate()
+{
+	mStore->Validate();
+	mAllTextIndex->Validate();
 }
 
 // --------------------------------------------------------------------
@@ -1150,4 +1155,14 @@ M6Document* M6Databank::FindDocument(const string& inIndex, const string& inValu
 uint32 M6Databank::size() const
 {
 	return mImpl->GetDocStore().size();
+}
+
+void M6Databank::RecalculateDocumentWeights()
+{
+	mImpl->RecalculateDocumentWeights();
+}
+
+void M6Databank::Validate()
+{
+	mImpl->Validate();
 }

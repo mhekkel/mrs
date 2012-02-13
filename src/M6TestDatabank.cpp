@@ -1,27 +1,27 @@
-﻿﻿#include "M6Lib.h"
+﻿#include "M6Lib.h"
+
+#include <iostream>
 
 #include <boost/test/unit_test.hpp>
 
-#include "M6BitStream.h"
+#include "M6Databank.h"
 
 using namespace std;
 
-BOOST_AUTO_TEST_CASE(test_bit_stream_1)
-{
-	cout << "testing bitstream" << endl;
-
-	M6OBitStream bits;
-	
-	for (uint32 i = 1; i < 100; ++i)
-		WriteGamma(bits, i);
-	bits.Sync();
-	
-	M6IBitStream ibits(bits);
-	
-	for (uint32 i = 1; i < 100; ++i)
-	{
-		uint32 v;
-		ReadGamma(ibits, v);
-		BOOST_CHECK_EQUAL(i, v);
-	}
-}
+//BOOST_AUTO_TEST_CASE(test_databank_0)
+//{
+//	cout << "testing pdbfinder" << endl;
+//
+//	M6Databank databank("./test/pdbfinder.m6", eReadOnly);
+//	databank.Validate();
+//}
+//
+//BOOST_AUTO_TEST_CASE(test_databank_1)
+//{
+//	cout << "testing pdbfinder" << endl;
+//
+//	M6Databank databank("./test/pdbfinder.m6", eReadWrite);
+//	databank.RecalculateDocumentWeights();
+//}
+//
+//

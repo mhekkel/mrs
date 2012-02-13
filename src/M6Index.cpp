@@ -1793,6 +1793,12 @@ M6IndexImpl::~M6IndexImpl()
 void M6IndexImpl::SetAutoCommit(bool inAutoCommit)
 {
 	mAutoCommit = inAutoCommit;
+	if (mAutoCommit == true)
+	{
+		Commit();
+		if (mDirty)
+			mFile.PWrite(mHeader, 0);
+	}
 }
 
 // --------------------------------------------------------------------
@@ -1871,11 +1877,20 @@ void M6IndexImplT<M6DataType>::Insert(const string& inKey, const M6DataType& inV
 		
 		Release(root);
 	
-		if (mAutoCommit)
-			Commit();
+// check for refcounted pages
+#if DEBUG
+for (uint32 ix = 0; ix < mCacheCount; ++ix)
+	assert(mCache[ix].mRefCount == 0);
+#endif
 	
 		++mHeader.mSize;
 		mDirty = true;
+
+		if (mAutoCommit)
+		{
+			Commit();
+			mFile.PWrite(mHeader, 0);
+		}
 	}
 	catch (...)
 	{
@@ -2145,9 +2160,12 @@ void M6IndexImplT<M6DataType>::Validate()
 {
 	try
 	{
-		M6IndexPagePtr root(Load<M6IndexPageType>(mHeader.mRoot));
-		root->Validate("", nullptr);
-		Release(root);
+		if (mHeader.mRoot != 0)
+		{
+			M6IndexPagePtr root(Load<M6IndexPageType>(mHeader.mRoot));
+			root->Validate("", nullptr);
+			Release(root);
+		}
 	}
 	catch (M6ValidationException& e)
 	{
@@ -2446,12 +2464,12 @@ void M6IndexBranchPage<M6DataType>::Dump(int inLevel, M6IndexBranchPageType* inP
 
 // --------------------------------------------------------------------
 
-void M6BasicIndex::dump() const
+void M6BasicIndex::Dump() const
 {
 	mImpl->Dump();
 }
 
-void M6BasicIndex::validate() const
+void M6BasicIndex::Validate() const
 {
 	mImpl->Validate();
 }
@@ -2586,7 +2604,7 @@ void M6WeightedBasicIndex::CalculateDocumentWeights(std::vector<float>& outWeigh
 			M6MultiData data = leaf->GetValue(i);
 			M6IBitStream bits(new M6IBitVectorImpl(*mImpl, data.mBitVector));
 
-			cout << leaf->GetKey(i) << " i = " << i << ' ';
+			//cout << leaf->GetKey(i) << " i = " << i << ' ';
 
 			uint32 weight = kM6MaxWeight + 1;
 			
@@ -2597,13 +2615,13 @@ void M6WeightedBasicIndex::CalculateDocumentWeights(std::vector<float>& outWeigh
 				ReadGamma(bits, delta);
 				weight -= delta;
 
-				cout << '.'; cout.flush();
+				//cout << '.'; cout.flush();
 
 				ReadArray(bits, docs);
 
 				count -= docs.size();
 			}
-			cout << endl;
+			//cout << endl;
 		}
 
 		uint32 link = page->GetLink();

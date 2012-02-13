@@ -77,7 +77,9 @@ BOOST_AUTO_TEST_CASE(test_store_1)
 
 	foreach (const string& doc, testdocs)
 		store.StoreDocument(doc.c_str(), doc.length());
-	
+
+	store.Validate();
+
 	BOOST_CHECK_EQUAL(store.size(), testdocs.size());
 }
 
@@ -88,6 +90,8 @@ BOOST_AUTO_TEST_CASE(test_store_2)
 //	boost::timer::auto_cpu_timer t;
 
 	M6DocStore store("test/pdbfind2.docs", eReadOnly);
+
+	store.Validate();
 
 	for (uint32 i = 1; i <= testdocs.size(); ++i)
 	{
@@ -121,6 +125,8 @@ BOOST_AUTO_TEST_CASE(test_store_3)
 //	boost::timer::auto_cpu_timer t;
 
 	M6DocStore store("test/pdbfind2.docs", eReadOnly);
+
+	store.Validate();
 
 	for (uint32 i = 1; i <= testdocs.size(); ++i)
 	{
@@ -159,6 +165,8 @@ BOOST_AUTO_TEST_CASE(test_store_4)
 		db.Store(doc);
 	}
 
+	db.Validate();
+
 	BOOST_CHECK_EQUAL(db.size(), testdocs.size());
 }
 
@@ -169,6 +177,9 @@ BOOST_AUTO_TEST_CASE(test_store_5)
 //	boost::timer::auto_cpu_timer t;
 
 	M6Databank db("test/pdbfind2.m6", eReadOnly);
+
+	db.Validate();
+
 	BOOST_CHECK_EQUAL(db.size(), testdocs.size());
 
 	for (uint32 i = 1; i <= testdocs.size(); ++i)

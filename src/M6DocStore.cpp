@@ -21,7 +21,7 @@ namespace io = boost::iostreams;
 const uint32
 	kM6DocStoreSignature	= 'm6ds',
 	kM6DataPageSize			= 16384,
-//	kM6DataPageSize			= 256,
+//	kM6DataPageSize			= 1024,
 	kM6DataPageTextSize		= kM6DataPageSize - 8,
 	kM6DataPageIndexCount	= kM6DataPageTextSize / (3 * sizeof(uint32) + sizeof(float)),
 	kM6DataPageTextCutOff	= 64;	// start a new data page if 'free' is less than this
@@ -41,6 +41,9 @@ struct M6DocStoreIndexEntry
 	uint32	mDocSize;
 	float	mDocWeight;
 };
+
+BOOST_STATIC_ASSERT(sizeof(M6DocStoreIndexEntry) == 16);
+BOOST_STATIC_ASSERT(sizeof(M6DocStoreIndexEntry[kM6DataPageIndexCount]) < kM6DataPageTextSize);
 
 struct M6DocStorePageData
 {
@@ -1024,7 +1027,7 @@ uint32 M6DocStoreImpl::StoreDocument(const char* inData, size_t inSize, float in
 		M6DocStoreIndexPagePtr newRoot(Allocate<M6DocStoreIndexPage>());
 		newRoot->SetPageType(eM6DocStoreIndexBranchPage);
 		newRoot->SetLink(mHeader.mIndexRoot);
-		newRoot->Insert(docNr, docPageNr, 0, 0);
+		newRoot->Insert(docNr, docPageNr, 0, inWeight, 0);
 		mHeader.mIndexRoot = newRoot->GetPageNr();
 		
 		mRoot = newRoot;
@@ -1037,6 +1040,8 @@ uint32 M6DocStoreImpl::StoreDocument(const char* inData, size_t inSize, float in
 	
 	if (mAutoCommit)
 		Commit();
+
+	Validate();
 
 	return result;
 }
@@ -1355,4 +1360,9 @@ uint32 M6DocStore::NextDocumentNumber() const
 void M6DocStore::UpdateDocWeights(float inWeights[])
 {
 	
+}
+
+void M6DocStore::Validate()
+{
+	mImpl->Validate();
 }

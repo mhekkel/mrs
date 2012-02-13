@@ -203,7 +203,7 @@ class M6DocStoreIndexPage : public M6DocStorePage
 	void			Erase(uint32 inDocNr);
 	bool			Find(uint32 inDocNr, uint32& outPageNr, uint32& outDocSize);
 
-	void			Insert(uint32 inDocNr, uint32 inPageNr, uint32 inDocSize, float inWeight, uint32 inIndex);
+	void			InsertValues(uint32 inDocNr, uint32 inPageNr, uint32 inDocSize, float inWeight, uint32 inIndex);
 	static void		Move(M6DocStoreIndexPage& inSrc, M6DocStoreIndexPage& inDst,
 						uint32 inSrcIndex, uint32 inDstIndex, uint32 inCount);
 
@@ -451,7 +451,7 @@ M6DocStoreIndexPage::~M6DocStoreIndexPage()
 {
 }
 
-void M6DocStoreIndexPage::Insert(uint32 inDocNr, uint32 inPageNr, uint32 inDocSize, float inWeight, uint32 inIndex)
+void M6DocStoreIndexPage::InsertValues(uint32 inDocNr, uint32 inPageNr, uint32 inDocSize, float inWeight, uint32 inIndex)
 {
 	memmove(mData->mData + inIndex + 1, mData->mData + inIndex, sizeof(M6DocStoreIndexEntry) * (mData->mN - inIndex));
 	SetKey(inIndex, inDocNr);
@@ -510,7 +510,7 @@ bool M6DocStoreIndexPage::Insert(uint32& ioDocNr, uint32& ioPageNr, uint32 inDoc
 			SetDocWeight(ix, inWeight);
 		}
 		else if (mData->mN < kM6DataPageIndexCount)
-			Insert(ioDocNr, ioPageNr, inDocSize, inWeight, ix);
+			InsertValues(ioDocNr, ioPageNr, inDocSize, inWeight, ix);
 		else
 		{
 			M6DocStoreIndexPagePtr next(mStore.Allocate<M6DocStoreIndexPage>());
@@ -523,9 +523,9 @@ bool M6DocStoreIndexPage::Insert(uint32& ioDocNr, uint32& ioPageNr, uint32 inDoc
 			mData->mLink = next->GetPageNr();
 			
 			if (ix <= mData->mN)
-				Insert(ioDocNr, ioPageNr, inDocSize, inWeight, ix);
+				InsertValues(ioDocNr, ioPageNr, inDocSize, inWeight, ix);
 			else
-				next->Insert(ioDocNr, ioPageNr, inDocSize, inWeight, ix - mData->mN);
+				next->InsertValues(ioDocNr, ioPageNr, inDocSize, inWeight, ix - mData->mN);
 			
 			ioDocNr = next->GetKey(0);
 			ioPageNr = next->GetPageNr();
@@ -549,7 +549,7 @@ bool M6DocStoreIndexPage::Insert(uint32& ioDocNr, uint32& ioPageNr, uint32 inDoc
 			int32 ix = R + 1;
 			
 			if (mData->mN + 1 < kM6DataPageIndexCount)
-				Insert(ioDocNr, ioPageNr, inDocSize, inWeight, ix);
+				InsertValues(ioDocNr, ioPageNr, inDocSize, inWeight, ix);
 			else
 			{
 				M6DocStoreIndexPagePtr next(mStore.Allocate<M6DocStoreIndexPage>());
@@ -577,9 +577,9 @@ bool M6DocStoreIndexPage::Insert(uint32& ioDocNr, uint32& ioPageNr, uint32 inDoc
 					mData->mN -= 1;
 					
 					if (ioDocNr < next->GetKey(0))
-						Insert(ioDocNr, ioPageNr, inDocSize, inWeight, ix);
+						InsertValues(ioDocNr, ioPageNr, inDocSize, inWeight, ix);
 					else
-						next->Insert(ioDocNr, ioPageNr, inDocSize, inWeight, ix - split - 1);
+						next->InsertValues(ioDocNr, ioPageNr, inDocSize, inWeight, ix - split - 1);
 				}
 				
 				next->SetLink(downPageNr);
@@ -1027,7 +1027,7 @@ uint32 M6DocStoreImpl::StoreDocument(const char* inData, size_t inSize, float in
 		M6DocStoreIndexPagePtr newRoot(Allocate<M6DocStoreIndexPage>());
 		newRoot->SetPageType(eM6DocStoreIndexBranchPage);
 		newRoot->SetLink(mHeader.mIndexRoot);
-		newRoot->Insert(docNr, docPageNr, 0, inWeight, 0);
+		newRoot->InsertValues(docNr, docPageNr, 0, inWeight, 0);
 		mHeader.mIndexRoot = newRoot->GetPageNr();
 		
 		mRoot = newRoot;
@@ -1040,8 +1040,6 @@ uint32 M6DocStoreImpl::StoreDocument(const char* inData, size_t inSize, float in
 	
 	if (mAutoCommit)
 		Commit();
-
-	Validate();
 
 	return result;
 }

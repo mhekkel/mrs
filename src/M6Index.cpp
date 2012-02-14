@@ -31,7 +31,7 @@ using namespace std;
 // is (pageSize - headerSize) / 8. For a 8192 byte page and 8 byte header
 // this boils down to 1023.
 
-enum M6IndexPageType : uint8
+enum M6IndexPageKind : uint8
 {
 	eM6IndexEmptyPage			= 'e',
 	eM6IndexBranchPage			= 'b',
@@ -43,7 +43,7 @@ enum M6IndexPageType : uint8
 
 struct M6IndexPageHeader
 {
-	M6IndexPageType	mType;
+	M6IndexPageKind	mType;
 	uint8			mFlags;
 	uint16			mN;
 	uint32			mLink;
@@ -68,7 +68,7 @@ const uint32
 	kM6MaxEntriesPerPage	= kM6KeySpace / 8;	// see above
 #endif
 
-template<M6IndexPageType>
+template<M6IndexPageKind>
 struct M6IndexPageDataTraits {};
 
 template<>
@@ -150,7 +150,7 @@ struct M6IndexPageDataTraits<eM6IndexMultiIDLLeafPage>
 	typedef M6MultiIDLData M6DataElement;
 };
 
-template<M6IndexPageType T>
+template<M6IndexPageKind T>
 struct M6IndexPageDataT : public M6IndexPageHeader
 {
 	typedef typename M6IndexPageDataTraits<T>::M6DataElement M6DataType;
@@ -160,7 +160,7 @@ struct M6IndexPageDataT : public M6IndexPageHeader
 		kM6EntryCount	= (kM6DataCount < kM6MaxEntriesPerPage ? kM6DataCount : kM6MaxEntriesPerPage)
 	};
 	
-	static const M6IndexPageType kIndexPageType = T;
+	static const M6IndexPageKind kIndexPageType = T;
 	
 	union
 	{
@@ -172,7 +172,7 @@ struct M6IndexPageDataT : public M6IndexPageHeader
 template<>
 struct M6IndexPageDataT<eM6IndexBitVectorPage> : public M6IndexPageHeader
 {
-	static const M6IndexPageType kIndexPageType = eM6IndexBitVectorPage;
+	static const M6IndexPageKind kIndexPageType = eM6IndexBitVectorPage;
 	uint8	mBits[kM6KeySpace];
 };
 
@@ -2716,5 +2716,5 @@ void M6WeightedBasicIndex::CalculateDocumentWeights(uint32 inDocCount,
 	
 	for_each(outWeights.begin(), outWeights.end(), [](float& w) { w = sqrt(w); });
 
-	mImpl->Release(page);
+//	mImpl->Release(page);
 }

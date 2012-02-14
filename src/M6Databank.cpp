@@ -932,8 +932,6 @@ void M6BatchIndexProcessor::Finish(uint32 inDocCount)
 	
 	// flush
 	for_each(mIndices.begin(), mIndices.end(), [&ie](M6BasicIx* ix) { ix->AddDocTerm(0, 0, 0, ie.idl); });
-//	fDocWeights = new CDocWeightArray*[fHeader->count];
-//	memset(fDocWeights, 0, sizeof(CDocWeightArray*) * fHeader->count);
 }
 
 // --------------------------------------------------------------------
@@ -959,6 +957,8 @@ M6DatabankImpl::M6DatabankImpl(M6Databank& inDatabank, const string& inPath, MOp
 	{
 		mStore = new M6DocStore((mDbDirectory / "data").string(), inMode);
 		mAllTextIndex.reset(new M6SimpleWeightedIndex((mDbDirectory / "all-text.index").string(), inMode));
+		
+		RecalculateDocumentWeights();
 	}
 }
 
@@ -1125,14 +1125,14 @@ M6Iterator* M6DatabankImpl::Find(const string& inQuery, uint32 inReportLimit)
 	uint32 maxDocNr = mStore->NextDocumentNumber();
 	float maxD = static_cast<float>(maxDocNr);
 
-	M6WeightedBasicIndex::M6WeightedIterator iter;
-	if (static_cast<M6WeightedBasicIndex*>(mAllTextIndex.get())->Find(inQuery, iter))
+	float queryWeight = 0, Smax = 0;
+	M6Accumulator A(maxDocNr);
+	
+	// for each term
 	{
-		float queryWeight = 0, Smax = 0;
-		
-		M6Accumulator A(maxDocNr);
-		
-		// for each term
+		M6WeightedBasicIndex::M6WeightedIterator iter;
+		if (static_cast<M6WeightedBasicIndex*>(mAllTextIndex.get())->Find(inQuery, iter))
+		{
 			uint8 termWeight = 1;	// ?
 		
 			const float c_add = 0.007f;
@@ -1162,47 +1162,45 @@ M6Iterator* M6DatabankImpl::Find(const string& inQuery, uint32 inReportLimit)
 						Smax = S;
 				}
 			}
-		
-		queryWeight = sqrt(queryWeight);
-		
-		vector<uint32> docs;
-		A.Collect(docs, 1);
-		
-		auto order = [](const pair<uint32,float>& a, const pair<uint32,float>& b) -> bool
-		{
-			return a.second > b.second;	
-		};
-		
-		vector<pair<uint32,float>> best;
-		
-		foreach (uint32 doc, docs)
-		{
-			float docWeight = mDocWeights[doc];//mStore->GetDocWeight(doc);
-			float rank = A[doc] / (docWeight * queryWeight);
-			
-			if (best.size() < inReportLimit)
-			{
-				best.push_back(make_pair(doc, rank));
-				push_heap(best.begin(), best.end(), order);
-			}
-			else if (best.front().second < rank)
-			{
-				pop_heap(best.begin(), best.end(), order);
-				best.back() = make_pair(doc, rank);
-				push_heap(best.begin(), best.end(), order);
-			}
 		}
+	}
 		
-		sort_heap(best.begin(), best.end(), order);
+	queryWeight = sqrt(queryWeight);
+	
+	vector<uint32> docs;
+	A.Collect(docs, 1);
+	
+	auto compare = [](const pair<uint32,float>& a, const pair<uint32,float>& b) -> bool
+						{ return a.second > b.second; };
+	vector<pair<uint32,float>> best;
+	
+	foreach (uint32 doc, docs)
+	{
+		float docWeight = mDocWeights[doc];//mStore->GetDocWeight(doc);
+		float rank = A[doc] / (docWeight * queryWeight);
 		
-		foreach (auto b, best)
+		if (best.size() < inReportLimit)
 		{
-			auto_ptr<M6Document> doc(Fetch(b.first));
+			best.push_back(make_pair(doc, rank));
+			push_heap(best.begin(), best.end(), compare);
+		}
+		else if (best.front().second < rank)
+		{
+			pop_heap(best.begin(), best.end(), compare);
+			best.back() = make_pair(doc, rank);
+			push_heap(best.begin(), best.end(), compare);
+		}
+	}
+	
+	sort_heap(best.begin(), best.end(), compare);
+	
+	foreach (auto b, best)
+	{
+		auto_ptr<M6Document> doc(Fetch(b.first));
 
-			cout << doc->GetAttribute("id") << '\t'
-				<< doc->GetAttribute("title") << '\t'
-				<< b.second << endl;
-		}
+		cout << doc->GetAttribute("id") << '\t'
+			<< doc->GetAttribute("title") << '\t'
+			<< b.second << endl;
 	}
 	
 	return result;

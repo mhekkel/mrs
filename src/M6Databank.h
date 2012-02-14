@@ -6,6 +6,7 @@ class M6Document;
 class M6DatabankImpl;
 class M6DocStore;
 class M6Lexicon;
+class M6Iterator;
 
 class M6Databank
 {
@@ -29,6 +30,8 @@ class M6Databank
 	
 	M6Document*		FindDocument(const std::string& inIndex,
 						const std::string& inValue);
+
+	M6Iterator*		Find(const std::string& inQuery, uint32 inReportLimit = 1000);
 	
 	M6DocStore&		GetDocStore();
 	

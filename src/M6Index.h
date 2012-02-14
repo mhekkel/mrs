@@ -8,9 +8,11 @@
 #include <boost/lexical_cast.hpp>
 
 #include "M6File.h"
+#include "M6BitStream.h"
 
 struct M6IndexImpl;
 class M6CompressedArray;
+union M6BitVector;
 
 extern const uint32 kM6MaxKeyLength;
 
@@ -210,19 +212,29 @@ class M6WeightedBasicIndex : public M6BasicIndex
   public:
 					M6WeightedBasicIndex(const std::string& inPath, MOpenMode inMode);
 
-	
-
-	class weighted_iterator
+	class M6WeightedIterator
 	{
 	  public:
-		uint32		size() const;
-		float		idf_correction(uint32 inDocCount) const;
-		bool		next(uint32& outDocNr, uint8& outFrequency);
+						M6WeightedIterator();
+						M6WeightedIterator(M6IndexImpl& inIndex, const M6BitVector& inBitVector, uint32 inCount);
+						M6WeightedIterator(const M6WeightedIterator&);
+		M6WeightedIterator&
+						operator=(const M6WeightedIterator&);
+
+		uint32			Size() const								{ return mSize; }
+		bool			Next(uint32& outDocNr, uint8& outWeight);
+
+	  private:
+		M6IBitStream	mBits;
+		std::vector<uint32>
+						mDocs;
+		uint32			mSize;
+		uint8			mWeight;
 	};
 	
 	void			Insert(const std::string& inKey, std::vector<std::pair<uint32,uint8>>& inDocuments);
-	bool			Find(const std::string& inKey, weighted_iterator& outIterator);
-	void			CalculateDocumentWeights(std::vector<float>& outWeights);
+	bool			Find(const std::string& inKey, M6WeightedIterator& outIterator);
+	void			CalculateDocumentWeights(uint32 inDocCount, std::vector<float>& outWeights);
 };
 
 typedef M6Index<M6WeightedBasicIndex, M6BasicComparator>	M6SimpleWeightedIndex;

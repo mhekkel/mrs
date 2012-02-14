@@ -45,6 +45,7 @@ class M6DatabankImpl
 	void			Store(M6Document* inDocument);
 	M6Document*		Fetch(uint32 inDocNr);
 	M6Document*		FindDocument(const string& inIndex, const string& inValue);
+	M6Iterator*		Find(const string& inQuery, uint32 inReportLimit);
 	
 	M6DocStore&		GetDocStore()						{ return *mStore; }
 	
@@ -77,6 +78,7 @@ class M6DatabankImpl
 	M6BatchIndexProcessor*	mBatch;
 	M6IndexDescList			mIndices;
 	M6BasicIndexPtr			mAllTextIndex;
+	vector<float>			mDocWeights;
 };
 
 // --------------------------------------------------------------------
@@ -1062,6 +1064,150 @@ M6Document* M6DatabankImpl::FindDocument(const string& inIndex, const string& in
 	return Fetch(v);
 }
 
+class M6Accumulator
+{
+  public:
+				M6Accumulator(uint32 inDocCount)
+					: mItems(reinterpret_cast<M6Item*>(calloc(sizeof(M6Item), inDocCount)))
+					, mFirst(nullptr), mDocCount(inDocCount), mHitCount(0) {}
+				
+				~M6Accumulator()
+				{
+					free(mItems);
+				}
+				
+	float		Add(uint32 inDocNr, float inDelta)
+				{
+					if (mItems[inDocNr].mCount++ == 0)
+					{
+						mItems[inDocNr].mNext = mFirst;
+						mFirst = &mItems[inDocNr];
+						++mHitCount;
+					}
+					
+					return mItems[inDocNr].mValue += inDelta;
+				}
+
+	float		operator[](uint32 inIndex) const	{ return mItems[inIndex].mValue; }
+	
+	void		Collect(vector<uint32>& outDocs, uint32 inTermCount)
+				{
+					outDocs.reserve(mHitCount);
+					for (M6Item* item = mFirst; item != nullptr; item = item->mNext)
+					{
+						if (item->mCount >= inTermCount)
+							outDocs.push_back(static_cast<uint32>(item - mItems));
+					}
+				}
+
+  private:
+	
+	struct M6Item
+	{
+		float	mValue;
+		uint32	mCount;
+		M6Item*	mNext;
+	};
+	
+	M6Item*		mItems;
+	M6Item*		mFirst;
+	uint32		mDocCount, mHitCount;
+};
+
+M6Iterator* M6DatabankImpl::Find(const string& inQuery, uint32 inReportLimit)
+{
+	if (mDocWeights.empty())
+		RecalculateDocumentWeights();
+
+	M6Iterator* result = nullptr;
+
+	uint32 docCount = mStore->size();
+	uint32 maxDocNr = mStore->NextDocumentNumber();
+	float maxD = static_cast<float>(maxDocNr);
+
+	M6WeightedBasicIndex::M6WeightedIterator iter;
+	if (static_cast<M6WeightedBasicIndex*>(mAllTextIndex.get())->Find(inQuery, iter))
+	{
+		float queryWeight = 0, Smax = 0;
+		
+		M6Accumulator A(maxDocNr);
+		
+		// for each term
+			uint8 termWeight = 1;	// ?
+		
+			const float c_add = 0.007f;
+			const float c_ins = 0.12f;
+	
+			float s_add = c_add * Smax;
+			float s_ins = c_ins * Smax;
+			
+			float idf = log(1.f + maxD / iter.Size());
+			float wq = idf * termWeight;
+			queryWeight += wq * wq;
+			
+			uint8 f_add = static_cast<uint8>(s_add / (idf * wq * wq));
+			uint8 f_ins = static_cast<uint8>(s_ins / (idf * wq * wq));
+			
+			uint32 docNr;
+			uint8 weight;
+			while (iter.Next(docNr, weight) and weight >= f_add)
+			{
+				if (weight >= f_ins or A[docNr] != 0)
+				{
+					float wd = weight;
+					float sd = idf * wd * wq;
+					
+					float S = A.Add(docNr, sd);
+					if (Smax < S)
+						Smax = S;
+				}
+			}
+		
+		queryWeight = sqrt(queryWeight);
+		
+		vector<uint32> docs;
+		A.Collect(docs, 1);
+		
+		auto order = [](const pair<uint32,float>& a, const pair<uint32,float>& b) -> bool
+		{
+			return a.second > b.second;	
+		};
+		
+		vector<pair<uint32,float>> best;
+		
+		foreach (uint32 doc, docs)
+		{
+			float docWeight = mDocWeights[doc];//mStore->GetDocWeight(doc);
+			float rank = A[doc] / (docWeight * queryWeight);
+			
+			if (best.size() < inReportLimit)
+			{
+				best.push_back(make_pair(doc, rank));
+				push_heap(best.begin(), best.end(), order);
+			}
+			else if (best.front().second < rank)
+			{
+				pop_heap(best.begin(), best.end(), order);
+				best.back() = make_pair(doc, rank);
+				push_heap(best.begin(), best.end(), order);
+			}
+		}
+		
+		sort_heap(best.begin(), best.end(), order);
+		
+		foreach (auto b, best)
+		{
+			auto_ptr<M6Document> doc(Fetch(b.first));
+
+			cout << doc->GetAttribute("id") << '\t'
+				<< doc->GetAttribute("title") << '\t'
+				<< b.second << endl;
+		}
+	}
+	
+	return result;
+}
+
 void M6DatabankImpl::StartBatchImport(M6Lexicon& inLexicon)
 {
 	mBatch = new M6BatchIndexProcessor(*this, inLexicon);
@@ -1088,12 +1234,13 @@ void M6DatabankImpl::RecalculateDocumentWeights()
 	uint32 maxDocNr = mStore->NextDocumentNumber();
 	
 	// recalculate document weights
-	vector<float> dw(maxDocNr, 0);
+	
+	mDocWeights.assign(maxDocNr, 0);
 	M6WeightedBasicIndex* ix = dynamic_cast<M6WeightedBasicIndex*>(mAllTextIndex.get());
 	if (ix == nullptr)
 		THROW(("Invalid index"));
-	ix->CalculateDocumentWeights(dw);
-	mStore->UpdateDocWeights(&dw[0]);
+	ix->CalculateDocumentWeights(docCount, mDocWeights);
+//	mStore->UpdateDocWeights(&mDocWeights[0]);
 }
 
 void M6DatabankImpl::Validate()
@@ -1150,6 +1297,11 @@ M6Document* M6Databank::Fetch(uint32 inDocNr)
 M6Document* M6Databank::FindDocument(const string& inIndex, const string& inValue)
 {
 	return mImpl->FindDocument(inIndex, inValue);
+}
+
+M6Iterator* M6Databank::Find(const string& inQuery, uint32 inReportLimit)
+{
+	return mImpl->Find(inQuery, inReportLimit);
 }
 
 uint32 M6Databank::size() const

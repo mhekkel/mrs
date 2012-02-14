@@ -78,6 +78,7 @@ BOOST_AUTO_TEST_CASE(test_store_1)
 	foreach (const string& doc, testdocs)
 		store.StoreDocument(doc.c_str(), doc.length());
 
+//	store.Dump();
 	store.Validate();
 
 	BOOST_CHECK_EQUAL(store.size(), testdocs.size());

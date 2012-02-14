@@ -17,6 +17,7 @@ class M6DocStore
 	void			UpdateDocWeight(uint32 inDocNr, float inWeight);
 	void			UpdateDocWeights(float inWeight[]);
 	bool			FetchDocument(uint32 inDocNr, uint32& outPageNr, uint32& outDocSize);
+	float			GetDocWeight(uint32 inDocNr);
 	void			OpenDataStream(uint32 inDocNr, uint32 inPageNr, uint32 inDocSize,
 						boost::iostreams::filtering_stream<boost::iostreams::input>& ioStream);
 	void			EraseDocument(uint32 inDocNr);
@@ -73,6 +74,7 @@ class M6DocStore
 	void				Commit();
 
 	void				Validate();
+	void				Dump();
 
   protected:
 	M6DocStoreImpl*		mImpl;

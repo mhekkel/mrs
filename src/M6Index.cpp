@@ -5,6 +5,7 @@
 
 #include "M6Lib.h"
 
+#include <cmath>
 #include <deque>
 #include <list>
 #include <vector>
@@ -12,6 +13,8 @@
 #include <iostream>
 
 #include <boost/static_assert.hpp>
+#include <boost/foreach.hpp>
+#define foreach BOOST_FOREACH
 
 #include "M6Index.h"
 #include "M6Error.h"
@@ -1450,6 +1453,10 @@ void M6IndexImpl::StoreBits(M6OBitStream& inBits, M6BitVector& outBitVector)
 	const uint8* data = inBits.Peek();
 	size_t size = inBits.Size();
 
+//cout << endl;
+//HexDump(data, size, cout);
+//cout << endl;
+
 	if (size <= kM6BitVectorInlineBitsSize)
 	{
 		outBitVector.mType = eM6InlineBitVector;
@@ -2581,14 +2588,85 @@ void M6WeightedBasicIndex::Insert(const string& inKey, vector<pair<uint32,uint8>
 	static_cast<M6IndexImplT<M6MultiData>*>(mImpl)->Insert(inKey, data);
 }
 
-bool M6WeightedBasicIndex::Find(const string& inKey, weighted_iterator& outIterator)
+M6WeightedBasicIndex::M6WeightedIterator::M6WeightedIterator()
+	: mSize(0)
 {
-	return false;
 }
 
-void M6WeightedBasicIndex::CalculateDocumentWeights(std::vector<float>& outWeights)
+M6WeightedBasicIndex::M6WeightedIterator::M6WeightedIterator(M6IndexImpl& inIndex,
+	const M6BitVector& inBitVector, uint32 inCount)
+	: mBits(new M6IBitVectorImpl(inIndex, inBitVector))
+	, mSize(inCount)
+	, mWeight(kM6MaxWeight + 1)
+{
+}
+
+M6WeightedBasicIndex::M6WeightedIterator::M6WeightedIterator(const M6WeightedIterator& inIter)
+	: mBits(inIter.mBits)
+	, mDocs(inIter.mDocs)
+	, mSize(inIter.mSize)
+	, mWeight(inIter.mWeight)
+{
+}
+
+M6WeightedBasicIndex::M6WeightedIterator&
+M6WeightedBasicIndex::M6WeightedIterator::operator=(const M6WeightedIterator& inIter)
+{
+	if (this != &inIter)
+	{
+		mBits = inIter.mBits;
+		mDocs = inIter.mDocs;
+		mSize = inIter.mSize;
+		mWeight = inIter.mWeight;
+	}
+	
+	return *this;
+}
+
+bool M6WeightedBasicIndex::M6WeightedIterator::Next(uint32& outDocNr, uint8& outWeight)
+{
+	bool result = false;
+	if (mSize > 0)
+	{
+		if (mDocs.empty())
+		{
+			uint32 delta;
+			ReadGamma(mBits, delta);
+			mWeight -= delta;
+			
+			ReadArray(mBits, mDocs);
+			reverse(mDocs.begin(), mDocs.end());
+		}
+		
+		outDocNr = mDocs.back();
+		mDocs.pop_back();
+
+		outWeight = mWeight;
+		
+		--mSize;
+		result = true;
+	}
+
+	return result;
+}
+
+bool M6WeightedBasicIndex::Find(const string& inKey, M6WeightedIterator& outIterator)
+{
+	bool result = false;
+	M6MultiData data;
+	if (static_cast<M6IndexImplT<M6MultiData>*>(mImpl)->Find(inKey, data))
+	{
+		outIterator = M6WeightedIterator(*mImpl, data.mBitVector, data.mCount);
+		result = true;
+	}
+	return result;
+}
+
+void M6WeightedBasicIndex::CalculateDocumentWeights(uint32 inDocCount,
+	vector<float>& outWeights)
 {
 	vector<uint32> docs;
+	float max = static_cast<float>(inDocCount);
 	
 	M6BasicPage* page = mImpl->GetFirstLeafPage();
 	while (page != nullptr)
@@ -2604,24 +2682,27 @@ void M6WeightedBasicIndex::CalculateDocumentWeights(std::vector<float>& outWeigh
 			M6MultiData data = leaf->GetValue(i);
 			M6IBitStream bits(new M6IBitVectorImpl(*mImpl, data.mBitVector));
 
-			//cout << leaf->GetKey(i) << " i = " << i << ' ';
-
 			uint32 weight = kM6MaxWeight + 1;
 			
 			uint32 count = data.mCount;
+			float idfCorrection = log(1.f + max / count);
+			
 			while (count > 0)
 			{
 				uint32 delta;
 				ReadGamma(bits, delta);
 				weight -= delta;
 
-				//cout << '.'; cout.flush();
+				float docTermWeight = weight * idfCorrection;
+				docTermWeight *= docTermWeight;
 
 				ReadArray(bits, docs);
 
-				count -= docs.size();
+				foreach (uint32 doc, docs)
+					outWeights[doc] += docTermWeight;
+
+				count -= static_cast<uint32>(docs.size());
 			}
-			//cout << endl;
 		}
 
 		uint32 link = page->GetLink();
@@ -2633,5 +2714,7 @@ void M6WeightedBasicIndex::CalculateDocumentWeights(std::vector<float>& outWeigh
 		page = next;
 	}
 	
+	for_each(outWeights.begin(), outWeights.end(), [](float& w) { w = sqrt(w); });
+
 	mImpl->Release(page);
 }

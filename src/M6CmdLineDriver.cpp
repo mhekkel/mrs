@@ -6,6 +6,7 @@
 #include <boost/filesystem/operations.hpp>
 
 #include "M6Builder.h"
+#include "M6Databank.h"
 #include "M6Config.h"
 #include "M6Error.h"
 
@@ -20,6 +21,12 @@ void Dump(const string& inDatabank, int inLevel)
 	
 }
 
+void Query(const string& inDatabank, const string& inQuery)
+{
+	M6Databank db(inDatabank, eReadOnly);
+	db.Find(inQuery);
+}
+
 int main(int argc, char* argv[])
 {
 	try
@@ -31,6 +38,7 @@ int main(int argc, char* argv[])
 			("databank,d",	po::value<string>(),	"Databank to build")
 			("config-file,c", po::value<string>(),	"Configuration file")
 			("level", po::value<int>(),				"Dump level, the higher the more information")
+			("query,q", po::value<string>(),		"Query term")
 			("verbose,v",							"Be verbose")
 			;
 
@@ -74,6 +82,8 @@ int main(int argc, char* argv[])
 				level = vm["level"].as<int>();
 			Dump(databank, level);
 		}
+		else if (vm["action"].as<string>() == "query")
+			Query(databank, vm["query"].as<string>());
 		else
 			THROW(("unimplemented action '%s'", vm["action"].as<string>().c_str()));
 	}

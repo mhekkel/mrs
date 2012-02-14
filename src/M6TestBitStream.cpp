@@ -77,3 +77,19 @@ BOOST_AUTO_TEST_CASE(test_bit_stream_2)
 	BOOST_CHECK(a2i == a.end());
 	BOOST_CHECK(b2i == arr2.end());
 }
+
+BOOST_AUTO_TEST_CASE(test_bit_stream_3)
+{
+	cout << "testing bitstream" << endl;
+
+	M6OBitStream bits;
+	
+	uint32 v = 0x01234567;
+
+	WriteBinary(bits, 32, v);
+	M6IBitStream ibits(bits);
+
+	uint32 t;
+	ReadBinary(ibits, 32, t);
+	BOOST_CHECK_EQUAL(t, v);
+}

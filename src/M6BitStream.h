@@ -159,17 +159,13 @@ void ReadBinary(M6IBitStream& inBits, int32 inBitCount, T& outValue)
 	}
 }
 
-template<class T> void WriteBinary(M6OBitStream& inBits, int inBitCount, const T& inValue)
+inline void WriteBinary(M6OBitStream& inBits, int inBitCount, uint64 inValue)
 {
-	assert(inBitCount <= int32(sizeof(T) * 8));
+	assert(inBitCount <= 64);
 	assert(inBitCount > 0);
 	
-	uint64 b = 1ULL << (inBitCount - 1);
-	while (b)
-	{
-		inBits << (inValue & b);
-		b >>= 1;
-	}
+	while (inBitCount-- > 0)
+		inBits << (inValue & (1ULL << inBitCount));
 }
 
 //	

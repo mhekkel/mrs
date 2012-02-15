@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 #include <boost/type_traits/is_integral.hpp>
 
@@ -51,6 +52,7 @@ void pread(MHandle inHandle, void* inBuffer, int64 inSize, int64 inOffset);
 
 class M6FileReader;
 class M6FileWriter;
+class M6FileSizeHelper;
 
 class M6File
 {
@@ -64,15 +66,28 @@ class M6File
 	template<class S>
 	void			PRead(S& outStruct, int64 inOffset)
 					{
-						M6FileReader data(this, inOffset);
+						M6FileSizeHelper size;
+						outStruct.serialize(size);
+						
+						std::vector<uint8> buffer(size.mSize);
+						PRead(&buffer[0], size.mSize, inOffset);
+						
+						M6FileReader data(&buffer[0]);
 						outStruct.serialize(data);
 					}
 	
 	template<class S>
 	void			PWrite(S& outStruct, int64 inOffset)
 					{
-						M6FileWriter data(this, inOffset);
+						M6FileSizeHelper size;
+						outStruct.serialize(size);
+						
+						std::vector<uint8> buffer(size.mSize);
+
+						M6FileWriter data(&buffer[0]);
 						outStruct.serialize(data);
+
+						PWrite(&buffer[0], size.mSize, inOffset);
 					}
 	
 	virtual void	Truncate(int64 inSize);
@@ -102,82 +117,101 @@ class M6FileStream : public M6File
 	int64			mOffset;
 };
 
+struct M6FileSizeHelper
+{
+					M6FileSizeHelper() : mSize(0)	{}
+	
+	template<class T>
+	M6FileSizeHelper& operator&(const T& inValue)	{ mSize += sizeof(T); return *this; }
+
+	int64			mSize;
+};
+
 class M6FileReader
 {
   public:
+					M6FileReader(const uint8* inBuffer) : mBuffer(inBuffer) {}
 
 	template<class T, bool>
-	struct read_and_swap
+	struct reader
 	{
-		void operator()(M6File& inFile, T& value, int64 inOffset)
+		size_t operator()(const uint8* inBuffer, T& outValue) const
 		{
-			inFile.PRead(value, sizeof(value), inOffset);
+			memcpy(&outValue, inBuffer, sizeof(T)); return sizeof(T);
 		}
 	};
 
 	template<class T>
-	struct read_and_swap<T, true>
+	struct reader<T, true>
 	{
-		void operator()(M6File& inFile, T& value, int64 inOffset)
+		size_t operator()(const uint8* inBuffer, T& outValue) const
 		{
-			inFile.PRead(&value, sizeof(value), inOffset);
-			value = swap_bytes(value);
+			for (int i = 0; i < sizeof(T); ++i)
+				outValue = (outValue << 8) | *inBuffer++; 
+			return sizeof(T);
 		}
 	};
-	
-				M6FileReader(M6File* inFile, int64 inOffset)
-					: mFile(inFile), mOffset(inOffset) {}
 
 	template<class T>
-	M6FileReader& operator&(T& v)
-	{
-		read_and_swap<T, boost::is_integral<T>::value> read;
-		read(*mFile, v, mOffset);
-		mOffset += sizeof(v);
-		return *this;
-	}
+	M6FileReader&	operator&(T& v)
+					{
+						reader<T, boost::is_integral<T>::value> reader;
+						mBuffer += reader(mBuffer, v);
+						return *this;
+					}
 
   private:
-	M6File*		mFile;
-	int64		mOffset;
+	const uint8*	mBuffer;
 };
 
 class M6FileWriter
 {
   public:
-				M6FileWriter(M6File* inFile, int64 inOffset)
-					: mFile(inFile), mOffset(inOffset) {}
+					M6FileWriter(uint8* inBuffer) : mBuffer(inBuffer) {}
 
 	template<class T, bool>
-	struct write_and_swap
+	struct writer
 	{
-		void operator()(M6File& inFile, const T& value, int64 inOffset)
+		size_t operator()(uint8* inBuffer, const T& inValue) const
 		{
-			inFile.PWrite(value, sizeof(value), inOffset);
+			memcpy(inBuffer, &inValue, sizeof(T)); return sizeof(T);
 		}
 	};
 
 	template<class T>
-	struct write_and_swap<T, true>
+	struct writer<T, true>
 	{
-		void operator()(M6File& inFile, const T& value, int64 inOffset)
+		size_t operator()(uint8* inBuffer, T inValue) const
 		{
-			T v = swap_bytes(value);
-			inFile.PWrite(&v, sizeof(T), inOffset);
+			for (int i = sizeof(T) - 1; i >= 0; --i)
+			{
+				inBuffer[i] = static_cast<uint8>(inValue);
+				inValue >>= 8;
+			}
+			return sizeof(T);
 		}
 	};
-	
-	template<class T>
-	M6FileWriter& operator&(const T& v)
-	{
-		write_and_swap<T, boost::is_integral<T>::value> write;
-		write(*mFile, v, mOffset);
-		mOffset += sizeof(v);
-		return *this;
-	}
 
+	template<class T>
+	M6FileWriter&	operator&(T& v)
+					{
+						writer<T, boost::is_integral<T>::value> writer;
+						mBuffer += writer(mBuffer, v);
+						return *this;
+					}
+
+	M6FileWriter&	operator&(int8 v)
+					{
+						*mBuffer++ = v;
+						return *this;
+					}
+
+	M6FileWriter&	operator&(uint8 v)
+					{
+						*mBuffer++ = v;
+						return *this;
+					}
 
   private:
-	M6File*		mFile;
-	int64		mOffset;
+	uint8*			mBuffer;
 };

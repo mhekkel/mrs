@@ -1,5 +1,6 @@
 #include "M6Lib.h"
 
+#include <iostream>
 #include <limits>
 
 #include <boost/thread.hpp>
@@ -165,6 +166,8 @@ void pwrite(MHandle inHandle, const void* inBuffer, int64 inSize, int64 inOffset
 
 void pread(MHandle inHandle, void* inBuffer, int64 inSize, int64 inOffset)
 {
+//cout << "pread(" << inSize << ", " << inOffset << ')' << endl;
+
 	char* buffer = reinterpret_cast<char*>(inBuffer);
 
 	// read in blocks of at most max_int32 size
@@ -261,6 +264,7 @@ int64 file_size(MHandle inHandle)
 
 void pwrite(MHandle inHandle, const void* inBuffer, int64 inSize, int64 inOffset)
 {
+//cout << "pwrite(" << inSize << ", " << inOffset << ')' << endl;
 	int64 result = ::pwrite(inHandle, inBuffer, inSize, inOffset);
 	if (result < 0)
 		THROW(("Error writing file: %s", strerror(errno)));
@@ -268,6 +272,7 @@ void pwrite(MHandle inHandle, const void* inBuffer, int64 inSize, int64 inOffset
 
 void pread(MHandle inHandle, void* inBuffer, int64 inSize, int64 inOffset)
 {
+//cout << "pread(" << inSize << ", " << inOffset << ')' << endl;
 	int64 result = ::pread(inHandle, inBuffer, inSize, inOffset);
 	if (result < 0)
 		THROW(("Error reading file: %s", strerror(errno)));

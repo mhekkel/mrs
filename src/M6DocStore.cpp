@@ -936,6 +936,8 @@ uint32 M6DocStoreImpl::StoreDocument(const char* inData, size_t inSize)
 	if (inSize > numeric_limits<uint32>::max())
 		THROW(("Document too large"));
 
+//cout << "store doc" << endl;
+
 	const uint8* ptr = reinterpret_cast<const uint8*>(inData);
 	uint32 size = static_cast<uint32>(inSize);
 	uint32 pageNr = mHeader.mLastDataPage;
@@ -1004,8 +1006,8 @@ uint32 M6DocStoreImpl::StoreDocument(const char* inData, size_t inSize)
 
 	mDirty = true;
 	
-	if (mAutoCommit)
-		Commit();
+//	if (mAutoCommit)
+//		Commit();
 
 	return result;
 }

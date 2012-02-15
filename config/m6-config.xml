@@ -72,7 +72,7 @@
 		</processing>
 
 	</databank>
-
+<!--
 	<databank id="genbank">
 		<name>Genbank</name>
 		<file>test/genbank.m6</file>
@@ -132,6 +132,6 @@
 			</switch>
 		</foreach>
 	</databank>
-	
+	-->
 	
 </m6-config>

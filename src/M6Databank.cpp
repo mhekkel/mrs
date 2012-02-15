@@ -965,9 +965,9 @@ M6DatabankImpl::M6DatabankImpl(M6Databank& inDatabank, const string& inPath, MOp
 				uint32 maxDocNr = mStore->NextDocumentNumber();
 				mDocWeights.assign(maxDocNr, 0);
 				
-				M6FileStream file(mDbDirectory / "all-text.weights", eReadOnly);
+				M6FileStream file((mDbDirectory / "all-text.weights").string(), eReadOnly);
 				if (file.Size() == sizeof(float) * maxDocNr)
-					file.PRead(&mDocWeights[0], sizeof(float) * maxDocNr);
+					file.Read(&mDocWeights[0], sizeof(float) * maxDocNr);
 				else
 					mDocWeights.clear();
 			}
@@ -1259,7 +1259,7 @@ void M6DatabankImpl::RecalculateDocumentWeights()
 		THROW(("Invalid index"));
 	ix->CalculateDocumentWeights(docCount, mDocWeights);
 
-	M6FileStream weightFile(mDbDirectory / "all-text.weights", eReadWrite);
+	M6FileStream weightFile((mDbDirectory / "all-text.weights").string(), eReadWrite);
 	weightFile.Write(&mDocWeights[0], sizeof(float) * mDocWeights.size());
 }
 

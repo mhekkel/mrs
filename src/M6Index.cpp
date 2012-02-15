@@ -598,9 +598,6 @@ class M6BasicPage
 	void			SetLink(uint32 inLink)			{ mData->mLink = inLink; SetDirty(true); }
 	uint32			GetLink() const					{ return mData->mLink; }
 
-	void*			operator new(size_t, M6IndexImpl& inImpl);
-	void			operator delete(void* p);
-
   protected:
 	M6IndexPageHeader*	mData;
 	uint32				mPageNr;

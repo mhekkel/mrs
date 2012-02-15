@@ -14,7 +14,7 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/regex.hpp>
 #include <boost/tr1/tuple.hpp>
-#include <boost/timer/timer.hpp>
+//#include <boost/timer/timer.hpp>
 
 #include "M6DocStore.h"
 #include "M6Error.h"
@@ -255,7 +255,7 @@ void M6Builder::SetupProcessor(zx::element* inConfig)
 
 void M6Builder::Build()
 {
-	boost::timer::auto_cpu_timer t;
+//	boost::timer::auto_cpu_timer t;
 
 	zx::element* file = mConfig->find_first("file");
 	if (not file)

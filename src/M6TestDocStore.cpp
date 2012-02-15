@@ -1,4 +1,4 @@
-﻿#include <iostream>
+#include <iostream>
 #include <ios>
 #include <fstream>
 #include <map>
@@ -10,7 +10,7 @@
 #define foreach BOOST_FOREACH
 #include <boost/algorithm/string.hpp>
 #include <boost/format.hpp>
-#include <boost/timer/timer.hpp>
+//#include <boost/timer/timer.hpp>
 #include <boost/regex.hpp>
 
 #include "M6Lib.h"
@@ -251,3 +251,23 @@ BOOST_AUTO_TEST_CASE(test_store_6)
 //	}
 //}
 
+//	boost::timer::auto_cpu_timer t;
+
+	M6Databank db("test/pdbfinder.m6", eReadOnly);
+	uint32 size = db.size();
+
+	for (uint32 i = 1; i <= size; ++i)
+	{
+		M6Document* doc = db.Fetch(i);
+		
+		BOOST_CHECK(doc != nullptr);
+		
+		if (doc == nullptr)
+			continue;
+		
+		(void)doc->GetAttribute("id");
+		(void)doc->GetAttribute("title");
+		
+		delete doc;
+	}
+}

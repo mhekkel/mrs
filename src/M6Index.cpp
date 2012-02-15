@@ -23,7 +23,7 @@
 using namespace std;
 
 class M6ValidationException;
-#define M6VALID_ASSERT(cond)	do { if (not (cond)) throw M6ValidationException(GetPageNr(), #cond ); } while (false)
+#define M6VALID_ASSERT(cond)	do { if (not (cond)) throw M6ValidationException(this->GetPageNr(), #cond ); } while (false)
 
 // --------------------------------------------------------------------
 
@@ -2542,98 +2542,6 @@ class M6ValidationException : public std::exception
 	uint32			mPageNr;
 	char			mReason[512];
 };
-
-//
-//template<class M6DataType>
-//void M6IndexLeafPage<M6DataType>::Validate(const string& inKey, M6IndexPage* inParent)
-//{
-////	M6VALID_ASSERT(mPageData.mN >= kM6MinEntriesPerPage or inParent == nullptr);
-//	//M6VALID_ASSERT(inParent == nullptr or not TooSmall());
-//	M6VALID_ASSERT(inKey.empty() or GetKey(0) == inKey);
-//	
-//	for (uint32 i = 0; i < mPageData.mN; ++i)
-//	{
-//		if (i > 0)
-//		{
-////			IM6VALID_ASSERT(GetValue(i) > GetValue(i - 1));
-//			M6VALID_ASSERT(mIndexImpl.CompareKeys(GetKey(i - 1), GetKey(i)) < 0);
-//		}
-//	}
-//	
-//	if (mPageData.mLink != 0)
-//	{
-//		M6IndexPagePtr next(mIndexImpl.Load<M6IndexPage>(mPageData.mLink));
-//		//M6VALID_ASSERT(mIndexImpl.CompareKeys(GetKey(mPageData.mN - 1), next->GetKey(0)) < 0);
-//		mIndexImpl.Release(next);
-//	}
-//}
-//
-//template<class M6DataType>
-//void M6IndexBranchPage<M6DataType>::Validate(const string& inKey, M6IndexPage* inParent)
-//{
-////		M6VALID_ASSERT(mPageData.mN >= kM6MinEntriesPerPage or inParent == nullptr);
-//	//M6VALID_ASSERT(inParent == nullptr or not TooSmall());
-////		M6VALID_ASSERT(mPageData.mN <= kM6DataCount);
-//
-//	for (uint32 i = 0; i < mPageData.mN; ++i)
-//	{
-//		M6IndexPagePtr link(mIndexImpl.Load<M6IndexPage>(mPageData.mLink));
-//		link->Validate(inKey, this);
-//		mIndexImpl.Release(link);
-//		
-//		for (uint32 i = 0; i < mPageData.mN; ++i)
-//		{
-//			M6IndexPagePtr page(mIndexImpl.Load<M6IndexPage>(GetValue(i)));
-//			page->Validate(GetKey(i), this);
-//			mIndexImpl.Release(page);
-//			if (i > 0)
-//				M6VALID_ASSERT(mIndexImpl.CompareKeys(GetKey(i - 1), GetKey(i)) < 0);
-//		}
-//	}
-//}
-//
-//template<class M6DataType>
-//void M6IndexLeafPage<M6DataType>::Dump(int inLevel, M6IndexPage* inParent)
-//{
-//	string prefix(inLevel * 2, ' ');
-//
-//	cout << prefix << "leaf page at " << mPageNr << "; N = " << mPageData.mN << ": [";
-//	for (int i = 0; i < mPageData.mN; ++i)
-//		cout << GetKey(i) << '(' << GetValue(i) << ')'
-//			 << (i + 1 < mPageData.mN ? ", " : "");
-//	cout << "]" << endl;
-//
-//	if (mPageData.mLink)
-//	{
-//		M6IndexPagePtr next(mIndexImpl.Load<M6IndexPage>(mPageData.mLink));
-//		//cout << prefix << "  " << "link: " << next->GetKey(0) << endl;
-//		mIndexImpl.Release(next);
-//	}
-//}
-//
-//template<class M6DataType>
-//void M6IndexBranchPage<M6DataType>::Dump(int inLevel, M6IndexPage* inParent)
-//{
-//	string prefix(inLevel * 2, ' ');
-//
-//	cout << prefix << (inParent ? "branch" : "root") << " page at " << mPageNr << "; N = " << mPageData.mN << ": {";
-//	for (int i = 0; i < mPageData.mN; ++i)
-//		cout << GetKey(i) << (i + 1 < mPageData.mN ? ", " : "");
-//	cout << "}" << endl;
-//
-//	M6IndexPagePtr link(mIndexImpl.Load<M6IndexPage>(mPageData.mLink));
-//	link->Dump(inLevel + 1, this);
-//	mIndexImpl.Release(link);
-//	
-//	for (int i = 0; i < mPageData.mN; ++i)
-//	{
-//		cout << prefix << inLevel << '.' << i << ") " << GetKey(i) << endl;
-//		
-//		M6IndexPagePtr sub(mIndexImpl.Load<M6IndexPage>(GetValue(i)));
-//		sub->Dump(inLevel + 1, this);
-//		mIndexImpl.Release(sub);
-//	}
-//}
 
 // --------------------------------------------------------------------
 

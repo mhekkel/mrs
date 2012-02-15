@@ -1,6 +1,7 @@
 #include "M6Lib.h"
 
 #include <cassert>
+#include <cstring>
 
 #include "M6Tokenizer.h"
 //#include "M6Unicode.h"

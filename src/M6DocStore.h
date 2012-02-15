@@ -13,11 +13,8 @@ class M6DocStore
 					M6DocStore(const std::string& inPath, MOpenMode inMode);
 	virtual			~M6DocStore();
 	
-	uint32			StoreDocument(const char* inData, size_t inSize, float inWeight = 0.f);
-	void			UpdateDocWeight(uint32 inDocNr, float inWeight);
-	void			UpdateDocWeights(float inWeight[]);
+	uint32			StoreDocument(const char* inData, size_t inSize = 0.f);
 	bool			FetchDocument(uint32 inDocNr, uint32& outPageNr, uint32& outDocSize);
-	float			GetDocWeight(uint32 inDocNr);
 	void			OpenDataStream(uint32 inDocNr, uint32 inPageNr, uint32 inDocSize,
 						boost::iostreams::filtering_stream<boost::iostreams::input>& ioStream);
 	void			EraseDocument(uint32 inDocNr);

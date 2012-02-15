@@ -267,7 +267,7 @@ class M6CompressedArray
 		bool			operator!=(const const_iterator& iter) const	{ return not operator==(iter); }
 
 	  private:
-		static const uint32 sSentinel = ~0UL;
+		static const uint32 sSentinel = ~0;
 
 		M6IBitStream	mBits;
 		uint32			mCount;

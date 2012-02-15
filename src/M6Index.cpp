@@ -598,6 +598,9 @@ class M6BasicPage
 	void			SetLink(uint32 inLink)			{ mData->mLink = inLink; SetDirty(true); }
 	uint32			GetLink() const					{ return mData->mLink; }
 
+	void*			operator new(size_t, M6IndexImpl& inImpl);
+	void			operator delete(void* p);
+
   protected:
 	M6IndexPageHeader*	mData;
 	uint32				mPageNr;
@@ -1815,9 +1818,6 @@ Page* M6IndexImpl::Load(uint32 inPageNr)
 			case eM6IndexMultiIDLLeafPage:	page = dynamic_cast<Page*>(CreateLeafPage(data, inPageNr)); break;
 			default:						THROW(("Invalid index type in load"));
 		}
-
-//		if (data->leaf.mType != Page::M6IndexPageType)
-//			THROW(("Inconsistent index, page type on disk is incorrect"));
 		
 		cp = GetCachePage();
 		cp->mPage = page;

@@ -958,7 +958,27 @@ M6DatabankImpl::M6DatabankImpl(M6Databank& inDatabank, const string& inPath, MOp
 		mStore = new M6DocStore((mDbDirectory / "data").string(), inMode);
 		mAllTextIndex.reset(new M6SimpleWeightedIndex((mDbDirectory / "all-text.index").string(), inMode));
 		
-		RecalculateDocumentWeights();
+		if (fs::exists(mDbDirectory / "all-text.weights"))
+		{
+			try
+			{
+				uint32 maxDocNr = mStore->NextDocumentNumber();
+				mDocWeights.assign(maxDocNr, 0);
+				
+				M6FileStream file(mDbDirectory / "all-text.weights", eReadOnly);
+				if (file.Size() == sizeof(float) * maxDocNr)
+					file.PRead(&mDocWeights[0], sizeof(float) * maxDocNr);
+				else
+					mDocWeights.clear();
+			}
+			catch (...)
+			{
+				mDocWeights.clear();
+			}
+		}
+		
+		if (mDocWeights.empty())
+			RecalculateDocumentWeights();
 	}
 }
 
@@ -1176,7 +1196,7 @@ M6Iterator* M6DatabankImpl::Find(const string& inQuery, uint32 inReportLimit)
 	
 	foreach (uint32 doc, docs)
 	{
-		float docWeight = mDocWeights[doc];//mStore->GetDocWeight(doc);
+		float docWeight = mDocWeights[doc];
 		float rank = A[doc] / (docWeight * queryWeight);
 		
 		if (best.size() < inReportLimit)
@@ -1238,7 +1258,9 @@ void M6DatabankImpl::RecalculateDocumentWeights()
 	if (ix == nullptr)
 		THROW(("Invalid index"));
 	ix->CalculateDocumentWeights(docCount, mDocWeights);
-//	mStore->UpdateDocWeights(&mDocWeights[0]);
+
+	M6FileStream weightFile(mDbDirectory / "all-text.weights", eReadWrite);
+	weightFile.Write(&mDocWeights[0], sizeof(float) * mDocWeights.size());
 }
 
 void M6DatabankImpl::Validate()

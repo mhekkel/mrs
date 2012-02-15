@@ -390,6 +390,8 @@ const char filename[] = "test.index";
 
 BOOST_AUTO_TEST_CASE(file_ix_comparator)
 {
+	cout << "testing comparator" << endl;
+
 	M6NumericComparator nc;
 	BOOST_CHECK_LT(nc("1", 1, "2", 1), 0);
 	BOOST_CHECK_LT(nc("01", 2, "2", 1), 0);
@@ -401,6 +403,8 @@ BOOST_AUTO_TEST_CASE(file_ix_comparator)
 
 BOOST_AUTO_TEST_CASE(file_ix_5)
 {
+	cout << "testing index insert" << endl;
+
 	if (fs::exists(filename))
 		fs::remove(filename);
 
@@ -478,6 +482,8 @@ BOOST_AUTO_TEST_CASE(file_ix_5a)
 
 BOOST_AUTO_TEST_CASE(file_ix_5b)
 {
+	cout << "testing index find" << endl;
+
 	ifstream text("test/test-doc-2.txt");
 	BOOST_REQUIRE(text.is_open());
 
@@ -519,6 +525,8 @@ BOOST_AUTO_TEST_CASE(file_ix_5b)
 
 BOOST_AUTO_TEST_CASE(file_ix_5c)
 {
+	cout << "testing index erase" << endl;
+
 	ifstream text("test/test-doc-2.txt");
 	BOOST_REQUIRE(text.is_open());
 

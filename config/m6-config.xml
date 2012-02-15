@@ -2,7 +2,6 @@
 <!DOCTYPE m6-config SYSTEM "http://mrs.cmbi.ru.nl/dtd/m6-config.dtd">
 <m6-config>
 	
-	
 	<databank id="pdbfinder">
 		<name>PDBFINDER</name>
 <!--		<file>C:\Users\maarten\projects\m6\test\pdbfinder.m6</file> -->
@@ -73,5 +72,66 @@
 		</processing>
 
 	</databank>
+
+	<databank id="genbank">
+		<name>Genbank</name>
+		<file>test/genbank.m6</file>
+		<locale>en_US.UTF-8</locale>
+		
+		<source type="path">/data/raw/genbank_release/*.seq.gz</source>
+		
+		<document-separator type="first-line-matches">^LOCUS </document-separator>
+		<document-separator type="last-line-equals">//</document-separator>
+
+		<foreach regex="^\s*(\w+)\s+((?:.+)(?:\n\s{5,}.+)*)">
+			<switch>
+				<case test="$1 eq 'locus'">
+					<substring location="13-28">
+						<store action="index attr unique" name="id"/>
+					</substring>
+					<substring location="69-79">
+						<store action="index" name="date" type="date" format="dd-MMM-yyyy" />
+					</substring>
+				</case>
+				
+				<case test="$1 eq 'definition'">
+					<store name="title" action="index attr" />
+				</case>
+
+				<case test="$1 eq 'accession'">
+					<foreach split="\s+">
+						<store name="accession" action="index unique" />
+					</foreach>
+				</case>
+				
+				<case test="$1 eq 'version'">
+					<match regex="(\S+) GI:(\d+)">
+						<capture nr="1">
+							<store name="version" action="index unique"/>
+						</capture>
+						<capture nr="2">
+							<store name="gi" action="index unique" />
+						</capture>
+					</match>
+				</case>
+				
+				<case test="$1 eq 'features'">
+					<foreach regex="^\s{5}(\w+)\s+((?:\S.+)(?:\n\s{20,}.+)*)">
+						<foreach regex="/(\w+)="((?:\n|[^"]|"")*?)">
+							<store name="feature" action="index"/>
+						</foreach>
+					</foreach>
+				</case>
+				
+				<case test="$1 eq 'origin'">
+					<stop />
+				</case>
+				
+				<default>
+				</default>
+			</switch>
+		</foreach>
+	</databank>
+	
 	
 </m6-config>

@@ -53,23 +53,23 @@ struct M6IndexPageHeader
 };
 
 const uint32
-#if DEBUG
-//	kM6IndexPageSize		= 8192,
-	kM6IndexPageSize		= 512,
-	kM6IndexPageHeaderSize	= sizeof(M6IndexPageHeader),
-	kM6KeySpace				= kM6IndexPageSize - kM6IndexPageHeaderSize,
-	kM6MinKeySpace			= kM6KeySpace / 2,
-	kM6MaxKeyLength			= (kM6MinKeySpace / 2 > 255 ? 255 : kM6MinKeySpace / 2),
-	kM6MaxEntriesPerPage	= 4;
-//	kM6MaxEntriesPerPage	= kM6KeySpace / 8;	// see above
-#else
+//#if DEBUG
+////	kM6IndexPageSize		= 8192,
+//	kM6IndexPageSize		= 512,
+//	kM6IndexPageHeaderSize	= sizeof(M6IndexPageHeader),
+//	kM6KeySpace				= kM6IndexPageSize - kM6IndexPageHeaderSize,
+//	kM6MinKeySpace			= kM6KeySpace / 2,
+//	kM6MaxKeyLength			= (kM6MinKeySpace / 2 > 255 ? 255 : kM6MinKeySpace / 2),
+//	kM6MaxEntriesPerPage	= 4;
+////	kM6MaxEntriesPerPage	= kM6KeySpace / 8;	// see above
+//#else
 	kM6IndexPageSize		= 8192,
 	kM6IndexPageHeaderSize	= sizeof(M6IndexPageHeader),
 	kM6KeySpace				= kM6IndexPageSize - kM6IndexPageHeaderSize,
 	kM6MinKeySpace			= kM6KeySpace / 2,
 	kM6MaxKeyLength			= (kM6MinKeySpace / 2 > 255 ? 255 : kM6MinKeySpace / 2),
 	kM6MaxEntriesPerPage	= kM6KeySpace / 8;	// see above
-#endif
+//#endif
 
 template<M6IndexPageKind>
 struct M6IndexPageDataTraits {};

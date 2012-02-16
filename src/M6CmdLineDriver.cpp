@@ -23,7 +23,16 @@ void Dump(const string& inDatabank, int inLevel)
 
 void Query(const string& inDatabank, const string& inQuery)
 {
-	M6Databank db(inDatabank, eReadOnly);
+	zeep::xml::element* config = M6Config::Instance().LoadConfig(inDatabank);
+	if (not config)
+		THROW(("Configuration for %s is missing", inDatabank.c_str()));
+
+	zeep::xml::element* file = config->find_first("file");
+	if (not file)
+		THROW(("Invalid config-file, file is missing"));
+
+	fs::path path = file->content();
+	M6Databank db(path.string(), eReadOnly);
 	db.Find(inQuery);
 }
 

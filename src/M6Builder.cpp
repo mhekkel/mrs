@@ -264,7 +264,8 @@ bool M6SplitExpr::Evaluate(M6InputDocument* inDocument, M6Argument& arg) const
 		
 		if (rc == PCRE_ERROR_NOMATCH)
 		{
-			M6Argument a(arg.mText, arg.mLength);
+			M6Argument a(arg.mText + offset, arg.mLength - offset);
+			a.mIteration = iteration;
 			result = mExpr->Evaluate(inDocument, a);
 			break;
 		}

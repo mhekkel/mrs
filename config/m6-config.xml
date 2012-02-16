@@ -95,12 +95,12 @@
 					</case>
 					<case value="TI">
 						<capture nr="2">
+							<index name="title" type="text"/>
 							<split separator=";;">
-								<to-lower />
-								<substr length="255" />
-								<replace what="\s+" with=" " />
-								<index name="title" type="text"/>
 								<if iteration="1">
+									<to-lower />
+									<substr length="255" />
+									<replace what="\s+" with=" " />
 									<attr name="title"/>
 								</if>
 							</split>

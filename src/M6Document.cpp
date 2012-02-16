@@ -1,5 +1,7 @@
 #include "M6Lib.h"
 
+#include <iostream>
+
 #include <boost/iostreams/filtering_stream.hpp>
 #include <boost/iostreams/filter/zlib.hpp>
 #include <boost/iostreams/device/back_inserter.hpp>
@@ -67,8 +69,11 @@ void M6InputDocument::SetAttribute(const string& inName, const char* inText, siz
 	
 	if (inSize > 255)
 		THROW(("Attribute values are limited to 255 characters"));
-	
-	mAttributes[inName] = string(inText, inSize);
+
+	string attribute(inText, inSize);
+	ba::trim(attribute);
+
+	mAttributes[inName] = attribute;
 }
 
 uint32 M6InputDocument::Store()

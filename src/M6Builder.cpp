@@ -407,6 +407,10 @@ bool M6ReplaceExpr::Evaluate(M6InputDocument* inDocument, M6Argument& arg) const
 			options = PCRE_NOTEMPTY | PCRE_ANCHORED;
 	}
 
+	arg.mScratch = s;
+	arg.mText = arg.mScratch.c_str();
+	arg.mLength = arg.mScratch.length();
+
 	return true;
 }
 

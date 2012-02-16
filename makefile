@@ -21,12 +21,14 @@ OBJDIR				= obj
 
 BOOST_LIBS			= system thread filesystem regex math_c99 math_c99f program_options iostreams
 BOOST_LIBS			:= $(BOOST_LIBS:%=boost_%$(BOOST_LIB_SUFFIX))
-LIBS				= m pthread z zeep
+LIBS				= m pthread z zeep pcre
 LDFLAGS				+= $(BOOST_LIB_DIR:%=-L%) $(LIBS:%=-l%) -g $(BOOST_LIBS:%=$(BOOST_LIB_DIR)/lib%.a) \
 							-L ../libzeep/
 
 CC					= icpc
 CFLAGS				+= $(BOOST_INC_DIR:%=-I%) -I. -pthread -std=c++0x -I../libzeep/
+CFLAGS				+= -I $(HOME)/projects/pcre/include
+LDFLAGS				+= -L $(HOME)/projects/pcre/lib
 ifneq ($(DEBUG),1)
 CFLAGS				+= -O3 -DNDEBUG
 else

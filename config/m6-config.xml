@@ -85,7 +85,7 @@
 		<document-separator type="first-line-equals">*RECORD*</document-separator>
 		
 		<script>
-			<foreach regex="^\*FIELD\* (\w\w)\n((?(?=\*FIELD\*)|.*\n)+)">
+			<foreach regex="^\*FIELD\* (\w\w)\n((?(?=\*FIELD\*)(*ACCEPT)|.*\n)+)">
 				<switch test="1">
 					<case value="NO">
 						<capture nr="2">

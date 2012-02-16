@@ -81,10 +81,35 @@ class M6Processor
 
 struct M6Argument
 {
-	const char*		mText;
-	string			mScratch;
+					M6Argument(const char* inText, int inOVector[30])
+						: mIteration(1), mText(inText + inOVector[0])
+						, mLength(inOVector[1] - inOVector[0])
+					{
+						for (int i = 0; i < 10; ++i)
+						{
+							mMatchStarts[i] = inText + inOVector[2 * i];
+							mMatchLengths[i] = inOVector[2 * i + 1] - inOVector[2 * i];
+						}
+					}
+
+					M6Argument(const char* inText, uint32 inLength)
+						: mIteration(1), mText(inText)
+						, mLength(inLength)
+					{
+						for (int i = 0; i < 10; ++i)
+						{
+							mMatchStarts[i] = inText;
+							mMatchLengths[i] = inLength;
+						}
+					}
+
+
 	uint32			mIteration;
-	int				mOVector[30];
+	const char*		mText;
+	uint32			mLength;
+	const char*		mMatchStarts[10];
+	uint32			mMatchLengths[10];
+	string			mScratch;
 };
 
 struct M6Expr
@@ -137,7 +162,7 @@ M6ForeachExpr::M6ForeachExpr(const string& inPattern)
 		&error, &erroffset, nullptr);
 	if (mRE == nullptr)
 	{
-		THROW(("PCRE compilation failed at offset %d: %s\npatter: >> %s <<\n",
+		THROW(("PCRE compilation failed at offset %d: %s\npattern: >> %s <<\n",
 			erroffset, error, inPattern.c_str()));
 	}
 	else
@@ -161,18 +186,12 @@ bool M6ForeachExpr::Evaluate(M6InputDocument* inDocument, M6Argument& arg) const
 {
 	bool result = true;
 	
-	int options = 0;
-	int offset = arg.mOVector[0];
-	int length = arg.mOVector[1] - arg.mOVector[0];
-
-	M6Argument a = arg;
-	a.mIteration = 1;
-
-	while (offset < length)
+	int options = 0, offset = 0, iteration = 1;
+	while (offset < arg.mLength)
 	{
-		int rc = pcre_exec(mRE, mInfo,
-			arg.mText, length, offset,
-			options, a.mOVector, 30);
+		int ovector[30];
+
+		int rc = pcre_exec(mRE, mInfo, arg.mText, arg.mLength, offset, options, ovector, 30);
 		
 		if (rc == PCRE_ERROR_NOMATCH)
 		{
@@ -185,17 +204,19 @@ bool M6ForeachExpr::Evaluate(M6InputDocument* inDocument, M6Argument& arg) const
 		if (rc < 0)
 			THROW(("Matching error %d\n", rc));
 		
+		M6Argument a(arg.mText, ovector);
+		a.mIteration = iteration;
 		if (not mLoop->Evaluate(inDocument, a))
 		{
 			result = false;
 			break;
 		}
 		
-		offset = a.mOVector[1];
-		if (offset == length)
+		offset = ovector[1];
+		if (offset == arg.mLength)
 			options = PCRE_NOTEMPTY | PCRE_ANCHORED;
 
-		++a.mIteration;
+		++iteration;
 	}
 
 	return result;
@@ -203,41 +224,69 @@ bool M6ForeachExpr::Evaluate(M6InputDocument* inDocument, M6Argument& arg) const
 
 struct M6SplitExpr : public M6Expr
 {
-					M6SplitExpr(const string& inSeparator) : mSeparator(inSeparator) {}
+					M6SplitExpr(const string& inSeparator);
+					~M6SplitExpr();
 	virtual bool	Evaluate(M6InputDocument* inDocument, M6Argument& arg) const;
-	string			mSeparator;
+
+	pcre*			mRE;
 	M6ExprPtr		mExpr;
 };
+
+M6SplitExpr::M6SplitExpr(const string& inSeparator)
+{
+	const char* error;
+	int erroffset;
+	
+	mRE = pcre_compile(inSeparator.c_str(), PCRE_MULTILINE | PCRE_UTF8 | PCRE_NEWLINE_LF,
+		&error, &erroffset, nullptr);
+	if (mRE == nullptr)
+	{
+		THROW(("PCRE compilation failed at offset %d: %s\npattern: >> %s <<\n",
+			erroffset, error, inSeparator.c_str()));
+	}
+}
+
+M6SplitExpr::~M6SplitExpr()
+{
+	if (mRE != nullptr)
+		pcre_free(mRE);
+}
 
 bool M6SplitExpr::Evaluate(M6InputDocument* inDocument, M6Argument& arg) const
 {
 	bool result = true;
 	
-	if (mSeparator.empty())
-		THROW(("Empty separator string"));
-
-	M6Argument a = { arg.mText };
-	a.mIteration = 1;
-
-	const char* start = arg.mText + arg.mOVector[0];
-	while (start < arg.mText + arg.mOVector[1])
+	int options = 0, offset = 0, iteration = 1;
+	while (offset < arg.mLength)
 	{
-		a.mText = arg.mText;
-
-		const char* s = strstr(start, mSeparator.c_str());
-		if (s == nullptr)
-			s = arg.mText + arg.mOVector[1];
+		int ovector[30];
+		int rc = pcre_exec(mRE, nullptr, arg.mText, arg.mLength, offset, options, ovector, 30);
 		
-		a.mOVector[0] = static_cast<uint32>(start - arg.mText);
-		a.mOVector[1] = static_cast<uint32>(s - arg.mText);
-		
-		if (a.mOVector[1] > a.mOVector[0])
+		if (rc == PCRE_ERROR_NOMATCH)
+		{
+			M6Argument a(arg.mText, arg.mLength);
 			result = mExpr->Evaluate(inDocument, a);
+			break;
+		}
 
-		start = s + mSeparator.length();
-		++a.mIteration;
+		if (rc < 0)
+			THROW(("Matching error %d\n", rc));
+		
+		M6Argument a(arg.mText + ovector[0], ovector[1] - ovector[0]);
+		a.mIteration = iteration;
+		if (not mExpr->Evaluate(inDocument, a))
+		{
+			result = false;
+			break;
+		}
+		
+		offset = ovector[1];
+		if (offset == arg.mLength)
+			options = PCRE_NOTEMPTY | PCRE_ANCHORED;
+
+		++iteration;
 	}
-	
+
 	return result;
 }
 
@@ -247,10 +296,7 @@ struct M6CaptureExpr : public M6ListExpr
 	
 	virtual bool	Evaluate(M6InputDocument* inDocument, M6Argument& arg) const
 					{
-						M6Argument a = { arg.mText };
-						a.mOVector[0] = arg.mOVector[2 * mNr];
-						a.mOVector[1] = arg.mOVector[2 * mNr + 1];
-						
+						M6Argument a(arg.mMatchStarts[mNr], arg.mMatchLengths[mNr]);
 						return mExpr->Evaluate(inDocument, a);
 					}
 	
@@ -263,12 +309,10 @@ struct M6TolowerExpr : public M6Expr
 	virtual bool	Evaluate(M6InputDocument* inDocument, M6Argument& arg) const
 					{
 						// copy text since we're about to mutate it
-						arg.mScratch.assign(arg.mText + arg.mOVector[0], arg.mOVector[1] - arg.mOVector[0]);
-						arg.mOVector[1] -= arg.mOVector[0];
-						arg.mOVector[0] = 0;
-
+						arg.mScratch.assign(arg.mText, arg.mLength);
 						ba::to_lower(arg.mScratch);
 						arg.mText = arg.mScratch.c_str();
+						arg.mLength = arg.mScratch.length();
 						return true;
 					}
 };
@@ -279,13 +323,14 @@ struct M6SubStrExpr : public M6Expr
 						: mStart(inStart), mLength(inLength) {}
 	virtual bool	Evaluate(M6InputDocument* inDocument, M6Argument& arg) const
 					{
-						if (arg.mOVector[0] + mStart >= arg.mOVector[1])
-							arg.mOVector[0] = arg.mOVector[1];
+						if (mStart >= arg.mLength)
+							arg.mLength = 0;
 						else
 						{
-							arg.mOVector[0] += mStart;
-							if (arg.mOVector[0] + mLength < arg.mOVector[1])
-								arg.mOVector[1] = arg.mOVector[0] + mLength;
+							arg.mText += mStart;
+							arg.mLength -= mStart;
+							if (arg.mLength > mLength)
+								arg.mLength = mLength;
 						}
 						
 						return true;
@@ -314,7 +359,7 @@ M6ReplaceExpr::M6ReplaceExpr(const string& inWhat, const string& inWith)
 		&error, &erroffset, nullptr);
 	if (mRE == nullptr)
 	{
-		THROW(("PCRE compilation failed at offset %d: %s\npatter: >> %s <<\n",
+		THROW(("PCRE compilation failed at offset %d: %s\npattern: >> %s <<\n",
 			erroffset, error, inWhat.c_str()));
 	}
 }
@@ -337,14 +382,17 @@ struct M6SwitchExpr : public M6Expr
 
 	void			AddCase(const string& inValue, M6ExprPtr inExpr)
 					{
-						M6Case c = { inValue, inExpr };
-						mCases.push_back(c);
+						mCases.push_back(M6Case(inValue, inExpr));
 					}
 					
 	virtual bool	Evaluate(M6InputDocument* inDocument, M6Argument& arg) const;
 
 	struct M6Case
 	{
+					M6Case(const string& inValue, M6ExprPtr inExpr)
+						: mValue(inValue), mExpr(inExpr) {}
+					M6Case(const M6Case& c) : mValue(c.mValue), mExpr(c.mExpr) {}
+		
 		string		mValue;
 		M6ExprPtr	mExpr;
 	};
@@ -358,7 +406,7 @@ bool M6SwitchExpr::Evaluate(M6InputDocument* inDocument, M6Argument& arg) const
 {
 	bool result = true;
 	
-	string test(arg.mText + arg.mOVector[2 * mTest], arg.mOVector[2 * mTest + 1] - arg.mOVector[2 * mTest]);
+	string test(arg.mMatchStarts[mTest], arg.mMatchLengths[mTest]);
 	
 	bool handled = false;
 	foreach (const M6Case& c, mCases)
@@ -399,8 +447,7 @@ struct M6IndexExpr : public M6Expr
 
 	virtual bool	Evaluate(M6InputDocument* inDocument, M6Argument& arg) const
 					{
-						inDocument->Index(mName, mType, mUnique,
-							arg.mText + arg.mOVector[0], arg.mOVector[1] - arg.mOVector[0]);
+						inDocument->Index(mName, mType, mUnique, arg.mText, arg.mLength);
 						return true;
 					}
 	
@@ -414,8 +461,7 @@ struct M6AttrExpr : public M6Expr
 					M6AttrExpr(const string& inName) : mName(inName) {}
 	virtual bool	Evaluate(M6InputDocument* inDocument, M6Argument& arg) const
 					{
-						inDocument->SetAttribute(mName,
-							arg.mText + arg.mOVector[0], arg.mOVector[1] - arg.mOVector[0]);
+						inDocument->SetAttribute(mName, arg.mText, arg.mLength);
 						return true;
 					}
 
@@ -614,8 +660,7 @@ void M6Processor::ProcessDocument(const string& inDocument)
 {
 	M6InputDocument* doc = new M6InputDocument(mDatabank, inDocument);
 	
-	M6Argument arg = { inDocument.c_str() };
-	arg.mOVector[1] = static_cast<int>(inDocument.length());
+	M6Argument arg(inDocument.c_str(), inDocument.length());
 	mScript->Evaluate(doc, arg);
 	
 	doc->Tokenize(mLexicon, 0);

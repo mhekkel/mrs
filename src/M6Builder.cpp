@@ -4,6 +4,9 @@
 #include <memory>
 #include <list>
 
+#define PCRE_STATIC
+#include <pcre.h>
+
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/fstream.hpp>
 #include <boost/iostreams/device/back_inserter.hpp>
@@ -16,6 +19,7 @@
 #include <boost/regex.hpp>
 #include <boost/tr1/tuple.hpp>
 //#include <boost/timer/timer.hpp>
+#include <boost/lexical_cast.hpp>
 
 #include "M6DocStore.h"
 #include "M6Error.h"
@@ -31,12 +35,11 @@ namespace fs = boost::filesystem;
 namespace ba = boost::algorithm;
 namespace io = boost::iostreams;
 
-namespace
-{
+// --------------------------------------------------------------------
 
-M6DataType MapDataType(const string& inKind)
+M6DataType MapDataType(const string& inKind, M6DataType inDefault)
 {
-	M6DataType result = eM6NoData;
+	M6DataType result = inDefault;
 		 if (inKind == "text")		result = eM6TextData;
 	else if (inKind == "string")	result = eM6StringData;
 	else if (inKind == "numeric")	result = eM6NumberData;
@@ -44,179 +47,487 @@ M6DataType MapDataType(const string& inKind)
 	return result;
 }
 
-class M6Processor;
-typedef list<M6Processor>	M6ProcessorList;
+// --------------------------------------------------------------------
+
+struct M6Expr;
+typedef shared_ptr<M6Expr>	M6ExprPtr;
+typedef list<M6ExprPtr>		M6ExprList;
+
+// --------------------------------------------------------------------
 
 class M6Processor
 {
   public:
-					M6Processor();
+					M6Processor(M6Databank& inDatabank, M6Lexicon& inLexicon,
+						zx::element* inTemplate);
 	virtual			~M6Processor();
-
-	virtual void	Process(string& ioText) const = 0;
-};
-
-class M6ListProcessor : public M6Processor
-{
-  public:
 	
-	void			AddSubProcessor(const M6Processor& inProcessor);
-
-	M6ProcessorList	mList;
-};
-
-class M6ForeachProcessor : public M6Processor
-{
-  public:
-					M6ForeachProcessor(const string& inPattern);
-	virtual void	Process(string& ioText) const;
-
-	M6ProcessorList	mCases;
-	M6Processor		mDefault;
-};
-
-class M6TolowerProcessor : public M6Processor
-{
-  public:
-	virtual void	Process(string& ioText) const			{ ba::to_lower(ioText); }
-};
-
-class M6ReplaceProcessor : public M6Processor
-{
-  public:
-					M6ReplaceProcessor(const string& inWhat, const string& inWith);
-	virtual void	Process(string& ioText) const;
-};
-
-class M6SwitchProcessor : public M6Processor
-{
-  public:
-					M6SwitchProcessor(const string& inVar, const string& inValue);
-	virtual void	Process(string& ioText) const;
-};
-
-class M6CaseProcessor : public M6Processor
-{
-  public:
-					M6CaseProcessor(const string& inValue);
-	virtual void	Process(string& ioText) const;
-};
-
-class M6IndexProcessor : public M6Processor
-{
-  public:
-					M6IndexProcessor(const string& inName, const string& inType);	
-	virtual void	Process(string& ioText) const;
-};
-
-class M6AttrProcessor : public M6Processor
-{
-  public:
-					M6AttrProcessor(const string& inName);
-	virtual void	Process(string& ioText) const;
-};
-
-
-}
-
-M6Builder::M6Builder(const string& inDatabank)
-	: mConfig(M6Config::Instance().LoadConfig(inDatabank))
-	, mDatabank(nullptr)
-{
-}
-
-M6Builder::~M6Builder()
-{
-	delete mDatabank;
-}
-
-void M6Builder::Glob(zx::element* inSource, vector<fs::path>& outFiles)
-{
-	if (inSource == nullptr)
-		THROW(("No source specified for databank"));
-
-	string source = inSource->content();
-	ba::trim(source);
+	void			ProcessFile(fs::path inFile);
+	void			ProcessDocument(const string& inDocument);
 	
-	if (inSource->get_attribute("type") == "path")
-		outFiles.push_back(source);
-	else
-		THROW(("Unsupported source type"));
-}
+  private:
 
+	M6ExprPtr		ParseScript(zx::element* inScript);
 
-void M6Builder::Process(const string& inDocument)
+	M6Databank&		mDatabank;
+	M6Lexicon&		mLexicon;
+	zx::element*	mConfig;
+	M6ExprPtr		mScript;
+	M6Document*		mDocument;
+};
+
+// --------------------------------------------------------------------
+// The xml based script interpreter
+
+struct M6Argument
 {
-	M6InputDocument* doc = new M6InputDocument(*mDatabank, inDocument);
-	
-	const char* start = inDocument.c_str();
-	const char* end = start + inDocument.length();
-	boost::cmatch m;
-	boost::match_flag_type flags = boost::match_default | boost::match_not_dot_newline;
-	
-	map<string,string> attributes;
-	
-	while (regex_search(start, end, m, mProcessorRE, flags))
+	const char*		mText;
+	string			mScratch;
+	uint32			mIteration;
+	int				mOVector[30];
+};
+
+struct M6Expr
+{
+					M6Expr() {}
+	virtual			~M6Expr() {}
+
+	virtual bool	Evaluate(M6InputDocument* inDocument, M6Argument& arg) const = 0;
+};
+
+struct M6ListExpr : public M6Expr
+{
+	virtual bool	Evaluate(M6InputDocument* inDocument, M6Argument& arg) const;
+	M6ExprList		mList;
+};
+
+bool M6ListExpr::Evaluate(M6InputDocument* inDocument, M6Argument& arg) const
+{
+	bool result = true;
+	foreach (M6ExprPtr proc, mList)
 	{
-		string key(m[1].first, m[1].second);
-		ba::to_lower(key);
-		ba::trim(key);
-		bool stop = false;
-		
-		foreach (M6Processor& p, mProcessors)
+		if (not proc->Evaluate(inDocument, arg))
 		{
-			if (p.key != key and not p.key.empty())
-				continue;
+			result = false;
+			break;
+		}
+	}
+	return result;
+}
 
-			stop = p.stop;
-			
-			string value(m[2].first, m[2].second);
-			ba::trim(value);
-			
-			if (value.empty() and stop == false)
-				continue;
-			
-			if (p.attr)
-			{
-				string attr = attributes[p.name];
-				if (not attr.empty())
-					attr += ' ';
-				attributes[p.name] = attr + value;
-			}
-			
-			if (p.index)
-				doc->Index(p.name, p.type, p.unique, value);
-			
+struct M6ForeachExpr : public M6Expr
+{
+					M6ForeachExpr(const string& inPattern);
+					~M6ForeachExpr();
+
+	virtual bool	Evaluate(M6InputDocument* inDocument, M6Argument& arg) const;
+	
+	pcre*			mRE;
+	pcre_extra*		mInfo;
+	M6ExprPtr		mLoop;
+};
+
+M6ForeachExpr::M6ForeachExpr(const string& inPattern)
+	: mRE(nullptr), mInfo(nullptr)
+{
+	const char* error;
+	int erroffset;
+	
+	mRE = pcre_compile(inPattern.c_str(), PCRE_MULTILINE | PCRE_UTF8 | PCRE_NEWLINE_LF,
+		&error, &erroffset, nullptr);
+	if (mRE == nullptr)
+	{
+		THROW(("PCRE compilation failed at offset %d: %s\npatter: >> %s <<\n",
+			erroffset, error, inPattern.c_str()));
+	}
+	else
+	{
+		mInfo = pcre_study(mRE, 0, &error);
+		if (error != nullptr)
+			THROW(("Error studying compiled regular expression: %s", error));
+	}
+}
+
+M6ForeachExpr::~M6ForeachExpr()
+{
+	if (mInfo != nullptr)
+		pcre_free(mInfo);
+	
+	if (mRE != nullptr)
+		pcre_free(mRE);
+}
+
+bool M6ForeachExpr::Evaluate(M6InputDocument* inDocument, M6Argument& arg) const
+{
+	bool result = true;
+	
+	int options = 0;
+	int offset = arg.mOVector[0];
+	int length = arg.mOVector[1] - arg.mOVector[0];
+
+	M6Argument a = arg;
+	a.mIteration = 1;
+
+	while (offset < length)
+	{
+		int rc = pcre_exec(mRE, mInfo,
+			arg.mText, length, offset,
+			options, a.mOVector, 30);
+		
+		if (rc == PCRE_ERROR_NOMATCH)
+		{
+			if (options == 0)
+				break;
+			offset += 1;
+			continue;
+		}
+
+		if (rc < 0)
+			THROW(("Matching error %d\n", rc));
+		
+		if (not mLoop->Evaluate(inDocument, a))
+		{
+			result = false;
 			break;
 		}
 		
-		if (stop)
-			break;
+		offset = a.mOVector[1];
+		if (offset == length)
+			options = PCRE_NOTEMPTY | PCRE_ANCHORED;
+
+		++a.mIteration;
+	}
+
+	return result;
+}
+
+struct M6SplitExpr : public M6Expr
+{
+					M6SplitExpr(const string& inSeparator) : mSeparator(inSeparator) {}
+	virtual bool	Evaluate(M6InputDocument* inDocument, M6Argument& arg) const;
+	string			mSeparator;
+	M6ExprPtr		mExpr;
+};
+
+bool M6SplitExpr::Evaluate(M6InputDocument* inDocument, M6Argument& arg) const
+{
+	bool result = true;
+	
+	if (mSeparator.empty())
+		THROW(("Empty separator string"));
+
+	M6Argument a = { arg.mText };
+	a.mIteration = 1;
+
+	const char* start = arg.mText + arg.mOVector[0];
+	while (start < arg.mText + arg.mOVector[1])
+	{
+		a.mText = arg.mText;
+
+		const char* s = strstr(start, mSeparator.c_str());
+		if (s == nullptr)
+			s = arg.mText + arg.mOVector[1];
 		
-		start = m[0].second;
-		flags |= boost::match_prev_avail;
-		flags |= boost::match_not_bob;
+		a.mOVector[0] = static_cast<uint32>(start - arg.mText);
+		a.mOVector[1] = static_cast<uint32>(s - arg.mText);
+		
+		if (a.mOVector[1] > a.mOVector[0])
+			result = mExpr->Evaluate(inDocument, a);
+
+		start = s + mSeparator.length();
+		++a.mIteration;
 	}
 	
-	foreach (auto attr, attributes)
-		doc->SetAttribute(attr.first, attr.second);
-	
-	doc->Tokenize(mLexicon, 0);
-	
-	mDatabank->Store(doc);
+	return result;
+}
 
-	static int n = 0;
-	if (++n % 1000 == 0)
+struct M6CaptureExpr : public M6ListExpr
+{
+					M6CaptureExpr(uint32 inNr, M6ExprPtr inExpr) : mNr(inNr), mExpr(inExpr) {}
+	
+	virtual bool	Evaluate(M6InputDocument* inDocument, M6Argument& arg) const
+					{
+						M6Argument a = { arg.mText };
+						a.mOVector[0] = arg.mOVector[2 * mNr];
+						a.mOVector[1] = arg.mOVector[2 * mNr + 1];
+						
+						return mExpr->Evaluate(inDocument, a);
+					}
+	
+	M6ExprPtr		mExpr;
+	uint32			mNr;
+};
+
+struct M6TolowerExpr : public M6Expr
+{
+	virtual bool	Evaluate(M6InputDocument* inDocument, M6Argument& arg) const
+					{
+						// copy text since we're about to mutate it
+						arg.mScratch.assign(arg.mText + arg.mOVector[0], arg.mOVector[1] - arg.mOVector[0]);
+						arg.mOVector[1] -= arg.mOVector[0];
+						arg.mOVector[0] = 0;
+
+						ba::to_lower(arg.mScratch);
+						arg.mText = arg.mScratch.c_str();
+						return true;
+					}
+};
+
+struct M6SubStrExpr : public M6Expr
+{
+					M6SubStrExpr(int32 inStart, int32 inLength)
+						: mStart(inStart), mLength(inLength) {}
+	virtual bool	Evaluate(M6InputDocument* inDocument, M6Argument& arg) const
+					{
+						if (arg.mOVector[0] + mStart >= arg.mOVector[1])
+							arg.mOVector[0] = arg.mOVector[1];
+						else
+						{
+							arg.mOVector[0] += mStart;
+							if (arg.mOVector[0] + mLength < arg.mOVector[1])
+								arg.mOVector[1] = arg.mOVector[0] + mLength;
+						}
+						
+						return true;
+					}
+	int32			mStart, mLength;
+};
+
+struct M6ReplaceExpr : public M6Expr
+{
+					M6ReplaceExpr(const string& inWhat, const string& inWith);
+					~M6ReplaceExpr();
+
+	virtual bool	Evaluate(M6InputDocument* inDocument, M6Argument& arg) const;
+
+	pcre*			mRE;
+	string			mWith;
+};
+
+M6ReplaceExpr::M6ReplaceExpr(const string& inWhat, const string& inWith)
+	: mWith(inWith)
+{
+	const char* error;
+	int erroffset;
+	
+	mRE = pcre_compile(inWhat.c_str(), PCRE_MULTILINE | PCRE_UTF8 | PCRE_NEWLINE_LF,
+		&error, &erroffset, nullptr);
+	if (mRE == nullptr)
 	{
-		cout << '.';
-		if (n % 60000 == 0)
-			cout << endl;
-		else
-			cout.flush();
+		THROW(("PCRE compilation failed at offset %d: %s\npatter: >> %s <<\n",
+			erroffset, error, inWhat.c_str()));
 	}
 }
 
-void M6Builder::Parse(const fs::path& inFile)
+M6ReplaceExpr::~M6ReplaceExpr()
+{
+	if (mRE != nullptr)
+		pcre_free(mRE);
+}
+
+bool M6ReplaceExpr::Evaluate(M6InputDocument* inDocument, M6Argument& arg) const
+{
+#pragma message("TODO implement")
+	return true;
+}
+
+struct M6SwitchExpr : public M6Expr
+{
+					M6SwitchExpr(uint32 inTest) : mTest(inTest) {}
+
+	void			AddCase(const string& inValue, M6ExprPtr inExpr)
+					{
+						M6Case c = { inValue, inExpr };
+						mCases.push_back(c);
+					}
+					
+	virtual bool	Evaluate(M6InputDocument* inDocument, M6Argument& arg) const;
+
+	struct M6Case
+	{
+		string		mValue;
+		M6ExprPtr	mExpr;
+	};
+	
+	uint32			mTest;
+	list<M6Case>	mCases;
+	M6ExprPtr		mDefault;
+};
+
+bool M6SwitchExpr::Evaluate(M6InputDocument* inDocument, M6Argument& arg) const
+{
+	bool result = true;
+	
+	string test(arg.mText + arg.mOVector[2 * mTest], arg.mOVector[2 * mTest + 1] - arg.mOVector[2 * mTest]);
+	
+	bool handled = false;
+	foreach (const M6Case& c, mCases)
+	{
+		if (test == c.mValue)
+		{
+			handled = true;
+			result = c.mExpr->Evaluate(inDocument, arg);
+			break;
+		}
+	}
+	
+	if (not handled and mDefault)
+		result = mDefault->Evaluate(inDocument, arg);
+	
+	return result;
+}
+
+struct M6IfExpr : public M6Expr
+{
+					M6IfExpr(uint32 inIteration) : mIteration(inIteration) {}
+	
+	bool			Evaluate(M6InputDocument* inDocument, M6Argument& arg) const
+					{
+						bool result = true;
+						if (mIteration == arg.mIteration)
+							result = mExpr->Evaluate(inDocument, arg);
+						return result;
+					}
+	M6ExprPtr		mExpr;
+	uint32			mIteration;
+};
+
+struct M6IndexExpr : public M6Expr
+{
+					M6IndexExpr(const string& inName, M6DataType inType, bool inUnique)
+						: mName(inName), mType(inType) {}
+
+	virtual bool	Evaluate(M6InputDocument* inDocument, M6Argument& arg) const
+					{
+						inDocument->Index(mName, mType, mUnique,
+							arg.mText + arg.mOVector[0], arg.mOVector[1] - arg.mOVector[0]);
+						return true;
+					}
+	
+	string			mName;
+	M6DataType		mType;
+	bool			mUnique;
+};
+
+struct M6AttrExpr : public M6Expr
+{
+					M6AttrExpr(const string& inName) : mName(inName) {}
+	virtual bool	Evaluate(M6InputDocument* inDocument, M6Argument& arg) const
+					{
+						inDocument->SetAttribute(mName,
+							arg.mText + arg.mOVector[0], arg.mOVector[1] - arg.mOVector[0]);
+						return true;
+					}
+
+	string			mName;
+};
+
+struct M6StopExpr : public M6Expr
+{
+	virtual bool	Evaluate(M6InputDocument* inDocument, M6Argument& arg) const
+					{
+						return false;
+					}
+};
+
+// --------------------------------------------------------------------
+
+M6Processor::M6Processor(M6Databank& inDatabank, M6Lexicon& inLexicon,
+		zx::element* inTemplate)
+	: mDatabank(inDatabank), mLexicon(inLexicon), mConfig(inTemplate)
+{
+	zx::element* script = mConfig->find_first("script");
+	if (script != nullptr)
+		mScript = ParseScript(script);
+}
+
+M6Processor::~M6Processor()
+{
+}
+
+M6ExprPtr M6Processor::ParseScript(zx::element* inScript)
+{
+	M6ListExpr* list = new M6ListExpr;
+	foreach (zx::element* node, *inScript)
+	{
+		if (node->name() == "foreach")
+		{
+			M6ForeachExpr* foreach = new M6ForeachExpr(node->get_attribute("regex"));
+			foreach->mLoop = ParseScript(node);
+			list->mList.push_back(M6ExprPtr(foreach));
+		}
+		else if (node->name() == "split")
+		{
+			M6SplitExpr* split = new M6SplitExpr(node->get_attribute("separator"));
+			split->mExpr = ParseScript(node);
+			list->mList.push_back(M6ExprPtr(split));
+		}
+		else if (node->name() == "switch")
+		{
+			uint32 test = boost::lexical_cast<uint32>(node->get_attribute("test"));
+			
+			M6SwitchExpr* expr = new M6SwitchExpr(test);
+			foreach (zx::element* n, *node)
+			{
+				if (n->name() == "case")
+					expr->AddCase(n->get_attribute("value"), ParseScript(n));
+				else if (n->name() == "default")
+				{
+					if (expr->mDefault)
+						THROW(("<default> already defined in switch"));
+					expr->mDefault = ParseScript(n);
+				}
+				else
+					THROW(("only <case> and <default> are allowed in switch"));
+			}
+
+			list->mList.push_back(M6ExprPtr(expr));
+		}
+		else if (node->name() == "if")
+		{
+			if (not node->get_attribute("iteration").empty())
+			{
+				uint32 iteration = boost::lexical_cast<uint32>(node->get_attribute("iteration"));
+				M6IfExpr* ifExpr = new M6IfExpr(iteration);
+				ifExpr->mExpr = ParseScript(node);
+				list->mList.push_back(M6ExprPtr(ifExpr));
+			}
+			else
+				THROW(("unsupported if"));
+		}
+		else if (node->name() == "capture")
+		{
+			uint32 nr = boost::lexical_cast<uint32>(node->get_attribute("nr"));
+			list->mList.push_back(M6ExprPtr(new M6CaptureExpr(nr, ParseScript(node))));
+		}
+		else if (node->name() == "to-lower")
+			list->mList.push_back(M6ExprPtr(new M6TolowerExpr));
+		else if (node->name() == "substr")
+		{
+			int32 start = 0, length = numeric_limits<int32>::max();
+			if (not node->get_attribute("start").empty())
+				start = boost::lexical_cast<uint32>(node->get_attribute("start"));
+			if (not node->get_attribute("length").empty())
+				length = boost::lexical_cast<uint32>(node->get_attribute("length"));
+			list->mList.push_back(M6ExprPtr(new M6SubStrExpr(start, length)));
+		}
+		else if (node->name() == "replace")
+			list->mList.push_back(M6ExprPtr(
+				new M6ReplaceExpr(node->get_attribute("what"), node->get_attribute("with"))));
+		else if (node->name() == "index")
+			list->mList.push_back(M6ExprPtr(new M6IndexExpr(node->get_attribute("name"),
+				MapDataType(node->get_attribute("type"), eM6TextData),
+				node->get_attribute("unique") == "true")));
+		else if (node->name() == "attr")
+			list->mList.push_back(M6ExprPtr(new M6AttrExpr(node->get_attribute("name"))));
+		else
+			THROW(("Unsupported script element %s", node->name().c_str()));
+	}
+	
+	return M6ExprPtr(list);
+}
+
+void M6Processor::ProcessFile(fs::path inFile)
 {
 	fs::ifstream file(inFile, ios::binary);
 	string line;
@@ -247,21 +558,42 @@ void M6Builder::Parse(const fs::path& inFile)
 	{
 		io::filtering_ostream out(io::back_inserter(document));
 		io::copy(file, out);
-		Process(document);
+		ProcessDocument(document);
 	}
 	else
 	{
 		string separatorLine = separator->content();
 		string separatorType = separator->get_attribute("type");
 		
-		if (separatorType == "last-line-equals" or separatorType.empty())
+		if (separatorType == "first-line-equals" or separatorType.empty())
+		{
+			for (;;)
+			{
+				if (line == separatorLine)
+				{
+					if (not document.empty())
+						ProcessDocument(document);
+					document.clear();
+				}
+				
+				document += line + "\n";
+
+				getline(file, line);
+				if (line.empty() and file.eof())
+					break;
+			}
+
+			if (not document.empty())
+				ProcessDocument(document);
+		}
+		else if (separatorType == "last-line-equals" or separatorType.empty())
 		{
 			for (;;)
 			{
 				document += line + "\n";
 				if (line == separatorLine)
 				{
-					Process(document);
+					ProcessDocument(document);
 					document.clear();
 				}
 
@@ -278,54 +610,166 @@ void M6Builder::Parse(const fs::path& inFile)
 	}
 }
 
-void M6Builder::SetupProcessor(zx::element* inConfig)
+void M6Processor::ProcessDocument(const string& inDocument)
 {
-	if (inConfig == nullptr)
-		THROW(("No processing information for databank in config file, cannot continue"));
+	M6InputDocument* doc = new M6InputDocument(mDatabank, inDocument);
 	
-	// fetch the processor type
-		 if (inConfig->get_attribute("type") == "delimited")	mProcessorType = eM6ProcessDelimited;
-	else if (inConfig->get_attribute("type") == "fixed-width")	mProcessorType = eM6ProcessFixedWidth;
-	else if (inConfig->get_attribute("type") == "regex")		mProcessorType = eM6ProcessRegex;
-	else THROW(("unsupported processing type"));
+	M6Argument arg = { inDocument.c_str() };
+	arg.mOVector[1] = static_cast<int>(inDocument.length());
+	mScript->Evaluate(doc, arg);
 	
-	if (mProcessorType == eM6ProcessDelimited)
-	{
-		string delimiter = inConfig->get_attribute("delimiter");
-		boost::format fre("(.+?)%1%(.+)$");
-		mProcessorRE = boost::regex((fre % delimiter).str());
-	}
+	doc->Tokenize(mLexicon, 0);
 	
-	foreach (zx::element* p, inConfig->find("process"))
-	{
-		string action = p->get_attribute("action");
-		M6Processor proc = {
-			p->get_attribute("key"),
-			p->get_attribute("name"),
-			MapDataType(p->get_attribute("type")),
-			ba::contains(action, "attr"),
-			ba::contains(action, "index"),
-			ba::contains(action, "unique"),
-			ba::contains(action, "stop")
-		};
-		
-		if (proc.name.empty())
-			proc.name = proc.key;
-		
-		foreach (zx::element* pp, p->find("postprocess"))
-		{
-			M6PostProcessor post = {
-				boost::regex(pp->get_attribute("what")),
-				pp->get_attribute("with"),
-				ba::contains(pp->get_attribute("flags"), "global")
-			};
-			
-			proc.post.push_back(post);
-		}
-		
-		mProcessors.push_back(proc);
-	}
+	mDatabank.Store(doc);
 }
+
+// --------------------------------------------------------------------
+
+M6Builder::M6Builder(const string& inDatabank)
+	: mConfig(M6Config::Instance().LoadConfig(inDatabank))
+	, mDatabank(nullptr)
+{
+}
+
+M6Builder::~M6Builder()
+{
+	delete mDatabank;
+}
+
+void M6Builder::Glob(zx::element* inSource, vector<fs::path>& outFiles)
+{
+	if (inSource == nullptr)
+		THROW(("No source specified for databank"));
+
+	string source = inSource->content();
+	ba::trim(source);
+	
+	if (inSource->get_attribute("type") == "path")
+		outFiles.push_back(source);
+	else
+		THROW(("Unsupported source type"));
+}
+
+//void M6Builder::Process(const string& inDocument)
+//{
+//	M6InputDocument* doc = new M6InputDocument(*mDatabank, inDocument);
+//	
+//	const char* start = inDocument.c_str();
+//	const char* end = start + inDocument.length();
+//	boost::cmatch m;
+//	boost::match_flag_type flags = boost::match_default | boost::match_not_dot_newline;
+//	
+//	map<string,string> attributes;
+//	
+//	while (regex_search(start, end, m, mProcessorRE, flags))
+//	{
+//		string key(m[1].first, m[1].second);
+//		ba::to_lower(key);
+//		ba::trim(key);
+//		bool stop = false;
+//		
+//		foreach (M6Processor& p, mProcessors)
+//		{
+//			if (p.key != key and not p.key.empty())
+//				continue;
+//
+//			stop = p.stop;
+//			
+//			string value(m[2].first, m[2].second);
+//			ba::trim(value);
+//			
+//			if (value.empty() and stop == false)
+//				continue;
+//			
+//			if (p.attr)
+//			{
+//				string attr = attributes[p.name];
+//				if (not attr.empty())
+//					attr += ' ';
+//				attributes[p.name] = attr + value;
+//			}
+//			
+//			if (p.index)
+//				doc->Index(p.name, p.type, p.unique, value);
+//			
+//			break;
+//		}
+//		
+//		if (stop)
+//			break;
+//		
+//		start = m[0].second;
+//		flags |= boost::match_prev_avail;
+//		flags |= boost::match_not_bob;
+//	}
+//	
+//	foreach (auto attr, attributes)
+//		doc->SetAttribute(attr.first, attr.second);
+//	
+//	doc->Tokenize(mLexicon, 0);
+//	
+//	mDatabank->Store(doc);
+//
+//	static int n = 0;
+//	if (++n % 1000 == 0)
+//	{
+//		cout << '.';
+//		if (n % 60000 == 0)
+//			cout << endl;
+//		else
+//			cout.flush();
+//	}
+//}
+//
+//
+//void M6Builder::SetupProcessor(zx::element* inConfig)
+//{
+//	if (inConfig == nullptr)
+//		THROW(("No processing information for databank in config file, cannot continue"));
+//	
+//	// fetch the processor type
+//		 if (inConfig->get_attribute("type") == "delimited")	mProcessorType = eM6ProcessDelimited;
+//	else if (inConfig->get_attribute("type") == "fixed-width")	mProcessorType = eM6ProcessFixedWidth;
+//	else if (inConfig->get_attribute("type") == "regex")		mProcessorType = eM6ProcessRegex;
+//	else THROW(("unsupported processing type"));
+//	
+//	if (mProcessorType == eM6ProcessDelimited)
+//	{
+//		string delimiter = inConfig->get_attribute("delimiter");
+//		boost::format fre("(.+?)%1%(.+)$");
+//		mProcessorRE = boost::regex((fre % delimiter).str());
+//	}
+//	
+//	foreach (zx::element* p, inConfig->find("process"))
+//	{
+//		string action = p->get_attribute("action");
+//		M6Processor proc = {
+//			p->get_attribute("key"),
+//			p->get_attribute("name"),
+//			MapDataType(p->get_attribute("type")),
+//			ba::contains(action, "attr"),
+//			ba::contains(action, "index"),
+//			ba::contains(action, "unique"),
+//			ba::contains(action, "stop")
+//		};
+//		
+//		if (proc.name.empty())
+//			proc.name = proc.key;
+//		
+//		foreach (zx::element* pp, p->find("postprocess"))
+//		{
+//			M6PostProcessor post = {
+//				boost::regex(pp->get_attribute("what")),
+//				pp->get_attribute("with"),
+//				ba::contains(pp->get_attribute("flags"), "global")
+//			};
+//			
+//			proc.post.push_back(post);
+//		}
+//		
+//		mProcessors.push_back(proc);
+//	}
+//}
 
 void M6Builder::Build()
 {
@@ -342,7 +786,8 @@ void M6Builder::Build()
 	vector<fs::path> files;
 	Glob(mConfig->find_first("source"), files);
 
-	SetupProcessor(mConfig->find_first("processing"));
+//	SetupProcessor(mConfig->find_first("processing"));
+	M6Processor processor(*mDatabank, mLexicon, mConfig);
 
 	foreach (fs::path& file, files)
 	{
@@ -352,7 +797,7 @@ void M6Builder::Build()
 			continue;
 		}
 		
-		Parse(file);
+		processor.ProcessFile(file);
 	}
 	
 	cout << endl << "creating index..."; cout.flush();

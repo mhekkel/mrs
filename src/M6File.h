@@ -52,7 +52,7 @@ void pread(MHandle inHandle, void* inBuffer, int64 inSize, int64 inOffset);
 
 class M6FileReader;
 class M6FileWriter;
-class M6FileSizeHelper;
+struct M6FileSizeHelper;
 
 class M6File
 {

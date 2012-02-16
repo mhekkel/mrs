@@ -74,34 +74,46 @@
 	</databank>
 	
 	<!-- omim -->
-	<databank>
+	<databank id="omim">
 		<name>OMIM</name>
 		<file>test/omim.m6</file>
 		
 		<locale>en_US.UTF-8</locale>
 		
-		<source type="path">/data/raw/omim/omim.dat</source>
+		<source type="path">test/omim.dat</source>
 		
 		<document-separator type="first-line-equals">*RECORD*</document-separator>
 		
-		<foreach regex="^\*FIELD\* (\w\w)\n((?(?=\*FIELD\*)|.*\n)+)">
-			<switch var="\1" value="\2">
-				<case value="NO">
-					<index name="id" unique="true"/>
-					<attr name="id"/>
-				</case>
-				<case value="TI">
-					<to-lower />
-					<replace what="\s+" with=" " />
-					<replace what=";;" with="\n" />
-					<index name="id" unique="true"/>
-					<attr name="id"/>
-				</case>
-				<default>
-					<index name="text" type="text"/>
-				</default>
-			</switch>
-		</foreach>
+		<script>
+			<foreach regex="^\*FIELD\* (\w\w)\n((?(?=\*FIELD\*)|.*\n)+)">
+				<switch test="1">
+					<case value="NO">
+						<capture nr="2">
+							<index name="id" unique="true" type="string"/>
+							<attr name="id"/>
+						</capture>
+					</case>
+					<case value="TI">
+						<capture nr="2">
+							<split separator=";;">
+								<to-lower />
+								<substr length="255" />
+								<replace what="\s+" with=" " />
+								<index name="title" type="text"/>
+								<if iteration="1">
+									<attr name="title"/>
+								</if>
+							</split>
+						</capture>
+					</case>
+					<default>
+						<capture nr="2">
+							<index name="text" type="text"/>
+						</capture>
+					</default>
+				</switch>
+			</foreach>
+		</script>
 	</databank>
 	
 <!--

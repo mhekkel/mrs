@@ -69,11 +69,11 @@ class M6InputDocument : public M6Document
 	virtual std::string	GetAttribute(const std::string& inName);
 	
 	void				SetAttribute(const std::string& inName,
-							const std::string& inData);
+							const char* inText, size_t inSize);
 
-	virtual void		Index(const std::string& inIndex, M6DataType inDataType,
-							bool isUnique, const std::string& inText,
-							bool inIndexNumbers = false);
+	virtual void		Index(const std::string& inIndex,
+							M6DataType inDataType, bool isUnique,
+							const char* inText, size_t inSize);
 
 	virtual void		Tokenize(M6Lexicon& inLexicon, uint32 inLastStopWord);
 

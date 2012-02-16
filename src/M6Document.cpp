@@ -60,15 +60,15 @@ string M6InputDocument::GetAttribute(const string& inName)
 	return mAttributes[inName];
 }
 
-void M6InputDocument::SetAttribute(const string& inName, const string& inData)
+void M6InputDocument::SetAttribute(const string& inName, const char* inText, size_t inSize)
 {
 	if (inName.length() > 255)
 		THROW(("Attribute names are limited to 255 characters"));
 	
-	if (inData.length() > 255)
+	if (inSize > 255)
 		THROW(("Attribute values are limited to 255 characters"));
 	
-	mAttributes[inName] = inData;
+	mAttributes[inName] = string(inText, inSize);
 }
 
 uint32 M6InputDocument::Store()
@@ -133,14 +133,16 @@ M6InputDocument::M6IndexTokenList::iterator M6InputDocument::GetIndexTokens(
 }
 
 void M6InputDocument::Index(const string& inIndex, M6DataType inDataType,
-	bool isUnique, const string& inText, bool inIndexNumbers)
+	bool isUnique, const char* inText, size_t inSize)
 {
 	bool tokenize = true;
+#pragma message("TODO implement inIndexNrs")
+	bool inIndexNumbers = false;
 	
 	if (inDataType != eM6TextData)
 	{
 		tokenize = inDataType == eM6StringData;
-		M6IndexValue v = { inDataType, inIndex, inText, isUnique };
+		M6IndexValue v = { inDataType, inIndex, string(inText, inSize), isUnique };
 		mValues.push_back(v);
 	}
 	
@@ -148,7 +150,7 @@ void M6InputDocument::Index(const string& inIndex, M6DataType inDataType,
 	{
 		auto ix = GetIndexTokens(inIndex, inDataType);
 
-		M6Tokenizer tokenizer(inText.c_str(), inText.length());
+		M6Tokenizer tokenizer(inText, inSize);
 		for (;;)
 		{
 			M6Token token = tokenizer.GetToken();

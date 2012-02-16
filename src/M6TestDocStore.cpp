@@ -161,7 +161,9 @@ BOOST_AUTO_TEST_CASE(test_store_4)
 		
 		boost::smatch m;
 		BOOST_REQUIRE(boost::regex_search(text, m, re));
-		doc->SetAttribute("id", m[1]);
+
+		string attr(m[1]);
+		doc->SetAttribute("id", attr.c_str(), attr.length());
 		
 		db.Store(doc);
 	}

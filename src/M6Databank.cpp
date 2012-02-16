@@ -1141,7 +1141,7 @@ M6Iterator* M6DatabankImpl::Find(const string& inQuery, uint32 inReportLimit)
 
 	M6Iterator* result = nullptr;
 
-	uint32 docCount = mStore->size();
+//	uint32 docCount = mStore->size();
 	uint32 maxDocNr = mStore->NextDocumentNumber();
 	float maxD = static_cast<float>(maxDocNr);
 

@@ -72,6 +72,38 @@
 		</processing>
 
 	</databank>
+	
+	<!-- omim -->
+	<databank>
+		<name>OMIM</name>
+		<file>test/omim.m6</file>
+		
+		<locale>en_US.UTF-8</locale>
+		
+		<source type="path">/data/raw/omim/omim.dat</source>
+		
+		<document-separator type="first-line-equals">*RECORD*</document-separator>
+		
+		<foreach regex="^\*FIELD\* (\w\w)\n((?(?=\*FIELD\*)|.*\n)+)">
+			<switch var="\1" value="\2">
+				<case value="NO">
+					<index name="id" unique="true"/>
+					<attr name="id"/>
+				</case>
+				<case value="TI">
+					<to-lower />
+					<replace what="\s+" with=" " />
+					<replace what=";;" with="\n" />
+					<index name="id" unique="true"/>
+					<attr name="id"/>
+				</case>
+				<default>
+					<index name="text" type="text"/>
+				</default>
+			</switch>
+		</foreach>
+	</databank>
+	
 <!--
 	<databank id="genbank">
 		<name>Genbank</name>

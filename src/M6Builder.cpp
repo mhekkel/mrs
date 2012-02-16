@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <memory>
+#include <list>
 
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/fstream.hpp>
@@ -42,6 +43,79 @@ M6DataType MapDataType(const string& inKind)
 	else if (inKind == "date")		result = eM6DateData;
 	return result;
 }
+
+class M6Processor;
+typedef list<M6Processor>	M6ProcessorList;
+
+class M6Processor
+{
+  public:
+					M6Processor();
+	virtual			~M6Processor();
+
+	virtual void	Process(string& ioText) const = 0;
+};
+
+class M6ListProcessor : public M6Processor
+{
+  public:
+	
+	void			AddSubProcessor(const M6Processor& inProcessor);
+
+	M6ProcessorList	mList;
+};
+
+class M6ForeachProcessor : public M6Processor
+{
+  public:
+					M6ForeachProcessor(const string& inPattern);
+	virtual void	Process(string& ioText) const;
+
+	M6ProcessorList	mCases;
+	M6Processor		mDefault;
+};
+
+class M6TolowerProcessor : public M6Processor
+{
+  public:
+	virtual void	Process(string& ioText) const			{ ba::to_lower(ioText); }
+};
+
+class M6ReplaceProcessor : public M6Processor
+{
+  public:
+					M6ReplaceProcessor(const string& inWhat, const string& inWith);
+	virtual void	Process(string& ioText) const;
+};
+
+class M6SwitchProcessor : public M6Processor
+{
+  public:
+					M6SwitchProcessor(const string& inVar, const string& inValue);
+	virtual void	Process(string& ioText) const;
+};
+
+class M6CaseProcessor : public M6Processor
+{
+  public:
+					M6CaseProcessor(const string& inValue);
+	virtual void	Process(string& ioText) const;
+};
+
+class M6IndexProcessor : public M6Processor
+{
+  public:
+					M6IndexProcessor(const string& inName, const string& inType);	
+	virtual void	Process(string& ioText) const;
+};
+
+class M6AttrProcessor : public M6Processor
+{
+  public:
+					M6AttrProcessor(const string& inName);
+	virtual void	Process(string& ioText) const;
+};
+
 
 }
 

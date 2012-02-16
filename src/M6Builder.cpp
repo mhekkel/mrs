@@ -272,7 +272,7 @@ bool M6SplitExpr::Evaluate(M6InputDocument* inDocument, M6Argument& arg) const
 		if (rc < 0)
 			THROW(("Matching error %d\n", rc));
 		
-		M6Argument a(arg.mText + ovector[0], ovector[1] - ovector[0]);
+		M6Argument a(arg.mText + offset, ovector[0] - offset);
 		a.mIteration = iteration;
 		if (not mExpr->Evaluate(inDocument, a))
 		{
@@ -372,7 +372,40 @@ M6ReplaceExpr::~M6ReplaceExpr()
 
 bool M6ReplaceExpr::Evaluate(M6InputDocument* inDocument, M6Argument& arg) const
 {
-#pragma message("TODO implement")
+	bool result = true;
+	
+	int options = 0, offset = 0;
+	
+	string s;
+	
+	while (offset < arg.mLength)
+	{
+		int ovector[30];
+
+		int rc = pcre_exec(mRE, nullptr, arg.mText, arg.mLength, offset, options, ovector, 30);
+		
+		if (rc == PCRE_ERROR_NOMATCH)
+		{
+			if (options == 0)
+			{
+				s.append(arg.mText + offset, arg.mLength - offset);
+				break;
+			}
+			offset += 1;
+			continue;
+		}
+
+		if (rc < 0)
+			THROW(("Matching error %d\n", rc));
+		
+		s.append(arg.mText + offset, ovector[0] - offset);
+		s.append(mWith);
+		
+		offset = ovector[1];
+		if (offset == arg.mLength)
+			options = PCRE_NOTEMPTY | PCRE_ANCHORED;
+	}
+
 	return true;
 }
 

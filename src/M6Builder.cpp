@@ -897,6 +897,8 @@ M6ExprPtr M6Processor::ParseScript(zx::element* inScript)
 				node->get_attribute("unique") == "true")));
 		else if (node->name() == "attr")
 			list->mList.push_back(M6ExprPtr(new M6AttrExpr(node->get_attribute("name"))));
+		else if (node->name() == "stop")
+			list->mList.push_back(M6ExprPtr(new M6StopExpr)));
 		else
 			THROW(("Unsupported script element %s", node->name().c_str()));
 	}

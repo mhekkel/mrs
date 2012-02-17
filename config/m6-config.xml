@@ -58,6 +58,12 @@
 		-->
 		
 <!--		<processing type="regex" regex="^\s*([A-Z]+)\s+((?:.+\n)(?:\s{4,}.+\n)*)" >-->
+	
+		<script>
+			
+			
+		</script>
+
 		<processing type="delimited" delimiter=":">
 			<process key="id"							type="string"		action="index attr unique" />
 			<process key="header"		name="title"	type="string"		action="index attr" />

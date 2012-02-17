@@ -29,9 +29,4 @@ class M6Builder
 	zeep::xml::element*	mConfig;
 	M6Databank*			mDatabank;
 	M6Lexicon			mLexicon;
-	
-	// parsing info
-//	M6ProcessorType		mProcessorType;
-//	M6Processors		mProcessors;
-//	boost::regex		mProcessorRE;
 };

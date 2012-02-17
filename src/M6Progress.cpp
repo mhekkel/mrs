@@ -1,5 +1,7 @@
 #include "M6Lib.h"
 
+#include <iostream>
+
 #include <boost/thread.hpp>
 #include <boost/format.hpp>
 #include <boost/date_time/posix_time/posix_time_types.hpp>
@@ -76,6 +78,7 @@ void M6ProgressImpl::PrintProgress()
 	msg += '%';
 	
 	cout << '\r' << msg;
+	cout.flush();
 }
 
 void M6ProgressImpl::PrintDone()

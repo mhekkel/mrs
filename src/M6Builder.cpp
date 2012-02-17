@@ -1064,9 +1064,7 @@ void M6Builder::Build()
 			processor.ProcessFile(i->mFilename, i->mStream);
 	}
 	
-	cout << endl << "creating index..."; cout.flush();
-	
 	mDatabank->CommitBatchImport();
-	cout << endl << "done" << endl;
+	cout << "done" << endl;
 }
 

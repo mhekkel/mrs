@@ -30,17 +30,21 @@ struct M6ProgressImpl
 
 void M6ProgressImpl::Run()
 {
-	for (;;)
+	try
 	{
-		boost::this_thread::sleep(boost::posix_time::seconds(5));
-		
-		boost::mutex::scoped_lock lock(mMutex);
-		
-		if (mConsumed == mMax)
-			break;
-		
-		PrintProgress();
+		for (;;)
+		{
+			boost::this_thread::sleep(boost::posix_time::seconds(1));
+			
+			boost::mutex::scoped_lock lock(mMutex);
+			
+			if (mConsumed == mMax)
+				break;
+			
+			PrintProgress();
+		}
 	}
+	catch (...) {}
 	
 	PrintDone();
 }
@@ -116,7 +120,10 @@ void M6Progress::Update(int64 inConsumed, const std::string& inMessage)
 	mImpl->mMessage = inMessage;
 
 	if (mImpl->mConsumed == mImpl->mMax)
+	{
 		mImpl->mThread.interrupt();
+		mImpl->mThread.join();
+	}
 }
 
 void M6Progress::Consumed(int64 inConsumed)
@@ -125,7 +132,10 @@ void M6Progress::Consumed(int64 inConsumed)
 	mImpl->mConsumed += inConsumed;
 
 	if (mImpl->mConsumed == mImpl->mMax)
+	{
 		mImpl->mThread.interrupt();
+		mImpl->mThread.join();
+	}
 }
 
 void M6Progress::Progress(int64 inProgress)
@@ -134,7 +144,10 @@ void M6Progress::Progress(int64 inProgress)
 	mImpl->mConsumed = inProgress;
 
 	if (mImpl->mConsumed == mImpl->mMax)
+	{
 		mImpl->mThread.interrupt();
+		mImpl->mThread.join();
+	}
 }
 
 void M6Progress::Message(const std::string& inMessage)

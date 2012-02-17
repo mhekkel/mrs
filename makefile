@@ -51,6 +51,7 @@ OBJECTS = \
 	$(OBJDIR)/M6File.o \
 	$(OBJDIR)/M6Index.o \
 	$(OBJDIR)/M6Lexicon.o \
+	$(OBJDIR)/M6Progress.o \
 	$(OBJDIR)/M6Tokenizer.o \
 
 m6: $(OBJECTS) $(OBJDIR)/M6CmdLineDriver.o

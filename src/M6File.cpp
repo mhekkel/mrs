@@ -284,76 +284,106 @@ void pread(MHandle inHandle, void* inBuffer, int64 inSize, int64 inOffset)
 
 // --------------------------------------------------------------------
 
-M6File::M6File(const std::string& inFile, MOpenMode inMode)
-	: mHandle(M6IO::open(inFile, inMode))
-	, mSize(M6IO::file_size(mHandle))
+M6File::M6File()
+	: mImpl(new M6FileImpl)
 {
+	mImpl->mHandle = -1;
+	mImpl->mSize = 0;
+	mImpl->mOffset = 0;
+	mImpl->mRefCount = 1;
+}
+
+M6File::M6File(const M6File& inFile)
+	: mImpl(inFile.mImpl)
+{
+	++mImpl->mRefCount;
+}
+
+M6File::M6File(const std::string& inFile, MOpenMode inMode)
+	: mImpl(new M6FileImpl)
+{
+	mImpl->mHandle = M6IO::open(inFile, inMode);
+	mImpl->mSize = M6IO::file_size(mImpl->mHandle);
+	mImpl->mOffset = 0;
+	mImpl->mRefCount = 1;
+}
+
+M6File::M6File(const boost::filesystem::path& inFile, MOpenMode inMode)
+	: mImpl(new M6FileImpl)
+{
+	mImpl->mHandle = M6IO::open(inFile.string(), inMode);
+	mImpl->mSize = M6IO::file_size(mImpl->mHandle);
+	mImpl->mOffset = 0;
+	mImpl->mRefCount = 1;
 }
 
 M6File::~M6File()
 {
-	M6IO::close(mHandle);
+	if (--mImpl->mRefCount == 0)
+	{
+		if (mImpl->mHandle >= 0)
+			M6IO::close(mImpl->mHandle);
+		delete mImpl;
+	}
+}
+
+M6File& M6File::operator=(const M6File& inFile)
+{
+	if (this != &inFile)
+	{
+		if (--mImpl->mRefCount == 0)
+		{
+			if (mImpl->mHandle >= 0)
+				M6IO::close(mImpl->mHandle);
+			delete mImpl;
+		}
+		mImpl = inFile.mImpl;
+		++mImpl->mRefCount;
+	}
+	
+	return *this;
+}
+
+void M6File::Read(void* inBuffer, int64 inSize)
+{
+	PRead(inBuffer, inSize, mImpl->mOffset);
+	mImpl->mOffset += inSize;
+}
+
+void M6File::Write(const void* inBuffer, int64 inSize)
+{
+	PWrite(inBuffer, inSize, mImpl->mOffset);
+	mImpl->mOffset += inSize;
 }
 
 void M6File::PRead(void* inBuffer, int64 inSize, int64 inOffset)
 {
-	M6IO::pread(mHandle, inBuffer, inSize, inOffset);
+	M6IO::pread(mImpl->mHandle, inBuffer, inSize, inOffset);
 }
 
 void M6File::PWrite(const void* inBuffer, int64 inSize, int64 inOffset)
 {
-	M6IO::pwrite(mHandle, inBuffer, inSize, inOffset);
-	if (mSize < inOffset + inSize)
-		mSize = inOffset + inSize;
+	M6IO::pwrite(mImpl->mHandle, inBuffer, inSize, inOffset);
+	if (mImpl->mSize < inOffset + inSize)
+		mImpl->mSize = inOffset + inSize;
 }
 
 void M6File::Truncate(int64 inSize)
 {
-	M6IO::truncate(mHandle, inSize);
-	mSize = inSize;
+	M6IO::truncate(mImpl->mHandle, inSize);
+	mImpl->mSize = inSize;
+	if (mImpl->mOffset > mImpl->mSize)
+		mImpl->mOffset = mImpl->mSize;
 }
 
-// --------------------------------------------------------------------
-
-M6FileStream::M6FileStream(const string& inFile, MOpenMode inMode)
-	: M6File(inFile, inMode)
-	, mOffset(0)
-{
-}
-
-int64 M6FileStream::Seek(int64 inOffset, int inMode)
+int64 M6File::Seek(int64 inOffset, int inMode)
 {
 	switch (inMode)
 	{
-		case SEEK_SET:	mOffset = inOffset; break;
-		case SEEK_CUR:	mOffset += inOffset; break;
-		case SEEK_END:	mOffset = mSize + inOffset; break;
+		case SEEK_SET:	mImpl->mOffset = inOffset; break;
+		case SEEK_CUR:	mImpl->mOffset += inOffset; break;
+		case SEEK_END:	mImpl->mOffset = mImpl->mSize + inOffset; break;
 	}
 	
-	return mOffset;
+	return mImpl->mOffset;
 }
-
-int64 M6FileStream::Tell() const
-{
-	return mOffset;
-}
-
-void M6FileStream::Read(void* inBuffer, int64 inSize)
-{
-	PRead(inBuffer, inSize, mOffset);
-	mOffset += inSize;
-}
-
-void M6FileStream::Write(const void* inBuffer, int64 inSize)
-{
-	PWrite(inBuffer, inSize, mOffset);
-	mOffset += inSize;
-}
-
-void M6FileStream::Truncate(int64 inSize)
-{
-	M6File::Truncate(inSize);
-	if (mOffset > mSize)
-		mOffset = mSize;
-}
-

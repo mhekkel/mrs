@@ -4,6 +4,7 @@
 #include <vector>
 
 #include <boost/type_traits/is_integral.hpp>
+#include <boost/filesystem/path.hpp>
 
 // wrappers for doing low level file i/o.
 // pread and pwrite will throw exceptions if they cannot read/write all requested data.
@@ -57,8 +58,15 @@ struct M6FileSizeHelper;
 class M6File
 {
   public:
+					M6File();
+					M6File(const M6File& inFile);
 					M6File(const std::string& inFile, MOpenMode inMode);
+					M6File(const boost::filesystem::path& inFile, MOpenMode inMode);
+	M6File&			operator=(const M6File& inFile);
 	virtual			~M6File();
+
+	void			Read(void* inBuffer, int64 inSize);
+	void			Write(const void* inBuffer, int64 inSize);
 	
 	void			PRead(void* inBuffer, int64 inSize, int64 inOffset);
 	void			PWrite(const void* inBuffer, int64 inSize, int64 inOffset);
@@ -91,31 +99,24 @@ class M6File
 					}
 	
 	virtual void	Truncate(int64 inSize);
-	int64			Size() const					{ return mSize; }
+	int64			Size() const						{ return mImpl->mSize; }
+	int64			Seek(int64 inOffset, int inMode);
+	int64			Tell() const						{ return mImpl->mOffset; }
 
   protected:
-	MHandle			mHandle;
-	int64			mSize;
+
+	struct M6FileImpl
+	{
+		MHandle			mHandle;
+		int64			mSize;
+		int64			mOffset;
+		uint32			mRefCount;
+	};
+
+	M6FileImpl*		mImpl;
 };
 
-// M6FileStream is an extension of M6File having the notion of an offset
-
-class M6FileStream : public M6File
-{
-  public:
-					M6FileStream(const std::string& inFile, MOpenMode inMode);
-	
-	int64			Seek(int64 inOffset, int inMode);
-	int64			Tell() const;
-	
-	void			Read(void* inBuffer, int64 inSize);
-	void			Write(const void* inBuffer, int64 inSize);
-
-	virtual void	Truncate(int64 inSize);
-
-  private:
-	int64			mOffset;
-};
+// helper classes
 
 struct M6FileSizeHelper
 {

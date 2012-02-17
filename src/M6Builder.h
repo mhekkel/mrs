@@ -21,7 +21,7 @@ class M6Builder
 
   private:
 
-	void				Glob(zeep::xml::element* inSource,
+	int64				Glob(zeep::xml::element* inSource,
 							std::vector<boost::filesystem::path>& outFiles);
 
 	void				Parse(const boost::filesystem::path& inFile);

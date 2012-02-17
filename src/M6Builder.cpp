@@ -7,6 +7,8 @@
 #define PCRE_STATIC
 #include <pcre.h>
 
+#include <archive.h>
+
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/fstream.hpp>
 #include <boost/iostreams/device/back_inserter.hpp>
@@ -27,6 +29,7 @@
 #include "M6Document.h"
 #include "M6Builder.h"
 #include "M6Config.h"
+#include "M6Progress.h"
 
 using namespace std;
 using namespace std::tr1;
@@ -34,6 +37,298 @@ namespace zx = zeep::xml;
 namespace fs = boost::filesystem;
 namespace ba = boost::algorithm;
 namespace io = boost::iostreams;
+
+// --------------------------------------------------------------------
+
+struct M6DataSource
+{
+  public:
+						M6DataSource(const fs::path& inFile, M6Progress& inProgress);
+	virtual				~M6DataSource();
+
+	struct M6DataFile
+	{
+						M6DataFile() : mRefCount(1) {}
+
+		string							mFilename;
+		io::filtering_stream<io::input>	mStream;
+		uint32			mRefCount;
+	};
+
+	struct M6DataSourceImpl
+	{
+						M6DataSourceImpl(M6Progress& inProgress) : mProgress(inProgress) {}
+		virtual			~M6DataSourceImpl() {}
+		
+		virtual M6DataFile*
+						Next() = 0;
+	
+		M6Progress&		mProgress;
+	};
+	
+	struct iterator : public std::iterator<std::forward_iterator_tag, M6DataFile>
+	{
+		typedef std::iterator<std::forward_iterator_tag, M6DataFile>	base_type;
+		typedef base_type::reference									reference;
+		typedef base_type::pointer										pointer;
+		
+						iterator() : mSource(nullptr), mDataFile(nullptr) {}
+						iterator(M6DataSourceImpl* inSource) : mSource(inSource), mDataFile(inSource->Next())
+						{
+							if (mDataFile == nullptr)
+								mSource = nullptr;
+						}
+						iterator(const iterator& iter) : mSource(iter.mSource), mDataFile(iter.mDataFile)
+						{
+							if (mDataFile != nullptr)
+								++mDataFile->mRefCount;
+						}
+		iterator&		operator=(const iterator& iter)
+						{
+							if (this != &iter)
+							{
+								if (mDataFile != nullptr and --mDataFile->mRefCount == 0)
+									delete mDataFile;
+								mSource = iter.mSource;
+								mDataFile = iter.mDataFile;
+								if (mDataFile != nullptr)
+									++mDataFile->mRefCount;
+							}
+							return *this;
+						}
+						~iterator()									{ delete mDataFile; }
+	
+		reference		operator*() 								{ return *mDataFile; }
+		pointer			operator->() 								{ return mDataFile; }
+	
+		iterator&		operator++()
+						{
+							assert(mSource);
+							if (mDataFile != nullptr and --mDataFile->mRefCount == 0)
+								delete mDataFile;
+							mDataFile = mSource->Next();
+							if (mDataFile == nullptr)
+								mSource = nullptr;
+							return *this;
+						}
+						
+		iterator		operator++(int)								{ iterator iter(*this); operator++(); return iter; }
+	
+		bool			operator==(const iterator& iter) const
+						{
+							return mSource == iter.mSource and mDataFile == iter.mDataFile;
+						}
+						
+		bool			operator!=(const iterator& iter) const		{ return not operator==(iter); }
+	
+	  private:
+		M6DataSourceImpl* mSource;
+		M6DataFile*		mDataFile;
+	};
+	
+	iterator			begin()										{ return iterator(mImpl); }
+	iterator			end()										{ return iterator(); }
+
+	void				progress(int64& outTotalSize, int64& outConsumed,
+							string& outCurrentFile) const;
+	
+  private:
+	
+	struct M6PlainTextDataSourceImpl : public M6DataSourceImpl
+	{
+						M6PlainTextDataSourceImpl(const fs::path& inFile, M6Progress& inProgress)
+							: M6DataSourceImpl(inProgress), mFile(inFile) {}
+		
+		struct device : public io::source
+		{
+			typedef char			char_type;
+			typedef io::source_tag	category;
+		
+							device(const fs::path inFile, M6Progress& inProgress)
+								: mFile(inFile, eReadOnly), mProgress(inProgress) {}
+
+			streamsize		read(char* s, streamsize n)
+							{
+								if (n > mFile.Size() - mFile.Tell())
+									n = mFile.Size() - mFile.Tell();
+								if (n > 0)
+								{
+									mFile.Read(s, n);
+									mProgress.Consumed(n);
+								}
+								else
+									n = -1;
+								return n;
+							}
+		
+			M6File			mFile;
+			M6Progress&		mProgress;
+		};
+
+		virtual M6DataFile*	Next()
+						{
+							M6DataFile* result = nullptr;
+							if (not mFile.empty())
+							{
+								result = new M6DataFile;
+								result->mFilename = mFile.filename().string();
+								result->mStream.push(device(mFile, mProgress));
+								mProgress.Message(mFile.filename().string());
+								mFile.clear();
+							}
+							return result;
+						}
+
+		fs::path		mFile;
+	};
+
+	M6DataSourceImpl*	mImpl;
+	M6Progress&			mProgress;
+};
+
+M6DataSource::M6DataSource(const fs::path& inFile, M6Progress& inProgress)
+	: mImpl(new M6PlainTextDataSourceImpl(inFile, inProgress))
+	, mProgress(inProgress)
+{
+}
+
+M6DataSource::~M6DataSource()
+{
+	delete mImpl;
+}
+
+
+
+//
+//
+//struct CArchiveReaderImpl : public CReaderImp
+//{
+//	enum {
+//		kBufferSize = 10240
+//	};
+//
+//					CArchiveReaderImpl(
+//						const fs::path&		inFile);
+//	
+//					~CArchiveReaderImpl();
+//	
+//	virtual int32	Read(
+//						char*				inBuffer,
+//						uint32				inLength);
+//	
+//	virtual bool	Eof() const;
+//	
+//	struct archive*	mArchive;
+//	struct archive_entry*
+//					mEntry;
+//	char			mBuffer[kBufferSize];
+//	uint32			mBufferPtr;
+//	uint32			mBufferSize;
+//	bool			mEOF;
+//};
+//
+//CArchiveReaderImpl::CArchiveReaderImpl(
+//	const fs::path&		inFile)
+//	: CReaderImp(inFile)
+//	, mArchive(archive_read_new())
+//	, mEntry(nullptr)
+//	, mBufferPtr(0)
+//	, mBufferSize(0)
+//	, mEOF(false)
+//{
+//	if (mArchive == nullptr)
+//		THROW(("Failed to initialize libarchive"));
+//	
+//	int err = archive_read_support_compression_all(mArchive);
+//
+//	if (err == ARCHIVE_OK)
+//		err = archive_read_support_format_all(mArchive);
+//	
+//	if (err == ARCHIVE_OK)
+//		err = archive_read_open_filename(mArchive,
+//			inFile.string().c_str(), kBufferSize);
+//	
+//	if (err == ARCHIVE_OK)
+//		err = archive_read_next_header(mArchive, &mEntry);
+//	
+//	if (err != ARCHIVE_OK)
+//	{
+//		string errmsg = archive_error_string(mArchive);
+//		THROW(("Error opening data file: %s", errmsg.c_str()));
+//	}
+//}
+//
+//CArchiveReaderImpl::~CArchiveReaderImpl()
+//{
+//	archive_read_finish(mArchive);
+//}
+//
+//int32 CArchiveReaderImpl::Read(
+//	char*				inBuffer,
+//	uint32				inLength)
+//{
+//	int32 result = 0;
+//
+//	for (;;)
+//	{
+//		if (mBufferPtr < mBufferSize)
+//		{
+//			uint32 k = mBufferSize - mBufferPtr;
+//			if (k > inLength)
+//				k = inLength;
+//			
+//			memcpy(inBuffer, mBuffer + mBufferPtr, k);
+//			mBufferPtr += k;
+//			result += k;
+//			inBuffer += k;
+//			inLength -= k;
+//		}
+//		
+//		if (result > 0 or inLength == 0 or mEOF)
+//			break;
+//		
+//		if (mEntry == nullptr)
+//		{
+//			int err = archive_read_next_header(mArchive, &mEntry);
+//			if (err == ARCHIVE_EOF)
+//				mEOF = true;
+//			else if (err != ARCHIVE_OK)
+//			{
+//				cerr << archive_error_string(mArchive) << endl;
+//				mEOF = true;
+//				break;
+//			}
+//		}
+//		else
+//		{
+//			int64 r = archive_read_data(mArchive, mBuffer, kBufferSize);
+//			if (r < 0)
+//			{
+//				THROW(("Error reading data from archive: %s",
+//					archive_error_string(mArchive)));
+//			}
+//			else if (r == 0)
+//				mEntry = nullptr;
+//	
+//			mReadData = archive_position_compressed(mArchive);
+//	
+//			mBufferSize = r;
+//			mBufferPtr = 0;
+//		}
+//		
+//		if (mEntry == nullptr)
+//			break;
+//	}
+//	
+//	return result;
+//}
+//	
+//bool CArchiveReaderImpl::Eof() const
+//{
+//	return mEOF;
+//}
+//
+
 
 // --------------------------------------------------------------------
 
@@ -62,7 +357,7 @@ class M6Processor
 						zx::element* inTemplate);
 	virtual			~M6Processor();
 	
-	void			ProcessFile(fs::path inFile);
+	void			ProcessFile(const string& inFileName, istream& inFileStream);
 	void			ProcessDocument(const string& inDocument);
 	
   private:
@@ -373,8 +668,6 @@ M6ReplaceExpr::~M6ReplaceExpr()
 
 bool M6ReplaceExpr::Evaluate(M6InputDocument* inDocument, M6Argument& arg) const
 {
-	bool result = true;
-	
 	int options = 0, offset = 0;
 	
 	string s;
@@ -611,9 +904,8 @@ M6ExprPtr M6Processor::ParseScript(zx::element* inScript)
 	return M6ExprPtr(list);
 }
 
-void M6Processor::ProcessFile(fs::path inFile)
+void M6Processor::ProcessFile(const string& inFileName, istream& inFileStream)
 {
-	fs::ifstream file(inFile, ios::binary);
 	string line;
 	
 	// do we need to strip off a header?
@@ -624,8 +916,8 @@ void M6Processor::ProcessFile(fs::path inFile)
 		
 		for (;;)
 		{
-			getline(file, line);
-			if (line.empty() and file.eof())
+			getline(inFileStream, line);
+			if (line.empty() and inFileStream.eof())
 				break;
 			if (boost::regex_match(line, he))
 				continue;
@@ -633,7 +925,7 @@ void M6Processor::ProcessFile(fs::path inFile)
 		}
 	}
 	else
-		getline(file, line);
+		getline(inFileStream, line);
 
 	string document;
 
@@ -641,7 +933,7 @@ void M6Processor::ProcessFile(fs::path inFile)
 	if (separator == nullptr)	// one file per document
 	{
 		io::filtering_ostream out(io::back_inserter(document));
-		io::copy(file, out);
+		io::copy(inFileStream, out);
 		ProcessDocument(document);
 	}
 	else
@@ -662,8 +954,8 @@ void M6Processor::ProcessFile(fs::path inFile)
 				
 				document += line + "\n";
 
-				getline(file, line);
-				if (line.empty() and file.eof())
+				getline(inFileStream, line);
+				if (line.empty() and inFileStream.eof())
 					break;
 			}
 
@@ -681,8 +973,8 @@ void M6Processor::ProcessFile(fs::path inFile)
 					document.clear();
 				}
 
-				getline(file, line);
-				if (line.empty() and file.eof())
+				getline(inFileStream, line);
+				if (line.empty() and inFileStream.eof())
 					break;
 			}
 
@@ -719,8 +1011,10 @@ M6Builder::~M6Builder()
 	delete mDatabank;
 }
 
-void M6Builder::Glob(zx::element* inSource, vector<fs::path>& outFiles)
+int64 M6Builder::Glob(zx::element* inSource, vector<fs::path>& outFiles)
 {
+	int64 result = 0;
+	
 	if (inSource == nullptr)
 		THROW(("No source specified for databank"));
 
@@ -728,9 +1022,15 @@ void M6Builder::Glob(zx::element* inSource, vector<fs::path>& outFiles)
 	ba::trim(source);
 	
 	if (inSource->get_attribute("type") == "path")
-		outFiles.push_back(source);
+	{
+		fs::path path(source);
+		result += fs::file_size(path);
+		outFiles.push_back(path);
+	}
 	else
 		THROW(("Unsupported source type"));
+	
+	return result;
 }
 
 void M6Builder::Build()
@@ -746,7 +1046,8 @@ void M6Builder::Build()
 	mDatabank->StartBatchImport(mLexicon);
 	
 	vector<fs::path> files;
-	Glob(mConfig->find_first("source"), files);
+	int64 rawBytes = Glob(mConfig->find_first("source"), files);
+	M6Progress progress(rawBytes);
 
 	M6Processor processor(*mDatabank, mLexicon, mConfig);
 
@@ -758,7 +1059,9 @@ void M6Builder::Build()
 			continue;
 		}
 		
-		processor.ProcessFile(file);
+		M6DataSource data(file, progress);
+		for (M6DataSource::iterator i = data.begin(); i != data.end(); ++i)
+			processor.ProcessFile(i->mFilename, i->mStream);
 	}
 	
 	cout << endl << "creating index..."; cout.flush();

@@ -35,7 +35,7 @@ class M6RunEntryWriter
 {
   public:
 	void		PrepareForWrite(const T* inValues, uint32 inCount) {}
-	void		WriteSortedRun(M6FileStream& inFile, const T* inValues, uint32 inCount)
+	void		WriteSortedRun(M6File& inFile, const T* inValues, uint32 inCount)
 					{ inFile.Write(inValues, sizeof(T) * inCount); }
 };
 
@@ -43,7 +43,7 @@ template<class T>
 class M6RunEntryReader
 {
   public:
-				M6RunEntryReader(M6FileStream& inFile, int64 inOffset)
+				M6RunEntryReader(M6File& inFile, int64 inOffset)
 					: mFile(inFile)
 					, mOffset(inOffset) { }
 
@@ -127,7 +127,7 @@ class M6SortedRunArray
 	class iterator
 	{
 	  public:
-					iterator(M6FileStream& inFile, compare_type& inComp, M6RunInfoList& inRuns)
+					iterator(M6File& inFile, compare_type& inComp, M6RunInfoList& inRuns)
 						: mFile(inFile)
 						, mCompare(inComp)
 					{
@@ -164,7 +164,7 @@ class M6SortedRunArray
 					iterator(const iterator&);
 		iterator&	operator=(const iterator&);
 	
-		M6FileStream&		mFile;
+		M6File&				mFile;
 		M6CompareRunEntry	mCompare;
 		M6QueueType			mQueue;
 	};
@@ -203,7 +203,7 @@ class M6SortedRunArray
 	
 	struct M6RunEntryIterator
 	{
-						M6RunEntryIterator(M6FileStream& inFile, int64 inOffset, uint32 inCount)
+						M6RunEntryIterator(M6File& inFile, int64 inOffset, uint32 inCount)
 							: mReader(inFile, inOffset)
 							, mCount(inCount) { }
 
@@ -225,7 +225,7 @@ class M6SortedRunArray
 		uint32			mCount;
 	};
 
-	M6FileStream		mFile;
+	M6File				mFile;
 	value_type*			mRun;
 	uint32				mRunCount;
 	M6RunInfoList		mRuns;

@@ -16,16 +16,89 @@ namespace fs = boost::filesystem;
 
 int VERBOSE;
 
-void Dump(const string& inDatabank, int inLevel)
+void Build(int argc, char* argv[])
 {
+	po::options_description desc("m6 build");
+	desc.add_options()
+		("databank,d",	po::value<string>(),	"Databank to build")
+		("config-file,c", po::value<string>(),	"Configuration file")
+		("verbose,v",							"Be verbose")
+		("help,h",								"Display help message")
+		;
+
+	po::positional_options_description p;
+	p.add("databank", 1);
 	
+	po::variables_map vm;
+	po::store(po::command_line_parser(argc, argv).options(desc).positional(p).run(), vm);
+	po::notify(vm);
+
+	if (vm.count("help") or vm.count("databank") == 0)
+	{
+		cout << desc << "\n";
+		exit(1);
+	}
+	
+	if (vm.count("verbose"))
+		VERBOSE = 1;
+	
+	string databank = vm["databank"].as<string>();
+
+	fs::path configFile("config/m6-config.xml");
+	if (vm.count("config-file"))
+		configFile = vm["config-file"].as<string>();
+	
+	if (not fs::exists(configFile))
+		THROW(("Configuration file not found (\"%s\")", configFile.string().c_str()));
+	
+	M6Config::SetConfigFile(configFile);
+
+	M6Builder builder(databank);
+	builder.Build();
 }
 
-void Query(const string& inDatabank, const string& inQuery)
+void Query(int argc, char* argv[])
 {
-	zeep::xml::element* config = M6Config::Instance().LoadConfig(inDatabank);
+	po::options_description desc("m6 query");
+	desc.add_options()
+		("databank,d",	po::value<string>(),	"Databank to build")
+		("query,q", po::value<string>(),		"Query term")
+		("config-file,c", po::value<string>(),	"Configuration file")
+		("verbose,v",							"Be verbose")
+		("help,h",								"Display help message")
+		;
+
+	po::positional_options_description p;
+	p.add("databank", 1);
+	p.add("query", 2);
+	
+	po::variables_map vm;
+	po::store(po::command_line_parser(argc, argv).options(desc).positional(p).run(), vm);
+	po::notify(vm);
+
+	if (vm.count("help") or vm.count("databank") == 0 or vm.count("query") == 0)
+	{
+		cout << desc << "\n";
+		exit(1);
+	}
+	
+	if (vm.count("verbose"))
+		VERBOSE = 1;
+	
+	string databank = vm["databank"].as<string>();
+
+	fs::path configFile("config/m6-config.xml");
+	if (vm.count("config-file"))
+		configFile = vm["config-file"].as<string>();
+	
+	if (not fs::exists(configFile))
+		THROW(("Configuration file not found (\"%s\")", configFile.string().c_str()));
+	
+	M6Config::SetConfigFile(configFile);
+
+	zeep::xml::element* config = M6Config::Instance().LoadConfig(databank);
 	if (not config)
-		THROW(("Configuration for %s is missing", inDatabank.c_str()));
+		THROW(("Configuration for %s is missing", databank.c_str()));
 
 	zeep::xml::element* file = config->find_first("file");
 	if (not file)
@@ -33,68 +106,39 @@ void Query(const string& inDatabank, const string& inQuery)
 
 	fs::path path = file->content();
 	M6Databank db(path.string(), eReadOnly);
-	db.Find(inQuery);
+	db.Find(vm["query"].as<string>());
+}
+
+void Info(int argc, char* argv[])
+{
+	cerr << "not supported yet" << endl;
 }
 
 int main(int argc, char* argv[])
 {
 	try
 	{
-		po::options_description desc("m6-build options");
-		desc.add_options()
-			("help,h",								"Display help message")
-			("action", po::value<string>(),			"Action to perform [build,dump,query]")
-			("databank,d",	po::value<string>(),	"Databank to build")
-			("config-file,c", po::value<string>(),	"Configuration file")
-			("level", po::value<int>(),				"Dump level, the higher the more information")
-			("query,q", po::value<string>(),		"Query term")
-			("verbose,v",							"Be verbose")
-			;
-
-		po::positional_options_description p;
-		p.add("action", 1);
-		p.add("databank", 2);
-		
-		po::variables_map vm;
-		po::store(po::command_line_parser(argc, argv).options(desc).positional(p).run(), vm);
-		po::notify(vm);
-
-		if (vm.count("help") or vm.count("action") == 0 or vm.count("databank") == 0)
+		if (argc < 2)
 		{
-			cout << desc << "\n";
+			cout << "Usage: m6 command [options]" << endl
+				 << endl
+				 << "  Command can be one of: build, query, info" << endl
+				 << "  Use m6 command --help for more info on each command" << endl;
 			exit(1);
 		}
 		
-		if (vm.count("verbose"))
-			VERBOSE = 1;
-		
-		string databank = vm["databank"].as<string>();
-
-		fs::path configFile("config/m6-config.xml");
-		if (vm.count("config-file"))
-			configFile = vm["config-file"].as<string>();
-		
-		if (not fs::exists(configFile))
-			THROW(("Configuration file not found (\"%s\")", configFile.string().c_str()));
-		
-		M6Config::SetConfigFile(configFile);
-
-		if (vm["action"].as<string>() == "build")
-		{
-			M6Builder builder(databank);
-			builder.Build();
-		}
-		else if (vm["action"].as<string>() == "dump")
-		{
-			int level = 0;
-			if (vm.count("level"))
-				level = vm["level"].as<int>();
-			Dump(databank, level);
-		}
-		else if (vm["action"].as<string>() == "query")
-			Query(databank, vm["query"].as<string>());
+		if (strcmp(argv[1], "build") == 0)
+			Build(argc - 1, argv + 1);
+		else if (strcmp(argv[1], "query") == 0)
+			Query(argc - 1, argv + 1);
+		else if (strcmp(argv[1], "info") == 0)
+			Info(argc - 1, argv + 1);
 		else
-			THROW(("unimplemented action '%s'", vm["action"].as<string>().c_str()));
+		{
+			cout << "Unknown command " << argv[1] << endl
+				 << "Supported commands are build, query and info" << endl;
+			exit(1);
+		}
 	}
 	catch (exception& e)
 	{

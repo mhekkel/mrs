@@ -15,6 +15,7 @@
 #include "M6BitStream.h"
 #include "M6Index.h"
 #include "M6SortedRunArray.h"
+#include "M6Progress.h"
 
 using namespace std;
 namespace fs = boost::filesystem;
@@ -107,7 +108,7 @@ class M6FullTextIx
 							: mFirstDoc(0), mFullTextIndex(&inFullTextIndex) { }
 
 		void			PrepareForWrite(const BufferEntry* values, uint32 count);
-		void			WriteSortedRun(M6FileStream& inFile, const BufferEntry* values, uint32 count);
+		void			WriteSortedRun(M6File& inFile, const BufferEntry* values, uint32 count);
 		
 		uint32			mFirstDoc;
 		M6FullTextIx*	mFullTextIndex;
@@ -115,7 +116,7 @@ class M6FullTextIx
 	
 	struct BufferEntryReader
 	{
-						BufferEntryReader(M6FileStream& file, int64 offset);
+						BufferEntryReader(M6File& file, int64 offset);
 		void			ReadSortedRunEntry(BufferEntry& value);
 
 		M6IBitStream	bits;
@@ -276,7 +277,7 @@ void M6FullTextIx::BufferEntryWriter::PrepareForWrite(const BufferEntry* inValue
 	mFirstDoc = inValues[0].doc;
 }
 
-void M6FullTextIx::BufferEntryWriter::WriteSortedRun(M6FileStream& inFile, const BufferEntry* inValues, uint32 inCount)
+void M6FullTextIx::BufferEntryWriter::WriteSortedRun(M6File& inFile, const BufferEntry* inValues, uint32 inCount)
 {
 	M6OBitStream bits(inFile);
 	
@@ -312,7 +313,7 @@ void M6FullTextIx::BufferEntryWriter::WriteSortedRun(M6FileStream& inFile, const
 	bits.Sync();
 }
 
-M6FullTextIx::BufferEntryReader::BufferEntryReader(M6FileStream& inFile, int64 inOffset)
+M6FullTextIx::BufferEntryReader::BufferEntryReader(M6File& inFile, int64 inOffset)
 	: bits(inFile, inOffset)
 {
 	ReadGamma(bits, mFirstDoc);
@@ -544,7 +545,7 @@ class M6TextIx : public M6BasicIx
 	void			AddDocTerm(uint32 inDoc, uint8 inFrequency, M6OBitStream& inIDL);
 	virtual void	FlushTerm(uint32 inTerm, uint32 inDocCount);
 
-	M6FileStream*	mIDLFile;
+	M6File*			mIDLFile;
 	M6OBitStream*	mIDLBits;
 	int64			mIDLOffset;
 };
@@ -557,7 +558,7 @@ M6TextIx::M6TextIx(M6FullTextIx& inFullTextIndex, M6Lexicon& inLexicon,
 	, mIDLOffset(0)
 {
 	mFullTextIndex.SetUsesInDocLocation(mIndexNr);
-	mIDLFile = new M6FileStream((mFullTextIndex.GetScratchDir().parent_path() / (inName + ".idl")).string(), eReadWrite);
+	mIDLFile = new M6File((mFullTextIndex.GetScratchDir().parent_path() / (inName + ".idl")).string(), eReadWrite);
 }
 
 M6TextIx::~M6TextIx()
@@ -884,16 +885,10 @@ void M6BatchIndexProcessor::Finish(uint32 inDocCount)
 	// get the iterator for all index entries
 	auto_ptr<M6FullTextIx::M6EntryIterator> iter(mFullTextIndex.Finish());
 
-	int64 entryCount = mFullTextIndex.CountEntries();
-	int64 entriesRead = 0;
-	int64 vStep = entryCount / 10;
+	int64 entryCount = mFullTextIndex.CountEntries(), entriesRead = 0;
 	
-	if (vStep == 0)
-		vStep = 1;
-
-	//// update progress information
-	//if (inProgress != nullptr)
-	//	inProgress->SetCreateIndexProgress(0, entryCount);
+	M6Progress progress(entryCount);
+	progress.Message("Creating index");
 	
 	// the next loop is very *hot*, make sure it is optimized as much as possible.
 	// 
@@ -909,8 +904,8 @@ void M6BatchIndexProcessor::Finish(uint32 inDocCount)
 	{
 		++entriesRead;
 	
-//		if (inProgress != nullptr and (entriesRead % 1000000) == 0)
-//			inProgress->SetCreateIndexProgress(entriesRead, entryCount);
+		if ((entriesRead % 10000) == 0)
+			progress.Progress(entriesRead);
 
 		if (lastDoc != ie.doc or lastTerm != ie.term)
 		{
@@ -929,9 +924,11 @@ void M6BatchIndexProcessor::Finish(uint32 inDocCount)
 			termFrequency = numeric_limits<uint8>::max();
 	}
 	while (iter->Next(ie));
-	
+
 	// flush
 	for_each(mIndices.begin(), mIndices.end(), [&ie](M6BasicIx* ix) { ix->AddDocTerm(0, 0, 0, ie.idl); });
+	
+	progress.Progress(entriesRead);
 }
 
 // --------------------------------------------------------------------
@@ -965,7 +962,7 @@ M6DatabankImpl::M6DatabankImpl(M6Databank& inDatabank, const string& inPath, MOp
 				uint32 maxDocNr = mStore->NextDocumentNumber();
 				mDocWeights.assign(maxDocNr, 0);
 				
-				M6FileStream file((mDbDirectory / "all-text.weights").string(), eReadOnly);
+				M6File file((mDbDirectory / "all-text.weights").string(), eReadOnly);
 				if (file.Size() == sizeof(float) * maxDocNr)
 					file.Read(&mDocWeights[0], sizeof(float) * maxDocNr);
 				else
@@ -1259,7 +1256,7 @@ void M6DatabankImpl::RecalculateDocumentWeights()
 		THROW(("Invalid index"));
 	ix->CalculateDocumentWeights(docCount, mDocWeights);
 
-	M6FileStream weightFile((mDbDirectory / "all-text.weights").string(), eReadWrite);
+	M6File weightFile((mDbDirectory / "all-text.weights").string(), eReadWrite);
 	weightFile.Write(&mDocWeights[0], sizeof(float) * mDocWeights.size());
 }
 

@@ -21,14 +21,14 @@ const uint32
 
 struct M6OBitStreamFileImpl : public M6OBitStreamImpl
 {
-					M6OBitStreamFileImpl(M6FileStream& inFile)
+					M6OBitStreamFileImpl(M6File& inFile)
 						: mFile(inFile) {}
 
 	virtual size_t	Size() const								{ return mFile.Size(); }
 	virtual void	Write(const void* inData, size_t inSize)	{ mFile.Write(inData, inSize); }
 	virtual void	Truncate()									{ mFile.Truncate(0); }
 					
-	M6FileStream&	mFile;
+	M6File&			mFile;
 };
 
 struct M6OBitStreamMemImpl : public M6OBitStreamImpl
@@ -83,7 +83,7 @@ M6OBitStream::M6OBitStream()
 	mData[mByteOffset] = 0;
 }
 
-M6OBitStream::M6OBitStream(M6FileStream& inFile)
+M6OBitStream::M6OBitStream(M6File& inFile)
 	: mImpl(new M6OBitStreamFileImpl(inFile))
 	, mByteOffset(0)
 	, mBitOffset(7)

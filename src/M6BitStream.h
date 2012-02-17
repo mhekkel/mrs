@@ -6,7 +6,6 @@
 class M6IBitStream;
 class M6OBitStream;
 class M6File;
-class M6FileStream;
 
 // --------------------------------------------------------------------
 
@@ -32,7 +31,7 @@ class M6OBitStream
 {
   public:
 						M6OBitStream();
-	explicit			M6OBitStream(M6FileStream& inFile);
+	explicit			M6OBitStream(M6File& inFile);
 						M6OBitStream(const M6OBitStream& inStream);
 						~M6OBitStream();
 	M6OBitStream&		operator=(const M6OBitStream& inStream);
@@ -49,7 +48,7 @@ class M6OBitStream
 	size_t				BitSize() const		{ return Size() * 8 + (7 - mBitOffset); }
 
 //	size_t				Copy(void* outBuffer, size_t inBufferSize) const;
-//	void				Write(M6FileStream& inFile) const;
+//	void				Write(M6File& inFile) const;
 //	void				GetBits(int64& outBits) const;
 
 	friend class M6IBitStream;

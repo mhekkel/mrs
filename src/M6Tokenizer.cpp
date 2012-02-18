@@ -263,6 +263,7 @@ uint32 M6Tokenizer::GetNextCharacter()
 	if (mPtr >= mBuffer + mBufferSize)
 	{
 		++mPtr;
+		++mToken;
 		return result;
 	}
 	

@@ -82,7 +82,8 @@ struct M6TokenTest
 	{ "10a 1e0a", { eM6TokenWord, eM6TokenWord, eM6TokenEOF } },
 	{ "Q92834; B1ARN3; O00702;",
 		{ eM6TokenWord, eM6TokenPunctuation, eM6TokenWord, eM6TokenPunctuation, eM6TokenWord, eM6TokenPunctuation, eM6TokenEOF } },
-	
+	{ "MHC I",
+		{ eM6TokenWord, eM6TokenWord, eM6TokenEOF } },	
 };
 
 BOOST_AUTO_TEST_CASE(test_tok_1)
@@ -102,4 +103,20 @@ BOOST_AUTO_TEST_CASE(test_tok_1)
 				break;
 		}
 	}
+}
+
+BOOST_AUTO_TEST_CASE(test_tok_2)
+{
+	cout << "testing tokenizer 2" << endl;
+	
+	M6Tokenizer tok("NMH I;", 5);
+	BOOST_CHECK_EQUAL(tok.GetToken(), eM6TokenWord);
+	BOOST_CHECK_EQUAL(tok.GetToken(), eM6TokenWord);
+	BOOST_CHECK_EQUAL(tok.GetToken(), eM6TokenEOF);
+
+	const char s2[] = "type 1\n";
+	M6Tokenizer tok2(s2, strlen(s2));
+	BOOST_CHECK_EQUAL(tok2.GetToken(), eM6TokenWord);
+	BOOST_CHECK_EQUAL(tok2.GetToken(), eM6TokenNumber);
+	BOOST_CHECK_EQUAL(tok2.GetToken(), eM6TokenEOF);
 }

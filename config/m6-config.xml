@@ -2,7 +2,161 @@
 <!DOCTYPE m6-config SYSTEM "http://mrs.cmbi.ru.nl/dtd/m6-config.dtd">
 <m6-config>
 	
-	<databank id="pdbfinder">
+<!--	<srvdir>/srv/mrs</srvdir>-->
+	<srvdir>srv</srvdir>
+	
+	<parser id="pdbfinder">
+		<match regex="^\s?(\w+)\s+:\s(.+)\n">
+			<switch test="1">
+				<case value="id">
+					<capture nr="2">
+						<index name="id" unique="true" type="string"/>
+						<attr name="id"/>
+					</capture>
+				</case>
+				<case value="header">
+					<capture nr="2">
+						<to-lower />
+						<index name="header" type="text"/>
+						<attr name="title"/>
+					</capture>
+				</case>
+				<case value="author">
+					<capture nr="2">
+						<replace what="\." with=". "/>
+						<index name="author" type="text"/>
+					</capture>
+				</case>
+				<case value="chain">
+					<stop/>
+				</case>
+				<default>
+					<capture nr="2">
+						<index name="text" type="text"/>
+					</capture>
+				</default>
+			</switch>
+		</match>
+	</parser>
+
+	<parser id="omim">
+		<match regex="^\*FIELD\* (\w\w)\n((?(?=\*FIELD\*)(*ACCEPT)|.*\n)+)">
+			<switch test="1">
+				<case value="NO">
+					<capture nr="2">
+						<index name="id" unique="true" type="string"/>
+						<attr name="id"/>
+					</capture>
+				</case>
+				<case value="TI">
+					<capture nr="2">
+						<index name="title" type="text"/>
+						<split separator=";;">
+							<if iteration="1">
+								<to-lower />
+								<substr length="255" />
+								<replace what="\s+" with=" " />
+								<attr name="title"/>
+							</if>
+						</split>
+					</capture>
+				</case>
+				<default>
+					<capture nr="2">
+						<index name="text" type="text"/>
+					</capture>
+				</default>
+			</switch>
+		</match>
+	</parser>
+	
+	<parser id="uniprot">
+		<match regex="^(?:([A-Z]{2})   ).+\n(?:\1.+\n)*">
+			<switch test="1">
+				<case value="ID">
+					<replace what="^ID   (.+)\n" with="$1 "/>
+					<match regex="^(\w+)" capture="1">
+						<index name="id" unique="true" type="string"/>
+						<attr name="id"/>
+					</match>
+				</case>
+				<case value="AC">
+					<replace what="^AC   (.+)\n" with="$1 "/>
+					<split separator=";\s*">
+						<index name="ac" unique="true" type="string"/>
+					</split>
+				</case>
+				<case value="DE">
+					<replace what="^DE   (.+)\n" with="$1 "/>
+					<match regex="\w+: ((?:[^:;]+;\s*)+)" capture="1">
+						<if iteration="1">
+							<match regex="\w+=(.+);">
+								<capture nr="1">
+									<attr name="title"/>
+								</capture>
+							</match>
+						</if>
+						<match regex="\w+=(.+)" capture="1">
+							<index name="de"/>
+						</match>
+					</match>
+				</case>
+				<case value="GN">
+					<replace what="^GN   (.+)\n" with="$1 "/>
+					<split separator=";\s*">
+						<match regex="(?:\w+=)?(.+)" capture="1">
+							<index name="gn"/>
+						</match>
+					</split>
+				</case>
+				<case value="OS">
+					<replace what="^OS   (.+)\n" with="$1 "/>
+					<index name="os" type="string" />
+				</case>
+				<case value="OC">
+					<replace what="^OC   (.+)\n" with="$1 "/>
+					<split separator=";\s*">
+						<index name="oc" type="string" />
+					</split>
+				</case>
+				<case value="DR">
+					<replace what="^DR   (.+)\n" with="$1 "/>
+					<replace what="^(\w+); ([^;]+);.*" with="$1:$2" />
+					<index name="dr" type="string" />
+				</case>
+				<case value="KW">
+					<replace what="^KW   (.+)\n" with="$1 "/>
+					<split separator=";\s*">
+						<index name="kw" type="string"/>
+					</split>
+				</case>
+				<case value="FT">
+					<replace what="^FT.{32}(.+)" with="$1\n" />
+					<index name="ft"/>
+				</case>
+				<case value="RX">
+					<match regex="MEDLINE=([^;]+);" capture="1">
+						<index name="medline"/>
+					</match>
+					<match regex="PubMed=([^;]+);" capture="1">
+						<index name="pubmed"/>
+					</match>
+					<match regex="DOI=([^;]+);" capture="1">
+						<index name="doi" type="string"/>
+					</match>
+				</case>
+				<case value="SQ">
+					<stop/>
+				</case>
+				<default>
+					<replace what="^.{5}(.+)\n" with="$1\n"/>
+					<index name="text"/>
+				</default>
+			</switch>
+		</match>
+	</parser>
+	
+	<databank id="pdbfinder" parser="pdbfinder">
 		<name>PDBFINDER</name>
 <!--		<file>C:\Users\maarten\projects\m6\test\pdbfinder.m6</file> -->
 		<file>test/pdbfinder.m6</file>
@@ -14,7 +168,6 @@
 <!--		<source type="path">C:\Users\maarten\projects\m6\test\pdbfind2-head-2.txt</source>-->
 <!--		<source type="path">C:\Users\maarten\projects\m6\test\pdbfind2-head.txt</source>-->
 		
-		<!-- parser info -->
 		<!-- if no header-line or document-separator element is specified, the
 			 entire file is considered to be one document. -->
 		
@@ -31,95 +184,27 @@
 		-->
 		<document-separator type="last-line-equals">//</document-separator>
 
-		<!--
-			There are three types of processing the document for indexing, specified by
-			the type attribute.
-
-			'delimited'					needs delimiter
-					a : value1
-					b : value2
-					etc...
-					
-			'fixed-width'				needs key-width, can have value-width
-			  		a   value1
-			  		bb  value2
-			  		etc...
-			  
-			'regex'						needs regex with two captures
-			  		Used for more 'human-readable' formats like genbank.
-			  		
-			  		a    bla bla
-			  		 b   another string
-			  		     of text for field b
-			  		c    and the value for c
-			  		
-			  		regex in this case e.g.: ^\s*(\w+)\s+((?:.+)(?:\n\s{4,}.+)*)
-				
-		-->
-		
-<!--		<processing type="regex" regex="^\s*([A-Z]+)\s+((?:.+\n)(?:\s{4,}.+\n)*)" >-->
-	
-		<script>
-			
-			
-		</script>
-
-		<processing type="delimited" delimiter=":">
-			<process key="id"							type="string"		action="index attr unique" />
-			<process key="header"		name="title"	type="string"		action="index attr" />
-			<process key="chain"											action="stop" />
-			<process key="resolution"					type="numeric"		action="index" />
-			<process key="author"						type="string"		action="index">
-				<postprocess what="(\w)\.(?=\w)" with="$1. " flags="global" />
-			</process>
-			<process key="date"							type="date"			action="index" />
-			<process key="r-factor"						type="numeric"		action="index" />
-			<process					name="text"		type="text"			action="index" />
-		</processing>
-
 	</databank>
 	
 	<!-- omim -->
-	<databank id="omim">
+	<databank id="omim" parser="omim">
 		<name>OMIM</name>
-		<file>test/omim.m6</file>
+		<file>m6/omim.m6</file>
 		
 		<locale>en_US.UTF-8</locale>
 		
-		<source type="path">test/omim.dat</source>
+		<source type="path">omim/omim.dat</source>
 		
 		<document-separator type="first-line-equals">*RECORD*</document-separator>
+	</databank>
+	
+	<databank id="sprot" parser="uniprot">
+		<name>SwissProt</name>
+		<file>test/sprot.m6</file>
+
+		<source type="path">test/sprot.dat</source>
 		
-		<script>
-			<foreach regex="^\*FIELD\* (\w\w)\n((?(?=\*FIELD\*)(*ACCEPT)|.*\n)+)">
-				<switch test="1">
-					<case value="NO">
-						<capture nr="2">
-							<index name="id" unique="true" type="string"/>
-							<attr name="id"/>
-						</capture>
-					</case>
-					<case value="TI">
-						<capture nr="2">
-							<index name="title" type="text"/>
-							<split separator=";;">
-								<if iteration="1">
-									<to-lower />
-									<substr length="255" />
-									<replace what="\s+" with=" " />
-									<attr name="title"/>
-								</if>
-							</split>
-						</capture>
-					</case>
-					<default>
-						<capture nr="2">
-							<index name="text" type="text"/>
-						</capture>
-					</default>
-				</switch>
-			</foreach>
-		</script>
+		<document-separator type="last-line-equals">//</document-separator>
 	</databank>
 	
 <!--
@@ -133,7 +218,7 @@
 		<document-separator type="first-line-matches">^LOCUS </document-separator>
 		<document-separator type="last-line-equals">//</document-separator>
 
-		<foreach regex="^\s*(\w+)\s+((?:.+)(?:\n\s{5,}.+)*)">
+		<match regex="^\s*(\w+)\s+((?:.+)(?:\n\s{5,}.+)*)">
 			<switch>
 				<case test="$1 eq 'locus'">
 					<substring location="13-28">
@@ -149,9 +234,9 @@
 				</case>
 
 				<case test="$1 eq 'accession'">
-					<foreach split="\s+">
+					<match split="\s+">
 						<store name="accession" action="index unique" />
-					</foreach>
+					</match>
 				</case>
 				
 				<case test="$1 eq 'version'">
@@ -166,11 +251,11 @@
 				</case>
 				
 				<case test="$1 eq 'features'">
-					<foreach regex="^\s{5}(\w+)\s+((?:\S.+)(?:\n\s{20,}.+)*)">
-						<foreach regex="/(\w+)="((?:\n|[^"]|"")*?)">
+					<match regex="^\s{5}(\w+)\s+((?:\S.+)(?:\n\s{20,}.+)*)">
+						<match regex="/(\w+)="((?:\n|[^"]|"")*?)">
 							<store name="feature" action="index"/>
-						</foreach>
-					</foreach>
+						</match>
+					</match>
 				</case>
 				
 				<case test="$1 eq 'origin'">
@@ -180,7 +265,7 @@
 				<default>
 				</default>
 			</switch>
-		</foreach>
+		</match>
 	</databank>
 	-->
 	

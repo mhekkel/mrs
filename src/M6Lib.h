@@ -80,6 +80,8 @@ enum M6IndexType
 extern const uint32
 	kM6MaxWeight, kM6WeightBitCount;
 
+extern int VERBOSE;
+
 // --------------------------------------------------------------------
 
 

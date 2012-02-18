@@ -54,3 +54,16 @@ zx::element* M6Config::LoadConfig(const std::string& inDatabank)
 	return dbConfig.front();
 }
 
+zx::element* M6Config::LoadParser(const std::string& inParser)
+{
+	string dbConfigPath = (boost::format("/m6-config/parser[@id='%1%']") % inParser).str();
+	auto dbConfig = mConfig->find(dbConfigPath);
+	if (dbConfig.empty())
+		THROW(("parser %s not specified in config file", inParser.c_str()));
+	
+	if (dbConfig.size() > 1)
+		THROW(("parser %s specified multiple times in config file", inParser.c_str()));
+	
+	return dbConfig.front();
+}
+

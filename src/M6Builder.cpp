@@ -22,6 +22,9 @@
 #include <boost/tr1/tuple.hpp>
 //#include <boost/timer/timer.hpp>
 #include <boost/lexical_cast.hpp>
+#include <boost/uuid/uuid.hpp>
+#include <boost/uuid/uuid_generators.hpp>
+#include <boost/uuid/uuid_io.hpp>
 
 #include "M6DocStore.h"
 #include "M6Error.h"
@@ -376,14 +379,22 @@ class M6Processor
 
 struct M6Argument
 {
-					M6Argument(const char* inText, int inOVector[30])
+					M6Argument(const char* inText, int inOVector[30], int inRC, uint32 inCapture)
 						: mIteration(1), mText(inText + inOVector[0])
 						, mLength(inOVector[1] - inOVector[0])
 					{
-						for (int i = 0; i < 10; ++i)
+						if (inCapture > 0)
 						{
-							mMatchStarts[i] = inText + inOVector[2 * i];
-							mMatchLengths[i] = inOVector[2 * i + 1] - inOVector[2 * i];
+							mText = inText + inOVector[inCapture * 2];
+							mLength = inOVector[inCapture * 2 + 1] - inOVector[inCapture * 2];
+						}
+						else
+						{
+							for (int i = 0; i < 10; ++i)
+							{
+								mMatchStarts[i] = inText + inOVector[2 * i];
+								mMatchLengths[i] = inOVector[2 * i + 1] - inOVector[2 * i];
+							}
 						}
 					}
 
@@ -435,20 +446,21 @@ bool M6ListExpr::Evaluate(M6InputDocument* inDocument, M6Argument& arg) const
 	return result;
 }
 
-struct M6ForeachExpr : public M6Expr
+struct M6MatchExpr : public M6Expr
 {
-					M6ForeachExpr(const string& inPattern);
-					~M6ForeachExpr();
+					M6MatchExpr(const string& inPattern, uint32 inCapture);
+					~M6MatchExpr();
 
 	virtual bool	Evaluate(M6InputDocument* inDocument, M6Argument& arg) const;
 	
 	pcre*			mRE;
 	pcre_extra*		mInfo;
 	M6ExprPtr		mLoop;
+	uint32			mCapture;
 };
 
-M6ForeachExpr::M6ForeachExpr(const string& inPattern)
-	: mRE(nullptr), mInfo(nullptr)
+M6MatchExpr::M6MatchExpr(const string& inPattern, uint32 inCapture)
+	: mRE(nullptr), mInfo(nullptr), mCapture(inCapture)
 {
 	const char* error;
 	int erroffset;
@@ -468,7 +480,7 @@ M6ForeachExpr::M6ForeachExpr(const string& inPattern)
 	}
 }
 
-M6ForeachExpr::~M6ForeachExpr()
+M6MatchExpr::~M6MatchExpr()
 {
 	if (mInfo != nullptr)
 		pcre_free(mInfo);
@@ -477,7 +489,7 @@ M6ForeachExpr::~M6ForeachExpr()
 		pcre_free(mRE);
 }
 
-bool M6ForeachExpr::Evaluate(M6InputDocument* inDocument, M6Argument& arg) const
+bool M6MatchExpr::Evaluate(M6InputDocument* inDocument, M6Argument& arg) const
 {
 	bool result = true;
 	
@@ -499,7 +511,7 @@ bool M6ForeachExpr::Evaluate(M6InputDocument* inDocument, M6Argument& arg) const
 		if (rc < 0)
 			THROW(("Matching error %d\n", rc));
 		
-		M6Argument a(arg.mText, ovector);
+		M6Argument a(arg.mText, ovector, rc, mCapture);
 		a.mIteration = iteration;
 		if (not mLoop->Evaluate(inDocument, a))
 		{
@@ -658,6 +670,11 @@ M6ReplaceExpr::M6ReplaceExpr(const string& inWhat, const string& inWith)
 		THROW(("PCRE compilation failed at offset %d: %s\npattern: >> %s <<\n",
 			erroffset, error, inWhat.c_str()));
 	}
+	
+	ba::replace_all(mWith, "\\n", "\n");
+	ba::replace_all(mWith, "\\r", "\r");
+	ba::replace_all(mWith, "\\t", "\t");
+	ba::replace_all(mWith, "\\\\", "\\");
 }
 
 M6ReplaceExpr::~M6ReplaceExpr()
@@ -692,8 +709,15 @@ bool M6ReplaceExpr::Evaluate(M6InputDocument* inDocument, M6Argument& arg) const
 		if (rc < 0)
 			THROW(("Matching error %d\n", rc));
 		
-		s.append(arg.mText + offset, ovector[0] - offset);
-		s.append(mWith);
+		string with = mWith;
+		for (int i = 0; i < 10; ++i)
+		{
+			char v[] = { '$', '0' + i, 0 };
+			string m(arg.mText + ovector[i * 2], ovector[i * 2 + 1] - ovector[i * 2]);
+			ba::replace_all(with, v, m);
+		}
+		
+		s.append(with);
 		
 		offset = ovector[1];
 		if (offset == arg.mLength)
@@ -742,7 +766,7 @@ bool M6SwitchExpr::Evaluate(M6InputDocument* inDocument, M6Argument& arg) const
 	bool handled = false;
 	foreach (const M6Case& c, mCases)
 	{
-		if (test == c.mValue)
+		if (ba::iequals(test, c.mValue))
 		{
 			handled = true;
 			result = c.mExpr->Evaluate(inDocument, arg);
@@ -778,6 +802,9 @@ struct M6IndexExpr : public M6Expr
 
 	virtual bool	Evaluate(M6InputDocument* inDocument, M6Argument& arg) const
 					{
+						if (VERBOSE)
+							cout << "index " << mName << " => " << string(arg.mText, arg.mLength) << endl;
+						
 						inDocument->Index(mName, mType, mUnique, arg.mText, arg.mLength);
 						return true;
 					}
@@ -792,6 +819,9 @@ struct M6AttrExpr : public M6Expr
 					M6AttrExpr(const string& inName) : mName(inName) {}
 	virtual bool	Evaluate(M6InputDocument* inDocument, M6Argument& arg) const
 					{
+						if (VERBOSE)
+							cout << "attr " << mName << " => " << string(arg.mText, arg.mLength) << endl;
+
 						inDocument->SetAttribute(mName, arg.mText, arg.mLength);
 						return true;
 					}
@@ -813,7 +843,11 @@ M6Processor::M6Processor(M6Databank& inDatabank, M6Lexicon& inLexicon,
 		zx::element* inTemplate)
 	: mDatabank(inDatabank), mLexicon(inLexicon), mConfig(inTemplate)
 {
-	zx::element* script = mConfig->find_first("script");
+	string parser = mConfig->get_attribute("parser");
+	if (parser.empty())
+		THROW(("Missing parser attribute"));
+	
+	zx::element* script = M6Config::Instance().LoadParser(parser);
 	if (script != nullptr)
 		mScript = ParseScript(script);
 }
@@ -827,9 +861,13 @@ M6ExprPtr M6Processor::ParseScript(zx::element* inScript)
 	M6ListExpr* list = new M6ListExpr;
 	foreach (zx::element* node, *inScript)
 	{
-		if (node->name() == "foreach")
+		if (node->name() == "match")
 		{
-			M6ForeachExpr* foreach = new M6ForeachExpr(node->get_attribute("regex"));
+			uint32 capture = 0;
+			if (not node->get_attribute("capture").empty())
+				capture = boost::lexical_cast<uint32>(node->get_attribute("capture"));
+			
+			M6MatchExpr* foreach = new M6MatchExpr(node->get_attribute("regex"), capture);
 			foreach->mLoop = ParseScript(node);
 			list->mList.push_back(M6ExprPtr(foreach));
 		}
@@ -898,7 +936,7 @@ M6ExprPtr M6Processor::ParseScript(zx::element* inScript)
 		else if (node->name() == "attr")
 			list->mList.push_back(M6ExprPtr(new M6AttrExpr(node->get_attribute("name"))));
 		else if (node->name() == "stop")
-			list->mList.push_back(M6ExprPtr(new M6StopExpr)));
+			list->mList.push_back(M6ExprPtr(new M6StopExpr));
 		else
 			THROW(("Unsupported script element %s", node->name().c_str()));
 	}
@@ -1043,30 +1081,58 @@ void M6Builder::Build()
 	if (not file)
 		THROW(("Invalid config-file, file is missing"));
 
-	fs::path path = file->content();
-	mDatabank = M6Databank::CreateNew(path.string());
-	mDatabank->StartBatchImport(mLexicon);
+	fs::path path(file->content());
 	
-	vector<fs::path> files;
-	int64 rawBytes = Glob(mConfig->find_first("source"), files);
-	M6Progress progress(rawBytes);
-
-	M6Processor processor(*mDatabank, mLexicon, mConfig);
-
-	foreach (fs::path& file, files)
+	if (fs::exists(path))
 	{
-		if (not fs::exists(file))
+		boost::uuids::random_generator gen;
+		boost::uuids::uuid u = gen();
+		
+		path = path.string() + "-" + boost::lexical_cast<string>(u);
+	}
+
+	try
+	{
+		mDatabank = M6Databank::CreateNew(path.string());
+		mDatabank->StartBatchImport(mLexicon);
+		
+		vector<fs::path> files;
+		int64 rawBytes = Glob(mConfig->find_first("source"), files);
+		M6Progress progress(rawBytes);
+	
+		M6Processor processor(*mDatabank, mLexicon, mConfig);
+	
+		foreach (fs::path& file, files)
 		{
-			cerr << "file missing: " << file << endl;
-			continue;
+			if (not fs::exists(file))
+			{
+				cerr << "file missing: " << file << endl;
+				continue;
+			}
+			
+			M6DataSource data(file, progress);
+			for (M6DataSource::iterator i = data.begin(); i != data.end(); ++i)
+				processor.ProcessFile(i->mFilename, i->mStream);
 		}
 		
-		M6DataSource data(file, progress);
-		for (M6DataSource::iterator i = data.begin(); i != data.end(); ++i)
-			processor.ProcessFile(i->mFilename, i->mStream);
+		mDatabank->CommitBatchImport();
+		
+		delete mDatabank;
+		mDatabank = nullptr;
+		
+		// if we created a temporary db
+		if (path.string() != file->content())
+		{
+			fs::remove_all(file->content());
+			fs::rename(path, file->content());
+		}
+		
+		cout << "done" << endl;
 	}
-	
-	mDatabank->CommitBatchImport();
-	cout << "done" << endl;
+	catch (...)
+	{
+		fs::remove_all(path);
+		throw;
+	}
 }
 

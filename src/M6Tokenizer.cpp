@@ -260,7 +260,7 @@ uint32 M6Tokenizer::GetNextCharacter()
 {
 	uint32 result = 0;
 
-	if (mPtr > mBuffer + mBufferSize)
+	if (mPtr >= mBuffer + mBufferSize)
 	{
 		++mPtr;
 		return result;
@@ -364,7 +364,7 @@ M6Token M6Tokenizer::GetToken()
 			case 10:
 				if (c == 0)	// done!
 					result = eM6TokenEOF;
-				if (fast::isspace(c))
+				else if (fast::isspace(c))
 					mToken = mTokenText;
 				else if (fast::isdigit(c))		// first try a number
 					state = 11;

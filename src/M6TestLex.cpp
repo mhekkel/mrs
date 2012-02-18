@@ -80,6 +80,9 @@ struct M6TokenTest
 	{ "aap noot", { eM6TokenWord, eM6TokenWord, eM6TokenEOF } },
 	{ "1 10 1e0 1.e0 1.0 1e+0 1e-1", { eM6TokenNumber, eM6TokenNumber, eM6TokenNumber, eM6TokenNumber, eM6TokenNumber, eM6TokenNumber, eM6TokenNumber, eM6TokenEOF } },
 	{ "10a 1e0a", { eM6TokenWord, eM6TokenWord, eM6TokenEOF } },
+	{ "Q92834; B1ARN3; O00702;",
+		{ eM6TokenWord, eM6TokenPunctuation, eM6TokenWord, eM6TokenPunctuation, eM6TokenWord, eM6TokenPunctuation, eM6TokenEOF } },
+	
 };
 
 BOOST_AUTO_TEST_CASE(test_tok_1)

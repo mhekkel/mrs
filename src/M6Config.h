@@ -12,6 +12,7 @@ class M6Config
 	static M6Config&	Instance();
 
 	zeep::xml::element*	LoadConfig(const std::string& inDatabank);
+	zeep::xml::element*	LoadParser(const std::string& inParser);
 
   private:
 						M6Config();

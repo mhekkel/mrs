@@ -496,7 +496,7 @@ bool M6MatchExpr::Evaluate(M6InputDocument* inDocument, M6Argument& arg) const
 	int options = 0, offset = 0, iteration = 1;
 	while (offset < arg.mLength)
 	{
-		int ovector[30];
+		int ovector[30] = {};
 
 		int rc = pcre_exec(mRE, mInfo, arg.mText, arg.mLength, offset, options, ovector, 30);
 		
@@ -566,7 +566,7 @@ bool M6SplitExpr::Evaluate(M6InputDocument* inDocument, M6Argument& arg) const
 	int options = 0, offset = 0, iteration = 1;
 	while (offset < arg.mLength)
 	{
-		int ovector[30];
+		int ovector[30] = {};
 		int rc = pcre_exec(mRE, nullptr, arg.mText, arg.mLength, offset, options, ovector, 30);
 		
 		if (rc == PCRE_ERROR_NOMATCH)
@@ -691,7 +691,7 @@ bool M6ReplaceExpr::Evaluate(M6InputDocument* inDocument, M6Argument& arg) const
 	
 	while (offset < arg.mLength)
 	{
-		int ovector[30];
+		int ovector[30] = {};
 
 		int rc = pcre_exec(mRE, nullptr, arg.mText, arg.mLength, offset, options, ovector, 30);
 		
@@ -713,7 +713,9 @@ bool M6ReplaceExpr::Evaluate(M6InputDocument* inDocument, M6Argument& arg) const
 		for (int i = 0; i < 10; ++i)
 		{
 			char v[] = { '$', '0' + i, 0 };
-			string m(arg.mText + ovector[i * 2], ovector[i * 2 + 1] - ovector[i * 2]);
+			string m;
+			if (i < rc)
+				m.append(arg.mText + ovector[i * 2], ovector[i * 2 + 1] - ovector[i * 2]);
 			ba::replace_all(with, v, m);
 		}
 		

@@ -200,9 +200,9 @@
 	
 	<databank id="sprot" parser="uniprot">
 		<name>SwissProt</name>
-		<file>test/sprot.m6</file>
+		<file>/data/md1120/tmp/sprot.m6</file>
 
-		<source type="path">test/sprot.dat</source>
+		<source type="path">/data/md1120/tmp/sprot.dat</source>
 		
 		<document-separator type="last-line-equals">//</document-separator>
 	</databank>

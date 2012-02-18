@@ -110,6 +110,7 @@ M6Progress::~M6Progress()
 {
 //	mImpl->mMutex.lock();
 	mImpl->mThread.interrupt();
+	mImpl->mThread.join();
 	delete mImpl;
 }
 	

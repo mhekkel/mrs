@@ -465,7 +465,7 @@ M6MatchExpr::M6MatchExpr(const string& inPattern, uint32 inCapture)
 	const char* error;
 	int erroffset;
 	
-	mRE = pcre_compile(inPattern.c_str(), PCRE_MULTILINE | PCRE_UTF8 | PCRE_NEWLINE_LF,
+	mRE = pcre_compile(inPattern.c_str(), PCRE_MULTILINE | PCRE_NEWLINE_LF,
 		&error, &erroffset, nullptr);
 	if (mRE == nullptr)
 	{
@@ -544,7 +544,7 @@ M6SplitExpr::M6SplitExpr(const string& inSeparator)
 	const char* error;
 	int erroffset;
 	
-	mRE = pcre_compile(inSeparator.c_str(), PCRE_MULTILINE | PCRE_UTF8 | PCRE_NEWLINE_LF,
+	mRE = pcre_compile(inSeparator.c_str(), PCRE_MULTILINE | PCRE_NEWLINE_LF,
 		&error, &erroffset, nullptr);
 	if (mRE == nullptr)
 	{
@@ -663,7 +663,7 @@ M6ReplaceExpr::M6ReplaceExpr(const string& inWhat, const string& inWith)
 	const char* error;
 	int erroffset;
 	
-	mRE = pcre_compile(inWhat.c_str(), PCRE_MULTILINE | PCRE_UTF8 | PCRE_NEWLINE_LF,
+	mRE = pcre_compile(inWhat.c_str(), PCRE_MULTILINE | PCRE_NEWLINE_LF,
 		&error, &erroffset, nullptr);
 	if (mRE == nullptr)
 	{

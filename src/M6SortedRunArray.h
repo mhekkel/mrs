@@ -76,20 +76,20 @@ class M6SortedRunArray
 		uint32	count;
 		int64	offset;
 	};
-	typedef std::list<run_info>				M6RunInfoList;
+	typedef std::list<run_info>					M6RunInfoList;
 	struct M6RunEntryIterator;
-	typedef std::vector<M6RunEntryIterator>	M6QueueType;
+	typedef std::vector<M6RunEntryIterator*>	M6QueueType;
 	
 	struct M6CompareRunEntry
 	{
 						M6CompareRunEntry(compare_type&	comp)
 							: comp(comp) {}
 		
-		bool			operator()(const M6RunEntryIterator& lhs, const M6RunEntryIterator& rhs) const
+		bool			operator()(const M6RunEntryIterator* lhs, const M6RunEntryIterator* rhs) const
 						{
 							// NOTE: due to the way the STL heap functions work
 							// we reverse the order of the arguments to compare here.
-							return comp(rhs.mValue, lhs.mValue);
+							return comp(rhs->mValue, lhs->mValue);
 						}
 		
 		compare_type&	comp;
@@ -133,9 +133,9 @@ class M6SortedRunArray
 					{
 						for (typename M6RunInfoList::iterator r = inRuns.begin(); r != inRuns.end(); ++r)
 						{
-							M6RunEntryIterator re(mFile, r->offset, r->count);
-							if (re.Next())
-								mQueue.push_back(re);
+							auto_ptr<M6RunEntryIterator> re(new M6RunEntryIterator(mFile, r->offset, r->count));
+							if (re->Next())
+								mQueue.push_back(re.release());
 						}
 						std::make_heap(mQueue.begin(), mQueue.end(), mCompare);
 					}
@@ -146,15 +146,18 @@ class M6SortedRunArray
 						if (not mQueue.empty())
 						{
 							std::pop_heap(mQueue.begin(), mQueue.end(), mCompare);
-							M6RunEntryIterator& r = mQueue.back();
+							M6RunEntryIterator* r = mQueue.back();
 
 							result = true;
-							v = r.mValue;
+							v = r->mValue;
 
-							if (r.Next())
+							if (r->Next())
 								std::push_heap(mQueue.begin(), mQueue.end(), mCompare);
 							else
+							{
 								mQueue.erase(mQueue.end() - 1);
+								delete r;
+							}
 						}
 						return result;
 					}

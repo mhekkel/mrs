@@ -73,7 +73,7 @@ void M6ProgressImpl::PrintProgress()
 	msg.append(tw - twd, ' ');
 	msg.append("] ");
 	
-	int perc = static_cast<int>(100 * progress + 0.5f);
+	int perc = static_cast<int>(100 * progress);
 	if (perc < 100)
 		msg += ' ';
 	if (perc < 10)

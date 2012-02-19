@@ -19,7 +19,9 @@ namespace io = boost::iostreams;
 // --------------------------------------------------------------------
 
 const uint32
-	kM6DocStoreSignature	= 'm6ds',
+	kM6DocStoreSignature	= 'm6ds';
+
+const int64
 	kM6DataPageSize			= 16384,
 //	kM6DataPageSize			= 256,
 	kM6DataPageTextSize		= kM6DataPageSize - 8,

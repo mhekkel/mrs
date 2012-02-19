@@ -132,6 +132,7 @@
     <ClCompile Include="..\..\src\M6Builder.cpp" />
     <ClCompile Include="..\..\src\M6Config.cpp" />
     <ClCompile Include="..\..\src\M6Databank.cpp" />
+    <ClCompile Include="..\..\src\M6DataSource.cpp" />
     <ClCompile Include="..\..\src\M6DocStore.cpp" />
     <ClCompile Include="..\..\src\M6Document.cpp" />
     <ClCompile Include="..\..\src\M6Error.cpp" />

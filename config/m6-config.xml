@@ -90,10 +90,8 @@
 					<replace what="^DE   (.+)\n" with="$1 "/>
 					<match regex="\w+: ((?:[^:;]+;\s*)+)" capture="1">
 						<if iteration="1">
-							<match regex="\w+=(.+);">
-								<capture nr="1">
-									<attr name="title"/>
-								</capture>
+							<match regex="\w+=([^;]+);" capture="1">
+								<attr name="title"/>
 							</match>
 						</if>
 						<match regex="\w+=(.+)" capture="1">

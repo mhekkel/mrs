@@ -52,7 +52,7 @@ struct M6IndexPageHeader
 	uint32			mLink;
 };
 
-const uint32
+const int64
 //#if DEBUG
 ////	kM6IndexPageSize		= 8192,
 //	kM6IndexPageSize		= 512,
@@ -67,8 +67,10 @@ const uint32
 	kM6IndexPageHeaderSize	= sizeof(M6IndexPageHeader),
 	kM6KeySpace				= kM6IndexPageSize - kM6IndexPageHeaderSize,
 	kM6MinKeySpace			= kM6KeySpace / 2,
-	kM6MaxKeyLength			= (kM6MinKeySpace / 2 > 255 ? 255 : kM6MinKeySpace / 2),
 	kM6MaxEntriesPerPage	= kM6KeySpace / 8;	// see above
+
+const uint32
+	kM6MaxKeyLength			= (kM6MinKeySpace / 2 > 255 ? 255 : kM6MinKeySpace / 2);
 //#endif
 
 template<M6IndexPageKind>

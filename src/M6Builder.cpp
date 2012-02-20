@@ -80,6 +80,15 @@ class M6Processor
 
 	void			ProcessFile(M6Progress& inProgress);
 	void			ProcessDocument();
+	void			ProcessDocument(const string& inDoc);
+
+	void			PutDocument(const string& inDoc)
+					{
+						if (mUseDocQueue)
+							mDocQueue.Put(inDoc);
+						else
+							ProcessDocument(inDoc);
+					}
 
 	M6Databank&		mDatabank;
 	M6Lexicon&		mLexicon;
@@ -87,6 +96,7 @@ class M6Processor
 	M6ExprPtr		mScript;
 	M6FileQueue		mFileQueue;
 	M6DocQueue		mDocQueue;
+	bool			mUseDocQueue;
 };
 
 // --------------------------------------------------------------------
@@ -691,7 +701,7 @@ void M6Processor::ProcessFile(const string& inFileName, istream& inFileStream)
 	{
 		io::filtering_ostream out(io::back_inserter(document));
 		io::copy(inFileStream, out);
-		mDocQueue.Put(document);
+		PutDocument(document);
 	}
 	else
 	{
@@ -705,7 +715,7 @@ void M6Processor::ProcessFile(const string& inFileName, istream& inFileStream)
 				if (line == separatorLine)
 				{
 					if (not document.empty())
-						mDocQueue.Put(document);
+						PutDocument(document);
 					document.clear();
 				}
 				
@@ -717,7 +727,7 @@ void M6Processor::ProcessFile(const string& inFileName, istream& inFileStream)
 			}
 
 			if (not document.empty())
-				mDocQueue.Put(document);
+				PutDocument(document);
 		}
 		else if (separatorType == "last-line-equals" or separatorType.empty())
 		{
@@ -726,7 +736,7 @@ void M6Processor::ProcessFile(const string& inFileName, istream& inFileStream)
 				document += line + "\n";
 				if (line == separatorLine)
 				{
-					mDocQueue.Put(document);
+					PutDocument(document);
 					document.clear();
 				}
 
@@ -759,6 +769,18 @@ void M6Processor::ProcessFile(M6Progress& inProgress)
 	mFileQueue.Put(fs::path());
 }
 
+void M6Processor::ProcessDocument(const string& inDoc)
+{
+	M6InputDocument* doc = new M6InputDocument(mDatabank, inDoc);
+	
+	M6Argument arg(inDoc.c_str(), inDoc.length());
+	mScript->Evaluate(doc, arg);
+	
+	doc->Tokenize(mLexicon, 0);
+	
+	mDatabank.Store(doc);
+}
+
 void M6Processor::ProcessDocument()
 {
 	for (;;)
@@ -766,15 +788,7 @@ void M6Processor::ProcessDocument()
 		string text = mDocQueue.Get();
 		if (text.empty())
 			break;
-	
-		M6InputDocument* doc = new M6InputDocument(mDatabank, text);
-		
-		M6Argument arg(text.c_str(), text.length());
-		mScript->Evaluate(doc, arg);
-		
-		doc->Tokenize(mLexicon, 0);
-		
-		mDatabank.Store(doc);
+		ProcessDocument(inDoc);
 	}
 	
 	mDocQueue.Put(string());
@@ -783,32 +797,48 @@ void M6Processor::ProcessDocument()
 void M6Processor::Process(vector<fs::path>& inFiles, M6Progress& inProgress)
 {
 	uint32 nrOfThreads = boost::thread::hardware_concurrency();
-	
 	boost::thread_group fileThreads, docThreads;
 	
-	for (uint32 i = 0; i < nrOfThreads; ++i)
+	if (nrOfThreads == 1)
+		mUseDocQueue = false;
+	else
 	{
-		if (i < inFiles.size())
+		mUseDocQueue = true;
+		for (uint32 i = 0; i < nrOfThreads; ++i)
+			docThreads.create_thread(boost::bind(&M6Processor::ProcessDocument, this));
+	}
+
+	if (nrOfThreads == 1 or inFiles.size() == 1)
+	{
+		M6DataSource data(path, inProgress);
+		for (M6DataSource::iterator i = data.begin(); i != data.end(); ++i)
+			ProcessFile(i->mFilename, i->mStream);
+	}
+	else
+	{
+		for (uint32 i = 0; i < min(nrOfThreads, inFiles.size(); ++i)
 			fileThreads.create_thread(boost::bind(&M6Processor::ProcessFile, this, boost::ref(inProgress)));
-		docThreads.create_thread(boost::bind(&M6Processor::ProcessDocument, this));
-	}
-	
-	foreach (fs::path& file, inFiles)
-	{
-		if (not fs::exists(file))
+
+		foreach (fs::path& file, inFiles)
 		{
-			cerr << "file missing: " << file << endl;
-			continue;
+			if (not fs::exists(file))
+			{
+				cerr << "file missing: " << file << endl;
+				continue;
+			}
+			
+			mFileQueue.Put(file);
 		}
-		
-		mFileQueue.Put(file);
+
+		mFileQueue.Put(fs::path());
+		fileThreads.join_all();
 	}
 	
-	mFileQueue.Put(fs::path());
-	fileThreads.join_all();
-	
-	mDocQueue.Put(string());
-	docThreads.join_all();
+	if (mUseDocQueue)
+	{
+		mDocQueue.Put(string());
+		docThreads.join_all();
+	}
 }
 
 // --------------------------------------------------------------------

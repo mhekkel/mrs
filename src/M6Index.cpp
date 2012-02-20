@@ -682,7 +682,7 @@ struct M6IndexImpl
 	M6File			mFile;
 	M6BasicIndex&	mIndex;
 	M6IxFileHeader	mHeader;
-	bool			mAutoCommit;
+	bool			mAutoCommit, mBatchMode;
 	bool			mDirty;
 
 	// cache

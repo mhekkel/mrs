@@ -39,6 +39,7 @@ class M6BasicIndex
 	void			Commit();
 	void			Rollback();
 	void			SetAutoCommit(bool inAutoCommit);
+	void			SetBatchMode(bool inBatchMode);
 	
 	void			Vacuum();
 	

@@ -840,7 +840,7 @@ void M6Builder::Build()
 	}
 	catch (...)
 	{
-		fs::remove_all(path);
+//		fs::remove_all(path);
 		throw;
 	}
 }

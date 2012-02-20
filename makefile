@@ -19,9 +19,9 @@ MANDIR				?= $(PREFIX)/man/man3
 
 OBJDIR				= obj
 
-BOOST_LIBS			= system thread filesystem regex math_c99 math_c99f program_options iostreams
+BOOST_LIBS			= system thread filesystem regex math_c99 math_c99f program_options iostreams timer chrono
 BOOST_LIBS			:= $(BOOST_LIBS:%=boost_%$(BOOST_LIB_SUFFIX))
-LIBS				= m pthread z zeep pcre
+LIBS				= m pthread archive bz2 z zeep pcre rt
 LDFLAGS				+= $(BOOST_LIB_DIR:%=-L%) $(LIBS:%=-l%) -g $(BOOST_LIBS:%=$(BOOST_LIB_DIR)/lib%.a) \
 							-L ../libzeep/
 
@@ -29,6 +29,8 @@ CC					= icpc
 CFLAGS				+= $(BOOST_INC_DIR:%=-I%) -I. -pthread -std=c++0x -I../libzeep/
 CFLAGS				+= -I $(HOME)/projects/pcre/include
 LDFLAGS				+= -L $(HOME)/projects/pcre/lib
+CFLAGS				+= -I $(HOME)/projects/libarchive/include
+LDFLAGS				+= -L $(HOME)/projects/libarchive/lib
 ifneq ($(DEBUG),1)
 CFLAGS				+= -O3 -DNDEBUG
 else
@@ -44,6 +46,7 @@ OBJECTS = \
 	$(OBJDIR)/M6Builder.o \
 	$(OBJDIR)/M6Config.o \
 	$(OBJDIR)/M6Databank.o \
+	$(OBJDIR)/M6DataSource.o \
 	$(OBJDIR)/M6DocStore.o \
 	$(OBJDIR)/M6Document.o \
 	$(OBJDIR)/M6Error.o \

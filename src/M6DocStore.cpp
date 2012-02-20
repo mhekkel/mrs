@@ -1077,7 +1077,7 @@ M6DocStorePagePtr<T> M6DocStoreImpl::Load(uint32 inPageNr)
 			
 			default:
 				delete data;
-				THROW(("Invalid page type in document store"));
+				THROW(("Invalid page type in document store (page = %d, type = %d)", inPageNr, data->mType));
 				break;
 		}
 	}

@@ -6,6 +6,7 @@
 #include <boost/format.hpp>
 #include <boost/date_time/posix_time/posix_time_types.hpp>
 #include <boost/lexical_cast.hpp>
+#include <boost/timer/timer.hpp>
 
 #include "M6Progress.h"
 
@@ -26,6 +27,8 @@ struct M6ProgressImpl
 	string			mMessage;
 	boost::mutex	mMutex;
 	boost::thread	mThread;
+	boost::timer::cpu_timer
+					mTimer;
 };
 
 void M6ProgressImpl::Run()
@@ -68,7 +71,7 @@ void M6ProgressImpl::PrintProgress()
 	
 	float progress = static_cast<float>(mConsumed) / mMax;
 	int tw = width - 28;
-	int twd = static_cast<int>(tw * progress);
+	int twd = static_cast<int>(tw * progress + 0.5f);
 	msg.append(twd, '=');
 	msg.append(tw - twd, ' ');
 	msg.append("] ");
@@ -87,16 +90,22 @@ void M6ProgressImpl::PrintProgress()
 
 void M6ProgressImpl::PrintDone()
 {
-	int width = 80;
+	int width = 79;
 
 	string msg;
 	msg.reserve(width + 1);
 	msg += '\r';
 	
-	if (mMessage.length() < (width - 5))
+	string time = mTimer.format(0, "%t cpu/%w wall");
+
+	if (mMessage.length() + time.length() < width)
 		msg += mMessage;
-	else
-		msg += mMessage.substr(width - 8) + "...";
+	else if (time.length() + 3 < width)
+		msg += mMessage.substr(0, width - time.length() - 3) + "...";
+	msg += ' ';
+	msg += time;
+	if (msg.length() < width)
+		msg += string(width - msg.length(), ' ');
 
 	cout << msg << endl;
 }

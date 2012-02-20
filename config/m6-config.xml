@@ -161,7 +161,7 @@
 		<locale>en_US.UTF-8</locale>
 		
 		<!-- source type can be path, glob or regex -->
-<!--		<source type="path">test/PDBFIND2.TXT.gz</source>-->
+		<source type="path">/data/raw/pdbfinder2/PDBFIND2.TXT.gz</source>
 <!--		<source type="path">C:\Users\maarten\projects\m6\test\PDBFIND2.TXT</source> -->
 		<source type="path">C:\Users\maarten\projects\m6\test\pdbfind2-head-2.txt</source>
 <!--		<source type="path">C:\Users\maarten\projects\m6\test\pdbfind2-head.txt</source>-->
@@ -187,18 +187,26 @@
 	<!-- omim -->
 	<databank id="omim" parser="omim">
 		<name>OMIM</name>
-		<file>test/omim.m6</file>
+		<file>/data/md1120/tmp/omim.m6</file>
+		
 		<locale>en_US.UTF-8</locale>
-		<source type="path">test/omim.dat.gz</source>
+		
+		<source type="path">test/omim.dat</source>
+		
 		<document-separator type="first-line-equals">*RECORD*</document-separator>
 	</databank>
 	
 	<databank id="sprot" parser="uniprot">
 		<name>SwissProt</name>
 		<file>/data/md1120/tmp/sprot.m6</file>
-
-		<source type="path">/data/md1120/tmp/sprot.dat</source>
-		
+		<source type="path">/data/raw/uniprot/uniprot_sprot.dat.gz</source>
+		<document-separator type="last-line-equals">//</document-separator>
+	</databank>
+	
+	<databank id="trembl" parser="uniprot">
+		<name>TrEMBL</name>
+		<file>/data/md1120/tmp/trembl.m6</file>
+		<source type="path">/data/raw/uniprot/uniprot_trembl.dat.gz</source>
 		<document-separator type="last-line-equals">//</document-separator>
 	</databank>
 	

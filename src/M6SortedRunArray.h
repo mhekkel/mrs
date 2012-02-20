@@ -133,7 +133,7 @@ class M6SortedRunArray
 					{
 						for (typename M6RunInfoList::iterator r = inRuns.begin(); r != inRuns.end(); ++r)
 						{
-							auto_ptr<M6RunEntryIterator> re(new M6RunEntryIterator(mFile, r->offset, r->count));
+							std::auto_ptr<M6RunEntryIterator> re(new M6RunEntryIterator(mFile, r->offset, r->count));
 							if (re->Next())
 								mQueue.push_back(re.release());
 						}

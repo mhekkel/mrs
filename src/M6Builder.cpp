@@ -434,6 +434,8 @@ bool M6ReplaceExpr::Evaluate(M6InputDocument* inDocument, M6Argument& arg) const
 		if (rc < 0)
 			THROW(("Matching error %d\n", rc));
 		
+		s.append(arg.mText + offset, ovector[0] - offset);
+
 		string with = mWith;
 		for (int i = 0; i < 10; ++i)
 		{
@@ -788,7 +790,7 @@ void M6Processor::ProcessDocument()
 		string text = mDocQueue.Get();
 		if (text.empty())
 			break;
-		ProcessDocument(inDoc);
+		ProcessDocument(text);
 	}
 	
 	mDocQueue.Put(string());
@@ -799,7 +801,7 @@ void M6Processor::Process(vector<fs::path>& inFiles, M6Progress& inProgress)
 	uint32 nrOfThreads = boost::thread::hardware_concurrency();
 	boost::thread_group fileThreads, docThreads;
 	
-	if (nrOfThreads == 1)
+	if (inFiles.size() >= nrOfThreads)
 		mUseDocQueue = false;
 	else
 	{
@@ -808,15 +810,18 @@ void M6Processor::Process(vector<fs::path>& inFiles, M6Progress& inProgress)
 			docThreads.create_thread(boost::bind(&M6Processor::ProcessDocument, this));
 	}
 
-	if (nrOfThreads == 1 or inFiles.size() == 1)
+	if (inFiles.size() == 1)
 	{
-		M6DataSource data(path, inProgress);
+		M6DataSource data(inFiles.front(), inProgress);
 		for (M6DataSource::iterator i = data.begin(); i != data.end(); ++i)
 			ProcessFile(i->mFilename, i->mStream);
 	}
 	else
 	{
-		for (uint32 i = 0; i < min(nrOfThreads, inFiles.size(); ++i)
+		if (nrOfThreads > inFiles.size())
+			nrOfThreads = inFiles.size();
+
+		for (uint32 i = 0; i < nrOfThreads; ++i)
 			fileThreads.create_thread(boost::bind(&M6Processor::ProcessFile, this, boost::ref(inProgress)));
 
 		foreach (fs::path& file, inFiles)

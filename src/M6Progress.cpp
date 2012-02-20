@@ -96,7 +96,7 @@ void M6ProgressImpl::PrintDone()
 	if (msg.length() < width)
 		msg += string(width - msg.length(), ' ');
 	
-	cout << msg << endl;
+	cout << '\r' << msg << endl;
 }
 
 M6Progress::M6Progress(int64 inMax, const string& inAction)

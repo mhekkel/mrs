@@ -5,12 +5,12 @@
 class M6Progress
 {
   public:
-				M6Progress(int64 inMax);
+				M6Progress(int64 inMax, const std::string& inAction);
 	virtual		~M6Progress();
 	
-	void		Update(int64 inConsumed, const std::string& inMessage);
 	void		Consumed(int64 inConsumed);	// consumed is relative
 	void		Progress(int64 inProgress);	// progress is absolute
+
 	void		Message(const std::string& inMessage);
 
   private:

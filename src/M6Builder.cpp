@@ -807,7 +807,7 @@ void M6Builder::Build()
 		
 		vector<fs::path> files;
 		int64 rawBytes = Glob(mConfig->find_first("source"), files);
-		M6Progress progress(rawBytes);
+		M6Progress progress(rawBytes, "parsing");
 	
 		M6Processor processor(*mDatabank, mLexicon, mConfig);
 	

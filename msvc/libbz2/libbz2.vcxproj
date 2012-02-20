@@ -19,8 +19,9 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{FC2A9881-F33D-4A44-A29D-D7A9F023A0DD}</ProjectGuid>
-    <RootNamespace>m6lib</RootNamespace>
+    <ProjectGuid>{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <RootNamespace>libbz2</RootNamespace>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -65,51 +66,45 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <TargetName>libm6</TargetName>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <TargetName>libm6</TargetName>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <TargetName>libm6</TargetName>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <TargetName>libm6</TargetName>
-  </PropertyGroup>
+  <PropertyGroup />
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>C:\Boost\include\boost-1_48</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
     </ClCompile>
     <Link>
+      <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>C:\Boost\include\boost-1_48;$(SolutionDir)..\..\libzeep;C:\Users\maarten\projects\pcre-build;C:\Users\maarten\projects\pcre-8.13;C:\Users\maarten\projects\libarchive;C:\Users\maarten\projects\libarchive-3.0.3\libarchive</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
     </ClCompile>
     <Link>
+      <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
-    <Lib>
-      <Verbose>true</Verbose>
-    </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>C:\Boost\include\boost-1_48</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>
+      <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
@@ -118,51 +113,33 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>C:\Boost\include\boost-1_48;$(SolutionDir)..\..\libzeep;C:\Users\maarten\projects\pcre-build;C:\Users\maarten\projects\pcre-8.13;C:\Users\maarten\projects\libarchive;C:\Users\maarten\projects\libarchive-3.0.3\libarchive</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <PreprocessorDefinitions>NDEBUG;_UNICODE;UNICODE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
+      <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\src\M6BitStream.cpp" />
-    <ClCompile Include="..\..\src\M6Builder.cpp" />
-    <ClCompile Include="..\..\src\M6Config.cpp" />
-    <ClCompile Include="..\..\src\M6Databank.cpp" />
-    <ClCompile Include="..\..\src\M6DataSource.cpp" />
-    <ClCompile Include="..\..\src\M6DocStore.cpp" />
-    <ClCompile Include="..\..\src\M6Document.cpp" />
-    <ClCompile Include="..\..\src\M6Error.cpp" />
-    <ClCompile Include="..\..\src\M6FastLZ.cpp" />
-    <ClCompile Include="..\..\src\M6File.cpp" />
-    <ClCompile Include="..\..\src\M6Index.cpp" />
-    <ClCompile Include="..\..\src\M6Lexicon.cpp" />
-    <ClCompile Include="..\..\src\M6Progress.cpp" />
-    <ClCompile Include="..\..\src\M6Tokenizer.cpp" />
+    <ClCompile Include="..\..\..\bzip2-1.0.6\blocksort.c" />
+    <ClCompile Include="..\..\..\bzip2-1.0.6\bzlib.c" />
+    <ClCompile Include="..\..\..\bzip2-1.0.6\compress.c" />
+    <ClCompile Include="..\..\..\bzip2-1.0.6\crctable.c" />
+    <ClCompile Include="..\..\..\bzip2-1.0.6\decompress.c" />
+    <ClCompile Include="..\..\..\bzip2-1.0.6\huffman.c" />
+    <ClCompile Include="..\..\..\bzip2-1.0.6\mk251.c" />
+    <ClCompile Include="..\..\..\bzip2-1.0.6\randtable.c" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\src\M6BitStream.h" />
-    <ClInclude Include="..\..\src\M6Builder.h" />
-    <ClInclude Include="..\..\src\M6Config.h" />
-    <ClInclude Include="..\..\src\M6Databank.h" />
-    <ClInclude Include="..\..\src\M6DocStore.h" />
-    <ClInclude Include="..\..\src\M6Document.h" />
-    <ClInclude Include="..\..\src\M6Error.h" />
-    <ClInclude Include="..\..\src\M6FastLZ.h" />
-    <ClInclude Include="..\..\src\M6File.h" />
-    <ClInclude Include="..\..\src\M6Index.h" />
-    <ClInclude Include="..\..\src\M6Lexicon.h" />
-    <ClInclude Include="..\..\src\M6Lib.h" />
-    <ClInclude Include="..\..\src\M6SortedRunArray.h" />
-    <ClInclude Include="..\..\src\M6Tokenizer.h" />
-    <ClInclude Include="..\..\src\M6UnicodeTables.h" />
+    <ClInclude Include="..\..\..\bzip2-1.0.6\bzlib.h" />
+    <ClInclude Include="..\..\..\bzip2-1.0.6\bzlib_private.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

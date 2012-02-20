@@ -887,8 +887,7 @@ void M6BatchIndexProcessor::Finish(uint32 inDocCount)
 
 	int64 entryCount = mFullTextIndex.CountEntries(), entriesRead = 0;
 	
-	M6Progress progress(entryCount);
-	progress.Message("Creating index");
+	M6Progress progress(entryCount, "creating index");
 	
 	// the next loop is very *hot*, make sure it is optimized as much as possible.
 	// 

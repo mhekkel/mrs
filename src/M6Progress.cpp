@@ -14,8 +14,8 @@ using namespace std;
 
 struct M6ProgressImpl
 {
-					M6ProgressImpl(int64 inMax)
-						: mMax(inMax), mConsumed(0)
+					M6ProgressImpl(int64 inMax, const string& inAction)
+						: mMax(inMax), mConsumed(0), mAction(inAction), mMessage(inAction)
 						, mThread(boost::bind(&M6ProgressImpl::Run, this)) {}
 
 	void			Run();
@@ -24,7 +24,7 @@ struct M6ProgressImpl
 	void			PrintDone();
 
 	int64			mMax, mConsumed;
-	string			mMessage;
+	string			mAction, mMessage;
 	boost::mutex	mMutex;
 	boost::thread	mThread;
 	boost::timer::cpu_timer
@@ -92,26 +92,15 @@ void M6ProgressImpl::PrintDone()
 {
 	int width = 79;
 
-	string msg;
-	msg.reserve(width + 1);
-	msg += '\r';
-	
-	string time = mTimer.format(0, "%t cpu/%w wall");
-
-	if (mMessage.length() + time.length() < width)
-		msg += mMessage;
-	else if (time.length() + 3 < width)
-		msg += mMessage.substr(0, width - time.length() - 3) + "...";
-	msg += ' ';
-	msg += time;
+	string msg = mAction + " done in " + mTimer.format(0, "%ts cpu / %ws wall");
 	if (msg.length() < width)
 		msg += string(width - msg.length(), ' ');
-
+	
 	cout << msg << endl;
 }
 
-M6Progress::M6Progress(int64 inMax)
-	: mImpl(new M6ProgressImpl(inMax))
+M6Progress::M6Progress(int64 inMax, const string& inAction)
+	: mImpl(new M6ProgressImpl(inMax, inAction))
 {
 }
 
@@ -123,16 +112,6 @@ M6Progress::~M6Progress()
 	delete mImpl;
 }
 	
-void M6Progress::Update(int64 inConsumed, const std::string& inMessage)
-{
-	boost::mutex::scoped_lock lock(mImpl->mMutex);
-	mImpl->mConsumed += inConsumed;
-	mImpl->mMessage = inMessage;
-
-	if (mImpl->mConsumed == mImpl->mMax)
-		mImpl->mThread.interrupt();
-}
-
 void M6Progress::Consumed(int64 inConsumed)
 {
 	boost::mutex::scoped_lock lock(mImpl->mMutex);

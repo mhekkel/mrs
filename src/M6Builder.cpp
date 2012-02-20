@@ -64,8 +64,8 @@ typedef list<M6ExprPtr>		M6ExprList;
 class M6Processor
 {
   public:
-	typedef M6Queue<fs::path>			M6FileQueue;
-	typedef M6Queue<M6InputDocument*>	M6DocQueue;
+	typedef M6Queue<fs::path>	M6FileQueue;
+	typedef M6Queue<string>		M6DocQueue;
 
 
 					M6Processor(M6Databank& inDatabank, M6Lexicon& inLexicon,
@@ -691,7 +691,7 @@ void M6Processor::ProcessFile(const string& inFileName, istream& inFileStream)
 	{
 		io::filtering_ostream out(io::back_inserter(document));
 		io::copy(inFileStream, out);
-		mDocQueue.Put(new M6InputDocument(mDatabank, document));
+		mDocQueue.Put(document);
 	}
 	else
 	{
@@ -705,7 +705,7 @@ void M6Processor::ProcessFile(const string& inFileName, istream& inFileStream)
 				if (line == separatorLine)
 				{
 					if (not document.empty())
-						mDocQueue.Put(new M6InputDocument(mDatabank, document));
+						mDocQueue.Put(document);
 					document.clear();
 				}
 				
@@ -717,7 +717,7 @@ void M6Processor::ProcessFile(const string& inFileName, istream& inFileStream)
 			}
 
 			if (not document.empty())
-				mDocQueue.Put(new M6InputDocument(mDatabank, document));
+				mDocQueue.Put(document);
 		}
 		else if (separatorType == "last-line-equals" or separatorType.empty())
 		{
@@ -726,7 +726,7 @@ void M6Processor::ProcessFile(const string& inFileName, istream& inFileStream)
 				document += line + "\n";
 				if (line == separatorLine)
 				{
-					mDocQueue.Put(new M6InputDocument(mDatabank, document));
+					mDocQueue.Put(document);
 					document.clear();
 				}
 
@@ -763,11 +763,12 @@ void M6Processor::ProcessDocument()
 {
 	for (;;)
 	{
-		M6InputDocument* doc = mDocQueue.Get();
-		if (doc == nullptr)
+		string text = mDocQueue.Get();
+		if (text.empty())
 			break;
+	
+		M6InputDocument* doc = new M6InputDocument(mDatabank, text);
 		
-		const string& text = doc->Peek();
 		M6Argument arg(text.c_str(), text.length());
 		mScript->Evaluate(doc, arg);
 		
@@ -776,7 +777,7 @@ void M6Processor::ProcessDocument()
 		mDatabank.Store(doc);
 	}
 	
-	mDocQueue.Put(nullptr);
+	mDocQueue.Put(string());
 }
 
 void M6Processor::Process(vector<fs::path>& inFiles, M6Progress& inProgress)
@@ -806,7 +807,7 @@ void M6Processor::Process(vector<fs::path>& inFiles, M6Progress& inProgress)
 	mFileQueue.Put(fs::path());
 	fileThreads.join_all();
 	
-	mDocQueue.Put(nullptr);
+	mDocQueue.Put(string());
 	docThreads.join_all();
 }
 

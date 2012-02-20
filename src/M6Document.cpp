@@ -49,6 +49,7 @@ M6Document::~M6Document()
 M6InputDocument::M6InputDocument(M6Databank& inDatabank, const string& inText)
 	: M6Document(inDatabank)
 	, mText(inText)
+	, mDocNr(0)
 {
 }
 
@@ -76,7 +77,7 @@ void M6InputDocument::SetAttribute(const string& inName, const char* inText, siz
 	mAttributes[inName] = attribute;
 }
 
-uint32 M6InputDocument::Store()
+void M6InputDocument::Store()
 {
 	M6DocStore& store(mDatabank.GetDocStore());
 
@@ -112,7 +113,6 @@ uint32 M6InputDocument::Store()
 	}
 
 	mDocNr = store.StoreDocument(&buffer[0], buffer.size());
-	return mDocNr;
 }
 
 M6InputDocument::M6IndexTokenList::iterator M6InputDocument::GetIndexTokens(

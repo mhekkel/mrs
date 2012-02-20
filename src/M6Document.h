@@ -77,7 +77,9 @@ class M6InputDocument : public M6Document
 
 	virtual void		Tokenize(M6Lexicon& inLexicon, uint32 inLastStopWord);
 
-	uint32				Store();
+	void				Store();
+	
+	uint32				GetDocNr() const					{ return mDocNr; }
 	
 	const M6IndexTokenList& GetIndexTokens() const			{ return mTokens; }
 	const M6IndexValueList& GetIndexValues() const			{ return mValues; }

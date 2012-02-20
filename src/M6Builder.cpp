@@ -32,6 +32,7 @@
 #include "M6Config.h"
 #include "M6Progress.h"
 #include "M6DataSource.h"
+#include "M6Queue.h"
 
 using namespace std;
 using namespace std::tr1;
@@ -63,22 +64,29 @@ typedef list<M6ExprPtr>		M6ExprList;
 class M6Processor
 {
   public:
+	typedef M6Queue<fs::path>	M6FileQueue;
+	typedef M6Queue<string>		M6DocQueue;
+
+
 					M6Processor(M6Databank& inDatabank, M6Lexicon& inLexicon,
 						zx::element* inTemplate);
 	virtual			~M6Processor();
 	
-	void			ProcessFile(const string& inFileName, istream& inFileStream);
-	void			ProcessDocument(const string& inDocument);
+	void			Process(vector<fs::path>& inFiles, M6Progress& inProgress);
 	
   private:
-
 	M6ExprPtr		ParseScript(zx::element* inScript);
+	void			ProcessFile(const string& inFileName, istream& inFileStream);
+
+	void			ProcessFile(M6Progress& inProgress);
+	void			ProcessDocument();
 
 	M6Databank&		mDatabank;
 	M6Lexicon&		mLexicon;
 	zx::element*	mConfig;
 	M6ExprPtr		mScript;
-	M6Document*		mDocument;
+	M6FileQueue		mFileQueue;
+	M6DocQueue		mDocQueue;
 };
 
 // --------------------------------------------------------------------
@@ -683,7 +691,7 @@ void M6Processor::ProcessFile(const string& inFileName, istream& inFileStream)
 	{
 		io::filtering_ostream out(io::back_inserter(document));
 		io::copy(inFileStream, out);
-		ProcessDocument(document);
+		mDocQueue.Put(document);
 	}
 	else
 	{
@@ -697,7 +705,7 @@ void M6Processor::ProcessFile(const string& inFileName, istream& inFileStream)
 				if (line == separatorLine)
 				{
 					if (not document.empty())
-						ProcessDocument(document);
+						mDocQueue.Put(document);
 					document.clear();
 				}
 				
@@ -709,7 +717,7 @@ void M6Processor::ProcessFile(const string& inFileName, istream& inFileStream)
 			}
 
 			if (not document.empty())
-				ProcessDocument(document);
+				mDocQueue.Put(document);
 		}
 		else if (separatorType == "last-line-equals" or separatorType.empty())
 		{
@@ -718,7 +726,7 @@ void M6Processor::ProcessFile(const string& inFileName, istream& inFileStream)
 				document += line + "\n";
 				if (line == separatorLine)
 				{
-					ProcessDocument(document);
+					mDocQueue.Put(document);
 					document.clear();
 				}
 
@@ -735,16 +743,72 @@ void M6Processor::ProcessFile(const string& inFileName, istream& inFileStream)
 	}
 }
 
-void M6Processor::ProcessDocument(const string& inDocument)
+void M6Processor::ProcessFile(M6Progress& inProgress)
 {
-	M6InputDocument* doc = new M6InputDocument(mDatabank, inDocument);
+	for (;;)
+	{
+		fs::path path = mFileQueue.Get();
+		if (path.empty())
+			break;
+		
+		M6DataSource data(path, inProgress);
+		for (M6DataSource::iterator i = data.begin(); i != data.end(); ++i)
+			ProcessFile(i->mFilename, i->mStream);
+	}
 	
-	M6Argument arg(inDocument.c_str(), inDocument.length());
-	mScript->Evaluate(doc, arg);
+	mFileQueue.Put(fs::path());
+}
+
+void M6Processor::ProcessDocument()
+{
+	for (;;)
+	{
+		string text = mDocQueue.Get();
+		if (text.empty())
+			break;
 	
-	doc->Tokenize(mLexicon, 0);
+		M6InputDocument* doc = new M6InputDocument(mDatabank, text);
+		
+		M6Argument arg(text.c_str(), text.length());
+		mScript->Evaluate(doc, arg);
+		
+		doc->Tokenize(mLexicon, 0);
+		
+		mDatabank.Store(doc);
+	}
 	
-	mDatabank.Store(doc);
+	mDocQueue.Put(string());
+}
+
+void M6Processor::Process(vector<fs::path>& inFiles, M6Progress& inProgress)
+{
+	uint32 nrOfThreads = boost::thread::hardware_concurrency();
+	
+	boost::thread_group fileThreads, docThreads;
+	
+	for (uint32 i = 0; i < nrOfThreads; ++i)
+	{
+		if (i < inFiles.size())
+			fileThreads.create_thread(boost::bind(&M6Processor::ProcessFile, this, boost::ref(inProgress)));
+		docThreads.create_thread(boost::bind(&M6Processor::ProcessDocument, this));
+	}
+	
+	foreach (fs::path& file, inFiles)
+	{
+		if (not fs::exists(file))
+		{
+			cerr << "file missing: " << file << endl;
+			continue;
+		}
+		
+		mFileQueue.Put(file);
+	}
+	
+	mFileQueue.Put(fs::path());
+	fileThreads.join_all();
+	
+	mDocQueue.Put(string());
+	docThreads.join_all();
 }
 
 // --------------------------------------------------------------------
@@ -807,23 +871,12 @@ void M6Builder::Build()
 		
 		vector<fs::path> files;
 		int64 rawBytes = Glob(mConfig->find_first("source"), files);
-		M6Progress progress(rawBytes, "parsing");
+		M6Progress progress(rawBytes + 1, "parsing");
 	
 		M6Processor processor(*mDatabank, mLexicon, mConfig);
+		processor.Process(files, progress);
+		progress.Consumed(1);
 	
-		foreach (fs::path& file, files)
-		{
-			if (not fs::exists(file))
-			{
-				cerr << "file missing: " << file << endl;
-				continue;
-			}
-			
-			M6DataSource data(file, progress);
-			for (M6DataSource::iterator i = data.begin(); i != data.end(); ++i)
-				processor.ProcessFile(i->mFilename, i->mStream);
-		}
-		
 		mDatabank->CommitBatchImport();
 		
 		delete mDatabank;

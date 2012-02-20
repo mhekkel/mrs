@@ -16,6 +16,7 @@
 #include "M6Index.h"
 #include "M6SortedRunArray.h"
 #include "M6Progress.h"
+#include "M6Queue.h"
 
 using namespace std;
 namespace fs = boost::filesystem;
@@ -37,6 +38,8 @@ typedef boost::shared_ptr<M6BasicIndex> M6BasicIndexPtr;
 class M6DatabankImpl
 {
   public:
+	typedef M6Queue<M6InputDocument*>	M6DocQueue;
+
 					M6DatabankImpl(M6Databank& inDatabank, const string& inPath, MOpenMode inMode);
 	virtual			~M6DatabankImpl();
 
@@ -60,6 +63,9 @@ class M6DatabankImpl
 
 	void			Validate();
 
+	void			StoreThread();
+	void			IndexThread();
+
   protected:
 
 	struct M6IndexDesc
@@ -80,6 +86,8 @@ class M6DatabankImpl
 	M6IndexDescList			mIndices;
 	M6BasicIndexPtr			mAllTextIndex;
 	vector<float>			mDocWeights;
+	M6DocQueue				mStoreQueue, mIndexQueue;
+	boost::thread			mStoreThread, mIndexThread;
 };
 
 // --------------------------------------------------------------------
@@ -1033,17 +1041,33 @@ M6BasicIndexPtr M6DatabankImpl::CreateIndex(const string& inName, M6IndexType in
 	}
 	return result;
 }
-	
-void M6DatabankImpl::Store(M6Document* inDocument)
-{
-	M6InputDocument* doc = dynamic_cast<M6InputDocument*>(inDocument);
-	if (doc == nullptr)
-		THROW(("Invalid document"));
 
-	uint32 docNr = doc->Store();
-	
-	if (mBatch != nullptr)
+void M6DatabankImpl::StoreThread()
+{
+	for (;;)
 	{
+		M6InputDocument* doc = mStoreQueue.Get();
+		if (doc == nullptr)
+			break;
+		
+		doc->Store();
+		mIndexQueue.Put(doc);
+	}
+	
+	mIndexQueue.Put(nullptr);
+}
+
+void M6DatabankImpl::IndexThread()
+{
+	for (;;)
+	{
+		M6InputDocument* doc = mIndexQueue.Get();
+		if (doc == nullptr)
+			break;
+		
+		uint32 docNr = doc->GetDocNr();
+		assert(docNr > 0);
+		
 		foreach (const M6InputDocument::M6IndexTokens& d, doc->GetIndexTokens())
 			mBatch->IndexTokens(d.mIndexName, d.mDataType, d.mTokens);
 
@@ -1051,9 +1075,32 @@ void M6DatabankImpl::Store(M6Document* inDocument)
 			mBatch->IndexValue(v.mIndexName, v.mDataType, v.mIndexValue, v.mUnique, docNr);
 
 		mBatch->FlushDoc(docNr);
+		
+		delete doc;
 	}
-	
-	delete inDocument;
+}
+
+void M6DatabankImpl::Store(M6Document* inDocument)
+{
+	M6InputDocument* doc = dynamic_cast<M6InputDocument*>(inDocument);
+	if (doc == nullptr)
+		THROW(("Invalid document"));
+
+//	uint32 docNr = doc->Store();
+//	
+	if (mBatch != nullptr)
+		mStoreQueue.Put(doc);
+//	{
+//		foreach (const M6InputDocument::M6IndexTokens& d, doc->GetIndexTokens())
+//			mBatch->IndexTokens(d.mIndexName, d.mDataType, d.mTokens);
+//
+//		foreach (const M6InputDocument::M6IndexValue& v, doc->GetIndexValues())
+//			mBatch->IndexValue(v.mIndexName, v.mDataType, v.mIndexValue, v.mUnique, docNr);
+//
+//		mBatch->FlushDoc(docNr);
+//	}
+//	
+//	delete inDocument;
 }
 
 M6Document* M6DatabankImpl::Fetch(uint32 inDocNr)
@@ -1225,10 +1272,17 @@ M6Iterator* M6DatabankImpl::Find(const string& inQuery, uint32 inReportLimit)
 void M6DatabankImpl::StartBatchImport(M6Lexicon& inLexicon)
 {
 	mBatch = new M6BatchIndexProcessor(*this, inLexicon);
+	
+	mStoreThread = boost::thread(boost::bind(&M6DatabankImpl::StoreThread, this));
+	mIndexThread = boost::thread(boost::bind(&M6DatabankImpl::IndexThread, this));
 }
 
 void M6DatabankImpl::CommitBatchImport()
 {
+	mStoreQueue.Put(nullptr);
+	mStoreThread.join();
+	mIndexThread.join();
+	
 	mBatch->Finish(mStore->size());
 	delete mBatch;
 	mBatch = nullptr;

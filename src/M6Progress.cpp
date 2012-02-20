@@ -90,7 +90,7 @@ void M6ProgressImpl::PrintProgress()
 
 void M6ProgressImpl::PrintDone()
 {
-	int width = 79;
+	int width = 80;
 
 	string msg = mAction + " done in " + mTimer.format(0, "%ts cpu / %ws wall");
 	if (msg.length() < width)

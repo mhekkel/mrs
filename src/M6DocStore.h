@@ -13,7 +13,7 @@ class M6DocStore
 					M6DocStore(const std::string& inPath, MOpenMode inMode);
 	virtual			~M6DocStore();
 	
-	uint32			StoreDocument(const char* inData, size_t inSize = 0.f);
+	uint32			StoreDocument(const char* inData, size_t inSize = 0);
 	bool			FetchDocument(uint32 inDocNr, uint32& outPageNr, uint32& outDocSize);
 	void			OpenDataStream(uint32 inDocNr, uint32 inPageNr, uint32 inDocSize,
 						boost::iostreams::filtering_stream<boost::iostreams::input>& ioStream);

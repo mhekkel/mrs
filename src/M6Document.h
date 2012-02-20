@@ -66,6 +66,8 @@ class M6InputDocument : public M6Document
 							const std::string& inText);
 
 	virtual std::string	GetText();
+	const std::string&	Peek() const						{ return mText; }
+	
 	virtual std::string	GetAttribute(const std::string& inName);
 	
 	void				SetAttribute(const std::string& inName,

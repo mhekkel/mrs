@@ -1262,8 +1262,8 @@ M6Iterator* M6DatabankImpl::Find(const string& inQuery, uint32 inReportLimit)
 		auto_ptr<M6Document> doc(Fetch(b.first));
 
 		cout << doc->GetAttribute("id") << '\t'
-			<< doc->GetAttribute("title") << '\t'
-			<< b.second << endl;
+			<< b.second << '\t'
+			<< doc->GetAttribute("title") << endl;
 	}
 	
 	return result;

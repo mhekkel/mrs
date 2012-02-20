@@ -139,7 +139,7 @@ class M6FullTextIx
 	// The value chosen here seems to be a reasonable tradeoff.
 	enum {
 		kBufferEntryCount = 800000
-//		kBufferEntryCount = 800
+//		kBufferEntryCount = 8000
 	};
 	
 	typedef M6SortedRunArray

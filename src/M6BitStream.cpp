@@ -21,15 +21,65 @@ const uint32
 
 struct M6OBitStreamFileImpl : public M6OBitStreamImpl
 {
-					M6OBitStreamFileImpl(M6File& inFile)
-						: mFile(inFile) {}
+	static const size_t kFileBufferSize = 16384;
 
-	virtual size_t	Size() const								{ return mFile.Size(); }
-	virtual void	Write(const void* inData, size_t inSize)	{ mFile.Write(inData, inSize); }
-	virtual void	Truncate()									{ mFile.Truncate(0); }
+					M6OBitStreamFileImpl(M6File& inFile)
+						: mFile(inFile), mBufferPtr(mBuffer) {}
+					~M6OBitStreamFileImpl();
+
+	virtual size_t	Size() const								{ return mFile.Size() + (mBufferPtr - mBuffer); }
+	virtual void	Write(const uint8* inData, size_t inSize);
+	virtual void	Truncate()									{ mFile.Truncate(0); mBufferPtr = mBuffer; }
 					
+  private:
 	M6File&			mFile;
+	char			mBuffer[kFileBufferSize];
+	char*			mBufferPtr;
 };
+
+M6OBitStreamFileImpl::~M6OBitStreamFileImpl()
+{
+	if (mBufferPtr > mBuffer)
+		mFile.Write(mBuffer, mBufferPtr - mBuffer);
+}
+
+void M6OBitStreamFileImpl::Write(const uint8* inData, size_t inSize)
+{
+	int64 free = kFileBufferSize - (mBufferPtr - mBuffer);
+	if (free >= inSize)
+	{
+		memcpy(mBufferPtr, inData, inSize);
+		mBufferPtr += inSize;
+	}
+	else
+	{
+		int64 n = free;
+		if (n > inSize)
+			n = inSize;
+		
+		if (n > 0)
+		{
+			memcpy(mBufferPtr, inData, n);
+			mBufferPtr += n;
+			inData += n;
+			inSize -= n;
+		}
+		
+		assert(mBufferPtr == mBuffer + kFileBufferSize);
+		mFile.Write(mBuffer, kFileBufferSize);
+		mBufferPtr = mBuffer;
+		
+		while (inSize > kFileBufferSize)
+		{
+			mFile.Write(inData, kFileBufferSize);
+			inSize -= kFileBufferSize;
+			inData += kFileBufferSize;
+		}
+		
+		memcpy(mBufferPtr, inData, inSize);
+		mBufferPtr += inSize;
+	}
+}
 
 struct M6OBitStreamMemImpl : public M6OBitStreamImpl
 {
@@ -37,7 +87,7 @@ struct M6OBitStreamMemImpl : public M6OBitStreamImpl
 	virtual			~M6OBitStreamMemImpl();
 
 	virtual size_t	Size() const								{ return mBufferPtr - mBuffer; }
-	virtual void	Write(const void* inData, size_t inSize);
+	virtual void	Write(const uint8* inData, size_t inSize);
 	virtual void	Truncate()									{ mBufferPtr = mBuffer; }
 
 	uint8*			mBuffer;
@@ -56,7 +106,7 @@ M6OBitStreamMemImpl::~M6OBitStreamMemImpl()
 	delete[] mBuffer;
 }
 
-void M6OBitStreamMemImpl::Write(const void* inData, size_t inSize)
+void M6OBitStreamMemImpl::Write(const uint8* inData, size_t inSize)
 {
 	size_t size = Size();
 	if (size + inSize > mBufferSize)

@@ -17,7 +17,7 @@ struct M6OBitStreamImpl
 	void			Release()							{ if (--mRefCount == 0) delete this; }
 
 	virtual size_t	Size() const = 0;
-	virtual void	Write(const void* inData, size_t inSize) = 0;
+	virtual void	Write(const uint8* inData, size_t inSize) = 0;
 	virtual void	Truncate() = 0;
 
   private:

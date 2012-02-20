@@ -28,7 +28,10 @@
 #include <list>
 #include <vector>
 
+#include <boost/thread.hpp>
+
 #include "M6File.h"
+#include "M6Queue.h"
 
 template<class T>
 class M6RunEntryWriter
@@ -76,9 +79,18 @@ class M6SortedRunArray
 		uint32	count;
 		int64	offset;
 	};
+	
 	typedef std::list<run_info>					M6RunInfoList;
 	struct M6RunEntryIterator;
 	typedef std::vector<M6RunEntryIterator*>	M6QueueType;
+	
+	struct thread_run_info
+	{
+		value_type*	run;
+		uint32		run_count;
+	};
+	
+	typedef M6Queue<thread_run_info,2>			M6ThreadRunQueue;
 	
 	struct M6CompareRunEntry
 	{
@@ -99,9 +111,10 @@ class M6SortedRunArray
 	
 				M6SortedRunArray(const std::string& inScratchFile, C inCompare = C(), W inWriter = W())
 					: mFile(inScratchFile, eReadWrite)
-					, mRun(new value_type[N])
+					, mRun(nullptr)
 					, mRunCount(0)
 					, mComp(inCompare)
+					, mFlushThread(boost::bind(&M6SortedRunArray::FlushRunThread, this))
 					, mCount(0)
 					, mWriter(inWriter)
 				{
@@ -116,6 +129,9 @@ class M6SortedRunArray
 				{
 					if (mRunCount >= N)
 						FlushRun();
+
+					if (mRun == nullptr)
+						mRun = new value_type[N];
 
 					mRun[mRunCount] = inValue;
 					++mRunCount;
@@ -174,10 +190,14 @@ class M6SortedRunArray
 	
 	iterator*	Finish()
 				{
-					if (mRunCount > 0)
+					if (mRunCount > 0 or mRun != nullptr)
 						FlushRun();
 					
+					assert(mRun == nullptr);
 					assert(mRunCount == 0);
+					FlushRun();
+
+					mFlushThread.join();
 
 					return new iterator(mFile, mComp, mRuns);
 				}
@@ -188,20 +208,39 @@ class M6SortedRunArray
 
 	void		FlushRun()
 				{
-					mWriter.PrepareForWrite(mRun, mRunCount);
+					thread_run_info tri = { mRun, mRunCount };
+					
+					mFlushQueue.Put(tri);
 
-					// don't use a quicksort here, it might take too much
-					// stack space...
-					stable_sort(mRun, mRun + mRunCount, mComp);
-					
-					run_info ri;
-					ri.offset = mFile.Tell();
-					ri.count = mRunCount;
-					mRuns.push_back(ri);
-					
-					mWriter.WriteSortedRun(mFile, mRun, mRunCount);
-					
+					mRun = nullptr;
 					mRunCount = 0;
+				}
+
+	void		FlushRunThread()
+				{
+					for (;;)
+					{
+						thread_run_info tri = mFlushQueue.Get();
+						
+						if (tri.run == nullptr)
+							break;
+
+						mWriter.PrepareForWrite(tri.run, tri.run_count);
+	
+						// don't use a quicksort here, it might take too much
+						// stack space...
+						stable_sort(tri.run, tri.run + tri.run_count, mComp);
+						
+						run_info ri;
+						ri.offset = mFile.Tell();
+						ri.count = tri.run_count;
+						mRuns.push_back(ri);
+						
+						mWriter.WriteSortedRun(mFile, tri.run, tri.run_count);
+
+						delete[] tri.run;
+						tri.run = nullptr;
+					}
 				}
 	
 	struct M6RunEntryIterator
@@ -233,6 +272,8 @@ class M6SortedRunArray
 	uint32				mRunCount;
 	M6RunInfoList		mRuns;
 	compare_type		mComp;
+	M6ThreadRunQueue	mFlushQueue;
+	boost::thread		mFlushThread;
 	int64				mCount;
 	writer_type			mWriter;
 };

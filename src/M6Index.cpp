@@ -55,17 +55,23 @@ struct M6IndexPageHeader
 	uint32			mLink;
 };
 
-const int64
 //#if DEBUG
+//
+//const int64
 ////	kM6IndexPageSize		= 8192,
 //	kM6IndexPageSize		= 512,
 //	kM6IndexPageHeaderSize	= sizeof(M6IndexPageHeader),
 //	kM6KeySpace				= kM6IndexPageSize - kM6IndexPageHeaderSize,
 //	kM6MinKeySpace			= kM6KeySpace / 2,
-//	kM6MaxKeyLength			= (kM6MinKeySpace / 2 > 255 ? 255 : kM6MinKeySpace / 2),
 //	kM6MaxEntriesPerPage	= 4;
 ////	kM6MaxEntriesPerPage	= kM6KeySpace / 8;	// see above
+//
+//const uint32
+//	kM6MaxKeyLength			= (kM6MinKeySpace / 2 > 255 ? 255 : kM6MinKeySpace / 2);
+//
 //#else
+
+const int64
 	kM6IndexPageSize		= 8192,
 	kM6IndexPageHeaderSize	= sizeof(M6IndexPageHeader),
 	kM6KeySpace				= kM6IndexPageSize - kM6IndexPageHeaderSize,
@@ -74,6 +80,7 @@ const int64
 
 const uint32
 	kM6MaxKeyLength			= (kM6MinKeySpace / 2 > 255 ? 255 : kM6MinKeySpace / 2);
+
 //#endif
 
 template<M6IndexPageKind>
@@ -565,12 +572,14 @@ struct M6IxFileHeader
 	uint32		mSize;
 	uint32		mDepth;
 	uint32		mRoot;
+	uint32		mFirstBitsPage;
 	uint32		mLastBitsPage;
 
 	template<class Archive>
 	void serialize(Archive& ar)
 	{
-		ar & mSignature & mHeaderSize & mSize & mDepth & mRoot & mLastBitsPage;
+		ar & mSignature & mHeaderSize & mSize & mDepth & mRoot
+		   & mFirstBitsPage & mLastBitsPage;
 	}
 };
 
@@ -660,7 +669,6 @@ struct M6IndexImpl
 	virtual void	Dump() = 0;
 
 	void			SetAutoCommit(bool inAutoCommit);
-	void			SetBatchMode(bool inBatchMode);
 
 	virtual void	Commit() = 0;
 	virtual void	Rollback() = 0;
@@ -690,7 +698,7 @@ struct M6IndexImpl
 	M6File			mFile;
 	M6BasicIndex&	mIndex;
 	M6IxFileHeader	mHeader;
-	bool			mAutoCommit, mBatchMode;
+	bool			mAutoCommit;
 	bool			mDirty;
 
 	// cache
@@ -713,8 +721,7 @@ struct M6IndexImpl
 	M6CachedPagePtr	mCache,	mLRUHead, mLRUTail;
 	uint32			mCacheCount;
 	const static uint32
-					kM6CacheCount = 16, kM6MegaCacheCount = 10000;
-	vector<uint32>	mCacheIndex;
+					kM6CacheCount = 16;
 };
 
 template<class M6DataType>
@@ -1651,7 +1658,7 @@ void M6IndexImpl::StoreBits(M6OBitStream& inBits, M6BitVector& outBitVector)
 		if (mHeader.mLastBitsPage == 0)
 		{
 			page = Allocate<M6IndexBitVectorPage>();
-			mHeader.mLastBitsPage = page->GetPageNr();
+			mHeader.mFirstBitsPage = mHeader.mLastBitsPage = page->GetPageNr();
 		}
 		else
 			page = Load<M6IndexBitVectorPage>(mHeader.mLastBitsPage);
@@ -1713,9 +1720,6 @@ void M6IndexImpl::InitCache(uint32 inCacheCount)
 		b->mPageNr = a->mPageNr;
 		b->mPage = a->mPage;
 		b->mRefCount = a->mRefCount;
-		
-		if (b->mPageNr != 0 and not mCacheIndex.empty())
-			mCacheIndex[b->mPageNr] = static_cast<uint32>(b - tmp);
 	}
 
 	delete[] mCache;
@@ -1766,9 +1770,6 @@ M6IndexImpl::M6CachedPagePtr M6IndexImpl::GetCachePage()
 		if (result->mPage->IsDirty())
 			result->mPage->Flush(mFile);
 
-		if (not mCacheIndex.empty())
-			mCacheIndex[result->mPageNr] = 0;
-
 		delete result->mPage;
 		result->mPage = nullptr;
 	}
@@ -1795,14 +1796,6 @@ Page* M6IndexImpl::Allocate()
 	cp->mPageNr = pageNr;
 	cp->mRefCount = 1;
 	
-	if (not mCacheIndex.empty())
-	{
-		if (pageNr >= mCacheIndex.size())
-			mCacheIndex.insert(mCacheIndex.end(), pageNr - mCacheIndex.size() + 1, 0);
-		assert(pageNr < mCacheIndex.size());
-		mCacheIndex[pageNr] = static_cast<uint32>(cp - mCache);
-	}
-
 	return page;
 }
 
@@ -1814,16 +1807,8 @@ Page* M6IndexImpl::Load(uint32 inPageNr)
 		
 	M6CachedPagePtr cp = mLRUHead;
 
-	if (mCacheIndex.empty())
-	{
-		while (cp != nullptr and cp->mPageNr != inPageNr)
-			cp = cp->mNext; 
-	}
-	else
-	{
-		assert(inPageNr < mCacheIndex.size());
-		cp = mCache + mCacheIndex[inPageNr];
-	}
+	while (cp != nullptr and cp->mPageNr != inPageNr)
+		cp = cp->mNext; 
 
 	if (cp == nullptr or cp->mPage == nullptr)
 	{
@@ -1846,9 +1831,6 @@ Page* M6IndexImpl::Load(uint32 inPageNr)
 		cp->mPage = page;
 		cp->mPageNr = inPageNr;
 		cp->mRefCount = 0;
-		
-		if (not mCacheIndex.empty())
-			mCacheIndex[inPageNr] = static_cast<uint32>(cp - mCache);
 	}
 
 	cp->mRefCount += 1;
@@ -1864,19 +1846,14 @@ void M6IndexImpl::Release(Page*& ioPage)
 {
 	assert(ioPage != nullptr);
 	
-	if (ioPage->GetPageNr() < mCacheIndex.size())
-		mCache[mCacheIndex[ioPage->GetPageNr()]].mRefCount -= 1;
-	else
-	{
-		M6CachedPagePtr cp = mLRUHead;
-		while (cp != nullptr and cp->mPage != ioPage)
-			cp = cp->mNext;
-		
-		if (cp == nullptr)
-			THROW(("Invalid page in Release"));
-		
-		cp->mRefCount -= 1;
-	}
+	M6CachedPagePtr cp = mLRUHead;
+	while (cp != nullptr and cp->mPage != ioPage)
+		cp = cp->mNext;
+	
+	if (cp == nullptr)
+		THROW(("Invalid page in Release"));
+	
+	cp->mRefCount -= 1;
 	
 	ioPage = nullptr;
 }
@@ -1886,19 +1863,14 @@ void M6IndexImpl::Reference(Page* inPage)
 {
 	assert(inPage != nullptr);
 	
-	if (inPage->GetPageNr() < mCacheIndex.size())
-		mCache[mCacheIndex[inPage->GetPageNr()]].mRefCount += 1;
-	else
-	{
-		M6CachedPagePtr cp = mLRUHead;
-		while (cp != nullptr and cp->mPage != inPage)
-			cp = cp->mNext;
-		
-		if (cp == nullptr)
-			THROW(("Invalid page in Release"));
-		
-		cp->mRefCount += 1;
-	}
+	M6CachedPagePtr cp = mLRUHead;
+	while (cp != nullptr and cp->mPage != inPage)
+		cp = cp->mNext;
+	
+	if (cp == nullptr)
+		THROW(("Invalid page in Release"));
+	
+	cp->mRefCount += 1;
 }
 
 M6IndexImpl::~M6IndexImpl()
@@ -1915,26 +1887,6 @@ void M6IndexImpl::SetAutoCommit(bool inAutoCommit)
 		Commit();
 		if (mDirty)
 			mFile.PWrite(mHeader, 0);
-	}
-}
-
-void M6IndexImpl::SetBatchMode(bool inBatchMode)
-{
-	if (inBatchMode)
-	{
-		int64 fileSize = mFile.Size();
-		uint32 maxPageNr = static_cast<uint32>((fileSize - 1) / kM6IndexPageSize + 1);
-		mCacheIndex = vector<uint32>(maxPageNr, 0);
-		
-		InitCache(kM6MegaCacheCount);
-	}
-	else
-	{
-		Commit();
-		if (mDirty)
-			mFile.PWrite(mHeader, 0);
-		mCacheIndex.clear();
-		InitCache(kM6CacheCount);
 	}
 }
 
@@ -2184,10 +2136,8 @@ void M6IndexImplT<M6DataType>::Vacuum(M6Progress& inProgress)
 		vector<uint32> remapped(pageCount, 0);
 			
 		// read the entire index in memory, why not?
-		mCacheIndex = vector<uint32>(pageCount, 0);
 		InitCache(static_cast<uint32>(pageCount));
-			
-	
+		
 		{
 			M6File tmpFile(tmpPath, eReadWrite);
 			tmpFile.Truncate(0);
@@ -2195,22 +2145,29 @@ void M6IndexImplT<M6DataType>::Vacuum(M6Progress& inProgress)
 			// write new header
 			M6IxFileHeaderPage header = { kM6IndexFileSignature, sizeof(M6IxFileHeader) };
 			tmpFile.Write(&header, kM6IndexPageSize);
-			tmpFile.PWrite(mHeader, 0);
 			
-			// first write out all bit vector pages
 			uint32 n = 1;
-			for (uint32 i = 1; i < pageCount; ++i)
+			
+			uint32 bitPageNr = mHeader.mFirstBitsPage;
+			
+			if (bitPageNr != 0)
 			{
-				M6BasicPage* page = Load<M6BasicPage>(i);
-				if (page->GetKind() == eM6IndexBitVectorPage)
+				header.mHeader.mFirstBitsPage = 1;
+				
+				while (bitPageNr != 0)
 				{
-					page->SetPageNr(n);
-					page->Flush(tmpFile);
-					mCache[mCacheIndex[i]].mRefCount -= 1;
-					remapped[i] = n;
+					M6IndexPageData data;
+					mFile.PRead(&data, kM6IndexPageSize, bitPageNr * kM6IndexPageSize);
+					remapped[bitPageNr] = n;
+					bitPageNr = data.leaf.mLink;
+					if (bitPageNr != 0)
+						header.mHeader.mLastBitsPage = data.leaf.mLink = n + 1;
+					tmpFile.PWrite(&data, kM6IndexPageSize, n * kM6IndexPageSize);
 					++n;
 				}
 			}
+			
+			tmpFile.PWrite(header.mHeader, 0);
 		}
 		
 		M6LeafPage* page = dynamic_cast<M6LeafPage*>(GetFirstLeafPage());
@@ -2323,7 +2280,7 @@ void M6IndexImplT<M6DataType>::CreateUpLevels(deque<pair<string,uint32>>& up)
 				// special case, if up.size() == 2 and we can store both
 				// keys, store them and break the loop
 				if (up.size() == 2 and
-//					page->GetN() + 1 < kM6DataCount and
+					page->GetN() + 1 < M6BranchPage::kM6EntryCount and
 					page->Free() >= (up[0].first.length() + up[1].first.length() + 2 + 2 * sizeof(uint32)))
 				{
 					page->InsertKeyValue(up[0].first, up[0].second, page->GetN());
@@ -2566,11 +2523,6 @@ void M6BasicIndex::Rollback()
 void M6BasicIndex::SetAutoCommit(bool inAutoCommit)
 {
 	mImpl->SetAutoCommit(inAutoCommit);
-}
-
-void M6BasicIndex::SetBatchMode(bool inBatchMode)
-{
-	mImpl->SetBatchMode(inBatchMode);
 }
 
 // DEBUG code

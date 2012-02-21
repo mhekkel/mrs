@@ -420,7 +420,6 @@ M6BasicIx::M6BasicIx(M6FullTextIx& inFullTextIndex, M6Lexicon& inLexicon,
 	, mDbDocCount(0)
 	, mFlushThread(boost::bind(&M6BasicIx::FlushThread, this))
 {
-	mIndex->SetBatchMode(true);
 }
 
 M6BasicIx::~M6BasicIx()
@@ -429,8 +428,6 @@ M6BasicIx::~M6BasicIx()
 	{
 		mFlushQueue.Put(nullptr);
 		mFlushThread.join();
-
-		mIndex->SetBatchMode(false);
 	}
 }
 
@@ -460,7 +457,6 @@ void M6BasicIx::AddDocTerm(uint32 inDoc, uint32 inTerm, uint8 inFrequency, M6OBi
 	{
 		mFlushQueue.Put(nullptr);
 		mFlushThread.join();
-		mIndex->SetBatchMode(true);
 	}
 }
 

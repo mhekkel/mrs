@@ -1409,9 +1409,12 @@ void M6DatabankImpl::RecalculateDocumentWeights()
 
 void M6DatabankImpl::Vacuum()
 {
-	M6Progress progress(mAllTextIndex->size(), "vacuum");
-	
-	mAllTextIndex->Vacuum(progress);
+	{
+		M6Progress progress(mAllTextIndex->size(), "vacuum");
+		mAllTextIndex->Vacuum(progress);
+		mAllTextIndex.reset(new M6SimpleWeightedIndex((mDbDirectory / "all-text.index").string(), eReadOnly));
+	}
+	RecalculateDocumentWeights();
 
 //	foreach (M6IndexDesc& desc, mIndices)
 //		desc.mIndex->Vacuum();

@@ -15,6 +15,7 @@
 #include <boost/static_assert.hpp>
 #include <boost/foreach.hpp>
 #define foreach BOOST_FOREACH
+#include <boost/filesystem/operations.hpp>
 
 #include "M6Index.h"
 #include "M6Error.h"
@@ -1707,7 +1708,7 @@ void M6IndexImpl::InitCache(uint32 inCacheCount)
 
 	tmp[0].mPrev = tmp[inCacheCount - 1].mNext = nullptr;
 	
-	for (M6CachedPagePtr a = mLRUHead, b = tmp; a != nullptr; a = a->mNext, b = b->mNext)
+	for (M6CachedPagePtr a = mLRUHead, b = tmp; a != nullptr and b != nullptr; a = a->mNext, b = b->mNext)
 	{
 		b->mPageNr = a->mPageNr;
 		b->mPage = a->mPage;
@@ -1716,7 +1717,7 @@ void M6IndexImpl::InitCache(uint32 inCacheCount)
 		if (b->mPageNr != 0 and not mCacheIndex.empty())
 			mCacheIndex[b->mPageNr] = static_cast<uint32>(b - tmp);
 	}
-	
+
 	delete[] mCache;
 	mCache = tmp;
 	mCacheCount = inCacheCount;
@@ -2175,75 +2176,87 @@ void M6IndexImplT<M6DataType>::Vacuum(M6Progress& inProgress)
 	
 	fs::path tmpPath = mPath.parent_path() / (mPath.filename().string() + "-vacuum");
 	
-	int64 offset = 0;
-	int64 fileSize = mFile.Size();
-	int64 pageCount = fileSize / kM6IndexPageSize;
-	vector<uint32> remapped(pageCount, 0);
-		
-	// read the entire index in memory, why not?
-	mCacheIndex = vector<uint32>(pageCount, 0);
-	InitCache(static_cast<uint32>(pageCount));
-		
-
+	try
 	{
-		M6File tmpFile(tmpPath, eReadWrite);
-		tmpFile.Truncate(0);
+		int64 offset = 0;
+		int64 fileSize = mFile.Size();
+		int64 pageCount = fileSize / kM6IndexPageSize;
+		vector<uint32> remapped(pageCount, 0);
+			
+		// read the entire index in memory, why not?
+		mCacheIndex = vector<uint32>(pageCount, 0);
+		InitCache(static_cast<uint32>(pageCount));
+			
 	
-		// write new header
-		M6IxFileHeaderPage header = { kM6IndexFileSignature, sizeof(M6IxFileHeader) };
-		tmpFile.Write(&header, kM6IndexPageSize);
-		tmpFile.PWrite(mHeader, 0);
-		
-		// first write out all bit vector pages
-		uint32 n = 1;
-		for (uint32 i = 1; i < pageCount; ++i)
 		{
-			M6BasicPage* page = Load<M6BasicPage>(i);
-			if (page->GetKind() == eM6IndexBitVectorPage)
+			M6File tmpFile(tmpPath, eReadWrite);
+			tmpFile.Truncate(0);
+		
+			// write new header
+			M6IxFileHeaderPage header = { kM6IndexFileSignature, sizeof(M6IxFileHeader) };
+			tmpFile.Write(&header, kM6IndexPageSize);
+			tmpFile.PWrite(mHeader, 0);
+			
+			// first write out all bit vector pages
+			uint32 n = 1;
+			for (uint32 i = 1; i < pageCount; ++i)
 			{
-				page->SetPageNr(n);
-				page->Flush(tmpFile);
-				mCache[mCacheIndex[i]].mRefCount -= 1;
-				remapped[i] = n;
-				++n;
+				M6BasicPage* page = Load<M6BasicPage>(i);
+				if (page->GetKind() == eM6IndexBitVectorPage)
+				{
+					page->SetPageNr(n);
+					page->Flush(tmpFile);
+					mCache[mCacheIndex[i]].mRefCount -= 1;
+					remapped[i] = n;
+					++n;
+				}
 			}
 		}
-	}
-	
-	M6LeafPage* page = dynamic_cast<M6LeafPage*>(GetFirstLeafPage());
-	uint32 nr = 0;
-	
-	M6SortedInputIterator input = [this, &page, &nr, &inProgress]
-		(string& outKey, M6DataType& outData) -> bool
-	{
-		bool result = false;
-		while (page != nullptr)
+		
+		M6LeafPage* page = dynamic_cast<M6LeafPage*>(GetFirstLeafPage());
+		uint32 nr = 0;
+		
+		M6SortedInputIterator input = [this, &page, &nr, &inProgress]
+			(string& outKey, M6DataType& outData) -> bool
 		{
-			if (nr < page->GetN())
+			bool result = false;
+			while (page != nullptr)
 			{
-				page->GetKeyValue(nr, outKey, outData);
-				++nr;
-				result = true;
-				break;
+				if (nr < page->GetN())
+				{
+					page->GetKeyValue(nr, outKey, outData);
+					++nr;
+					result = true;
+					break;
+				}
+				
+				inProgress.Consumed(page->GetN());
+	
+				uint32 link = page->GetLink();
+				this->Release(page);
+				page = nullptr;
+				nr = 0;
+	
+				if (link != 0)
+					page = this->Load<M6LeafPage>(link);
 			}
 			
-			inProgress.Consumed(page->GetN());
-
-			uint32 link = page->GetLink();
-			this->Release(page);
-			page = nullptr;
-			nr = 0;
-
-			if (link != 0)
-				page = this->Load<M6LeafPage>(link);
+			return result;
+		};
+	
+		{
+			M6IndexImplT tmpImpl(mIndex, tmpPath, input, remapped);
+			tmpImpl.Commit();
 		}
 		
-		return result;
-	};
-
-	M6IndexImplT tmpImpl(mIndex, tmpPath, input, remapped);
-
-//	swap(tmpImpl.mFile, mFile);
+		mFile = M6File();	// only way to close our file (for now)
+		fs::remove(mPath);
+		fs::rename(tmpPath, mPath);
+	}
+	catch (...)
+	{
+		fs::remove(tmpPath);
+	}
 }
 
 template<class M6DataType>

@@ -22,6 +22,7 @@ class M6Databank
 	void			CommitBatchImport();
 	
 	void			RecalculateDocumentWeights();
+	void			Vacuum();
 
 	void			Validate();
 	

@@ -60,6 +60,7 @@ class M6DatabankImpl
 	fs::path		GetScratchDir() const				{ return mDbDirectory / "tmp"; }
 
 	void			RecalculateDocumentWeights();
+	void			Vacuum();
 
 	void			Validate();
 
@@ -1406,6 +1407,16 @@ void M6DatabankImpl::RecalculateDocumentWeights()
 	weightFile.Write(&mDocWeights[0], sizeof(float) * mDocWeights.size());
 }
 
+void M6DatabankImpl::Vacuum()
+{
+	M6Progress progress(mAllTextIndex->size(), "vacuum");
+	
+	mAllTextIndex->Vacuum(progress);
+
+//	foreach (M6IndexDesc& desc, mIndices)
+//		desc.mIndex->Vacuum();
+}
+
 void M6DatabankImpl::Validate()
 {
 	mStore->Validate();
@@ -1475,6 +1486,11 @@ uint32 M6Databank::size() const
 void M6Databank::RecalculateDocumentWeights()
 {
 	mImpl->RecalculateDocumentWeights();
+}
+
+void M6Databank::Vacuum()
+{
+	mImpl->Vacuum();
 }
 
 void M6Databank::Validate()

@@ -6,6 +6,7 @@
 
 #include <boost/function.hpp>
 #include <boost/lexical_cast.hpp>
+#include <boost/filesystem/path.hpp>
 
 #include "M6File.h"
 #include "M6BitStream.h"
@@ -17,23 +18,10 @@ class M6Progress;
 
 extern const uint32 kM6MaxKeyLength;
 
-struct M6Tuple
-{
-	std::string		key;
-	int64			value;
-
-					M6Tuple() : value(0) {}
-					M6Tuple(const std::string& inKey, int64 inValue)
-						: key(inKey), value(inValue) {}
-};
-
-typedef boost::function<bool(M6Tuple&)>		M6SortedInputIterator;
-
 class M6BasicIndex
 {
   public:
-					M6BasicIndex(const std::string& inPath, MOpenMode inMode);
-					M6BasicIndex(const std::string& inPath, M6SortedInputIterator& inData);
+					M6BasicIndex(const boost::filesystem::path& inPath, MOpenMode inMode);
 
 	virtual			~M6BasicIndex();
 
@@ -42,51 +30,51 @@ class M6BasicIndex
 	void			SetAutoCommit(bool inAutoCommit);
 	void			SetBatchMode(bool inBatchMode);
 	
-	void			Vacuum();
+	void			Vacuum(M6Progress& inProgress);
 	
 	virtual int		CompareKeys(const char* inKeyA, size_t inKeyLengthA,
 						const char* inKeyB, size_t inKeyLengthB) const = 0;
 
-	// TODO: rewrite iterator to be able to mutate value's directly
-	class iterator : public std::iterator<std::forward_iterator_tag,const M6Tuple>
-	{
-	  public:
-		typedef std::iterator<std::forward_iterator_tag, const M6Tuple>	base_type;
-		typedef base_type::reference									reference;
-		typedef base_type::pointer										pointer;
-		
-						iterator();
-						iterator(const iterator& iter);
-		iterator&		operator=(const iterator& iter);
+	//// TODO: rewrite iterator to be able to mutate value's directly
+	//class iterator : public std::iterator<std::forward_iterator_tag,const M6Tuple>
+	//{
+	//  public:
+	//	typedef std::iterator<std::forward_iterator_tag, const M6Tuple>	base_type;
+	//	typedef base_type::reference									reference;
+	//	typedef base_type::pointer										pointer;
+	//	
+	//					iterator();
+	//					iterator(const iterator& iter);
+	//	iterator&		operator=(const iterator& iter);
 
-		reference		operator*() const							{ return mCurrent; }
-		pointer			operator->() const							{ return &mCurrent; }
+	//	reference		operator*() const							{ return mCurrent; }
+	//	pointer			operator->() const							{ return &mCurrent; }
 
-		iterator&		operator++();
-		iterator		operator++(int)								{ iterator iter(*this); operator++(); return iter; }
+	//	iterator&		operator++();
+	//	iterator		operator++(int)								{ iterator iter(*this); operator++(); return iter; }
 
-		bool			operator==(const iterator& iter) const		{ return mIndex == iter.mIndex and mPage == iter.mPage and mKeyNr == iter.mKeyNr; }
-		bool			operator!=(const iterator& iter) const		{ return not operator==(iter); }
+	//	bool			operator==(const iterator& iter) const		{ return mIndex == iter.mIndex and mPage == iter.mPage and mKeyNr == iter.mKeyNr; }
+	//	bool			operator!=(const iterator& iter) const		{ return not operator==(iter); }
 
-	  private:
-		friend struct M6IndexImpl;
+	//  private:
+	//	friend struct M6IndexImpl;
 
-						iterator(M6IndexImpl* inIndex, int64 inPageNr, uint32 inKeyNr);
+	//					iterator(M6IndexImpl* inIndex, int64 inPageNr, uint32 inKeyNr);
 
-		M6IndexImpl*	mIndex;
-		int64			mPage;
-		uint32			mKeyNr;
-		M6Tuple			mCurrent;
-	};
+	//	M6IndexImpl*	mIndex;
+	//	int64			mPage;
+	//	uint32			mKeyNr;
+	//	M6Tuple			mCurrent;
+	//};
 	
-	// lame, but works for now (needed for boost::range)
-	typedef iterator const_iterator;
-	
-//	iterator		begin() const;
-//	iterator		end() const;
-	
-	iterator		lower_bound(const std::string& inKey) const;
-	iterator		upper_bound(const std::string& inKey) const;
+//	// lame, but works for now (needed for boost::range)
+//	typedef iterator const_iterator;
+//	
+////	iterator		begin() const;
+////	iterator		end() const;
+//	
+//	iterator		lower_bound(const std::string& inKey) const;
+//	iterator		upper_bound(const std::string& inKey) const;
 	
 	void			Insert(const std::string& inKey, uint32 inValue);
 	void			Erase(const std::string& inKey);
@@ -109,10 +97,10 @@ template<class INDEX, class COMPARATOR> class M6Index : public INDEX
   public:
 	typedef COMPARATOR			M6Comparator;
 
-					M6Index(const std::string& inPath, MOpenMode inMode)
+					M6Index(const boost::filesystem::path& inPath, MOpenMode inMode)
 						: INDEX(inPath, inMode) {}
 
-//					M6Index(const std::string& inPath, M6SortedInputIterator& inData)
+//					M6Index(const boost::filesystem::path& inPath, M6SortedInputIterator& inData)
 //						: INDEX(inPath, inData) {}
 
 	virtual int		CompareKeys(const char* inKeyA, size_t inKeyLengthA,
@@ -185,7 +173,7 @@ typedef M6Index<M6BasicIndex, M6NumericComparator>	M6NumberIndex;
 class M6MultiBasicIndex : public M6BasicIndex
 {
   public:
-					M6MultiBasicIndex(const std::string& inPath, MOpenMode inMode);
+					M6MultiBasicIndex(const boost::filesystem::path& inPath, MOpenMode inMode);
 
 	void			Insert(const std::string& inKey, const std::vector<uint32>& inDocuments);
 	bool			Find(const std::string& inKey, M6CompressedArray& outDocuments);
@@ -199,7 +187,7 @@ typedef M6Index<M6MultiBasicIndex, M6NumericComparator>	M6NumberMultiIndex;
 class M6MultiIDLBasicIndex : public M6BasicIndex
 {
   public:
-					M6MultiIDLBasicIndex(const std::string& inPath, MOpenMode inMode);
+					M6MultiIDLBasicIndex(const boost::filesystem::path& inPath, MOpenMode inMode);
 
 	void			Insert(const std::string& inKey, int64 inIDLOffset, const std::vector<uint32>& inDocuments);
 	bool			Find(const std::string& inKey, M6CompressedArray& outDocuments, int64& outIDLOffset);
@@ -212,7 +200,7 @@ typedef M6Index<M6MultiIDLBasicIndex, M6BasicComparator>	M6SimpleIDLMultiIndex;
 class M6WeightedBasicIndex : public M6BasicIndex
 {
   public:
-					M6WeightedBasicIndex(const std::string& inPath, MOpenMode inMode);
+					M6WeightedBasicIndex(const boost::filesystem::path& inPath, MOpenMode inMode);
 
 	class M6WeightedIterator
 	{

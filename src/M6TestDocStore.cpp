@@ -156,6 +156,9 @@ BOOST_AUTO_TEST_CASE(test_store_4)
 
 	M6Databank db("test/pdbfind2.m6", eReadWrite);
 
+	M6Lexicon lexicon;
+	db.StartBatchImport(lexicon);
+
 	foreach (const string& text, testdocs)
 	{
 		M6InputDocument* doc = new M6InputDocument(db, text);
@@ -168,6 +171,8 @@ BOOST_AUTO_TEST_CASE(test_store_4)
 		
 		db.Store(doc);
 	}
+
+	db.CommitBatchImport();
 
 	db.Validate();
 

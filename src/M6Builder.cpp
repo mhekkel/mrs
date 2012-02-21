@@ -527,7 +527,7 @@ struct M6IfExpr : public M6Expr
 struct M6IndexExpr : public M6Expr
 {
 					M6IndexExpr(const string& inName, M6DataType inType, bool inUnique)
-						: mName(inName), mType(inType) {}
+						: mName(inName), mType(inType), mUnique(inUnique) {}
 
 	virtual bool	Evaluate(M6InputDocument* inDocument, M6Argument& arg) const
 					{

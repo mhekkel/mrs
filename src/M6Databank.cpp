@@ -161,6 +161,10 @@ class M6FullTextIx
 	bool			UsesInDocLocation(uint32 inIndexNr) const	{ return mDocLocationIxMap & (1 << inIndexNr); }
 	uint32			GetDocLocationIxMap() const					{ return mDocLocationIxMap; }
 
+	void			SetExcludeInFullText(uint32 inIndexNr)		{ mFullTextIxMap |= (1 << inIndexNr); }
+	bool			ExcludesInFullText(uint32 inIndexNr) const	{ return mFullTextIxMap & (1 << inIndexNr); }
+	uint32			GetFullTextIxMap() const					{ return mFullTextIxMap; }
+
 	void			AddWord(uint8 inIndex, uint32 inWord);
 	void			FlushDoc(uint32 inDocNr);
 
@@ -187,7 +191,7 @@ class M6FullTextIx
 	typedef set<DocWord> DocWords;
 	
 	DocWords		mDocWords;
-	uint32			mDocLocationIxMap;
+	uint32			mDocLocationIxMap, mFullTextIxMap;
 	uint32			mDocWordLocation;
 
 	BufferEntryWriter
@@ -206,7 +210,7 @@ ostream& operator<<(ostream& os, const M6FullTextIx::BufferEntry& e)
 }
 
 M6FullTextIx::M6FullTextIx(const fs::path& inScratchUrl)
-	: mDocLocationIxMap(0)
+	: mDocLocationIxMap(0), mFullTextIxMap(0)
 	, mDocWordLocation(1)
 	, mBufferEntryWriter(*this)
 	, mScratchDir(inScratchUrl)
@@ -529,13 +533,12 @@ void M6BasicIx::FlushTerm(FlushedTerm* inTermData)
 }
 
 // --------------------------------------------------------------------
-// M6ValueIx, can only store one value per document and so
-// it should be unique
+// M6StringIx, stores strings in an index, but not in the full text index
 
-class M6ValueIx : public M6BasicIx
+class M6StringIx : public M6BasicIx
 {
   public:
-					M6ValueIx(M6FullTextIx& inFullTextIndex, M6Lexicon& inLexicon,
+					M6StringIx(M6FullTextIx& inFullTextIndex, M6Lexicon& inLexicon,
 						const string& inName, uint8 inIndexNr, M6BasicIndexPtr inIndex);
 	
 	virtual void	AddDocTerm(uint32 inDoc, uint8 inFrequency, M6OBitStream& inIDL);
@@ -548,34 +551,21 @@ class M6ValueIx : public M6BasicIx
 	vector<uint32>	mDocs;
 };
 
-M6ValueIx::M6ValueIx(M6FullTextIx& inFullTextIndex, M6Lexicon& inLexicon,
+M6StringIx::M6StringIx(M6FullTextIx& inFullTextIndex, M6Lexicon& inLexicon,
 		const string& inName, uint8 inIndexNr, M6BasicIndexPtr inIndex)
 	: M6BasicIx(inFullTextIndex, inLexicon, inName, inIndexNr, inIndex)
 {
+	mFullTextIndex.SetExcludeInFullText(mIndexNr);
 }
 	
-void M6ValueIx::AddDocTerm(uint32 inDoc, uint8 inFrequency, M6OBitStream& inIDL)
+void M6StringIx::AddDocTerm(uint32 inDoc, uint8 inFrequency, M6OBitStream& inIDL)
 {
 	mDocs.push_back(inDoc);
 	mLastDoc = inDoc;
 }
 
-void M6ValueIx::FlushTerm(uint32 inTerm, uint32 inDocCount)
+void M6StringIx::FlushTerm(uint32 inTerm, uint32 inDocCount)
 {
-	if (mDocs.size() != 1)
-	{
-		string term = mLexicon.GetString(inTerm);
-
-		cerr << endl
-			 << "Term " << term << " is not unique for index "
-			 << mName << ", it appears in document: ";
-
-		for (vector<uint32>::iterator d = mDocs.begin(); d != mDocs.end(); ++d)
-			cerr << *d << " ";
-
-		cerr << endl;
-	}
-	
 	if (mDocs.size() > 0)
 	{
 		FlushedTerm* termData = new FlushedTerm;
@@ -587,7 +577,7 @@ void M6ValueIx::FlushTerm(uint32 inTerm, uint32 inDocCount)
 	mDocs.clear();
 }
 
-void M6ValueIx::FlushTerm(FlushedTerm* inTermData)
+void M6StringIx::FlushTerm(FlushedTerm* inTermData)
 {
 	mIndex->Insert(inTermData->mTerm, inTermData->mDocs.back());
 }
@@ -942,15 +932,14 @@ void M6BatchIndexProcessor::IndexValue(const string& inIndexName,
 	
 		index->Insert(inValue, inDocNr);
 	}
-	else
+	else if (inValue.length() < kM6MaxKeyLength)
 	{
 		// too bad, we still have to go through the old route
-		
 		M6BasicIx* index;
 
 		switch (inDataType)
 		{
-			case eM6StringData:	index = GetIndexBase<M6TextIx>(inIndexName, eM6StringIndexType); break;
+			case eM6StringData:	index = GetIndexBase<M6StringIx>(inIndexName, eM6StringIndexType); break;
 			case eM6NumberData:	index = GetIndexBase<M6NumberIx>(inIndexName, eM6NumberIndexType); break;
 			case eM6DateData:	index = GetIndexBase<M6DateIx>(inIndexName, eM6DateIndexType); break;
 			default:			THROW(("Runtime error, unexpected index type"));
@@ -995,6 +984,8 @@ void M6BatchIndexProcessor::Finish(uint32 inDocCount)
 	uint32 lastDoc = ie.doc;
 	uint32 termFrequency = ie.weight;
 
+	uint32 exclude = mFullTextIndex.GetFullTextIxMap();
+
 	do
 	{
 		++entriesRead;
@@ -1004,7 +995,8 @@ void M6BatchIndexProcessor::Finish(uint32 inDocCount)
 
 		if (lastDoc != ie.doc or lastTerm != ie.term)
 		{
-			mIndices.back()->AddDocTerm(lastDoc, lastTerm, termFrequency, ie.idl);
+			if (termFrequency > 0)
+				mIndices.back()->AddDocTerm(lastDoc, lastTerm, termFrequency, ie.idl);
 
 			lastDoc = ie.doc;
 			lastTerm = ie.term;
@@ -1013,7 +1005,9 @@ void M6BatchIndexProcessor::Finish(uint32 inDocCount)
 		
 		if (ie.ix > 0)
 			mIndices[ie.ix - 1]->AddDocTerm(ie.doc, ie.term, ie.weight, ie.idl);
-		termFrequency += ie.weight;
+		
+		if ((exclude & (1 << ie.ix)) == 0)
+			termFrequency += ie.weight;
 		
 		if (termFrequency > numeric_limits<uint8>::max())
 			termFrequency = numeric_limits<uint8>::max();

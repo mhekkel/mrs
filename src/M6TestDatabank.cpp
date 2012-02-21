@@ -23,6 +23,6 @@ BOOST_AUTO_TEST_CASE(test_databank_1)
 
 //	boost::timer::auto_cpu_timer t;
 
-	M6Databank databank("./test/pdbfinder.m6", eReadWrite);
-	databank.RecalculateDocumentWeights();
+	//M6Databank databank("./test/pdbfinder.m6", eReadWrite);
+	//databank.RecalculateDocumentWeights();
 }

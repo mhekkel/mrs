@@ -120,3 +120,18 @@ BOOST_AUTO_TEST_CASE(test_tok_2)
 	BOOST_CHECK_EQUAL(tok2.GetToken(), eM6TokenNumber);
 	BOOST_CHECK_EQUAL(tok2.GetToken(), eM6TokenEOF);
 }
+
+BOOST_AUTO_TEST_CASE(test_tok_3)
+{
+	cout << "testing tokenizer 3" << endl;
+	
+	M6Tokenizer tok("1", 1);
+	BOOST_CHECK_EQUAL(tok.GetToken(), eM6TokenNumber);
+	BOOST_CHECK_EQUAL(tok.GetTokenLength(), 1);
+	BOOST_CHECK_EQUAL(tok.GetToken(), eM6TokenEOF);
+
+	M6Tokenizer tok2("a", 1);
+	BOOST_CHECK_EQUAL(tok2.GetToken(), eM6TokenWord);
+	BOOST_CHECK_EQUAL(tok.GetTokenLength(), 1);
+	BOOST_CHECK_EQUAL(tok.GetToken(), eM6TokenEOF);
+}

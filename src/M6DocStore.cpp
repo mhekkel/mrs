@@ -1021,6 +1021,18 @@ void M6DocStoreImpl::EraseDocument(uint32 inDocNr)
 
 bool M6DocStoreImpl::FetchDocument(uint32 inDocNr, uint32& outPageNr, uint32& outDocSize)
 {
+	if (not mRoot)
+	{
+		if (mHeader.mIndexRoot == 0)
+		{
+			mRoot = Allocate<M6DocStoreIndexPage>();
+			mRoot->SetPageType(eM6DocStoreIndexLeafPage);
+			mHeader.mIndexRoot = mRoot->GetPageNr();
+		}
+		else
+			mRoot = Load<M6DocStoreIndexPage>(mHeader.mIndexRoot);
+	}
+
 	return mRoot->Find(inDocNr, outPageNr, outDocSize);
 }
 
@@ -1244,12 +1256,36 @@ void M6DocStoreImpl::SetAutoCommit(bool inAutoCommit)
 
 void M6DocStoreImpl::Validate()
 {
+	if (not mRoot)
+	{
+		if (mHeader.mIndexRoot == 0)
+		{
+			mRoot = Allocate<M6DocStoreIndexPage>();
+			mRoot->SetPageType(eM6DocStoreIndexLeafPage);
+			mHeader.mIndexRoot = mRoot->GetPageNr();
+		}
+		else
+			mRoot = Load<M6DocStoreIndexPage>(mHeader.mIndexRoot);
+	}
+
 	mRoot->Validate(0, nullptr);
 }
 
 void M6DocStoreImpl::Dump()
 {
 	cout << endl << "Dumping tree" << endl << endl;
+
+	if (not mRoot)
+	{
+		if (mHeader.mIndexRoot == 0)
+		{
+			mRoot = Allocate<M6DocStoreIndexPage>();
+			mRoot->SetPageType(eM6DocStoreIndexLeafPage);
+			mHeader.mIndexRoot = mRoot->GetPageNr();
+		}
+		else
+			mRoot = Load<M6DocStoreIndexPage>(mHeader.mIndexRoot);
+	}
 
 	mRoot->Dump(0);
 

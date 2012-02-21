@@ -55,12 +55,12 @@ class M6Tokenizer
 	M6Token			GetToken();
 
 	const char*		GetTokenValue() const			{ return mTokenText; }
-	uint32			GetTokenLength() const			{ return static_cast<uint32>(mToken - mTokenText); }
+	size_t			GetTokenLength() const			{ return mToken - mTokenText; }
 	std::string		GetTokenString() const			{ return std::string(GetTokenValue(), GetTokenLength()); }
 	
 	bool			TokenHasUpperCase() const		{ return mHasUpperCase; }
 	
-	uint32			GetOffset() const				{ return static_cast<uint32>(mPtr - mBuffer); }
+	size_t			GetOffset() const				{ return mPtr - mBuffer; }
 	void			SetOffset(uint32 inOffset);
 	
   private:

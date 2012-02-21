@@ -2210,8 +2210,9 @@ void M6IndexImplT<M6DataType>::Vacuum(M6Progress& inProgress)
 		fs::remove(mPath);
 		fs::rename(tmpPath, mPath);
 	}
-	catch (...)
+	catch (exception& e)
 	{
+		cerr << e.what() << endl;
 		fs::remove(tmpPath);
 	}
 }

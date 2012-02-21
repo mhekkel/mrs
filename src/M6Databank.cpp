@@ -361,6 +361,14 @@ void M6FullTextIx::BufferEntryReader::ReadSortedRunEntry(BufferEntry& outValue)
 class M6BasicIx
 {
   public:
+	
+	struct FlushedTerm
+	{
+		string			mTerm;
+		vector<uint32>	mDocs;
+	};
+	typedef M6Queue<FlushedTerm*>	M6FlushQueue;
+
 					M6BasicIx(M6FullTextIx& inFullTextIndex, M6Lexicon& inLexicon,
 						const string& inName, uint8 inIndexNr, M6BasicIndexPtr inIndex);
 	virtual 		~M6BasicIx();
@@ -377,6 +385,9 @@ class M6BasicIx
 	
 	virtual void	AddDocTerm(uint32 inDoc, uint8 inFrequency, M6OBitStream& inIDL);
 	virtual void	FlushTerm(uint32 inTerm, uint32 inDocCount);
+	
+	virtual void	FlushTerm(FlushedTerm* inTermData);
+	void			FlushThread();
 
 	string			mName;
 	M6FullTextIx&	mFullTextIndex;
@@ -391,6 +402,9 @@ class M6BasicIx
 	M6OBitStream	mBits;
 	uint32			mDocCount;
 	uint32			mDbDocCount;
+	
+	M6FlushQueue	mFlushQueue;
+	boost::thread	mFlushThread;
 };
 
 // --------------------------------------------------------------------
@@ -407,11 +421,14 @@ M6BasicIx::M6BasicIx(M6FullTextIx& inFullTextIndex, M6Lexicon& inLexicon,
 	, mLastDoc(0)
 	, mDocCount(0)
 	, mDbDocCount(0)
+	, mFlushThread(boost::bind(&M6BasicIx::FlushThread, this))
 {
 }
 
 M6BasicIx::~M6BasicIx()
 {
+	mFlushQueue.Put(nullptr);
+	mFlushThread.join();
 }
 
 void M6BasicIx::AddWord(uint32 inWord)
@@ -436,6 +453,8 @@ void M6BasicIx::AddDocTerm(uint32 inDoc, uint32 inTerm, uint8 inFrequency, M6OBi
 		mLastTerm = inTerm;
 		AddDocTerm(inDoc, inFrequency, inIDL);
 	}
+	else
+		mFlushQueue.Put(nullptr);
 }
 
 void M6BasicIx::AddDocTerm(uint32 inDoc, uint8 inFrequency, M6OBitStream& inIDL)
@@ -468,23 +487,42 @@ void M6BasicIx::FlushTerm(uint32 inTerm, uint32 inDocCount)
 		M6IBitStream bits(mBits);
 
 		uint32 docNr = 0;
-		vector<uint32> docs;
-		
+
+		FlushedTerm* termData = new FlushedTerm;
+		termData->mTerm = mLexicon.GetString(inTerm);
+
 		for (uint32 d = 0; d < mDocCount; ++d)
 		{
 			uint32 delta;
 			ReadGamma(bits, delta);
 			docNr += delta;
-			docs.push_back(docNr);
+			termData->mDocs.push_back(docNr);
 		}
 
-		static_cast<M6MultiBasicIndex*>(mIndex.get())->Insert(mLexicon.GetString(inTerm), docs);
+		mFlushQueue.Put(termData);
 	}
 
 	mBits.Clear();
 	
 	mDocCount = 0;
 	mLastDoc = 0;
+}
+
+void M6BasicIx::FlushThread()
+{
+	for (;;)
+	{
+		FlushedTerm* term = mFlushQueue.Get();
+		if (term == nullptr)
+			break;
+		FlushTerm(term);
+	}
+}
+
+void M6BasicIx::FlushTerm(FlushedTerm* inTermData)
+{
+	static_cast<M6MultiBasicIndex*>(mIndex.get())->Insert(inTermData->mTerm, inTermData->mDocs);
+	delete inTermData;
 }
 
 // --------------------------------------------------------------------
@@ -501,6 +539,9 @@ class M6ValueIx : public M6BasicIx
 	virtual void	FlushTerm(uint32 inTerm, uint32 inDocCount);
 	
   private:
+
+	virtual void	FlushTerm(FlushedTerm* inTermData);
+
 	vector<uint32>	mDocs;
 };
 
@@ -533,9 +574,19 @@ void M6ValueIx::FlushTerm(uint32 inTerm, uint32 inDocCount)
 	}
 	
 	if (mDocs.size() > 0)
-		mIndex->Insert(mLexicon.GetString(inTerm), mDocs.back());
+	{
+		FlushedTerm* termData = new FlushedTerm;
+		termData->mTerm = mLexicon.GetString(inTerm);
+		termData->mDocs.swap(mDocs);
+		mFlushQueue.Put(termData);
+	}
 	
 	mDocs.clear();
+}
+
+void M6ValueIx::FlushTerm(FlushedTerm* inTermData)
+{
+	mIndex->Insert(inTermData->mTerm, inTermData->mDocs.back());
 }
 
 // --------------------------------------------------------------------
@@ -544,6 +595,11 @@ void M6ValueIx::FlushTerm(uint32 inTerm, uint32 inDocCount)
 class M6TextIx : public M6BasicIx
 {
   public:
+	struct FlushedIDLTerm : public FlushedTerm
+	{
+		int64		mIDLOffset;
+	};
+
 					M6TextIx(M6FullTextIx& inFullTextIndex, M6Lexicon& inLexicon,
 						const string& inName, uint8 inIndexNr, M6BasicIndexPtr inIndex);
 	virtual			~M6TextIx();
@@ -551,6 +607,8 @@ class M6TextIx : public M6BasicIx
   private:
 	void			AddDocTerm(uint32 inDoc, uint8 inFrequency, M6OBitStream& inIDL);
 	virtual void	FlushTerm(uint32 inTerm, uint32 inDocCount);
+
+	virtual void	FlushTerm(FlushedTerm* inTermData);
 
 	M6File*			mIDLFile;
 	M6OBitStream*	mIDLBits;
@@ -607,7 +665,9 @@ void M6TextIx::FlushTerm(uint32 inTerm, uint32 inDocCount)
 		if (mIDLBits != nullptr)
 			mIDLBits->Sync();
 
-		vector<uint32> docs;
+		FlushedIDLTerm* termData = new FlushedIDLTerm;
+		termData->mTerm = mLexicon.GetString(inTerm);
+		termData->mIDLOffset = mIDLOffset;
 		
 		M6IBitStream bits(mBits);
 
@@ -618,10 +678,10 @@ void M6TextIx::FlushTerm(uint32 inTerm, uint32 inDocCount)
 			uint32 delta;
 			ReadGamma(bits, delta);
 			docNr += delta;
-			docs.push_back(docNr);
+			termData->mDocs.push_back(docNr);
 		}
 
-		static_cast<M6MultiIDLBasicIndex*>(mIndex.get())->Insert(mLexicon.GetString(inTerm), mIDLOffset, docs);
+		mFlushQueue.Put(termData);
 	}
 
 	mBits.Clear();
@@ -633,17 +693,35 @@ void M6TextIx::FlushTerm(uint32 inTerm, uint32 inDocCount)
 	mLastDoc = 0;
 }
 
+void M6TextIx::FlushTerm(FlushedTerm* inTermData)
+{
+	FlushedIDLTerm* idlTerm = static_cast<FlushedIDLTerm*>(inTermData);
+	
+	static_cast<M6MultiIDLBasicIndex*>(mIndex.get())->
+		Insert(idlTerm->mTerm, idlTerm->mIDLOffset, idlTerm->mDocs);
+	delete idlTerm;
+}
+
 // --------------------------------------------------------------------
 //	Weighted word index, used for ranked searching
 
 class M6WeightedWordIx : public M6BasicIx
 {
   public:
+	struct FlushedWeightedTerm : public FlushedTerm
+	{
+		vector<pair<uint32,uint8>>	mWeightedDocs;
+	};
+
 					M6WeightedWordIx(M6FullTextIx& inFullTextIndex, M6Lexicon& inLexicon,
 						const string& inName, uint8 inIndexNr, M6BasicIndexPtr inIndex);
 
 	virtual void	AddDocTerm(uint32 inDoc, uint8 inFrequency, M6OBitStream& inIDL);
 	virtual void	FlushTerm(uint32 inTerm, uint32 inDocCount);
+
+  private:
+
+	virtual void	FlushTerm(FlushedTerm* inTermData);
 };
 
 M6WeightedWordIx::M6WeightedWordIx(M6FullTextIx& inFullTextIndex, M6Lexicon& inLexicon,
@@ -687,9 +765,12 @@ void M6WeightedWordIx::FlushTerm(uint32 inTerm, uint32 inDocCount)
 		// flush the raw index bits
 		mBits.Sync();
 		
-		vector<pair<uint32,uint8>> docs;
+//		vector<pair<uint32,uint8>> docs;
 		
 		M6IBitStream bits(mBits);
+		
+		FlushedWeightedTerm* termData = new FlushedWeightedTerm;
+		termData->mTerm = mLexicon.GetString(inTerm);
 
 		uint32 docNr = 0;
 		for (uint32 d = 0; d < mDocCount; ++d)
@@ -701,16 +782,23 @@ void M6WeightedWordIx::FlushTerm(uint32 inTerm, uint32 inDocCount)
 			uint8 weight;
 			ReadBinary(bits, kM6WeightBitCount, weight);
 			assert(weight > 0);
-			docs.push_back(make_pair(docNr, weight));
+			termData->mWeightedDocs.push_back(make_pair(docNr, weight));
 		}
 
-		static_cast<M6WeightedBasicIndex*>(mIndex.get())->Insert(mLexicon.GetString(inTerm), docs);
+		mFlushQueue.Put(termData);
 	}
 
 	mBits.Clear();
 	
 	mDocCount = 0;
 	mLastDoc = 0;
+}
+
+void M6WeightedWordIx::FlushTerm(FlushedTerm* inTermData)
+{
+	FlushedWeightedTerm* termData = static_cast<FlushedWeightedTerm*>(inTermData);
+	static_cast<M6WeightedBasicIndex*>(mIndex.get())->Insert(termData->mTerm, termData->mWeightedDocs);
+	delete termData;
 }
 
 // --------------------------------------------------------------------

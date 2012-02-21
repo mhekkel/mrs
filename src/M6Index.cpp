@@ -654,6 +654,7 @@ struct M6IndexImpl
 	virtual void	Dump() = 0;
 
 	void			SetAutoCommit(bool inAutoCommit);
+	void			SetBatchMode(bool inBatchMode);
 
 	virtual void	Commit() = 0;
 	virtual void	Rollback() = 0;
@@ -700,13 +701,14 @@ struct M6IndexImpl
 		M6CachedPagePtr	mPrev;
 	};
 
-	void			InitCache();
+	void			InitCache(uint32 inCacheCount);
 	M6CachedPagePtr	GetCachePage();
 
 	M6CachedPagePtr	mCache,	mLRUHead, mLRUTail;
 	uint32			mCacheCount;
 	const static uint32
-					kM6CacheCount = 16;
+					kM6CacheCount = 16, kM6MegaCacheCount = 10000;
+	vector<uint32>	mCacheIndex;
 };
 
 template<class M6DataType>
@@ -1597,6 +1599,7 @@ M6IndexImpl::M6IndexImpl(M6BasicIndex& inIndex, const string& inPath, MOpenMode 
 	, mIndex(inIndex)
 	, mDirty(false)
 	, mAutoCommit(true)
+	, mCache(nullptr), mLRUHead(nullptr), mLRUTail(nullptr), mCacheCount(0)
 {
 	if (inMode == eReadWrite and mFile.Size() == 0)
 	{
@@ -1679,21 +1682,35 @@ void M6IndexImpl::StoreBits(M6OBitStream& inBits, M6BitVector& outBitVector)
 	}
 }
 
-void M6IndexImpl::InitCache()
+void M6IndexImpl::InitCache(uint32 inCacheCount)
 {
-	mCacheCount = kM6CacheCount;
-	mCache = new M6CachedPage[mCacheCount];
+	M6CachedPagePtr tmp = new M6CachedPage[inCacheCount];
 	
-	for (uint32 ix = 0; ix < mCacheCount; ++ix)
+	for (uint32 ix = 0; ix < inCacheCount; ++ix)
 	{
-		mCache[ix].mPage = nullptr;
-		mCache[ix].mPageNr = 0;
-		mCache[ix].mRefCount = 0;
-		mCache[ix].mNext = mCache + ix + 1;
-		mCache[ix].mPrev = mCache + ix - 1;
+		tmp[ix].mPage = nullptr;
+		tmp[ix].mPageNr = 0;
+		tmp[ix].mRefCount = 0;
+		tmp[ix].mNext = tmp + ix + 1;
+		tmp[ix].mPrev = tmp + ix - 1;
+	}
+
+	tmp[0].mPrev = tmp[inCacheCount - 1].mNext = nullptr;
+	
+	for (M6CachedPagePtr a = mLRUHead, b = tmp; a != nullptr; a = a->mNext, b = b->mNext)
+	{
+		b->mPageNr = a->mPageNr;
+		b->mPage = a->mPage;
+		b->mRefCount = a->mRefCount;
+		
+		if (b->mPageNr != 0 and not mCacheIndex.empty())
+			mCacheIndex[b->mPageNr] = static_cast<uint32>(b - tmp);
 	}
 	
-	mCache[0].mPrev = mCache[mCacheCount - 1].mNext = nullptr;
+	delete[] mCache;
+	mCache = tmp;
+	mCacheCount = inCacheCount;
+	
 	mLRUHead = mCache;
 	mLRUTail = mCache + mCacheCount - 1;
 }
@@ -1713,33 +1730,7 @@ M6IndexImpl::M6CachedPagePtr M6IndexImpl::GetCachePage()
 	// we could end up with a full cache, if so, double the cache
 	if (result == nullptr)
 	{
-		mCacheCount *= 2;
-		M6CachedPagePtr tmp = new M6CachedPage[mCacheCount];
-		
-		for (uint32 ix = 0; ix < mCacheCount; ++ix)
-		{
-			tmp[ix].mPage = nullptr;
-			tmp[ix].mPageNr = 0;
-			tmp[ix].mRefCount = 0;
-			tmp[ix].mNext = tmp + ix + 1;
-			tmp[ix].mPrev = tmp + ix - 1;
-		}
-
-		tmp[0].mPrev = tmp[mCacheCount - 1].mNext = nullptr;
-
-		for (M6CachedPagePtr a = mLRUHead, b = tmp; a != nullptr; a = a->mNext, b = b->mNext)
-		{
-			b->mPageNr = a->mPageNr;
-			b->mPage = a->mPage;
-			b->mRefCount = a->mRefCount;
-		}
-		
-		delete[] mCache;
-		mCache = tmp;
-		
-		mLRUHead = mCache;
-		mLRUTail = mCache + mCacheCount - 1;
-		
+		InitCache(mCacheCount * 2);
 		result = mLRUTail;
 	}
 
@@ -1763,6 +1754,9 @@ M6IndexImpl::M6CachedPagePtr M6IndexImpl::GetCachePage()
 	{
 		if (result->mPage->IsDirty())
 			result->mPage->Flush(mFile);
+
+		if (not mCacheIndex.empty())
+			mCacheIndex[result->mPageNr] = 0;
 
 		delete result->mPage;
 		result->mPage = nullptr;
@@ -1789,6 +1783,14 @@ Page* M6IndexImpl::Allocate()
 	cp->mPage = page;
 	cp->mPageNr = pageNr;
 	cp->mRefCount = 1;
+	
+	if (not mCacheIndex.empty())
+	{
+		if (pageNr >= mCacheIndex.size())
+			mCacheIndex.insert(mCacheIndex.end(), pageNr - mCacheIndex.size() + 1, 0);
+		assert(pageNr < mCacheIndex.size());
+		mCacheIndex[pageNr] = static_cast<uint32>(cp - mCache);
+	}
 
 	return page;
 }
@@ -1798,31 +1800,44 @@ Page* M6IndexImpl::Load(uint32 inPageNr)
 {
 	if (inPageNr == 0)
 		THROW(("Invalid page number"));
-
+		
 	M6CachedPagePtr cp = mLRUHead;
-	while (cp != nullptr and cp->mPageNr != inPageNr)
-		cp = cp->mNext; 
+
+	if (mCacheIndex.empty())
+	{
+		while (cp != nullptr and cp->mPageNr != inPageNr)
+			cp = cp->mNext; 
+	}
+	else
+	{
+		assert(inPageNr < mCacheIndex.size());
+		cp = mCache + mCacheIndex[inPageNr];
+	}
 
 	if (cp == nullptr)
 	{
 		M6IndexPageData* data = new M6IndexPageData;
 		mFile.PRead(data, kM6IndexPageSize, inPageNr * kM6IndexPageSize);
 
-		Page* page;
+		M6BasicPage* page;
 		switch (data->leaf.mType)
 		{
 			case eM6IndexEmptyPage:			THROW(("Empty page!")); break;
-			case eM6IndexBranchPage:		page = dynamic_cast<Page*>(CreateBranchPage(data, inPageNr)); break;
+			case eM6IndexBranchPage:		page = CreateBranchPage(data, inPageNr); break;
 			case eM6IndexSimpleLeafPage:
 			case eM6IndexMultiLeafPage:
-			case eM6IndexMultiIDLLeafPage:	page = dynamic_cast<Page*>(CreateLeafPage(data, inPageNr)); break;
-			default:						THROW(("Invalid index type in load"));
+			case eM6IndexMultiIDLLeafPage:	page = CreateLeafPage(data, inPageNr); break;
+			case eM6IndexBitVectorPage:		page = new M6IndexBitVectorPage(*this, data, inPageNr); break;
+			default:						THROW(("Invalid index type in load (%c/%x)", data->leaf.mType, data->leaf.mType));
 		}
 		
 		cp = GetCachePage();
 		cp->mPage = page;
 		cp->mPageNr = inPageNr;
 		cp->mRefCount = 0;
+		
+		if (not mCacheIndex.empty())
+			mCacheIndex[inPageNr] = static_cast<uint32>(cp - mCache);
 	}
 
 	cp->mRefCount += 1;
@@ -1835,33 +1850,34 @@ Page* M6IndexImpl::Load(uint32 inPageNr)
 
 M6IndexBitVectorPage* M6IndexImpl::LoadBitPage(uint32 inPageNr)
 {
-	if (inPageNr == 0)
-		THROW(("Invalid page number"));
-
-	M6CachedPagePtr cp = mLRUHead;
-	while (cp != nullptr and cp->mPageNr != inPageNr)
-		cp = cp->mNext; 
-
-	if (cp == nullptr)
-	{
-		M6IndexPageData* data = new M6IndexPageData;
-		mFile.PRead(data, kM6IndexPageSize, inPageNr * kM6IndexPageSize);
-
-		if (data->leaf.mType != eM6IndexBitVectorPage)
-			THROW(("Invalid index type in load"));
-		
-		cp = GetCachePage();
-		cp->mPage = new M6IndexBitVectorPage(*this, data, inPageNr);
-		cp->mPageNr = inPageNr;
-		cp->mRefCount = 0;
-	}
-
-	cp->mRefCount += 1;
-	
-	M6IndexBitVectorPage* result = dynamic_cast<M6IndexBitVectorPage*>(cp->mPage);
-	if (result == nullptr)
-		THROW(("Error loading cache page"));
-	return result;
+	return static_cast<M6IndexBitVectorPage*>(Load<M6IndexBitVectorPage>(inPageNr));
+//	if (inPageNr == 0)
+//		THROW(("Invalid page number"));
+//
+//	M6CachedPagePtr cp = mLRUHead;
+//	while (cp != nullptr and cp->mPageNr != inPageNr)
+//		cp = cp->mNext; 
+//
+//	if (cp == nullptr)
+//	{
+//		M6IndexPageData* data = new M6IndexPageData;
+//		mFile.PRead(data, kM6IndexPageSize, inPageNr * kM6IndexPageSize);
+//
+//		if (data->leaf.mType != eM6IndexBitVectorPage)
+//			THROW(("Invalid index type in load"));
+//		
+//		cp = GetCachePage();
+//		cp->mPage = new M6IndexBitVectorPage(*this, data, inPageNr);
+//		cp->mPageNr = inPageNr;
+//		cp->mRefCount = 0;
+//	}
+//
+//	cp->mRefCount += 1;
+//	
+//	M6IndexBitVectorPage* result = dynamic_cast<M6IndexBitVectorPage*>(cp->mPage);
+//	if (result == nullptr)
+//		THROW(("Error loading cache page"));
+//	return result;
 }
 
 template<class Page>
@@ -1869,14 +1885,19 @@ void M6IndexImpl::Release(Page*& ioPage)
 {
 	assert(ioPage != nullptr);
 	
-	M6CachedPagePtr cp = mLRUHead;
-	while (cp != nullptr and cp->mPage != ioPage)
-		cp = cp->mNext;
-	
-	if (cp == nullptr)
-		THROW(("Invalid page in Release"));
-	
-	cp->mRefCount -= 1;
+	if (ioPage->GetPageNr() < mCacheIndex.size())
+		mCache[mCacheIndex[ioPage->GetPageNr()]].mRefCount -= 1;
+	else
+	{
+		M6CachedPagePtr cp = mLRUHead;
+		while (cp != nullptr and cp->mPage != ioPage)
+			cp = cp->mNext;
+		
+		if (cp == nullptr)
+			THROW(("Invalid page in Release"));
+		
+		cp->mRefCount -= 1;
+	}
 	
 	ioPage = nullptr;
 }
@@ -1886,14 +1907,19 @@ void M6IndexImpl::Reference(Page* inPage)
 {
 	assert(inPage != nullptr);
 	
-	M6CachedPagePtr cp = mLRUHead;
-	while (cp != nullptr and cp->mPage != inPage)
-		cp = cp->mNext;
-	
-	if (cp == nullptr)
-		THROW(("Invalid page in Release"));
-	
-	cp->mRefCount += 1;
+	if (inPage->GetPageNr() < mCacheIndex.size())
+		mCache[mCacheIndex[inPage->GetPageNr()]].mRefCount += 1;
+	else
+	{
+		M6CachedPagePtr cp = mLRUHead;
+		while (cp != nullptr and cp->mPage != inPage)
+			cp = cp->mNext;
+		
+		if (cp == nullptr)
+			THROW(("Invalid page in Release"));
+		
+		cp->mRefCount += 1;
+	}
 }
 
 //M6IndexImpl::M6IndexImpl(M6BasicIndex& inIndex, const string& inPath,
@@ -1975,13 +2001,33 @@ void M6IndexImpl::SetAutoCommit(bool inAutoCommit)
 	}
 }
 
+void M6IndexImpl::SetBatchMode(bool inBatchMode)
+{
+	if (inBatchMode)
+	{
+		int64 fileSize = mFile.Size();
+		uint32 maxPageNr = static_cast<uint32>((fileSize - 1) / kM6IndexPageSize + 1);
+		mCacheIndex = vector<uint32>(maxPageNr, 0);
+		
+		InitCache(kM6MegaCacheCount);
+	}
+	else
+	{
+		Commit();
+		if (mDirty)
+			mFile.PWrite(mHeader, 0);
+		mCacheIndex.clear();
+		InitCache(kM6CacheCount);
+	}
+}
+
 // --------------------------------------------------------------------
 
 template<class M6DataType>
 M6IndexImplT<M6DataType>::M6IndexImplT(M6BasicIndex& inIndex, const string& inPath, MOpenMode inMode)
 	: M6IndexImpl(inIndex, inPath, inMode)
 {
-	InitCache();
+	InitCache(kM6CacheCount);
 }
 
 template<class M6DataType>
@@ -2520,6 +2566,11 @@ void M6BasicIndex::Rollback()
 void M6BasicIndex::SetAutoCommit(bool inAutoCommit)
 {
 	mImpl->SetAutoCommit(inAutoCommit);
+}
+
+void M6BasicIndex::SetBatchMode(bool inBatchMode)
+{
+	mImpl->SetBatchMode(inBatchMode);
 }
 
 // DEBUG code

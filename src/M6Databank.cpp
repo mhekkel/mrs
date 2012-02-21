@@ -419,6 +419,7 @@ M6BasicIx::M6BasicIx(M6FullTextIx& inFullTextIndex, M6Lexicon& inLexicon,
 	, mDbDocCount(0)
 	, mFlushThread(boost::bind(&M6BasicIx::FlushThread, this))
 {
+	mIndex->SetBatchMode(true);
 }
 
 M6BasicIx::~M6BasicIx()
@@ -427,6 +428,8 @@ M6BasicIx::~M6BasicIx()
 	{
 		mFlushQueue.Put(nullptr);
 		mFlushThread.join();
+
+		mIndex->SetBatchMode(false);
 	}
 }
 
@@ -456,6 +459,7 @@ void M6BasicIx::AddDocTerm(uint32 inDoc, uint32 inTerm, uint8 inFrequency, M6OBi
 	{
 		mFlushQueue.Put(nullptr);
 		mFlushThread.join();
+		mIndex->SetBatchMode(true);
 	}
 }
 
@@ -982,7 +986,7 @@ void M6BatchIndexProcessor::Finish(uint32 inDocCount)
 
 	int64 entryCount = mFullTextIndex.CountEntries(), entriesRead = 0;
 	
-	M6Progress progress(entryCount, "creating index");
+	M6Progress progress(entryCount, "index assembly");
 	
 	// the next loop is very *hot*, make sure it is optimized as much as possible.
 	// 

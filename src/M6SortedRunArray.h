@@ -33,40 +33,36 @@
 #include "M6File.h"
 #include "M6Queue.h"
 
-//template<class T>
-//class M6RunEntryWriter
-//{
-//  public:
-//	void		PrepareForWrite(const T* inValues, uint32 inCount) {}
-//	void		WriteSortedRun(M6OBitStream& inBits, const T* inValues, uint32 inCount)
-//					{ inFile.Write(inValues, sizeof(T) * inCount); }
-//};
-//
-//template<class T>
-//class M6RunEntryReader
-//{
-//  public:
-//				M6RunEntryReader(M6File& inFile, int64 inOffset)
-//					: mFile(inFile)
-//					, mOffset(inOffset) { }
-//
-//	void		ReadSortedRunEntry(T& inValue)		{ mFile.PRead(&inValue, sizeof(T), mOffset); mOffset += sizeof(T); }
-//
-//	M6File&		mFile;
-//	int64		mOffset;
-//};
+template<class T>
+class M6RunEntryWriter
+{
+  public:
+	void		PrepareForWrite(const T* inValues, uint32 inCount) {}
+	void		WriteSortedRun(M6File& inFile, const T* inValues, uint32 inCount)
+					{ inFile.Write(inValues, sizeof(T) * inCount); }
+};
+
+template<class T>
+class M6RunEntryReader
+{
+  public:
+				M6RunEntryReader(M6File& inFile, int64 inOffset)
+					: mFile(inFile)
+					, mOffset(inOffset) { }
+
+	void		ReadSortedRunEntry(T& inValue)		{ mFile.PRead(&inValue, sizeof(T), mOffset); mOffset += sizeof(T); }
+
+	M6File&		mFile;
+	int64		mOffset;
+};
 
 template
 <
 	class V,						// the value to store
-//	class C = std::greater<V>,		// comparator class, default is greater due to the way std::heap works
-//	uint32 N = 1000000,				// number of elements per buffer run, default is a million
-	class C,
-	uint32 N,
-	class W,
-	class R
-//	class W = M6RunEntryWriter<V>,	// IO helper classes
-//	class R = M6RunEntryReader<V>
+	class C = std::greater<V>,		// comparator class, default is greater due to the way std::heap works
+	uint32 N = 1000000,				// number of elements per buffer run, default is a million
+	class W = M6RunEntryWriter<V>,	// IO helper classes
+	class R = M6RunEntryReader<V>
 >
 class M6SortedRunArray
 {
@@ -118,11 +114,10 @@ class M6SortedRunArray
 					, mRun(nullptr)
 					, mRunCount(0)
 					, mComp(inCompare)
+					, mFlushThread(boost::bind(&M6SortedRunArray::FlushRunThread, this))
 					, mCount(0)
 					, mWriter(inWriter)
 				{
-					for (int i = 0; i < 4; ++i)
-						mFlushThreads.create_thread(boost::bind(&M6SortedRunArray::FlushRunThread, this)); 
 				}
 
 				~M6SortedRunArray()
@@ -202,7 +197,7 @@ class M6SortedRunArray
 					assert(mRunCount == 0);
 					FlushRun();
 
-					mFlushThreads.join_all();
+					mFlushThread.join();
 
 					return new iterator(mFile, mComp, mRuns);
 				}
@@ -236,27 +231,16 @@ class M6SortedRunArray
 						// stack space...
 						stable_sort(tri.run, tri.run + tri.run_count, mComp);
 						
-						M6OBitStream bits;
-						mWriter.WriteSortedRun(bits, tri.run, tri.run_count);
-						
-						boost::mutex::scoped_lock lock(mFileMutex);
-						
 						run_info ri;
 						ri.offset = mFile.Tell();
 						ri.count = tri.run_count;
 						mRuns.push_back(ri);
 						
-						bits.Sync();
-						mFile.Write(bits.Peek(), bits.Size());
-						
-//						mWriter.WriteSortedRun(mFile, tri.run, tri.run_count);
+						mWriter.WriteSortedRun(mFile, tri.run, tri.run_count);
 
 						delete[] tri.run;
 						tri.run = nullptr;
 					}
-
-					thread_run_info sentinel = {};
-					mFlushQueue.Put(sentinel);
 				}
 	
 	struct M6RunEntryIterator
@@ -289,8 +273,7 @@ class M6SortedRunArray
 	M6RunInfoList		mRuns;
 	compare_type		mComp;
 	M6ThreadRunQueue	mFlushQueue;
-	boost::thread_group	mFlushThreads;
-	boost::mutex		mFileMutex;
+	boost::thread		mFlushThread;
 	int64				mCount;
 	writer_type			mWriter;
 };

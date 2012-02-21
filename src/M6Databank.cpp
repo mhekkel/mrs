@@ -116,7 +116,7 @@ class M6FullTextIx
 							: mFirstDoc(0), mFullTextIndex(&inFullTextIndex) { }
 
 		void			PrepareForWrite(const BufferEntry* values, uint32 count);
-		void			WriteSortedRun(M6OBitStream& inBits, const BufferEntry* values, uint32 count);
+		void			WriteSortedRun(M6File& inFile, const BufferEntry* values, uint32 count);
 		
 		uint32			mFirstDoc;
 		M6FullTextIx*	mFullTextIndex;
@@ -281,9 +281,9 @@ void M6FullTextIx::BufferEntryWriter::PrepareForWrite(const BufferEntry* inValue
 	mFirstDoc = inValues[0].doc;
 }
 
-void M6FullTextIx::BufferEntryWriter::WriteSortedRun(M6OBitStream& inBits, const BufferEntry* inValues, uint32 inCount)
+void M6FullTextIx::BufferEntryWriter::WriteSortedRun(M6File& inFile, const BufferEntry* inValues, uint32 inCount)
 {
-//	M6OBitStream bits(inFile);
+	M6OBitStream bits(inFile);
 	
 	uint32 t = 0;
 	uint32 d = mFirstDoc;	// the first doc in this run
@@ -291,8 +291,8 @@ void M6FullTextIx::BufferEntryWriter::WriteSortedRun(M6OBitStream& inBits, const
 	
 	uint32 idlIxMap = mFullTextIndex->GetDocLocationIxMap();
 	
-	WriteGamma(inBits, mFirstDoc);
-	WriteBinary(inBits, 32, idlIxMap);
+	WriteGamma(bits, mFirstDoc);
+	WriteBinary(bits, 32, idlIxMap);
 
 	for (uint32 i = 0; i < inCount; ++i)
 	{
@@ -301,20 +301,20 @@ void M6FullTextIx::BufferEntryWriter::WriteSortedRun(M6OBitStream& inBits, const
 		if (inValues[i].term > t)
 			d = mFirstDoc;
 
-		WriteGamma(inBits, inValues[i].term - t + 1);
-		WriteGamma(inBits, inValues[i].doc - d + 1);
-		WriteGamma(inBits, inValues[i].ix + 1);
-		WriteBinary(inBits, kM6WeightBitCount, inValues[i].weight);
+		WriteGamma(bits, inValues[i].term - t + 1);
+		WriteGamma(bits, inValues[i].doc - d + 1);
+		WriteGamma(bits, inValues[i].ix + 1);
+		WriteBinary(bits, kM6WeightBitCount, inValues[i].weight);
 
 		if (idlIxMap & (1 << inValues[i].ix))
-			WriteBits(inBits, inValues[i].idl);
+			WriteBits(bits, inValues[i].idl);
 
 		t = inValues[i].term;
 		d = inValues[i].doc;
 		ix = inValues[i].ix;
 	}
 	
-	inBits.Sync();
+	bits.Sync();
 }
 
 M6FullTextIx::BufferEntryReader::BufferEntryReader(M6File& inFile, int64 inOffset)

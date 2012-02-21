@@ -19,6 +19,7 @@
 #include "M6Index.h"
 #include "M6Error.h"
 #include "M6BitStream.h"
+#include "M6Progress.h"
 
 using namespace std;
 
@@ -2736,12 +2737,14 @@ bool M6WeightedBasicIndex::Find(const string& inKey, M6WeightedIterator& outIter
 }
 
 void M6WeightedBasicIndex::CalculateDocumentWeights(uint32 inDocCount,
-	vector<float>& outWeights)
+	vector<float>& outWeights, M6Progress& inProgress)
 {
 	vector<uint32> docs;
 	float max = static_cast<float>(inDocCount);
 	
 	M6BasicPage* page = mImpl->GetFirstLeafPage();
+	uint32 cntr = 0;
+
 	while (page != nullptr)
 	{
 		typedef M6LeafPage<M6MultiData> M6LeafPageType;
@@ -2776,7 +2779,11 @@ void M6WeightedBasicIndex::CalculateDocumentWeights(uint32 inDocCount,
 
 				count -= static_cast<uint32>(docs.size());
 			}
+			
+			++cntr;
 		}
+		
+		inProgress.Progress(cntr);
 
 		uint32 link = page->GetLink();
 		if (link == 0)

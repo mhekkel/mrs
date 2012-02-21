@@ -1394,7 +1394,9 @@ void M6DatabankImpl::RecalculateDocumentWeights()
 	M6WeightedBasicIndex* ix = dynamic_cast<M6WeightedBasicIndex*>(mAllTextIndex.get());
 	if (ix == nullptr)
 		THROW(("Invalid index"));
-	ix->CalculateDocumentWeights(docCount, mDocWeights);
+	
+	M6Progress progress(ix->size(), "weight calculation");
+	ix->CalculateDocumentWeights(docCount, mDocWeights, progress);
 
 	M6File weightFile((mDbDirectory / "all-text.weights").string(), eReadWrite);
 	weightFile.Write(&mDocWeights[0], sizeof(float) * mDocWeights.size());

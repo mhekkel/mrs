@@ -13,6 +13,7 @@
 struct M6IndexImpl;
 class M6CompressedArray;
 union M6BitVector;
+class M6Progress;
 
 extern const uint32 kM6MaxKeyLength;
 
@@ -235,7 +236,8 @@ class M6WeightedBasicIndex : public M6BasicIndex
 	
 	void			Insert(const std::string& inKey, std::vector<std::pair<uint32,uint8>>& inDocuments);
 	bool			Find(const std::string& inKey, M6WeightedIterator& outIterator);
-	void			CalculateDocumentWeights(uint32 inDocCount, std::vector<float>& outWeights);
+	void			CalculateDocumentWeights(uint32 inDocCount, std::vector<float>& outWeights,
+						M6Progress& inProgress);
 };
 
 typedef M6Index<M6WeightedBasicIndex, M6BasicComparator>	M6SimpleWeightedIndex;

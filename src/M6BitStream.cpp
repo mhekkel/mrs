@@ -708,7 +708,7 @@ M6CompressedArray::const_iterator& M6CompressedArray::const_iterator::operator++
 // --------------------------------------------------------------------
 //	Array Routines
 
-void WriteArray(M6OBitStream& inBits, vector<uint32>& inArray)
+void WriteArray(M6OBitStream& inBits, const vector<uint32>& inArray)
 {
 	uint32 cnt = static_cast<uint32>(inArray.size());
 	WriteGamma(inBits, cnt);

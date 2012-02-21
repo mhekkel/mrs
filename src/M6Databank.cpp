@@ -267,11 +267,7 @@ void M6FullTextIx::FlushDoc(uint32 inDoc)
 			e.weight = 1;
 		
 		if (UsesInDocLocation(w->index))
-		{
-			DocLoc& loc = const_cast<DocLoc&>(w->loc);
-			assert(e.idl.BitSize() == 0);
-			WriteArray(e.idl, loc);
-		}
+			WriteArray(e.idl, w->loc);
 
 		mEntries.PushBack(e);
 	}
@@ -427,8 +423,11 @@ M6BasicIx::M6BasicIx(M6FullTextIx& inFullTextIndex, M6Lexicon& inLexicon,
 
 M6BasicIx::~M6BasicIx()
 {
-	mFlushQueue.Put(nullptr);
-	mFlushThread.join();
+	if (mFlushThread.joinable())	// left over?
+	{
+		mFlushQueue.Put(nullptr);
+		mFlushThread.join();
+	}
 }
 
 void M6BasicIx::AddWord(uint32 inWord)
@@ -454,7 +453,10 @@ void M6BasicIx::AddDocTerm(uint32 inDoc, uint32 inTerm, uint8 inFrequency, M6OBi
 		AddDocTerm(inDoc, inFrequency, inIDL);
 	}
 	else
+	{
 		mFlushQueue.Put(nullptr);
+		mFlushThread.join();
+	}
 }
 
 void M6BasicIx::AddDocTerm(uint32 inDoc, uint8 inFrequency, M6OBitStream& inIDL)

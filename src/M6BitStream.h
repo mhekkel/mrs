@@ -225,7 +225,7 @@ void CopyBits(M6OBitStream& inBits, const M6OBitStream& inValue);
 // The size of the array is stored inside the bitstream.
 
 void ReadArray(M6IBitStream& inBits, std::vector<uint32>& outArray);
-void WriteArray(M6OBitStream& inBits, std::vector<uint32>& inArray);
+void WriteArray(M6OBitStream& inBits, const std::vector<uint32>& inArray);
 
 // Lower level access to arrays, the CompressSimpleArraySelector
 // writes out the same array as WriteArray, but without the size.

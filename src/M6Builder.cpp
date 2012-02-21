@@ -799,6 +799,9 @@ void M6Processor::ProcessDocument()
 void M6Processor::Process(vector<fs::path>& inFiles, M6Progress& inProgress)
 {
 	uint32 nrOfThreads = boost::thread::hardware_concurrency();
+	if (nrOfThreads > 6)
+		nrOfThreads = 6;
+	
 	boost::thread_group fileThreads, docThreads;
 	
 	if (inFiles.size() >= nrOfThreads)

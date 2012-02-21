@@ -138,8 +138,8 @@ class M6FullTextIx
 	// variables affecting indexing speed and memory consumption.
 	// The value chosen here seems to be a reasonable tradeoff.
 	enum {
-		kBufferEntryCount = 800000
-//		kBufferEntryCount = 8000
+//		kBufferEntryCount = 800000
+		kBufferEntryCount = 8000
 	};
 	
 	typedef M6SortedRunArray

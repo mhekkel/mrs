@@ -29,6 +29,7 @@
 #include <vector>
 
 #include <boost/thread.hpp>
+#include <boost/filesystem/path.hpp>
 
 #include "M6File.h"
 #include "M6Queue.h"
@@ -46,9 +47,9 @@ template<class T>
 class M6RunEntryReader
 {
   public:
-				M6RunEntryReader(M6File& inFile, int64 inOffset)
+				M6RunEntryReader(M6File& inFile)
 					: mFile(inFile)
-					, mOffset(inOffset) { }
+					, mOffset(0) { }
 
 	void		ReadSortedRunEntry(T& inValue)		{ mFile.PRead(&inValue, sizeof(T), mOffset); mOffset += sizeof(T); }
 
@@ -67,30 +68,29 @@ template
 class M6SortedRunArray
 {
   public:
-
 	typedef V	value_type;
 	typedef C	compare_type;
 	typedef W	writer_type;
 	typedef R	reader_type;
 
   private:
-	struct run_info
+	struct M6RunInfo
 	{
 		uint32	count;
-		int64	offset;
+		M6File	file;
 	};
 	
-	typedef std::list<run_info>					M6RunInfoList;
+	typedef std::list<M6RunInfo>				M6RunInfoList;
 	struct M6RunEntryIterator;
 	typedef std::vector<M6RunEntryIterator*>	M6QueueType;
 	
-	struct thread_run_info
+	struct M6ThreadRunInfo
 	{
 		value_type*	run;
 		uint32		run_count;
 	};
 	
-	typedef M6Queue<thread_run_info,2>			M6ThreadRunQueue;
+	typedef M6Queue<M6ThreadRunInfo,8>			M6ThreadRunQueue;
 	
 	struct M6CompareRunEntry
 	{
@@ -109,15 +109,16 @@ class M6SortedRunArray
 	
   public:
 	
-				M6SortedRunArray(const std::string& inScratchFile, C inCompare = C(), W inWriter = W())
-					: mFile(inScratchFile, eReadWrite)
+				M6SortedRunArray(const boost::filesystem::path& inScratchFile, C inCompare = C(), W inWriter = W())
+					: mPath(inScratchFile)
 					, mRun(nullptr)
 					, mRunCount(0)
 					, mComp(inCompare)
-					, mFlushThread(boost::bind(&M6SortedRunArray::FlushRunThread, this))
 					, mCount(0)
 					, mWriter(inWriter)
 				{
+					for (int i = 0; i < 4; ++i)
+						mFlushThreads.create_thread(boost::bind(&M6SortedRunArray::FlushRunThread, this));
 				}
 
 				~M6SortedRunArray()
@@ -143,13 +144,12 @@ class M6SortedRunArray
 	class iterator
 	{
 	  public:
-					iterator(M6File& inFile, compare_type& inComp, M6RunInfoList& inRuns)
-						: mFile(inFile)
-						, mCompare(inComp)
+					iterator(compare_type& inComp, M6RunInfoList& inRuns)
+						: mCompare(inComp)
 					{
 						for (typename M6RunInfoList::iterator r = inRuns.begin(); r != inRuns.end(); ++r)
 						{
-							std::auto_ptr<M6RunEntryIterator> re(new M6RunEntryIterator(mFile, r->offset, r->count));
+							std::auto_ptr<M6RunEntryIterator> re(new M6RunEntryIterator(r->file, r->count));
 							if (re->Next())
 								mQueue.push_back(re.release());
 						}
@@ -183,7 +183,6 @@ class M6SortedRunArray
 					iterator(const iterator&);
 		iterator&	operator=(const iterator&);
 	
-		M6File&				mFile;
 		M6CompareRunEntry	mCompare;
 		M6QueueType			mQueue;
 	};
@@ -197,9 +196,9 @@ class M6SortedRunArray
 					assert(mRunCount == 0);
 					FlushRun();
 
-					mFlushThread.join();
+					mFlushThreads.join_all();
 
-					return new iterator(mFile, mComp, mRuns);
+					return new iterator(mComp, mRuns);
 				}
 
   private:
@@ -208,7 +207,7 @@ class M6SortedRunArray
 
 	void		FlushRun()
 				{
-					thread_run_info tri = { mRun, mRunCount };
+					M6ThreadRunInfo tri = { mRun, mRunCount };
 					
 					mFlushQueue.Put(tri);
 
@@ -220,7 +219,7 @@ class M6SortedRunArray
 				{
 					for (;;)
 					{
-						thread_run_info tri = mFlushQueue.Get();
+						M6ThreadRunInfo tri = mFlushQueue.Get();
 						
 						if (tri.run == nullptr)
 							break;
@@ -231,22 +230,24 @@ class M6SortedRunArray
 						// stack space...
 						stable_sort(tri.run, tri.run + tri.run_count, mComp);
 						
-						run_info ri;
-						ri.offset = mFile.Tell();
-						ri.count = tri.run_count;
-						mRuns.push_back(ri);
+						M6File file(mPath.parent_path() / (mPath.filename().string() + '.' + boost::lexical_cast<string>(mRuns.size())), eReadWrite);
+						mWriter.WriteSortedRun(file, tri.run, tri.run_count);
 						
-						mWriter.WriteSortedRun(mFile, tri.run, tri.run_count);
+						M6RunInfo ri = { tri.run_count, file };
+						mRuns.push_back(ri);
 
 						delete[] tri.run;
 						tri.run = nullptr;
 					}
+
+					M6ThreadRunInfo sentinel = {};
+					mFlushQueue.Put(sentinel);
 				}
 	
 	struct M6RunEntryIterator
 	{
-						M6RunEntryIterator(M6File& inFile, int64 inOffset, uint32 inCount)
-							: mReader(inFile, inOffset)
+						M6RunEntryIterator(M6File& inFile, uint32 inCount)
+							: mReader(inFile, 0)
 							, mCount(inCount) { }
 
 		bool			Next()
@@ -267,13 +268,14 @@ class M6SortedRunArray
 		uint32			mCount;
 	};
 
-	M6File				mFile;
+	boost::filesystem::path
+						mPath;
 	value_type*			mRun;
 	uint32				mRunCount;
 	M6RunInfoList		mRuns;
 	compare_type		mComp;
 	M6ThreadRunQueue	mFlushQueue;
-	boost::thread		mFlushThread;
+	boost::thread_group	mFlushThreads;
 	int64				mCount;
 	writer_type			mWriter;
 };

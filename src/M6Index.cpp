@@ -600,13 +600,10 @@ class M6BasicPage
 					M6BasicPage(M6IndexPageData* inData, uint32 inPageNr);
 	virtual			~M6BasicPage();
 	
-	void			ReleaseData()					{ mData = nullptr; }
-
 	void			Deallocate();
 	void			Flush(M6File& inFile);
 	
 	uint32			GetPageNr() const				{ return mPageNr; }
-	void			SetPageNr(uint32 inPageNr)		{ mPageNr = inPageNr; }
 	void			MoveTo(uint32 inPageNr);
 
 	virtual bool	IsDirty() const = 0;
@@ -693,8 +690,6 @@ struct M6IndexImpl
 
 	virtual M6BasicPage*	CreateLeafPage(M6IndexPageData* inData, uint32 inPageNr) = 0;
 	virtual M6BasicPage*	CreateBranchPage(M6IndexPageData* inData, uint32 inPageNr) = 0;
-
-	void			CopyBitVectorPages(fs::path inPath, vector<uint32>& outRemappedPageNrs);
 
 	fs::path		mPath;
 	M6File			mFile;
@@ -1706,6 +1701,8 @@ void M6IndexImpl::StoreBits(M6OBitStream& inBits, M6BitVector& outBitVector)
 
 void M6IndexImpl::InitCache(uint32 inCacheCount)
 {
+	assert(inCacheCount > mCacheCount);
+	
 	M6CachedPagePtr tmp = new M6CachedPage[inCacheCount];
 	
 	for (uint32 ix = 0; ix < inCacheCount; ++ix)
@@ -2155,9 +2152,6 @@ void M6IndexImplT<M6DataType>::Vacuum(M6Progress& inProgress)
 		int64 pageCount = fileSize / kM6IndexPageSize;
 		vector<uint32> remapped(pageCount, 0);
 			
-		// read the entire index in memory, why not?
-		InitCache(static_cast<uint32>(pageCount));
-		
 		{
 			M6File tmpFile(tmpPath, eReadWrite);
 			tmpFile.Truncate(0);
@@ -2341,7 +2335,7 @@ template<class M6DataType>
 M6BasicPage* M6IndexImplT<M6DataType>::CreateLeafPage(M6IndexPageData* inData, uint32 inPageNr)
 {
 	if (inData->leaf.mType != M6LeafPageType::M6DataPageType::kIndexPageType)
-		THROW(("Inconsistent page type"));
+		THROW(("Inconsistent page type, expected %c, found %c", M6LeafPageType::M6DataPageType::kIndexPageType, inData->leaf.mType));
 	return new M6LeafPageType(*this, inData, inPageNr);
 }
 
@@ -2349,7 +2343,7 @@ template<class M6DataType>
 M6BasicPage* M6IndexImplT<M6DataType>::CreateBranchPage(M6IndexPageData* inData, uint32 inPageNr)
 {
 	if (inData->leaf.mType != M6BranchPageType::M6DataPageType::kIndexPageType)
-		THROW(("Inconsistent page type"));
+		THROW(("Inconsistent page type, expected %c, found %c", M6BranchPageType::M6DataPageType::kIndexPageType, inData->leaf.mType));
 	return new M6BranchPageType(*this, inData, inPageNr);
 }
 

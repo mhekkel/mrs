@@ -2,6 +2,11 @@
 //
 //	TODO: - implement a way to recover deallocated pages
 //
+//
+//	This B+ tree implementation has tree variants. They differ in the
+//	data stored in the leaf pages, the branch pages are almost identical.
+//	The handling of the keys and data in a page is delegated to a separate
+//	class called M6DataAccess.
 
 #include "M6Lib.h"
 
@@ -56,21 +61,21 @@ struct M6IndexPageHeader
 	uint32			mLink;
 };
 
-#if DEBUG
-
-const int64
-//	kM6IndexPageSize		= 8192,
-	kM6IndexPageSize		= 512,
-	kM6IndexPageHeaderSize	= sizeof(M6IndexPageHeader),
-	kM6KeySpace				= kM6IndexPageSize - kM6IndexPageHeaderSize,
-	kM6MinKeySpace			= kM6KeySpace / 2,
-	kM6MaxEntriesPerPage	= 4;
-//	kM6MaxEntriesPerPage	= kM6KeySpace / 8;	// see above
-
-const uint32
-	kM6MaxKeyLength			= (kM6MinKeySpace / 2 > 255 ? 255 : kM6MinKeySpace / 2);
-
-#else
+//#if DEBUG
+//
+//const int64
+////	kM6IndexPageSize		= 8192,
+//	kM6IndexPageSize		= 512,
+//	kM6IndexPageHeaderSize	= sizeof(M6IndexPageHeader),
+//	kM6KeySpace				= kM6IndexPageSize - kM6IndexPageHeaderSize,
+//	kM6MinKeySpace			= kM6KeySpace / 2,
+//	kM6MaxEntriesPerPage	= 4;
+////	kM6MaxEntriesPerPage	= kM6KeySpace / 8;	// see above
+//
+//const uint32
+//	kM6MaxKeyLength			= (kM6MinKeySpace / 2 > 255 ? 255 : kM6MinKeySpace / 2);
+//
+//#else
 
 const int64
 	kM6IndexPageSize		= 8192,
@@ -82,7 +87,7 @@ const int64
 const uint32
 	kM6MaxKeyLength			= (kM6MinKeySpace / 2 > 255 ? 255 : kM6MinKeySpace / 2);
 
-#endif
+//#endif
 
 template<M6IndexPageKind>
 struct M6IndexPageDataTraits {};
@@ -98,6 +103,11 @@ struct M6IndexPageDataTraits<eM6IndexSimpleLeafPage>
 {
 	typedef uint32 M6DataElement;
 };
+
+// --------------------------------------------------------------------
+//	BitVector is a type used to store small compressed arrays inline
+//	and to contain pointers to as well as the leading bytes of larger
+//	arrays.
 
 const uint32
 	kM6BitVectorSize				= 20,
@@ -166,6 +176,10 @@ struct M6IndexPageDataTraits<eM6IndexMultiIDLLeafPage>
 	typedef M6MultiIDLData M6DataElement;
 };
 
+// --------------------------------------------------------------------
+//	Each page on disk has the following layout. It starts with a header
+//	which is the same for each, and then a combined keys/data area.
+
 template<M6IndexPageKind T>
 struct M6IndexPageDataT : public M6IndexPageHeader
 {
@@ -208,6 +222,10 @@ union M6IndexPageData
 };
 
 BOOST_STATIC_ASSERT(sizeof(M6IndexPageData) == kM6IndexPageSize);
+
+// --------------------------------------------------------------------
+//	As stated above, the manipulation of data in the page is delegated
+//	to a separate class.
 
 template<class M6PageData>
 class M6PageDataAccess
@@ -598,6 +616,7 @@ union M6IxFileHeaderPage
 BOOST_STATIC_ASSERT(sizeof(M6IxFileHeaderPage) == kM6IndexPageSize);
 
 // --------------------------------------------------------------------
+//	M6BasicPage is the base class for all page classes
 
 class M6BasicPage
 {
@@ -629,16 +648,12 @@ class M6BasicPage
 	M6BasicPage&	operator=(const M6BasicPage&);
 };
 
-template<class M6DataType>
-class M6IndexPage;
+// forward declarations for the four page types
 
-template<class M6DataType>
-class M6LeafPage;
-
-template<class M6DataType>
-class M6BranchPage;
-
-class M6IndexBitVectorPage;
+template<class M6DataType>	class M6IndexPage;
+template<class M6DataType>	class M6LeafPage;
+template<class M6DataType>	class M6BranchPage;
+							class M6IndexBitVectorPage;
 
 // --------------------------------------------------------------------
 
@@ -678,7 +693,6 @@ struct M6IndexImpl
 	virtual void	Dump() = 0;
 
 	void			SetAutoCommit(bool inAutoCommit);
-	void			SetBatchMode(bool inBatchMode);
 
 	virtual void	Commit() = 0;
 	virtual void	Rollback() = 0;
@@ -705,8 +719,6 @@ struct M6IndexImpl
 	M6IxFileHeader	mHeader;
 	bool			mAutoCommit;
 	bool			mDirty;
-	boost::thread::id
-					mBatchThreadID;
 
 	// cache
 
@@ -739,19 +751,11 @@ class M6IndexImplT : public M6IndexImpl
   public:
 	//typedef typename M6BasicIndex::iterator	iterator;
 	
-	typedef M6IndexPage<M6DataType>			M6IndexPageType;
-	typedef M6LeafPage<M6DataType>			M6LeafPageType;
-	typedef M6BranchPage<M6DataType>		M6BranchPageType;
-
-	typedef M6IndexPageType*				M6IndexPagePtr;
-	typedef M6LeafPageType*					M6LeafPagePtr;
-	typedef M6BranchPageType*				M6BranchPagePtr;
-
-	typedef boost::function<bool(string& outKey, M6DataType& outData)> M6SortedInputIterator;
+	typedef M6IndexPage<M6DataType>			M6IndexPage;
+	typedef M6LeafPage<M6DataType>			M6LeafPage;
+	typedef M6BranchPage<M6DataType>		M6BranchPage;
 
 					M6IndexImplT(M6BasicIndex& inIndex, const fs::path& inPath, MOpenMode inMode);
-					M6IndexImplT(M6BasicIndex& inIndex, const fs::path& inPath,
-						M6SortedInputIterator inData, const vector<uint32>& inRemappedBitPageNrs);
 	virtual 		~M6IndexImplT();
 
 	virtual void	Insert(const string& inKey, const M6DataType& inValue);
@@ -806,34 +810,15 @@ void M6BasicPage::Flush(M6File& inFile)
 	}
 }
 
-//void M6BasicPage::MoveTo(uint32 inPageNr)
-//{
-//	if (inPageNr != mPageNr)
-//	{
-//#pragma message("TODO: fix this")
-//		assert(false);
-//		//M6BasicPage* page(mIndex.Load<M6BasicPage>(inPageNr));
-//
-//		//page->mPageNr = mPageNr;
-//		////if (page->IsLeaf())	// only save page if it is a leaf
-//		//	page->mDirty = true;
-//		//
-//		//mPageNr = inPageNr;
-//		//mDirty = true;
-//		//
-//		//mIndex.Release(page);
-//	}
-//}
-
 // --------------------------------------------------------------------
 
 template<class M6DataType>
 class M6IndexPage : public M6BasicPage
 {
   public:
-//	typedef M6IndexPage<M6DataType>													M6IndexPage;
-	typedef M6LeafPage<M6DataType>													M6LeafPage;
-	typedef M6BranchPage<M6DataType>												M6BranchPage;
+//	typedef M6IndexPage<M6DataType>		M6IndexPage;
+	typedef M6LeafPage<M6DataType>		M6LeafPage;
+	typedef M6BranchPage<M6DataType>	M6BranchPage;
 
 						M6IndexPage(M6IndexPageData* inData, uint32 inPageNr)
 							: M6BasicPage(inData, inPageNr) {}
@@ -854,9 +839,9 @@ template<class M6DataType>
 class M6LeafPage : public M6IndexPage<M6DataType>
 {
   public:
-	typedef ::M6IndexPage<M6DataType>												M6IndexPage;
-//	typedef ::M6LeafPage<M6DataType>												M6LeafPage;
-	typedef ::M6BranchPage<M6DataType>												M6BranchPage;
+	typedef ::M6IndexPage<M6DataType>	M6IndexPage;
+//	typedef ::M6LeafPage<M6DataType>	M6LeafPage;
+	typedef ::M6BranchPage<M6DataType>	M6BranchPage;
 
 	typedef typename M6IndexPageDataTypeFactory<M6DataType>::M6LeafPageDataType		M6DataPageType;
 	typedef M6PageDataAccess<M6DataPageType>										M6Access;
@@ -1952,14 +1937,6 @@ void M6IndexImpl::SetAutoCommit(bool inAutoCommit)
 	}
 }
 
-void M6IndexImpl::SetBatchMode(bool inBatchMode)
-{
-	if (inBatchMode)
-		mBatchThreadID = boost::this_thread::get_id();
-	else
-		mBatchThreadID = boost::thread::id();
-}
-
 // --------------------------------------------------------------------
 
 template<class M6DataType>
@@ -1986,64 +1963,6 @@ void M6IndexImplT<M6MultiIDLData>::Remap(M6MultiIDLData& ioData, const vector<ui
 {
 	if (ioData.mBitVector.mType == eM6OnDiskBitVector)
 		ioData.mBitVector.mPage = inRemappedBitPageNrs[ioData.mBitVector.mPage];
-}
-
-template<class M6DataType>
-M6IndexImplT<M6DataType>::M6IndexImplT(M6BasicIndex& inIndex, const fs::path& inPath,
-		M6SortedInputIterator inData, const vector<uint32>& inRemappedBitPageNrs)
-	: M6IndexImpl(inIndex, inPath, eReadWrite)
-{
-	typedef M6LeafPage<M6DataType> M6LeafPage;
-
-	InitCache(kM6CacheCount);
-
-	string last;
-	
-	try
-	{
-		// inData is sorted, so we start by writing out leaf pages:
-		M6LeafPage* page(Allocate<M6LeafPage>());
-		
-		deque<pair<string,uint32>> up;		// keep track of the nodes we have to create for the next levels
-		
-		up.push_back(make_pair("", page->GetPageNr()));
-		
-		string key;
-		M6DataType data;
-		while (inData(key, data))
-		{
-			Remap(data, inRemappedBitPageNrs);
-			
-			// sanity check
-			if (CompareKeys(last, key) >= 0)
-				THROW(("Trying to build index from unsorted data"));
-			
-			if (not page->CanStore(key))
-			{
-				M6LeafPage* next(Allocate<M6LeafPage>());
-				page->SetLink(next->GetPageNr());
-				Release(page);
-				page = next;
-	
-				up.push_back(make_pair(key, page->GetPageNr()));
-			}
-			
-			page->InsertKeyValue(key, data, page->GetN());
-			++mHeader.mSize;
-		}
-		
-		Release(page);
-		
-		// all data is written in the leafs, now construct branch pages
-		CreateUpLevels(up);
-	}
-	catch (...)
-	{
-		Rollback();
-		throw;
-	}
-
-	Commit();
 }
 
 template<class M6DataType>
@@ -2080,25 +1999,17 @@ void M6IndexImplT<M6DataType>::Rollback()
 template<class M6DataType>
 void M6IndexImplT<M6DataType>::Insert(const string& inKey, const M6DataType& inValue)
 {
-	if (mBatchThreadID != boost::thread::id() and boost::this_thread::get_id() != mBatchThreadID)
-	{
-		cerr << "calling thread = " << boost::this_thread::get_id() << endl
-			 << "owning thread = " << mBatchThreadID << endl;
-
-		THROW(("Index::Insert called from wrong thread (%s)", mPath.filename().c_str()));
-	}
-	
 	try
 	{
 		if (mHeader.mRoot == 0)	// empty index?
 		{
-			M6IndexPagePtr root(Allocate<M6LeafPageType>());
+			M6IndexPage* root(Allocate<M6LeafPage>());
 			mHeader.mRoot = mHeader.mFirstLeafPage = root->GetPageNr();
 			mHeader.mDepth = 1;
 			Release(root);
 		}
 		
-		M6IndexPagePtr root(Load<M6IndexPageType>(mHeader.mRoot));
+		M6IndexPage* root(Load<M6IndexPage>(mHeader.mRoot));
 		
 		string key(inKey);
 		uint32 link;
@@ -2108,7 +2019,7 @@ void M6IndexImplT<M6DataType>::Insert(const string& inKey, const M6DataType& inV
 			// increase depth
 			++mHeader.mDepth;
 			
-			M6BranchPagePtr newRoot(Allocate<M6BranchPageType>());
+			M6BranchPage* newRoot(Allocate<M6BranchPage>());
 			newRoot->SetLink(mHeader.mRoot);
 			newRoot->InsertKeyValue(key, link, 0);
 			mHeader.mRoot = newRoot->GetPageNr();
@@ -2149,7 +2060,7 @@ bool M6IndexImplT<M6DataType>::Erase(const string& inKey)
 	
 	try
 	{
-		M6IndexPagePtr root(Load<M6IndexPageType>(mHeader.mRoot));
+		M6IndexPage* root(Load<M6IndexPage>(mHeader.mRoot));
 		
 		string key(inKey);
 	
@@ -2191,7 +2102,7 @@ bool M6IndexImplT<M6DataType>::Find(const string& inKey, M6DataType& outValue)
 	bool result = false;
 	if (mHeader.mRoot != 0)
 	{
-		M6IndexPagePtr root(Load<M6IndexPageType>(mHeader.mRoot));
+		M6IndexPage* root(Load<M6IndexPage>(mHeader.mRoot));
 		result = root->Find(inKey, outValue);
 		Release(root);
 	}
@@ -2255,14 +2166,14 @@ void M6IndexImplT<M6DataType>::Vacuum(M6Progress& inProgress)
 			pageNr = n;
 		}
 
-		M6LeafPageType* page = Load<M6LeafPageType>(pageNr);
+		M6LeafPage* page = Load<M6LeafPage>(pageNr);
 
 		up.push_back(make_pair(page->GetKey(0), pageNr));
 		uint32 link = page->GetLink();
 		
 		while (link != 0)
 		{
-			M6LeafPageType* next = Load<M6LeafPageType>(ix1[link]);
+			M6LeafPage* next = Load<M6LeafPage>(ix1[link]);
 			if (next->GetN() == 0)
 			{
 				link = next->GetLink();
@@ -2299,6 +2210,8 @@ void M6IndexImplT<M6DataType>::Vacuum(M6Progress& inProgress)
 		else
 			page->SetLink(n);
 		
+		inProgress.Consumed(page->GetN());
+		
 		Release(page);
 	}
 	
@@ -2312,15 +2225,13 @@ M6BasicPage* M6IndexImplT<M6DataType>::GetFirstLeafPage()
 {
 	M6BasicPage* result = nullptr;
 	if (mHeader.mFirstLeafPage != 0)
-		result = Load<M6LeafPageType>(mHeader.mFirstLeafPage);
+		result = Load<M6LeafPage>(mHeader.mFirstLeafPage);
 	return result;
 }
 
 template<class M6DataType>
 void M6IndexImplT<M6DataType>::CreateUpLevels(deque<pair<string,uint32>>& up)
 {
-	typedef M6BranchPage<M6DataType> M6BranchPage;
-
 	mHeader.mDepth = 1;
 	while (up.size() > 1)
 	{
@@ -2395,17 +2306,17 @@ void M6IndexImplT<M6DataType>::CreateUpLevels(deque<pair<string,uint32>>& up)
 template<class M6DataType>
 M6BasicPage* M6IndexImplT<M6DataType>::CreateLeafPage(M6IndexPageData* inData, uint32 inPageNr)
 {
-	if (inData->leaf.mType != M6LeafPageType::M6DataPageType::kIndexPageType)
-		THROW(("Inconsistent page type, expected %c, found %c", M6LeafPageType::M6DataPageType::kIndexPageType, inData->leaf.mType));
-	return new M6LeafPageType(*this, inData, inPageNr);
+	if (inData->leaf.mType != M6LeafPage::M6DataPageType::kIndexPageType)
+		THROW(("Inconsistent page type, expected %c, found %c", M6LeafPage::M6DataPageType::kIndexPageType, inData->leaf.mType));
+	return new M6LeafPage(*this, inData, inPageNr);
 }
 
 template<class M6DataType>
 M6BasicPage* M6IndexImplT<M6DataType>::CreateBranchPage(M6IndexPageData* inData, uint32 inPageNr)
 {
-	if (inData->leaf.mType != M6BranchPageType::M6DataPageType::kIndexPageType)
-		THROW(("Inconsistent page type, expected %c, found %c", M6BranchPageType::M6DataPageType::kIndexPageType, inData->leaf.mType));
-	return new M6BranchPageType(*this, inData, inPageNr);
+	if (inData->leaf.mType != M6BranchPage::M6DataPageType::kIndexPageType)
+		THROW(("Inconsistent page type, expected %c, found %c", M6BranchPage::M6DataPageType::kIndexPageType, inData->leaf.mType));
+	return new M6BranchPage(*this, inData, inPageNr);
 }
 
 template<class M6DataType>
@@ -2415,7 +2326,7 @@ void M6IndexImplT<M6DataType>::Validate()
 	{
 		if (mHeader.mRoot != 0)
 		{
-			M6IndexPagePtr root(Load<M6IndexPageType>(mHeader.mRoot));
+			M6IndexPage* root(Load<M6IndexPage>(mHeader.mRoot));
 			root->Validate("", nullptr);
 			Release(root);
 		}
@@ -2439,7 +2350,7 @@ void M6IndexImplT<M6DataType>::Dump()
 		 << "Dumping tree" << endl
 		 << endl;
 
-	M6IndexPagePtr root(Load<M6IndexPageType>(mHeader.mRoot));
+	M6IndexPage* root(Load<M6IndexPage>(mHeader.mRoot));
 	root->Dump(0, nullptr);
 	Release(root);
 }
@@ -2451,7 +2362,7 @@ void M6IndexImplT<M6DataType>::Dump()
 //	uint32 pageNr = mHeader.mRoot;
 //	for (;;)
 //	{
-//		M6IndexPagePtr page(Load<M6IndexPage>(pageNr));
+//		M6IndexPage* page(Load<M6IndexPage>(pageNr));
 //		if (page->IsLeaf())
 //			break;
 //		pageNr = page->GetLink();
@@ -2489,7 +2400,7 @@ void M6IndexImplT<M6DataType>::Dump()
 //{
 //	if (mIndex != nullptr)
 //	{
-//		M6IndexPagePtr page(mIndex->Load<M6IndexPage>(mPage));
+//		M6IndexPage* page(mIndex->Load<M6IndexPage>(mPage));
 //		page->GetKeyValue(mKeyNr, mCurrent.key, mCurrent.value);
 //	}
 //}
@@ -2509,7 +2420,7 @@ void M6IndexImplT<M6DataType>::Dump()
 //
 //M6BasicIndex::iterator& M6BasicIndex::iterator::operator++()
 //{
-//	M6IndexPagePtr page(mIndex->Load<M6IndexPage>(mPage));
+//	M6IndexPage* page(mIndex->Load<M6IndexPage>(mPage));
 //	if (not page->GetNext(mPage, mKeyNr, mCurrent))
 //	{
 //		mIndex = nullptr;
@@ -2527,11 +2438,6 @@ M6BasicIndex::M6BasicIndex(const fs::path& inPath, MOpenMode inMode)
 	: mImpl(new M6IndexImplT<uint32>(*this, inPath, inMode))
 {
 }
-
-//M6BasicIndex::M6BasicIndex(const fs::path& inPath, M6SortedInputIterator& inData)
-//	: mImpl(new M6IndexImplT<uint32>(*this, inPath, inData))
-//{
-//}
 
 M6BasicIndex::M6BasicIndex(M6IndexImpl* inImpl)
 	: mImpl(inImpl)
@@ -2599,11 +2505,6 @@ void M6BasicIndex::Rollback()
 void M6BasicIndex::SetAutoCommit(bool inAutoCommit)
 {
 	mImpl->SetAutoCommit(inAutoCommit);
-}
-
-void M6BasicIndex::SetBatchMode(bool inBatchMode)
-{
-	mImpl->SetBatchMode(inBatchMode);
 }
 
 // DEBUG code
@@ -2823,6 +2724,8 @@ bool M6WeightedBasicIndex::Find(const string& inKey, M6WeightedIterator& outIter
 void M6WeightedBasicIndex::CalculateDocumentWeights(uint32 inDocCount,
 	vector<float>& outWeights, M6Progress& inProgress)
 {
+	typedef M6LeafPage<M6MultiData> M6LeafPage;
+	
 	vector<uint32> docs;
 	float max = static_cast<float>(inDocCount);
 	
@@ -2831,8 +2734,7 @@ void M6WeightedBasicIndex::CalculateDocumentWeights(uint32 inDocCount,
 
 	while (page != nullptr)
 	{
-		typedef M6LeafPage<M6MultiData> M6LeafPageType;
-		M6LeafPageType* leaf = dynamic_cast<M6LeafPageType*>(page);
+		M6LeafPage* leaf = dynamic_cast<M6LeafPage*>(page);
 		if (leaf == nullptr)
 			THROW(("invalid index"));
 		

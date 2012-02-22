@@ -100,9 +100,6 @@ template<class INDEX, class COMPARATOR> class M6Index : public INDEX
 					M6Index(const boost::filesystem::path& inPath, MOpenMode inMode)
 						: INDEX(inPath, inMode) {}
 
-//					M6Index(const boost::filesystem::path& inPath, M6SortedInputIterator& inData)
-//						: INDEX(inPath, inData) {}
-
 	virtual int		CompareKeys(const char* inKeyA, size_t inKeyLengthA,
 								const char* inKeyB, size_t inKeyLengthB) const
 						{ return mComparator(inKeyA, inKeyLengthA, inKeyB, inKeyLengthB); }

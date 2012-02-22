@@ -517,6 +517,7 @@ void M6BasicIx::FlushTerm(uint32 inTerm, uint32 inDocCount)
 
 void M6BasicIx::FlushThread()
 {
+	mIndex->SetBatchMode(true);
 	for (;;)
 	{
 		FlushedTerm* term = mFlushQueue.Get();
@@ -524,6 +525,7 @@ void M6BasicIx::FlushThread()
 			break;
 		FlushTerm(term);
 	}
+	mIndex->SetBatchMode(false);
 }
 
 void M6BasicIx::FlushTerm(FlushedTerm* inTermData)

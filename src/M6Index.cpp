@@ -16,6 +16,7 @@
 #include <boost/foreach.hpp>
 #define foreach BOOST_FOREACH
 #include <boost/filesystem/operations.hpp>
+#include <boost/thread.hpp>
 
 #include "M6Index.h"
 #include "M6Error.h"
@@ -669,6 +670,7 @@ struct M6IndexImpl
 	virtual void	Dump() = 0;
 
 	void			SetAutoCommit(bool inAutoCommit);
+	void			SetBatchMode(bool inBatchMode);
 
 	virtual void	Commit() = 0;
 	virtual void	Rollback() = 0;
@@ -700,6 +702,8 @@ struct M6IndexImpl
 	M6IxFileHeader	mHeader;
 	bool			mAutoCommit;
 	bool			mDirty;
+	boost::thread::id
+					mBatchThreadID;
 
 	// cache
 
@@ -1890,6 +1894,14 @@ void M6IndexImpl::SetAutoCommit(bool inAutoCommit)
 	}
 }
 
+void M6IndexImpl::SetBatchMode(bool inBatchMode)
+{
+	if (inBatchMode)
+		mBatchThreadID = boost::this_thread::get_id();
+	else
+		mBatchThreadID = boost::thread::id();
+}
+
 // --------------------------------------------------------------------
 
 template<class M6DataType>
@@ -2014,6 +2026,14 @@ void M6IndexImplT<M6DataType>::Rollback()
 template<class M6DataType>
 void M6IndexImplT<M6DataType>::Insert(const string& inKey, const M6DataType& inValue)
 {
+	if (mBatchThreadID != boost::thread::id() and boost::this_thread::get_id() != mBatchThreadID)
+	{
+		cerr << "calling thread = " << boost::this_thread::get_id() << endl
+			 << "owning thread = " << mBatchThreadID << endl;
+
+		THROW(("Index::Insert called from wrong thread (%s)", mPath.filename().c_str()));
+	}
+	
 	try
 	{
 		if (mHeader.mRoot == 0)	// empty index?
@@ -2524,6 +2544,11 @@ void M6BasicIndex::Rollback()
 void M6BasicIndex::SetAutoCommit(bool inAutoCommit)
 {
 	mImpl->SetAutoCommit(inAutoCommit);
+}
+
+void M6BasicIndex::SetBatchMode(bool inBatchMode)
+{
+	mImpl->SetBatchMode(inBatchMode);
 }
 
 // DEBUG code

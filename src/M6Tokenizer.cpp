@@ -330,11 +330,13 @@ uint32 M6Tokenizer::GetNextCharacter()
 inline void M6Tokenizer::Retract()
 {
 	// skip one valid character back in the input mBuffer
-	while (mPtr > mBuffer + mBuffer)
+	if (mPtr > mBuffer + mBufferSize)
 		--mToken, --mPtr;
-	
-	do --mToken; while (mToken > mTokenText and (*mToken & 0x0c0) == 0x080);
-	do --mPtr; while (mPtr > mBuffer and (*mPtr & 0x0c0) == 0x080);
+	else
+	{
+		do --mToken; while (mToken > mTokenText and (*mToken & 0x0c0) == 0x080);
+		do --mPtr; while (mPtr > mBuffer and (*mPtr & 0x0c0) == 0x080);
+	}
 }
 
 int M6Tokenizer::Restart(int inStart)

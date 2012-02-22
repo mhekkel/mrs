@@ -112,7 +112,7 @@ class M6FullTextIx
 	void			AddWord(uint8 inIndex, uint32 inWord);
 	void			FlushDoc(uint32 inDocNr);
 
-		struct BufferEntry
+	struct BufferEntry
 	{
 		M6OBitStream	idl;
 		uint8			ix;
@@ -1405,6 +1405,7 @@ void M6DatabankImpl::CommitBatchImport()
 	// And clean up
 	fs::remove_all(mDbDirectory / "tmp");
 
+	Vacuum();
 	RecalculateDocumentWeights();
 }
 
@@ -1420,7 +1421,7 @@ void M6DatabankImpl::RecalculateDocumentWeights()
 	if (ix == nullptr)
 		THROW(("Invalid index"));
 	
-	M6Progress progress(ix->size(), "weight calculation");
+	M6Progress progress(ix->size(), "calculating weights");
 	ix->CalculateDocumentWeights(docCount, mDocWeights, progress);
 
 	M6File weightFile((mDbDirectory / "all-text.weights").string(), eReadWrite);
@@ -1429,11 +1430,17 @@ void M6DatabankImpl::RecalculateDocumentWeights()
 
 void M6DatabankImpl::Vacuum()
 {
-	M6Progress progress(mAllTextIndex->size(), "vacuum");
-	mAllTextIndex->Vacuum(progress);
+	int64 size = mAllTextIndex->size();
+	
+	foreach (M6IndexDesc& desc, mIndices)
+		size += desc.mIndex->size();
+	
+	M6Progress progress(size + 1, "vacuuming");
 
-//	foreach (M6IndexDesc& desc, mIndices)
-//		desc.mIndex->Vacuum();
+	mAllTextIndex->Vacuum(progress);
+	foreach (M6IndexDesc& desc, mIndices)
+		desc.mIndex->Vacuum(progress);
+	progress.Consumed(1);
 }
 
 void M6DatabankImpl::Validate()

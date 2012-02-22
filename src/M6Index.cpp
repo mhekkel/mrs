@@ -649,6 +649,14 @@ struct M6IndexImpl
 	//iterator		Begin();
 	//iterator		End();
 
+	virtual void	Insert(const string& inKey, const uint32& inValue)				{ THROW(("Incorrect use of index")); }
+	virtual void	Insert(const string& inKey, const M6MultiData& inValue)			{ THROW(("Incorrect use of index")); }
+	virtual void	Insert(const string& inKey, const M6MultiIDLData& inValue)		{ THROW(("Incorrect use of index")); }
+	virtual bool	Erase(const string& inKey) = 0;
+	virtual bool	Find(const string& inKey, uint32& outValue)						{ THROW(("Incorrect use of index")); }
+	virtual bool	Find(const string& inKey, M6MultiData& outValue)				{ THROW(("Incorrect use of index")); }
+	virtual bool	Find(const string& inKey, M6MultiIDLData& outValue)				{ THROW(("Incorrect use of index")); }
+
 	uint32			Size() const				{ return mHeader.mSize; }
 	uint32			Depth() const				{ return mHeader.mDepth; }
 	
@@ -731,7 +739,7 @@ class M6IndexImplT : public M6IndexImpl
 	
 	typedef M6IndexPage<M6DataType>			M6IndexPageType;
 	typedef M6LeafPage<M6DataType>			M6LeafPageType;
-	typedef M6BranchPage<M6DataType>	M6BranchPageType;
+	typedef M6BranchPage<M6DataType>		M6BranchPageType;
 
 	typedef M6IndexPageType*				M6IndexPagePtr;
 	typedef M6LeafPageType*					M6LeafPagePtr;
@@ -744,9 +752,9 @@ class M6IndexImplT : public M6IndexImpl
 						M6SortedInputIterator inData, const vector<uint32>& inRemappedBitPageNrs);
 	virtual 		~M6IndexImplT();
 
-	void			Insert(const string& inKey, const M6DataType& inValue);
-	bool			Erase(const string& inKey);
-	bool			Find(const string& inKey, M6DataType& outValue);
+	virtual void	Insert(const string& inKey, const M6DataType& inValue);
+	virtual bool	Erase(const string& inKey);
+	virtual bool	Find(const string& inKey, M6DataType& outValue);
 
 	void			Remap(M6DataType& ioData, const vector<uint32>& inRemappedBitPageNrs);
 
@@ -2504,17 +2512,17 @@ void M6BasicIndex::Insert(const string& key, uint32 value)
 	if (key.length() >= kM6MaxKeyLength)
 		THROW(("Invalid key length"));
 
-	static_cast<M6IndexImplT<uint32>*>(mImpl)->Insert(key, value);
+	mImpl->Insert(key, value);
 }
 
 void M6BasicIndex::Erase(const string& key)
 {
-	static_cast<M6IndexImplT<uint32>*>(mImpl)->Erase(key);
+	mImpl->Erase(key);
 }
 
 bool M6BasicIndex::Find(const string& inKey, uint32& outValue)
 {
-	return static_cast<M6IndexImplT<uint32>*>(mImpl)->Find(inKey, outValue);
+	return mImpl->Find(inKey, outValue);
 }
 
 uint32 M6BasicIndex::size() const
@@ -2595,14 +2603,14 @@ void M6MultiBasicIndex::Insert(const string& inKey, const vector<uint32>& inDocu
 	CompressSimpleArraySelector(bits, inDocuments);
 	mImpl->StoreBits(bits, data.mBitVector);
 	
-	static_cast<M6IndexImplT<M6MultiData>*>(mImpl)->Insert(inKey, data);
+	mImpl->Insert(inKey, data);
 }
 
 bool M6MultiBasicIndex::Find(const string& inKey, M6CompressedArray& outDocuments)
 {
 	bool result = false;
 	M6MultiData data;
-	if (static_cast<M6IndexImplT<M6MultiData>*>(mImpl)->Find(inKey, data))
+	if (mImpl->Find(inKey, data))
 	{
 		M6IBitStream bits(new M6IBitVectorImpl(*mImpl, data.mBitVector));
 		outDocuments = M6CompressedArray(bits, data.mCount);
@@ -2627,7 +2635,7 @@ void M6MultiIDLBasicIndex::Insert(const string& inKey, int64 inIDLOffset, const 
 	CompressSimpleArraySelector(bits, inDocuments);
 	mImpl->StoreBits(bits, data.mBitVector);
 
-	static_cast<M6IndexImplT<M6MultiIDLData>*>(mImpl)->Insert(inKey, data);
+	mImpl->Insert(inKey, data);
 }
 
 bool M6MultiIDLBasicIndex::Find(const string& inKey, M6CompressedArray& outDocuments, int64& outIDLOffset)
@@ -2684,7 +2692,7 @@ void M6WeightedBasicIndex::Insert(const string& inKey, vector<pair<uint32,uint8>
 
 	mImpl->StoreBits(bits, data.mBitVector);
 
-	static_cast<M6IndexImplT<M6MultiData>*>(mImpl)->Insert(inKey, data);
+	mImpl->Insert(inKey, data);
 }
 
 M6WeightedBasicIndex::M6WeightedIterator::M6WeightedIterator()
@@ -2753,7 +2761,7 @@ bool M6WeightedBasicIndex::Find(const string& inKey, M6WeightedIterator& outIter
 {
 	bool result = false;
 	M6MultiData data;
-	if (static_cast<M6IndexImplT<M6MultiData>*>(mImpl)->Find(inKey, data))
+	if (mImpl->Find(inKey, data))
 	{
 		outIterator = M6WeightedIterator(*mImpl, data.mBitVector, data.mCount);
 		result = true;

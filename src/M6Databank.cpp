@@ -53,8 +53,8 @@ class M6DatabankImpl
 	
 	M6DocStore&		GetDocStore()						{ return *mStore; }
 	
-	M6BasicIndexPtr	GetIndex(const string& inName);
-	M6BasicIndexPtr	CreateIndex(const string& inName, M6IndexType inType, bool inUnique = false);
+	M6BasicIndexPtr	GetIndex(const string& inName, M6IndexType inType, bool inUnique);
+	M6BasicIndexPtr	CreateIndex(const string& inName, M6IndexType inType, bool inUnique);
 	M6BasicIndexPtr	GetAllTextIndex()					{ return mAllTextIndex; }
 	
 	fs::path		GetScratchDir() const				{ return mDbDirectory / "tmp"; }
@@ -71,11 +71,13 @@ class M6DatabankImpl
 
 	struct M6IndexDesc
 	{
-							M6IndexDesc(const string& inName, M6BasicIndexPtr inIndex)
-								: mName(inName), mIndex(inIndex) {}
+							M6IndexDesc(const string& inName, M6BasicIndexPtr inIndex, M6IndexType inType, bool inUnique)
+								: mName(inName), mIndex(inIndex), mType(inType), mUnique(inUnique) {}
 
 		string				mName;
 		M6BasicIndexPtr		mIndex;
+		M6IndexType			mType;
+		bool				mUnique;
 	};
 	typedef vector<M6IndexDesc>	M6IndexDescList;
 	
@@ -855,12 +857,22 @@ class M6BatchIndexProcessor
   private:
 
 	template<class T>
-	M6BasicIx*	GetIndexBase(const string& inName, M6IndexType inType);
+	M6BasicIx*	GetIndexBase(const string& inName, M6IndexType inType, bool inUnique);
 
 	M6FullTextIx		mFullTextIndex;
 	M6DatabankImpl&		mDatabank;
 	M6Lexicon&			mLexicon;
-	vector<M6BasicIx*>	mIndices;
+	
+	struct M6BasicIxDesc
+	{
+		M6BasicIx*		mBasicIx;
+		string			mName;
+		M6IndexType		mType;
+		bool			mUnique;
+	};
+	typedef vector<M6BasicIxDesc>	M6BasicIxDescList;
+	
+	M6BasicIxDescList	mIndices;
 };
 
 M6BatchIndexProcessor::M6BatchIndexProcessor(M6DatabankImpl& inDatabank, M6Lexicon& inLexicon)
@@ -872,28 +884,39 @@ M6BatchIndexProcessor::M6BatchIndexProcessor(M6DatabankImpl& inDatabank, M6Lexic
 
 M6BatchIndexProcessor::~M6BatchIndexProcessor()
 {
-	foreach (M6BasicIx* ix, mIndices)
-		delete ix;
+	foreach (M6BasicIxDesc& ix, mIndices)
+		delete ix.mBasicIx;
 }
 
 template<class T>
-M6BasicIx* M6BatchIndexProcessor::GetIndexBase(const string& inName, M6IndexType inType)
+M6BasicIx* M6BatchIndexProcessor::GetIndexBase(const string& inName, M6IndexType inType, bool inUnique)
 {
-	vector<M6BasicIx*>::iterator ix = find_if(mIndices.begin(), mIndices.end(),
-		boost::bind(&M6BasicIx::GetName, _1) == inName);
-	
-	if (ix == mIndices.end())
+	T* result = nullptr;
+	foreach (M6BasicIxDesc& ix, mIndices)
 	{
-		M6BasicIndexPtr index = mDatabank.CreateIndex(inName, inType);
+		if (inName == ix.mName)
+		{
+			if (inType != ix.mType or inUnique != ix.mUnique)
+				THROW(("Inconsistent use of indices (%s)", inName.c_str()));
+			result = dynamic_cast<T*>(ix.mBasicIx);
+			break;
+		}
+	}
+	
+	if (result == nullptr)
+	{
+		M6BasicIndexPtr index = mDatabank.CreateIndex(inName, inType, inUnique);
 
 		index->SetAutoCommit(false);
 		
-		mIndices.push_back(new T(mFullTextIndex, mLexicon, inName,
-			static_cast<uint8>(mIndices.size() + 1), index));
-		ix = mIndices.end() - 1;
+		result = new T(mFullTextIndex, mLexicon, inName,
+			static_cast<uint8>(mIndices.size() + 1), index);
+		
+		M6BasicIxDesc desc = { result, inName, inType, inUnique };
+		mIndices.push_back(desc);
 	}
 	
-	return *ix;
+	return result;
 }
 
 void M6BatchIndexProcessor::IndexTokens(const string& inIndexName,
@@ -908,7 +931,7 @@ void M6BatchIndexProcessor::IndexTokens(const string& inIndexName,
 		}
 		else
 		{
-			M6BasicIx* index = GetIndexBase<M6TextIx>(inIndexName, eM6FullTextIndexType);
+			M6BasicIx* index = GetIndexBase<M6TextIx>(inIndexName, eM6FullTextIndexType, false);
 			foreach (uint32 t, inTokens)
 				index->AddWord(t);
 		}
@@ -941,9 +964,9 @@ void M6BatchIndexProcessor::IndexValue(const string& inIndexName,
 
 		switch (inDataType)
 		{
-			case eM6StringData:	index = GetIndexBase<M6StringIx>(inIndexName, eM6StringIndexType); break;
-			case eM6NumberData:	index = GetIndexBase<M6NumberIx>(inIndexName, eM6NumberIndexType); break;
-			case eM6DateData:	index = GetIndexBase<M6DateIx>(inIndexName, eM6DateIndexType); break;
+			case eM6StringData:	index = GetIndexBase<M6StringIx>(inIndexName, eM6StringIndexType, false); break;
+			case eM6NumberData:	index = GetIndexBase<M6NumberIx>(inIndexName, eM6NumberIndexType, false); break;
+			case eM6DateData:	index = GetIndexBase<M6DateIx>(inIndexName, eM6DateIndexType, false); break;
 			default:			THROW(("Runtime error, unexpected index type"));
 		}
 
@@ -963,11 +986,12 @@ void M6BatchIndexProcessor::FlushDoc(uint32 inDocNr)
 void M6BatchIndexProcessor::Finish(uint32 inDocCount)
 {
 	// add the required 'alltext' index
-	mIndices.push_back(new M6WeightedWordIx(mFullTextIndex, mLexicon, "all-text",
-		static_cast<uint8>(mIndices.size() + 1), mDatabank.GetAllTextIndex()));
+	M6BasicIxDesc allDesc = { new M6WeightedWordIx(mFullTextIndex, mLexicon, "all-text",
+		static_cast<uint8>(mIndices.size() + 1), mDatabank.GetAllTextIndex()), "all-text", eM6FullTextIndexType };
+	mIndices.push_back(allDesc);
 	
 	// tell indices about the doc count
-	for_each(mIndices.begin(), mIndices.end(), [&inDocCount](M6BasicIx* ix) { ix->SetDbDocCount(inDocCount); });
+	for_each(mIndices.begin(), mIndices.end(), [&inDocCount](M6BasicIxDesc& ix) { ix.mBasicIx->SetDbDocCount(inDocCount); });
 	
 	// get the iterator for all index entries
 	auto_ptr<M6FullTextIx::M6EntryIterator> iter(mFullTextIndex.Finish());
@@ -998,7 +1022,7 @@ void M6BatchIndexProcessor::Finish(uint32 inDocCount)
 		if (lastDoc != ie.doc or lastTerm != ie.term)
 		{
 			if (termFrequency > 0)
-				mIndices.back()->AddDocTerm(lastDoc, lastTerm, termFrequency, ie.idl);
+				mIndices.back().mBasicIx->AddDocTerm(lastDoc, lastTerm, termFrequency, ie.idl);
 
 			lastDoc = ie.doc;
 			lastTerm = ie.term;
@@ -1006,7 +1030,7 @@ void M6BatchIndexProcessor::Finish(uint32 inDocCount)
 		}
 		
 		if (ie.ix > 0)
-			mIndices[ie.ix - 1]->AddDocTerm(ie.doc, ie.term, ie.weight, ie.idl);
+			mIndices[ie.ix - 1].mBasicIx->AddDocTerm(ie.doc, ie.term, ie.weight, ie.idl);
 		
 		if ((exclude & (1 << ie.ix)) == 0)
 			termFrequency += ie.weight;
@@ -1017,7 +1041,7 @@ void M6BatchIndexProcessor::Finish(uint32 inDocCount)
 	while (iter->Next(ie));
 
 	// flush
-	for_each(mIndices.begin(), mIndices.end(), [&ie](M6BasicIx* ix) { ix->AddDocTerm(0, 0, 0, ie.idl); });
+	for_each(mIndices.begin(), mIndices.end(), [&ie](M6BasicIxDesc& ix) { ix.mBasicIx->AddDocTerm(0, 0, 0, ie.idl); });
 	
 	progress.Progress(entriesRead);
 }
@@ -1076,7 +1100,7 @@ M6DatabankImpl::~M6DatabankImpl()
 	delete mStore;
 }
 
-M6BasicIndexPtr M6DatabankImpl::GetIndex(const string& inName)
+M6BasicIndexPtr M6DatabankImpl::GetIndex(const string& inName, M6IndexType inType, bool inUnique)
 {
 	M6BasicIndexPtr result;
 	
@@ -1084,6 +1108,9 @@ M6BasicIndexPtr M6DatabankImpl::GetIndex(const string& inName)
 	{
 		if (desc.mName == inName)
 		{
+			if (desc.mType != inType or desc.mUnique != inUnique)
+				THROW(("Inconsistent use of indices (%s)", inName.c_str()));
+			
 			result = desc.mIndex;
 			break;
 		}
@@ -1094,7 +1121,7 @@ M6BasicIndexPtr M6DatabankImpl::GetIndex(const string& inName)
 
 M6BasicIndexPtr M6DatabankImpl::CreateIndex(const string& inName, M6IndexType inType, bool inUnique)
 {
-	M6BasicIndexPtr result = GetIndex(inName);
+	M6BasicIndexPtr result = GetIndex(inName, inType, inUnique);
 	if (result == nullptr)
 	{
 		string path = (mDbDirectory / (inName + ".index")).string();
@@ -1121,7 +1148,7 @@ M6BasicIndexPtr M6DatabankImpl::CreateIndex(const string& inName, M6IndexType in
 			}
 		}
 
-		mIndices.push_back(M6IndexDesc(inName, result));
+		mIndices.push_back(M6IndexDesc(inName, result, inType, inUnique));
 	}
 	return result;
 }
@@ -1200,15 +1227,16 @@ M6Document* M6DatabankImpl::Fetch(uint32 inDocNr)
 
 M6Document* M6DatabankImpl::FindDocument(const string& inIndex, const string& inValue)
 {
-	M6BasicIndexPtr index = CreateIndex(inIndex, eM6StringIndexType);
-	if (not index)
-		THROW(("Index %s not found", inIndex.c_str()));
-	
-	uint32 v;
-	if (not index->Find(ba::to_lower_copy(inValue), v))
-		THROW(("Value %s not found in index %s", inValue.c_str(), inIndex.c_str()));
-	
-	return Fetch(v);
+	//M6BasicIndexPtr index = CreateIndex(inIndex, eM6StringIndexType);
+	//if (not index)
+	//	THROW(("Index %s not found", inIndex.c_str()));
+	//
+	//uint32 v;
+	//if (not index->Find(ba::to_lower_copy(inValue), v))
+	//	THROW(("Value %s not found in index %s", inValue.c_str(), inIndex.c_str()));
+	//
+	//return Fetch(v);
+	return nullptr;
 }
 
 class M6Accumulator

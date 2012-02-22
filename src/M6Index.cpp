@@ -1791,6 +1791,8 @@ Page* M6IndexImpl::Allocate()
 	data->leaf.mType = Page::M6DataPageType::kIndexPageType;
 
 	Page* page = new Page(*this, data, pageNr);
+	page->SetDirty(true);
+	page->Flush(mFile);
 	
 	M6CachedPagePtr cp = GetCachePage();
 	cp->mPage = page;

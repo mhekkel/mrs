@@ -56,21 +56,21 @@ struct M6IndexPageHeader
 	uint32			mLink;
 };
 
-//#if DEBUG
-//
-//const int64
-////	kM6IndexPageSize		= 8192,
-//	kM6IndexPageSize		= 512,
-//	kM6IndexPageHeaderSize	= sizeof(M6IndexPageHeader),
-//	kM6KeySpace				= kM6IndexPageSize - kM6IndexPageHeaderSize,
-//	kM6MinKeySpace			= kM6KeySpace / 2,
-//	kM6MaxEntriesPerPage	= 4;
-////	kM6MaxEntriesPerPage	= kM6KeySpace / 8;	// see above
-//
-//const uint32
-//	kM6MaxKeyLength			= (kM6MinKeySpace / 2 > 255 ? 255 : kM6MinKeySpace / 2);
-//
-//#else
+#if DEBUG
+
+const int64
+//	kM6IndexPageSize		= 8192,
+	kM6IndexPageSize		= 512,
+	kM6IndexPageHeaderSize	= sizeof(M6IndexPageHeader),
+	kM6KeySpace				= kM6IndexPageSize - kM6IndexPageHeaderSize,
+	kM6MinKeySpace			= kM6KeySpace / 2,
+	kM6MaxEntriesPerPage	= 4;
+//	kM6MaxEntriesPerPage	= kM6KeySpace / 8;	// see above
+
+const uint32
+	kM6MaxKeyLength			= (kM6MinKeySpace / 2 > 255 ? 255 : kM6MinKeySpace / 2);
+
+#else
 
 const int64
 	kM6IndexPageSize		= 8192,
@@ -82,7 +82,7 @@ const int64
 const uint32
 	kM6MaxKeyLength			= (kM6MinKeySpace / 2 > 255 ? 255 : kM6MinKeySpace / 2);
 
-//#endif
+#endif
 
 template<M6IndexPageKind>
 struct M6IndexPageDataTraits {};
@@ -221,7 +221,11 @@ class M6PageDataAccess
 	};
 	
 					M6PageDataAccess(M6IndexPageData* inData);
-	
+
+	uint32			GetN() const					{ return mData.mN; }
+	uint32			GetLink() const					{ return mData.mLink; }
+	void			SetLink(uint32 inLink)			{ mData.mLink = inLink; }
+
 	uint32			Free() const;
 	bool			CanStore(const string& inKey) const;
 	bool			TooSmall() const				{ return Free() > kM6MinKeySpace; }
@@ -575,12 +579,13 @@ struct M6IxFileHeader
 	uint32		mRoot;
 	uint32		mFirstBitsPage;
 	uint32		mLastBitsPage;
+	uint32		mFirstLeafPage;
 
 	template<class Archive>
 	void serialize(Archive& ar)
 	{
 		ar & mSignature & mHeaderSize & mSize & mDepth & mRoot
-		   & mFirstBitsPage & mLastBitsPage;
+		   & mFirstBitsPage & mLastBitsPage & mFirstLeafPage;
 	}
 };
 
@@ -604,7 +609,7 @@ class M6BasicPage
 	void			Flush(M6File& inFile);
 	
 	uint32			GetPageNr() const				{ return mPageNr; }
-	void			MoveTo(uint32 inPageNr);
+	void			SetPageNr(uint32 inPageNr)		{ mPageNr = inPageNr; }
 
 	virtual bool	IsDirty() const = 0;
 	virtual void	SetDirty(bool inDirty) = 0;
@@ -640,8 +645,6 @@ class M6IndexBitVectorPage;
 struct M6IndexImpl
 {
 					M6IndexImpl(M6BasicIndex& inIndex, const fs::path& inPath, MOpenMode inMode);
-//					M6IndexImpl(M6BasicIndex& inIndex, const fs::path& inPath,
-//						M6SortedInputIterator& inData);
 	virtual 		~M6IndexImpl();
 
 	void			StoreBits(M6OBitStream& inBits, M6BitVector& outBitVector);
@@ -682,14 +685,11 @@ struct M6IndexImpl
 	virtual void	Vacuum(M6Progress& inProgress) = 0;
 
 	// basic cache routines
-	template<class PageType>
-	PageType*		Allocate();
-	template<class PageType>
-	PageType*		Load(uint32 inPageNr);
-	template<class PageType>
-	void			Reference(PageType* inPage);
-	template<class PageType>
-	void			Release(PageType*& ioPage);
+	template<class PageType>	PageType*	Allocate();
+	template<class PageType>	PageType*	Load(uint32 inPageNr);
+	template<class PageType>	void		Reference(PageType* inPage);
+	template<class PageType>	void		Release(PageType*& ioPage);
+	void									SwapPages(uint32 inPageA, uint32 inPageB);
 	
 	virtual M6BasicPage*
 					GetFirstLeafPage() = 0;
@@ -723,6 +723,8 @@ struct M6IndexImpl
 	};
 
 	void			InitCache(uint32 inCacheCount);
+	void			FlushCache();
+
 	M6CachedPagePtr	GetCachePage();
 
 	M6CachedPagePtr	mCache,	mLRUHead, mLRUTail;
@@ -762,12 +764,13 @@ class M6IndexImplT : public M6IndexImpl
 	virtual void	Rollback();
 	virtual void	Vacuum(M6Progress& inProgress);
 
-	virtual M6BasicPage*
-					GetFirstLeafPage();
 	void			CreateUpLevels(deque<pair<string,uint32>>& up);
 
 	virtual void	Validate();
 	virtual void	Dump();
+
+	virtual M6BasicPage*
+					GetFirstLeafPage();
 
   protected:
 	virtual M6BasicPage*	CreateLeafPage(M6IndexPageData* inData, uint32 inPageNr);
@@ -785,6 +788,7 @@ M6BasicPage::M6BasicPage(M6IndexPageData* inData, uint32 inPageNr)
 
 M6BasicPage::~M6BasicPage()
 {
+//	assert(not IsDirty());
 	delete mData;
 }
 
@@ -802,24 +806,24 @@ void M6BasicPage::Flush(M6File& inFile)
 	}
 }
 
-void M6BasicPage::MoveTo(uint32 inPageNr)
-{
-	if (inPageNr != mPageNr)
-	{
-#pragma message("TODO: fix this")
-		assert(false);
-		//M6BasicPage* page(mIndex.Load<M6BasicPage>(inPageNr));
-
-		//page->mPageNr = mPageNr;
-		////if (page->IsLeaf())	// only save page if it is a leaf
-		//	page->mDirty = true;
-		//
-		//mPageNr = inPageNr;
-		//mDirty = true;
-		//
-		//mIndex.Release(page);
-	}
-}
+//void M6BasicPage::MoveTo(uint32 inPageNr)
+//{
+//	if (inPageNr != mPageNr)
+//	{
+//#pragma message("TODO: fix this")
+//		assert(false);
+//		//M6BasicPage* page(mIndex.Load<M6BasicPage>(inPageNr));
+//
+//		//page->mPageNr = mPageNr;
+//		////if (page->IsLeaf())	// only save page if it is a leaf
+//		//	page->mDirty = true;
+//		//
+//		//mPageNr = inPageNr;
+//		//mDirty = true;
+//		//
+//		//mIndex.Release(page);
+//	}
+//}
 
 // --------------------------------------------------------------------
 
@@ -1644,6 +1648,15 @@ M6IndexImpl::M6IndexImpl(M6BasicIndex& inIndex, const fs::path& inPath, MOpenMod
 	assert(mHeader.mHeaderSize == sizeof(M6IxFileHeader));
 }
 
+M6IndexImpl::~M6IndexImpl()
+{
+	FlushCache();
+	delete [] mCache;
+
+	if (mDirty)
+		mFile.PWrite(mHeader, 0);
+}
+
 void M6IndexImpl::StoreBits(M6OBitStream& inBits, M6BitVector& outBitVector)
 {
 	inBits.Sync();
@@ -1737,6 +1750,21 @@ void M6IndexImpl::InitCache(uint32 inCacheCount)
 	
 	mLRUHead = mCache;
 	mLRUTail = mCache + mCacheCount - 1;
+}
+
+void M6IndexImpl::FlushCache()
+{
+	for (uint32 ix = 0; ix < mCacheCount; ++ix)
+	{
+		if (mCache[ix].mPage != nullptr)
+		{
+			if (mCache[ix].mPage->IsDirty())
+				mCache[ix].mPage->Flush(mFile);
+			delete mCache[ix].mPage;
+			mCache[ix].mPage = nullptr;
+		}
+		mCache[ix].mPageNr = 0;
+	}
 }
 
 M6IndexImpl::M6CachedPagePtr M6IndexImpl::GetCachePage()
@@ -1884,10 +1912,33 @@ void M6IndexImpl::Reference(Page* inPage)
 	cp->mRefCount += 1;
 }
 
-M6IndexImpl::~M6IndexImpl()
+void M6IndexImpl::SwapPages(uint32 inPageA, uint32 inPageB)
 {
-	if (mDirty)
-		mFile.PWrite(mHeader, 0);
+	M6BasicPage* pageA = Load<M6BasicPage>(inPageA);
+	M6BasicPage* pageB = Load<M6BasicPage>(inPageB);
+
+	M6CachedPagePtr cpb = nullptr, cpa = nullptr;
+	for (M6CachedPagePtr cp = mLRUHead; cp != nullptr and (cpa == nullptr or cpb == nullptr); cp = cp->mNext)
+	{
+		if (cp->mPage == pageA)
+			cpa = cp;
+		if (cp->mPage == pageB)
+			cpb = cp;
+	}
+	
+	assert(cpa->mPage == pageA);
+	assert(cpb->mPage == pageB);
+	
+	swap(cpa->mPageNr, cpb->mPageNr);
+
+	pageA->SetPageNr(inPageB);
+	pageA->SetDirty(true);
+
+	pageB->SetPageNr(inPageA);
+	pageB->SetDirty(true);
+	
+	--cpa->mRefCount;
+	--cpb->mRefCount;
 }
 
 void M6IndexImpl::SetAutoCommit(bool inAutoCommit)
@@ -1998,10 +2049,6 @@ M6IndexImplT<M6DataType>::M6IndexImplT(M6BasicIndex& inIndex, const fs::path& in
 template<class M6DataType>
 M6IndexImplT<M6DataType>::~M6IndexImplT()
 {
-	for (uint32 ix = 0; ix < mCacheCount; ++ix)
-		delete mCache[ix].mPage;
-
-	delete[] mCache;
 }
 
 template<class M6DataType>
@@ -2046,7 +2093,7 @@ void M6IndexImplT<M6DataType>::Insert(const string& inKey, const M6DataType& inV
 		if (mHeader.mRoot == 0)	// empty index?
 		{
 			M6IndexPagePtr root(Allocate<M6LeafPageType>());
-			mHeader.mRoot = root->GetPageNr();
+			mHeader.mRoot = mHeader.mFirstLeafPage = root->GetPageNr();
 			mHeader.mDepth = 1;
 			Release(root);
 		}
@@ -2116,6 +2163,9 @@ bool M6IndexImplT<M6DataType>::Erase(const string& inKey)
 				root->Deallocate();
 				--mHeader.mDepth;
 			}
+			
+			if (mHeader.mRoot == 0)
+				mHeader.mFirstLeafPage = 0;
 		}
 		
 		Release(root);
@@ -2151,118 +2201,119 @@ bool M6IndexImplT<M6DataType>::Find(const string& inKey, M6DataType& outValue)
 template<class M6DataType>
 void M6IndexImplT<M6DataType>::Vacuum(M6Progress& inProgress)
 {
-	typedef M6LeafPage<M6DataType>	M6LeafPage;
-	
-	fs::path tmpPath = mPath.parent_path() / (mPath.filename().string() + "-vacuum");
-	
-	try
+	int64 fileSize = mFile.Size();
+
+	// keep an indirect array of reordered pages
+	int64 pageCount = (fileSize / kM6IndexPageSize) + 1;
+	vector<uint32> ix1(pageCount);
+	iota(ix1.begin(), ix1.end(), 0);
+	vector<uint32> ix2(ix1);
+
+	//Get the address of the mapped region
+	uint32 n = 1;	// page counter
+
+	// start by reordering the bit pages
+	uint32 pageNr = mHeader.mFirstBitsPage;
+	while (pageNr != 0)
 	{
-		int64 offset = 0;
-		int64 fileSize = mFile.Size();
-		int64 pageCount = fileSize / kM6IndexPageSize;
-		vector<uint32> remapped(pageCount, 0);
-			
+		pageNr = ix1[pageNr];
+		if (pageNr != n)
 		{
-			M6File tmpFile(tmpPath, eReadWrite);
-			tmpFile.Truncate(0);
+			swap(ix1[ix2[pageNr]], ix1[ix2[n]]);
+			swap(ix2[pageNr], ix2[n]);
+			SwapPages(pageNr, n);
+			pageNr = n;
+		}
+
+		M6IndexBitVectorPage* page = Load<M6IndexBitVectorPage>(pageNr);
+
+		pageNr = page->GetLink();
+		if (pageNr != 0)
+			page->SetLink(n + 1);
+		++n;
+		Release(page);
+	}
+	
+	if (mHeader.mFirstBitsPage)
+		mHeader.mFirstBitsPage = 1;
+	mHeader.mLastBitsPage = n - 1;
+
+	// Now update the leaf pages
+	deque<pair<string,uint32>> up;
+	pageNr = mHeader.mFirstLeafPage;
+	mHeader.mFirstLeafPage = n;
+	
+	while (pageNr != 0)
+	{
+		pageNr = ix1[pageNr];
+
+		if (pageNr != n)
+		{
+			swap(ix1[ix2[pageNr]], ix1[ix2[n]]);
+			swap(ix2[pageNr], ix2[n]);
+			SwapPages(pageNr, n);
+			pageNr = n;
+		}
+
+		M6LeafPageType* page = Load<M6LeafPageType>(pageNr);
+
+		up.push_back(make_pair(page->GetKey(0), pageNr));
+		uint32 link = page->GetLink();
 		
-			// write new header
-			M6IxFileHeaderPage header = { kM6IndexFileSignature, sizeof(M6IxFileHeader) };
-			tmpFile.Write(&header, kM6IndexPageSize);
-			
-			uint32 n = 1;
-			
-			uint32 bitPageNr = mHeader.mFirstBitsPage;
-			
-			if (bitPageNr != 0)
+		while (link != 0)
+		{
+			M6LeafPageType* next = Load<M6LeafPageType>(ix1[link]);
+			if (next->GetN() == 0)
 			{
-				header.mHeader.mFirstBitsPage = 1;
-				
-				while (bitPageNr != 0)
-				{
-					M6IndexPageData data;
-					mFile.PRead(&data, kM6IndexPageSize, bitPageNr * kM6IndexPageSize);
-					remapped[bitPageNr] = n;
-					bitPageNr = data.leaf.mLink;
-					if (bitPageNr != 0)
-						header.mHeader.mLastBitsPage = data.leaf.mLink = n + 1;
-					tmpFile.PWrite(&data, kM6IndexPageSize, n * kM6IndexPageSize);
-					++n;
-				}
+				link = next->GetLink();
+				Release(next);
+				continue;
 			}
 			
-			tmpFile.PWrite(header.mHeader, 0);
-		}
-		
-		M6LeafPage* page = dynamic_cast<M6LeafPage*>(GetFirstLeafPage());
-		uint32 nr = 0;
-		
-		M6SortedInputIterator input = [this, &page, &nr, &inProgress]
-			(string& outKey, M6DataType& outData) -> bool
-		{
-			bool result = false;
-			while (page != nullptr)
+			string key = next->GetKey(0);
+			assert(key.compare(page->GetKey(page->GetN() - 1)) > 0);
+			if (not page->CanStore(key))
 			{
-				if (nr < page->GetN())
-				{
-					page->GetKeyValue(nr, outKey, outData);
-					++nr;
-					result = true;
-					break;
-				}
-				
-				inProgress.Consumed(page->GetN());
-	
-				uint32 link = page->GetLink();
-				this->Release(page);
-				page = nullptr;
-				nr = 0;
-	
-				if (link != 0)
-					page = this->Load<M6LeafPage>(link);
+				Release(next);
+				break;
 			}
 			
-			return result;
-		};
-	
-		{
-			M6IndexImplT tmpImpl(mIndex, tmpPath, input, remapped);
-			tmpImpl.Commit();
+			page->InsertKeyValue(key, next->GetValue(0), page->GetN());
+			next->EraseEntry(0);
+			Release(next);
 		}
 		
-		mFile = M6File();	// only way to close our file (for now)
-		fs::remove(mPath);
-		fs::rename(tmpPath, mPath);
+		// adjust bit vector indices in data
+		for (uint32 i = 0; i < page->GetN(); ++i)
+		{
+			M6DataType value = page->GetValue(i);
+			Remap(value, ix1);
+			page->SetValue(i, value);
+		}
+		
+		++n;
+		pageNr = link;
+
+		if (link == 0)
+			page->SetLink(0);
+		else
+			page->SetLink(n);
+		
+		Release(page);
 	}
-	catch (exception& e)
-	{
-		cerr << e.what() << endl;
-		fs::remove(tmpPath);
-	}
+	
+	mFile.Truncate(n * kM6IndexPageSize);
+	CreateUpLevels(up);
+	Commit();
 }
 
 template<class M6DataType>
 M6BasicPage* M6IndexImplT<M6DataType>::GetFirstLeafPage()
 {
-	if (mHeader.mRoot == 0)
-		return nullptr;
-	
-	// start by locating the first leaf node.
-	// Then compact the nodes and shift them to the start
-	// of the file. Truncate the file and reconstruct the
-	// branch nodes.
-
-	uint32 pageNr = mHeader.mRoot;
-	for (;;)
-	{
-		M6IndexPagePtr page(Load<M6IndexPageType>(pageNr));
-		if (page->IsLeaf())
-			break;
-		pageNr = page->GetLink();
-		Release(page);
-	}
-	
-	return Load<M6IndexPageType>(pageNr);
+	M6BasicPage* result = nullptr;
+	if (mHeader.mFirstLeafPage != 0)
+		result = Load<M6LeafPageType>(mHeader.mFirstLeafPage);
+	return result;
 }
 
 template<class M6DataType>

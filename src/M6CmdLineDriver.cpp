@@ -160,7 +160,7 @@ void Vacuum(int argc, char* argv[])
 		THROW(("Invalid config-file, file is missing"));
 
 	fs::path path = file->content();
-	M6Databank db(path.string(), eReadOnly);
+	M6Databank db(path.string(), eReadWrite);
 	db.Vacuum();
 }
 

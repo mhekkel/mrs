@@ -199,6 +199,13 @@
 		<source type="path">/data/raw/uniprot/uniprot_sprot.dat.gz</source>
 		<document-separator type="last-line-equals">//</document-separator>
 	</databank>
+
+	<databank id="sprotw" parser="uniprot">
+		<name>SwissProt</name>
+		<file>test/sprot.m6</file>
+		<source type="path">test/sprot-mini.dat</source>
+		<document-separator type="last-line-equals">//</document-separator>
+	</databank>
 	
 	<databank id="trembl" parser="uniprot">
 		<name>TrEMBL</name>

@@ -373,7 +373,7 @@ class M6BasicIx
 	typedef M6Queue<FlushedTerm*>	M6FlushQueue;
 
 					M6BasicIx(M6FullTextIx& inFullTextIndex, M6Lexicon& inLexicon,
-						const string& inName, uint8 inIndexNr, M6BasicIndexPtr inIndex);
+						const string& inName, uint8 inIndexNr);
 	virtual 		~M6BasicIx();
 	
 	void			AddWord(uint32 inWord);
@@ -389,7 +389,7 @@ class M6BasicIx
 	virtual void	AddDocTerm(uint32 inDoc, uint8 inFrequency, M6OBitStream& inIDL);
 	virtual void	FlushTerm(uint32 inTerm, uint32 inDocCount);
 	
-	virtual void	FlushTerm(FlushedTerm* inTermData);
+	virtual void	FlushTerm(FlushedTerm* inTermData) = 0;
 	void			FlushThread();
 
 	string			mName;
@@ -398,8 +398,6 @@ class M6BasicIx
 	uint8			mIndexNr;
 	
 	// data for the second pass
-	M6BasicIndexPtr	mIndex;
-
 	uint32			mLastDoc;
 	uint32			mLastTerm;
 	M6OBitStream	mBits;
@@ -415,12 +413,11 @@ class M6BasicIx
 //
 
 M6BasicIx::M6BasicIx(M6FullTextIx& inFullTextIndex, M6Lexicon& inLexicon,
-	const string& inName, uint8 inIndexNr, M6BasicIndexPtr inIndex)
+		const string& inName, uint8 inIndexNr)
 	: mName(inName)
 	, mFullTextIndex(inFullTextIndex)
 	, mLexicon(inLexicon)
 	, mIndexNr(inIndexNr)
-	, mIndex(inIndex)
 	, mLastDoc(0)
 	, mDocCount(0)
 	, mDbDocCount(0)
@@ -519,7 +516,6 @@ void M6BasicIx::FlushTerm(uint32 inTerm, uint32 inDocCount)
 
 void M6BasicIx::FlushThread()
 {
-	mIndex->SetBatchMode(true);
 	for (;;)
 	{
 		FlushedTerm* term = mFlushQueue.Get();
@@ -527,13 +523,6 @@ void M6BasicIx::FlushThread()
 			break;
 		FlushTerm(term);
 	}
-	mIndex->SetBatchMode(false);
-}
-
-void M6BasicIx::FlushTerm(FlushedTerm* inTermData)
-{
-	static_cast<M6MultiBasicIndex*>(mIndex.get())->Insert(inTermData->mTerm, inTermData->mDocs);
-	delete inTermData;
 }
 
 // --------------------------------------------------------------------
@@ -553,12 +542,17 @@ class M6StringIx : public M6BasicIx
 	virtual void	FlushTerm(FlushedTerm* inTermData);
 
 	vector<uint32>	mDocs;
+	
+	M6MultiBasicIndex*
+					mIndex;
 };
 
 M6StringIx::M6StringIx(M6FullTextIx& inFullTextIndex, M6Lexicon& inLexicon,
 		const string& inName, uint8 inIndexNr, M6BasicIndexPtr inIndex)
-	: M6BasicIx(inFullTextIndex, inLexicon, inName, inIndexNr, inIndex)
+	: M6BasicIx(inFullTextIndex, inLexicon, inName, inIndexNr)
+	, mIndex(dynamic_cast<M6MultiBasicIndex*>(inIndex.get()))
 {
+	assert(mIndex);
 	mFullTextIndex.SetExcludeInFullText(mIndexNr);
 }
 	
@@ -583,7 +577,7 @@ void M6StringIx::FlushTerm(uint32 inTerm, uint32 inDocCount)
 
 void M6StringIx::FlushTerm(FlushedTerm* inTermData)
 {
-	mIndex->Insert(inTermData->mTerm, inTermData->mDocs.back());
+	mIndex->Insert(inTermData->mTerm, inTermData->mDocs);
 }
 
 // --------------------------------------------------------------------
@@ -610,15 +604,19 @@ class M6TextIx : public M6BasicIx
 	M6File*			mIDLFile;
 	M6OBitStream*	mIDLBits;
 	int64			mIDLOffset;
+	M6MultiIDLBasicIndex*
+					mIndex;
 };
 
 M6TextIx::M6TextIx(M6FullTextIx& inFullTextIndex, M6Lexicon& inLexicon,
 		const string& inName, uint8 inIndexNr, M6BasicIndexPtr inIndex)
-	: M6BasicIx(inFullTextIndex, inLexicon, inName, inIndexNr, inIndex)
+	: M6BasicIx(inFullTextIndex, inLexicon, inName, inIndexNr)
 	, mIDLFile(nullptr)
 	, mIDLBits(nullptr)
 	, mIDLOffset(0)
+	, mIndex(dynamic_cast<M6MultiIDLBasicIndex*>(inIndex.get()))
 {
+	assert(mIndex);
 	mFullTextIndex.SetUsesInDocLocation(mIndexNr);
 	mIDLFile = new M6File((mFullTextIndex.GetScratchDir().parent_path() / (inName + ".idl")).string(), eReadWrite);
 }
@@ -694,8 +692,7 @@ void M6TextIx::FlushTerm(FlushedTerm* inTermData)
 {
 	FlushedIDLTerm* idlTerm = static_cast<FlushedIDLTerm*>(inTermData);
 	
-	static_cast<M6MultiIDLBasicIndex*>(mIndex.get())->
-		Insert(idlTerm->mTerm, idlTerm->mIDLOffset, idlTerm->mDocs);
+	mIndex->Insert(idlTerm->mTerm, idlTerm->mIDLOffset, idlTerm->mDocs);
 	delete idlTerm;
 }
 
@@ -719,12 +716,17 @@ class M6WeightedWordIx : public M6BasicIx
   private:
 
 	virtual void	FlushTerm(FlushedTerm* inTermData);
+	
+	M6WeightedBasicIndex*
+					mIndex;
 };
 
 M6WeightedWordIx::M6WeightedWordIx(M6FullTextIx& inFullTextIndex, M6Lexicon& inLexicon,
 		const string& inName, uint8 inIndexNr, M6BasicIndexPtr inIndex)
-	: M6BasicIx(inFullTextIndex, inLexicon, inName, inIndexNr, inIndex)
+	: M6BasicIx(inFullTextIndex, inLexicon, inName, inIndexNr)
+	, mIndex(dynamic_cast<M6WeightedBasicIndex*>(inIndex.get()))
 {
+	assert(mIndex);
 }
 
 void M6WeightedWordIx::AddDocTerm(uint32 inDoc, uint8 inFrequency, M6OBitStream& inIDL)
@@ -794,14 +796,14 @@ void M6WeightedWordIx::FlushTerm(uint32 inTerm, uint32 inDocCount)
 void M6WeightedWordIx::FlushTerm(FlushedTerm* inTermData)
 {
 	FlushedWeightedTerm* termData = static_cast<FlushedWeightedTerm*>(inTermData);
-	static_cast<M6WeightedBasicIndex*>(mIndex.get())->Insert(termData->mTerm, termData->mWeightedDocs);
+	mIndex->Insert(termData->mTerm, termData->mWeightedDocs);
 	delete termData;
 }
 
 // --------------------------------------------------------------------
 //	Date Index, only dates
 
-class M6DateIx : public M6BasicIx
+class M6DateIx : public M6StringIx
 {
   public:
 					M6DateIx(M6FullTextIx& inFullTextIndex, M6Lexicon& inLexicon,
@@ -810,14 +812,14 @@ class M6DateIx : public M6BasicIx
 
 M6DateIx::M6DateIx(M6FullTextIx& inFullTextIndex, M6Lexicon& inLexicon,
 		const string& inName, uint8 inIndexNr, M6BasicIndexPtr inIndex)
-	: M6BasicIx(inFullTextIndex, inLexicon, inName, inIndexNr, inIndex)
+	: M6StringIx(inFullTextIndex, inLexicon, inName, inIndexNr, inIndex)
 {
 }
 
 // --------------------------------------------------------------------
 //	Number Index, only numbers
 
-class M6NumberIx : public M6BasicIx
+class M6NumberIx : public M6StringIx
 {
   public:
 					M6NumberIx(M6FullTextIx& inFullTextIndex, M6Lexicon& inLexicon,
@@ -828,7 +830,7 @@ class M6NumberIx : public M6BasicIx
 
 M6NumberIx::M6NumberIx(M6FullTextIx& inFullTextIndex, M6Lexicon& inLexicon,
 		const string& inName, uint8 inIndexNr, M6BasicIndexPtr inIndex)
-	: M6BasicIx(inFullTextIndex, inLexicon, inName, inIndexNr, inIndex)
+	: M6StringIx(inFullTextIndex, inLexicon, inName, inIndexNr, inIndex)
 {
 }
 
@@ -1142,7 +1144,7 @@ M6BasicIndexPtr M6DatabankImpl::CreateIndex(const string& inName, M6IndexType in
 			{
 				case eM6DateIndexType:		result.reset(new M6SimpleMultiIndex(path, mMode)); break;
 				case eM6NumberIndexType:	result.reset(new M6NumberMultiIndex(path, mMode)); break;
-				case eM6StringIndexType:
+				case eM6StringIndexType:	result.reset(new M6SimpleMultiIndex(path, mMode)); break;
 				case eM6FullTextIndexType:	result.reset(new M6SimpleIDLMultiIndex(path, mMode)); break;
 				default:					THROW(("unsupported"));
 			}

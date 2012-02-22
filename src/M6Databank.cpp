@@ -98,8 +98,21 @@ class M6DatabankImpl
 class M6FullTextIx
 {
   public:
+					M6FullTextIx(const fs::path& inScratch);
+	virtual			~M6FullTextIx();
+	
+	void			SetUsesInDocLocation(uint32 inIndexNr)		{ mDocLocationIxMap |= (1 << inIndexNr); }
+	bool			UsesInDocLocation(uint32 inIndexNr) const	{ return mDocLocationIxMap & (1 << inIndexNr); }
+	uint32			GetDocLocationIxMap() const					{ return mDocLocationIxMap; }
 
-	struct BufferEntry
+	void			SetExcludeInFullText(uint32 inIndexNr)		{ mFullTextIxMap |= (1 << inIndexNr); }
+	bool			ExcludesInFullText(uint32 inIndexNr) const	{ return mFullTextIxMap & (1 << inIndexNr); }
+	uint32			GetFullTextIxMap() const					{ return mFullTextIxMap; }
+
+	void			AddWord(uint8 inIndex, uint32 inWord);
+	void			FlushDoc(uint32 inDocNr);
+
+		struct BufferEntry
 	{
 		M6OBitStream	idl;
 		uint8			ix;
@@ -109,8 +122,7 @@ class M6FullTextIx
 		
 		bool			operator<(const BufferEntry& inOther) const
 							{ return term < inOther.term or
-									(term == inOther.term and doc < inOther.doc) or
-									(term == inOther.term and doc == inOther.doc and ix < inOther.ix); }
+									(term == inOther.term and doc < inOther.doc); }
 	};
 	
 	struct BufferEntryWriter
@@ -156,19 +168,6 @@ class M6FullTextIx
 
 	typedef M6EntryBuffer::iterator M6EntryIterator;
 
-					M6FullTextIx(const fs::path& inScratch);
-	virtual			~M6FullTextIx();
-	
-	void			SetUsesInDocLocation(uint32 inIndexNr)		{ mDocLocationIxMap |= (1 << inIndexNr); }
-	bool			UsesInDocLocation(uint32 inIndexNr) const	{ return mDocLocationIxMap & (1 << inIndexNr); }
-	uint32			GetDocLocationIxMap() const					{ return mDocLocationIxMap; }
-
-	void			SetExcludeInFullText(uint32 inIndexNr)		{ mFullTextIxMap |= (1 << inIndexNr); }
-	bool			ExcludesInFullText(uint32 inIndexNr) const	{ return mFullTextIxMap & (1 << inIndexNr); }
-	uint32			GetFullTextIxMap() const					{ return mFullTextIxMap; }
-
-	void			AddWord(uint8 inIndex, uint32 inWord);
-	void			FlushDoc(uint32 inDocNr);
 
 	M6EntryIterator*Finish()									{ return mEntries.Finish(); }
 	int64			CountEntries() const						{ return mEntries.Size(); }
@@ -195,7 +194,6 @@ class M6FullTextIx
 	DocWords		mDocWords;
 	uint32			mDocLocationIxMap, mFullTextIxMap;
 	uint32			mDocWordLocation;
-
 	BufferEntryWriter
 					mBufferEntryWriter;
 	fs::path		mScratchDir;

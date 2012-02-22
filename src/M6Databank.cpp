@@ -40,7 +40,7 @@ class M6DatabankImpl
   public:
 	typedef M6Queue<M6InputDocument*>	M6DocQueue;
 
-					M6DatabankImpl(M6Databank& inDatabank, const string& inPath, MOpenMode inMode);
+					M6DatabankImpl(M6Databank& inDatabank, const fs::path& inPath, MOpenMode inMode);
 	virtual			~M6DatabankImpl();
 
 	void			StartBatchImport(M6Lexicon& inLexicon);
@@ -214,7 +214,7 @@ M6FullTextIx::M6FullTextIx(const fs::path& inScratchUrl)
 	, mDocWordLocation(1)
 	, mBufferEntryWriter(*this)
 	, mScratchDir(inScratchUrl)
-	, mEntries((mScratchDir / "fulltext").string(), less<BufferEntry>(), mBufferEntryWriter)
+	, mEntries(mScratchDir / "fulltext", less<BufferEntry>(), mBufferEntryWriter)
 {
 }
 
@@ -616,7 +616,8 @@ M6TextIx::M6TextIx(M6FullTextIx& inFullTextIndex, M6Lexicon& inLexicon,
 {
 	assert(mIndex);
 	mFullTextIndex.SetUsesInDocLocation(mIndexNr);
-	mIDLFile = new M6File((mFullTextIndex.GetScratchDir().parent_path() / (inName + ".idl")).string(), eReadWrite);
+	mIDLFile = new M6File(
+		mFullTextIndex.GetScratchDir().parent_path() / (inName + ".idl"), eReadWrite);
 }
 
 M6TextIx::~M6TextIx()
@@ -1048,7 +1049,7 @@ void M6BatchIndexProcessor::Finish(uint32 inDocCount)
 
 // --------------------------------------------------------------------
 
-M6DatabankImpl::M6DatabankImpl(M6Databank& inDatabank, const string& inPath, MOpenMode inMode)
+M6DatabankImpl::M6DatabankImpl(M6Databank& inDatabank, const fs::path& inPath, MOpenMode inMode)
 	: mDatabank(inDatabank)
 	, mDbDirectory(inPath)
 	, mMode(inMode)
@@ -1060,15 +1061,15 @@ M6DatabankImpl::M6DatabankImpl(M6Databank& inDatabank, const string& inPath, MOp
 		fs::create_directory(mDbDirectory);
 		fs::create_directory(mDbDirectory / "tmp");
 		
-		mStore = new M6DocStore((mDbDirectory / "data").string(), eReadWrite);
-		mAllTextIndex.reset(new M6SimpleWeightedIndex((mDbDirectory / "all-text.index").string(), eReadWrite));
+		mStore = new M6DocStore(mDbDirectory / "data", eReadWrite);
+		mAllTextIndex.reset(new M6SimpleWeightedIndex(mDbDirectory / "all-text.index", eReadWrite));
 	}
 	else if (not fs::is_directory(mDbDirectory))
-		THROW(("databank path is invalid (%s)", inPath.c_str()));
+		THROW(("databank path is invalid (%s)", inPath.string().c_str()));
 	else
 	{
-		mStore = new M6DocStore((mDbDirectory / "data").string(), inMode);
-		mAllTextIndex.reset(new M6SimpleWeightedIndex((mDbDirectory / "all-text.index").string(), inMode));
+		mStore = new M6DocStore(mDbDirectory / "data", inMode);
+		mAllTextIndex.reset(new M6SimpleWeightedIndex(mDbDirectory / "all-text.index", inMode));
 		
 		if (fs::exists(mDbDirectory / "all-text.weights"))
 		{
@@ -1077,7 +1078,7 @@ M6DatabankImpl::M6DatabankImpl(M6Databank& inDatabank, const string& inPath, MOp
 				uint32 maxDocNr = mStore->NextDocumentNumber();
 				mDocWeights.assign(maxDocNr, 0);
 				
-				M6File file((mDbDirectory / "all-text.weights").string(), eReadOnly);
+				M6File file(mDbDirectory / "all-text.weights", eReadOnly);
 				if (file.Size() == sizeof(float) * maxDocNr)
 					file.Read(&mDocWeights[0], sizeof(float) * maxDocNr);
 				else
@@ -1124,7 +1125,7 @@ M6BasicIndexPtr M6DatabankImpl::CreateIndex(const string& inName, M6IndexType in
 	M6BasicIndexPtr result = GetIndex(inName, inType, inUnique);
 	if (result == nullptr)
 	{
-		string path = (mDbDirectory / (inName + ".index")).string();
+		fs::path path = mDbDirectory / (inName + ".index");
 		
 		if (inUnique)
 		{
@@ -1424,7 +1425,7 @@ void M6DatabankImpl::RecalculateDocumentWeights()
 	M6Progress progress(ix->size(), "calculating weights");
 	ix->CalculateDocumentWeights(docCount, mDocWeights, progress);
 
-	M6File weightFile((mDbDirectory / "all-text.weights").string(), eReadWrite);
+	M6File weightFile(mDbDirectory / "all-text.weights", eReadWrite);
 	weightFile.Write(&mDocWeights[0], sizeof(float) * mDocWeights.size());
 }
 
@@ -1451,7 +1452,7 @@ void M6DatabankImpl::Validate()
 
 // --------------------------------------------------------------------
 
-M6Databank::M6Databank(const string& inPath, MOpenMode inMode)
+M6Databank::M6Databank(const fs::path& inPath, MOpenMode inMode)
 	: mImpl(new M6DatabankImpl(*this, inPath, inMode))
 {
 }
@@ -1461,7 +1462,7 @@ M6Databank::~M6Databank()
 	delete mImpl;
 }
 
-M6Databank* M6Databank::CreateNew(const std::string& inPath)
+M6Databank* M6Databank::CreateNew(const fs::path& inPath)
 {
 	if (fs::exists(inPath))
 		fs::remove_all(inPath);

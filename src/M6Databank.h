@@ -11,12 +11,12 @@ class M6Iterator;
 class M6Databank
 {
   public:
-					M6Databank(const std::string& inPath,
+					M6Databank(const boost::filesystem::path& inPath,
 						MOpenMode inMode);
 	virtual			~M6Databank();
 
 	static M6Databank*
-					CreateNew(const std::string& inPath);
+					CreateNew(const boost::filesystem::path& inPath);
 
 	void			StartBatchImport(M6Lexicon& inLexicon);
 	void			CommitBatchImport();

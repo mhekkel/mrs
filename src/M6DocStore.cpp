@@ -15,6 +15,7 @@
 
 using namespace std;
 namespace io = boost::iostreams;
+namespace fs = boost::filesystem;
 
 // --------------------------------------------------------------------
 
@@ -250,7 +251,7 @@ typedef M6DocStorePagePtr<M6DocStoreIndexPage>	M6DocStoreIndexPagePtr;
 class M6DocStoreImpl
 {
   public:
-					M6DocStoreImpl(const string& inPath, MOpenMode inMode);
+					M6DocStoreImpl(const fs::path& inPath, MOpenMode inMode);
 					~M6DocStoreImpl();
 
 	uint32			Size() const					{ return mHeader.mDocCount; }
@@ -829,7 +830,7 @@ streamsize M6DocSource::read(char* s, streamsize n)
 
 // --------------------------------------------------------------------
 
-M6DocStoreImpl::M6DocStoreImpl(const string& inPath, MOpenMode inMode)
+M6DocStoreImpl::M6DocStoreImpl(const fs::path& inPath, MOpenMode inMode)
 	: mFile(inPath, inMode)
 	, mDirty(false)
 	, mAutoCommit(true)
@@ -1294,8 +1295,8 @@ void M6DocStoreImpl::Dump()
 
 // --------------------------------------------------------------------
 
-M6DocStore::M6DocStore(const string& inPage, MOpenMode inMode)
-	: mImpl(new M6DocStoreImpl(inPage, inMode))
+M6DocStore::M6DocStore(const fs::path& inPath, MOpenMode inMode)
+	: mImpl(new M6DocStoreImpl(inPath, inMode))
 {
 }
 

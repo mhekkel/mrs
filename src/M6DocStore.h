@@ -10,7 +10,7 @@ class M6DocStoreImpl;
 class M6DocStore
 {
   public:
-					M6DocStore(const std::string& inPath, MOpenMode inMode);
+					M6DocStore(const boost::filesystem::path& inPath, MOpenMode inMode);
 	virtual			~M6DocStore();
 	
 	uint32			StoreDocument(const char* inData, size_t inSize = 0);

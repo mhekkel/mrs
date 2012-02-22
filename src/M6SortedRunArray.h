@@ -109,7 +109,7 @@ class M6SortedRunArray
 	
   public:
 	
-				M6SortedRunArray(const std::string& inScratchFile, C inCompare = C(), W inWriter = W())
+				M6SortedRunArray(const boost::filesystem::path& inScratchFile, C inCompare = C(), W inWriter = W())
 					: mFile(inScratchFile, eReadWrite)
 					, mRun(nullptr)
 					, mRunCount(0)

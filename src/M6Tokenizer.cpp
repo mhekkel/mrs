@@ -263,7 +263,7 @@ uint32 M6Tokenizer::GetNextCharacter()
 	if (mPtr >= mBuffer + mBufferSize)
 	{
 		++mPtr;
-		++mToken;
+		*mToken++ = 0;
 		return result;
 	}
 	
@@ -330,8 +330,11 @@ uint32 M6Tokenizer::GetNextCharacter()
 inline void M6Tokenizer::Retract()
 {
 	// skip one valid character back in the input mBuffer
-	do --mToken; while ((*mToken & 0x0c0) == 0x080 and mToken > mTokenText);
-	do --mPtr; while ((*mPtr & 0x0c0) == 0x080 and mPtr > mBuffer);
+	while (mPtr > mBuffer + mBuffer)
+		--mToken, --mPtr;
+	
+	do --mToken; while (mToken > mTokenText and (*mToken & 0x0c0) == 0x080);
+	do --mPtr; while (mPtr > mBuffer and (*mPtr & 0x0c0) == 0x080);
 }
 
 int M6Tokenizer::Restart(int inStart)

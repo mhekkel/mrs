@@ -62,6 +62,7 @@ class M6DatabankImpl
 	void			Vacuum();
 
 	void			Validate();
+	void			DumpIndex(const string& inIndex, ostream& inStream);
 
 	void			StoreThread();
 	void			IndexThread();
@@ -896,47 +897,6 @@ void M6WeightedWordIx::FlushTerm(FlushedTerm* inTermData)
 }
 
 // --------------------------------------------------------------------
-//	Date Index, only dates
-
-class M6DateIx : public M6StringIx
-{
-  public:
-					M6DateIx(M6FullTextIx& inFullTextIndex, M6Lexicon& inLexicon,
-						const string& inName, uint8 inIndexNr, M6BasicIndexPtr inIndex);
-};
-
-M6DateIx::M6DateIx(M6FullTextIx& inFullTextIndex, M6Lexicon& inLexicon,
-		const string& inName, uint8 inIndexNr, M6BasicIndexPtr inIndex)
-	: M6StringIx(inFullTextIndex, inLexicon, inName, inIndexNr, inIndex)
-{
-}
-
-// --------------------------------------------------------------------
-//	Number Index, only numbers
-
-class M6NumberIx : public M6StringIx
-{
-  public:
-					M6NumberIx(M6FullTextIx& inFullTextIndex, M6Lexicon& inLexicon,
-						const string& inName, uint8 inIndexNr, M6BasicIndexPtr inIndex);
-//
-//	virtual int		Compare(const char* inA, uint32 inLengthA, const char* inB, uint32 inLengthB) const;
-};
-
-M6NumberIx::M6NumberIx(M6FullTextIx& inFullTextIndex, M6Lexicon& inLexicon,
-		const string& inName, uint8 inIndexNr, M6BasicIndexPtr inIndex)
-	: M6StringIx(inFullTextIndex, inLexicon, inName, inIndexNr, inIndex)
-{
-}
-
-//int M6NumberIx::Compare(const char* inA, uint32 inLengthA,
-//	const char* inB, uint32 inLengthB) const
-//{
-//	M6IndexTraits<kNumberIndex> comp;
-//	return comp.Compare(inA, inLengthA, inB, inLengthB);
-//}
-
-// --------------------------------------------------------------------
 
 class M6BatchIndexProcessor
 {
@@ -1062,8 +1022,8 @@ void M6BatchIndexProcessor::IndexValue(const string& inIndexName,
 		switch (inDataType)
 		{
 			case eM6StringData:	index = GetIndexBase<M6StringIx>(inIndexName, eM6StringIndexType, false); break;
-			case eM6NumberData:	index = GetIndexBase<M6NumberIx>(inIndexName, eM6NumberIndexType, false); break;
-			case eM6DateData:	index = GetIndexBase<M6DateIx>(inIndexName, eM6DateIndexType, false); break;
+			case eM6NumberData:	index = GetIndexBase<M6StringIx>(inIndexName, eM6NumberIndexType, false); break;
+			case eM6DateData:	index = GetIndexBase<M6StringIx>(inIndexName, eM6DateIndexType, false); break;
 			default:			THROW(("Runtime error, unexpected index type"));
 		}
 
@@ -1546,6 +1506,15 @@ void M6DatabankImpl::Validate()
 	mAllTextIndex->Validate();
 }
 
+void M6DatabankImpl::DumpIndex(const string& inIndex, ostream& inStream)
+{
+	if (inIndex != "all-text")
+		THROW(("Dumping of other indices not supported yet"));
+	
+	foreach (string& key, *mAllTextIndex)
+		inStream << key << endl;
+}
+
 // --------------------------------------------------------------------
 
 M6Databank::M6Databank(const fs::path& inPath, MOpenMode inMode)
@@ -1619,4 +1588,9 @@ void M6Databank::Vacuum()
 void M6Databank::Validate()
 {
 	mImpl->Validate();
+}
+
+void M6Databank::DumpIndex(const string& inIndex, ostream& inStream)
+{
+	mImpl->DumpIndex(inIndex, inStream);
 }

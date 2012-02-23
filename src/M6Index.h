@@ -35,46 +35,49 @@ class M6BasicIndex
 	virtual int		CompareKeys(const char* inKeyA, size_t inKeyLengthA,
 						const char* inKeyB, size_t inKeyLengthB) const = 0;
 
-	//// TODO: rewrite iterator to be able to mutate value's directly
-	//class iterator : public std::iterator<std::forward_iterator_tag,const M6Tuple>
-	//{
-	//  public:
-	//	typedef std::iterator<std::forward_iterator_tag, const M6Tuple>	base_type;
-	//	typedef base_type::reference									reference;
-	//	typedef base_type::pointer										pointer;
-	//	
-	//					iterator();
-	//					iterator(const iterator& iter);
-	//	iterator&		operator=(const iterator& iter);
+	// iterator is used to iterate over the keys in an index.
+	// To access the accompanying data, use the M6Iterator producing
+	// method.
 
-	//	reference		operator*() const							{ return mCurrent; }
-	//	pointer			operator->() const							{ return &mCurrent; }
-
-	//	iterator&		operator++();
-	//	iterator		operator++(int)								{ iterator iter(*this); operator++(); return iter; }
-
-	//	bool			operator==(const iterator& iter) const		{ return mIndex == iter.mIndex and mPage == iter.mPage and mKeyNr == iter.mKeyNr; }
-	//	bool			operator!=(const iterator& iter) const		{ return not operator==(iter); }
-
-	//  private:
-	//	friend struct M6IndexImpl;
-
-	//					iterator(M6IndexImpl* inIndex, int64 inPageNr, uint32 inKeyNr);
-
-	//	M6IndexImpl*	mIndex;
-	//	int64			mPage;
-	//	uint32			mKeyNr;
-	//	M6Tuple			mCurrent;
-	//};
+	class iterator : public std::iterator<std::forward_iterator_tag,const std::string>
+	{
+	  public:
+		typedef std::iterator<std::forward_iterator_tag, const std::string>	base_type;
+		typedef base_type::reference										reference;
+		typedef base_type::pointer											pointer;
+		
+						iterator();
+						iterator(const iterator& iter);
+		iterator&		operator=(const iterator& iter);
 	
-//	// lame, but works for now (needed for boost::range)
-//	typedef iterator const_iterator;
-//	
-////	iterator		begin() const;
-////	iterator		end() const;
-//	
-//	iterator		lower_bound(const std::string& inKey) const;
-//	iterator		upper_bound(const std::string& inKey) const;
+		reference		operator*() const							{ return mCurrent; }
+		pointer			operator->() const							{ return &mCurrent; }
+	
+		iterator&		operator++();
+		iterator		operator++(int)								{ iterator iter(*this); operator++(); return iter; }
+	
+		bool			operator==(const iterator& iter) const		{ return mIndex == iter.mIndex and mPage == iter.mPage and mKeyNr == iter.mKeyNr; }
+		bool			operator!=(const iterator& iter) const		{ return not operator==(iter); }
+	
+	  private:
+		friend struct M6IndexImpl;
+	
+						iterator(M6IndexImpl* inIndex, uint32 inPageNr, uint32 inKeyNr);
+	
+		M6IndexImpl*	mIndex;
+		uint32			mPage;
+		uint32			mKeyNr;
+		std::string		mCurrent;
+	};
+	
+	// lame, but works for now (needed for boost::range)
+	typedef iterator const_iterator;
+	
+	iterator		begin() const;
+	iterator		end() const;
+	
+	iterator		lower_bound(const std::string& inKey) const;
+	iterator		upper_bound(const std::string& inKey) const;
 	
 	void			Insert(const std::string& inKey, uint32 inValue);
 	void			Erase(const std::string& inKey);

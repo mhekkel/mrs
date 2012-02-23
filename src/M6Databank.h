@@ -25,6 +25,7 @@ class M6Databank
 	void			Vacuum();
 
 	void			Validate();
+	void			DumpIndex(const std::string& inIndex, std::ostream& inStream);
 	
 	void			Store(M6Document* inDocument);
 	M6Document*		Fetch(uint32 inDocNr);

@@ -664,8 +664,12 @@ struct M6IndexImpl
 
 	void			StoreBits(M6OBitStream& inBits, M6BitVector& outBitVector);
 
-	//iterator		Begin();
-	//iterator		End();
+	typedef typename M6BasicIndex::iterator	iterator;
+
+	iterator		Begin();
+	iterator		End();
+	virtual void	GetKey(uint32 inPage, uint32 inKeyNr, string& outKey) = 0;
+	virtual bool	GetNextKey(uint32& ioPage, uint32& ioKeyNr, string& outKey) = 0;
 
 	virtual void	Insert(const string& inKey, const uint32& inValue)				{ THROW(("Incorrect use of index")); }
 	virtual void	Insert(const string& inKey, const M6MultiData& inValue)			{ THROW(("Incorrect use of index")); }
@@ -749,14 +753,15 @@ template<class M6DataType>
 class M6IndexImplT : public M6IndexImpl
 {
   public:
-	//typedef typename M6BasicIndex::iterator	iterator;
-	
 	typedef M6IndexPage<M6DataType>			M6IndexPage;
 	typedef M6LeafPage<M6DataType>			M6LeafPage;
 	typedef M6BranchPage<M6DataType>		M6BranchPage;
 
 					M6IndexImplT(M6BasicIndex& inIndex, const fs::path& inPath, MOpenMode inMode);
 	virtual 		~M6IndexImplT();
+
+	virtual void	GetKey(uint32 inPage, uint32 inKeyNr, string& outKey);
+	virtual bool	GetNextKey(uint32& ioPage, uint32& ioKeyNr, string& outKey);
 
 	virtual void	Insert(const string& inKey, const M6DataType& inValue);
 	virtual bool	Erase(const string& inKey);
@@ -1997,6 +2002,44 @@ void M6IndexImplT<M6DataType>::Rollback()
 }
 
 template<class M6DataType>
+void M6IndexImplT<M6DataType>::GetKey(uint32 inPage, uint32 inKeyNr, string& outKey)
+{
+	M6LeafPage* page = Load<M6LeafPage>(inPage);
+	if (inKeyNr >= page->GetN())
+		THROW(("key index out of range"));
+	outKey = page->GetKey(inKeyNr);
+	Release(page);
+}
+
+template<class M6DataType>
+bool M6IndexImplT<M6DataType>::GetNextKey(uint32& ioPage, uint32& ioKeyNr, string& outKey)
+{
+	bool result = false;
+	
+	M6LeafPage* page = Load<M6LeafPage>(ioPage);
+
+	if (ioKeyNr + 1 < page->GetN())
+	{
+		++ioKeyNr;
+		GetKey(ioPage, ioKeyNr, outKey);
+		result = true;
+	}
+	else
+	{
+		ioPage = page->GetLink();
+		ioKeyNr = 0;
+		if (ioPage != 0)
+		{
+			result = true;
+			GetKey(ioPage, ioKeyNr, outKey);
+		}
+	}
+	
+	Release(page);
+	return result;
+}
+
+template<class M6DataType>
 void M6IndexImplT<M6DataType>::Insert(const string& inKey, const M6DataType& inValue)
 {
 	try
@@ -2357,80 +2400,67 @@ void M6IndexImplT<M6DataType>::Dump()
 
 // --------------------------------------------------------------------
 
-//M6BasicIndex::iterator M6IndexImpl::Begin()
-//{
-//	uint32 pageNr = mHeader.mRoot;
-//	for (;;)
-//	{
-//		M6IndexPage* page(Load<M6IndexPage>(pageNr));
-//		if (page->IsLeaf())
-//			break;
-//		pageNr = page->GetLink();
-//	}
-//	
-//	return M6BasicIndex::iterator(this, pageNr, 0);
-//}
-//
-//M6BasicIndex::iterator M6IndexImpl::End()
-//{
-//	return M6BasicIndex::iterator(nullptr, 0, 0);
-//}
-//
-//// --------------------------------------------------------------------
-//
-//M6BasicIndex::iterator::iterator()
-//	: mIndex(nullptr)
-//	, mPage(0)
-//	, mKeyNr(0)
-//{
-//}
-//
-//M6BasicIndex::iterator::iterator(const iterator& iter)
-//	: mIndex(iter.mIndex)
-//	, mPage(iter.mPage)
-//	, mKeyNr(iter.mKeyNr)
-//	, mCurrent(iter.mCurrent)
-//{
-//}
-//
-//M6BasicIndex::iterator::iterator(M6IndexImpl* inImpl, uint32 inPageNr, uint32 inKeyNr)
-//	: mIndex(inImpl)
-//	, mPage(inPageNr)
-//	, mKeyNr(inKeyNr)
-//{
-//	if (mIndex != nullptr)
-//	{
-//		M6IndexPage* page(mIndex->Load<M6IndexPage>(mPage));
-//		page->GetKeyValue(mKeyNr, mCurrent.key, mCurrent.value);
-//	}
-//}
-//
-//M6BasicIndex::iterator& M6BasicIndex::iterator::operator=(const iterator& iter)
-//{
-//	if (this != &iter)
-//	{
-//		mIndex = iter.mIndex;
-//		mPage = iter.mPage;
-//		mKeyNr = iter.mKeyNr;
-//		mCurrent = iter.mCurrent;
-//	}
-//	
-//	return *this;
-//}
-//
-//M6BasicIndex::iterator& M6BasicIndex::iterator::operator++()
-//{
-//	M6IndexPage* page(mIndex->Load<M6IndexPage>(mPage));
-//	if (not page->GetNext(mPage, mKeyNr, mCurrent))
-//	{
-//		mIndex = nullptr;
-//		mPage = 0;
-//		mKeyNr = 0;
-//		mCurrent = M6Tuple();
-//	}
-//
-//	return *this;
-//}
+M6BasicIndex::iterator M6IndexImpl::Begin()
+{
+	return M6BasicIndex::iterator(this, mHeader.mFirstLeafPage, 0);
+}
+
+M6BasicIndex::iterator M6IndexImpl::End()
+{
+	return M6BasicIndex::iterator(nullptr, 0, 0);
+}
+
+// --------------------------------------------------------------------
+
+M6BasicIndex::iterator::iterator()
+	: mIndex(nullptr)
+	, mPage(0)
+	, mKeyNr(0)
+{
+}
+
+M6BasicIndex::iterator::iterator(const iterator& iter)
+	: mIndex(iter.mIndex)
+	, mPage(iter.mPage)
+	, mKeyNr(iter.mKeyNr)
+	, mCurrent(iter.mCurrent)
+{
+}
+
+M6BasicIndex::iterator::iterator(M6IndexImpl* inImpl, uint32 inPageNr, uint32 inKeyNr)
+	: mIndex(inImpl)
+	, mPage(inPageNr)
+	, mKeyNr(inKeyNr)
+{
+	if (mIndex != nullptr)
+		mIndex->GetKey(inPageNr, inKeyNr, mCurrent);
+}
+
+M6BasicIndex::iterator& M6BasicIndex::iterator::operator=(const iterator& iter)
+{
+	if (this != &iter)
+	{
+		mIndex = iter.mIndex;
+		mPage = iter.mPage;
+		mKeyNr = iter.mKeyNr;
+		mCurrent = iter.mCurrent;
+	}
+	
+	return *this;
+}
+
+M6BasicIndex::iterator& M6BasicIndex::iterator::operator++()
+{
+	if (not mIndex->GetNextKey(mPage, mKeyNr, mCurrent))
+	{
+		mIndex = nullptr;
+		mPage = 0;
+		mKeyNr = 0;
+		mCurrent.clear();
+	}
+
+	return *this;
+}
 
 // --------------------------------------------------------------------
 

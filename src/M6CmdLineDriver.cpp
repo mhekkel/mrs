@@ -111,7 +111,58 @@ void Query(int argc, char* argv[])
 
 void Info(int argc, char* argv[])
 {
-	cerr << "not supported yet" << endl;
+	po::options_description desc("m6 info");
+	desc.add_options()
+		("databank,d",	po::value<string>(),	"Databank to build")
+		("config-file,c", po::value<string>(),	"Configuration file")
+		("index,i", po::value<string>(),		"Index to dump")
+		("verbose,v",							"Be verbose")
+		("help,h",								"Display help message")
+		;
+
+	po::positional_options_description p;
+	p.add("databank", 1);
+	
+	po::variables_map vm;
+	po::store(po::command_line_parser(argc, argv).options(desc).positional(p).run(), vm);
+	po::notify(vm);
+
+	if (vm.count("help") or vm.count("databank") == 0)
+	{
+		cout << desc << "\n";
+		exit(1);
+	}
+	
+	if (vm.count("verbose"))
+		VERBOSE = 1;
+	
+	string databank = vm["databank"].as<string>();
+
+	fs::path configFile("config/m6-config.xml");
+	if (vm.count("config-file"))
+		configFile = vm["config-file"].as<string>();
+	
+	if (not fs::exists(configFile))
+		THROW(("Configuration file not found (\"%s\")", configFile.string().c_str()));
+	
+	M6Config::SetConfigFile(configFile);
+
+	zeep::xml::element* config = M6Config::Instance().LoadConfig(databank);
+	if (not config)
+		THROW(("Configuration for %s is missing", databank.c_str()));
+
+	zeep::xml::element* file = config->find_first("file");
+	if (not file)
+		THROW(("Invalid config-file, file is missing"));
+
+	fs::path path = file->content();
+	M6Databank db(path.string(), eReadOnly);
+	
+	if (vm.count("index"))
+	{
+		db.DumpIndex(vm["index"].as<string>(), cout);
+	}
+	
 }
 
 void Vacuum(int argc, char* argv[])

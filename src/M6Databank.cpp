@@ -1511,7 +1511,7 @@ void M6DatabankImpl::DumpIndex(const string& inIndex, ostream& inStream)
 	if (inIndex != "all-text")
 		THROW(("Dumping of other indices not supported yet"));
 	
-	foreach (string& key, *mAllTextIndex)
+	foreach (const string& key, *mAllTextIndex)
 		inStream << key << endl;
 }
 

@@ -2484,15 +2484,15 @@ void M6BasicIndex::Vacuum(M6Progress& inProgress)
 	mImpl->Vacuum(inProgress);
 }
 
-//M6BasicIndex::iterator M6BasicIndex::begin() const
-//{
-//	return mImpl->Begin();
-//}
-//
-//M6BasicIndex::iterator M6BasicIndex::end() const
-//{
-//	return mImpl->End();
-//}
+M6BasicIndex::iterator M6BasicIndex::begin() const
+{
+	return mImpl->Begin();
+}
+
+M6BasicIndex::iterator M6BasicIndex::end() const
+{
+	return mImpl->End();
+}
 
 void M6BasicIndex::Insert(const string& key, uint32 value)
 {

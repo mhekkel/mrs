@@ -187,7 +187,10 @@ class M6FullTextIx
 	struct CompareEntryIterator
 	{
 		bool operator()(const M6BufferEntryIterator* a, const M6BufferEntryIterator* b) const
-						{ return not (a->mEntry < b->mEntry); }
+		{
+			return a->mEntry.term > b->mEntry.term or
+				(a->mEntry.term == b->mEntry.term and a->mEntry.doc > b->mEntry.doc);
+		}
 	};
 	
 	typedef vector<M6BufferEntryIterator*>	M6EntryQueue;

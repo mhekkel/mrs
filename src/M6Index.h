@@ -15,6 +15,7 @@ struct M6IndexImpl;
 class M6CompressedArray;
 union M6BitVector;
 class M6Progress;
+class M6Iterator;
 
 extern const uint32 kM6MaxKeyLength;
 
@@ -58,6 +59,8 @@ class M6BasicIndex
 	
 		bool			operator==(const iterator& iter) const		{ return mIndex == iter.mIndex and mPage == iter.mPage and mKeyNr == iter.mKeyNr; }
 		bool			operator!=(const iterator& iter) const		{ return not operator==(iter); }
+
+		M6Iterator*		GetDocuments() const;
 	
 	  private:
 		friend struct M6IndexImpl;

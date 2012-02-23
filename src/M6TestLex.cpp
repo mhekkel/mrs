@@ -97,7 +97,7 @@ BOOST_AUTO_TEST_CASE(test_lex_1)
 	ifstream text("test/test-doc.txt");
 	BOOST_REQUIRE(text.is_open());
 
-	M6Lexicon lexicon;
+	M6Lexicon lexicon("de_DE.UTF-8");
 	map<uint32,string> wordmap;
 	vector<string> words;
 
@@ -136,4 +136,27 @@ BOOST_AUTO_TEST_CASE(test_lex_1)
 
 	for (uint32 t = 1; t < lexicon.Count(); ++t)
 		BOOST_CHECK_EQUAL(lexicon.GetString(t), wordmap[t]);
+}
+
+
+BOOST_AUTO_TEST_CASE(test_lex_2)
+{
+	cout << "testing lexicon 2 (locale test)" << endl;
+
+	ifstream text("test/test-duits.txt");
+	BOOST_REQUIRE(text.is_open());
+
+	M6Lexicon lexicon("de_DE.UTF-8");
+
+	string w;
+	getline(text, w);
+	uint32 t = lexicon.Store(w.c_str(), w.length());
+	BOOST_CHECK_EQUAL(lexicon.Lookup(w), t);
+
+	getline(text, w);
+	BOOST_CHECK_EQUAL(lexicon.Lookup(w), t);
+
+	getline(text, w);
+	BOOST_CHECK_EQUAL(lexicon.Lookup(w), t);
+
 }

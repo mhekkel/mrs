@@ -37,7 +37,6 @@ enum M6Token
 	eM6TokenEOF,
 	eM6TokenWord,
 	eM6TokenNumber,
-//	eM6TokenCardinal,
 	eM6TokenPunctuation,
 	eM6TokenOther
 };

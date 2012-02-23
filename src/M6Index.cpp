@@ -27,6 +27,7 @@
 #include "M6Error.h"
 #include "M6BitStream.h"
 #include "M6Progress.h"
+#include "M6Iterator.h"
 
 using namespace std;
 namespace fs = boost::filesystem;
@@ -396,28 +397,6 @@ void M6PageDataAccess<M6DataPage>::InsertKeyValue(const string& inKey, const M6D
 	mDirty = true;
 }
 
-//template<class M6DataPage>
-//bool M6PageDataAccess<M6DataPage>::GetNext(uint32& ioPage, uint32& ioIndex, M6Tuple& outTuple) const
-//{
-//	bool result = false;
-//	++ioIndex;
-//	if (ioIndex < mData.mN)
-//	{
-//		result = true;
-//		GetKeyValue(ioIndex, outTuple.key, outTuple.value);
-//	}
-//	else if (mData.mLink != 0)
-//	{
-//		ioPage = mData.mLink;
-//		M6IndexPagePtr next(mIndex.Load(ioPage));
-//		ioIndex = 0;
-//		next->GetKeyValue(ioIndex, outTuple.key, outTuple.value);
-//		result = true;
-//	}
-//	
-//	return result;
-//}
-
 template<class M6DataPage>
 void M6PageDataAccess<M6DataPage>::EraseEntry(uint32 inIndex)
 {
@@ -664,12 +643,14 @@ struct M6IndexImpl
 
 	void			StoreBits(M6OBitStream& inBits, M6BitVector& outBitVector);
 
-	typedef typename M6BasicIndex::iterator	iterator;
+	typedef M6BasicIndex::iterator	iterator;
 
 	iterator		Begin();
 	iterator		End();
 	virtual void	GetKey(uint32 inPage, uint32 inKeyNr, string& outKey) = 0;
 	virtual bool	GetNextKey(uint32& ioPage, uint32& ioKeyNr, string& outKey) = 0;
+	virtual M6Iterator*
+					GetIterator(uint32 inPage, uint32 inKeyNr) = 0;
 
 	virtual void	Insert(const string& inKey, const uint32& inValue)				{ THROW(("Incorrect use of index")); }
 	virtual void	Insert(const string& inKey, const M6MultiData& inValue)			{ THROW(("Incorrect use of index")); }
@@ -762,6 +743,8 @@ class M6IndexImplT : public M6IndexImpl
 
 	virtual void	GetKey(uint32 inPage, uint32 inKeyNr, string& outKey);
 	virtual bool	GetNextKey(uint32& ioPage, uint32& ioKeyNr, string& outKey);
+	virtual M6Iterator*
+					GetIterator(uint32 inPage, uint32 inKeyNr);
 
 	virtual void	Insert(const string& inKey, const M6DataType& inValue);
 	virtual bool	Erase(const string& inKey);
@@ -2039,6 +2022,25 @@ bool M6IndexImplT<M6DataType>::GetNextKey(uint32& ioPage, uint32& ioKeyNr, strin
 	return result;
 }
 
+template<>
+M6Iterator* M6IndexImplT<uint32>::GetIterator(uint32 inPage, uint32 inKeyNr)
+{
+	return nullptr;
+}
+
+template<>
+M6Iterator* M6IndexImplT<M6MultiData>::GetIterator(uint32 inPage, uint32 inKeyNr)
+{
+	return nullptr;
+}
+
+template<>
+M6Iterator* M6IndexImplT<M6MultiIDLData>::GetIterator(uint32 inPage, uint32 inKeyNr)
+{
+	THROW(("Invalid use of weighted index"));
+	return nullptr;
+}
+
 template<class M6DataType>
 void M6IndexImplT<M6DataType>::Insert(const string& inKey, const M6DataType& inValue)
 {
@@ -2768,7 +2770,6 @@ void M6WeightedBasicIndex::CalculateDocumentWeights(uint32 inDocCount,
 		if (leaf == nullptr)
 			THROW(("invalid index"));
 		
-		// 
 		for (uint32 i = 0; i < leaf->GetN(); ++i)
 		{
 			M6MultiData data = leaf->GetValue(i);

@@ -14,7 +14,6 @@
 #include "M6Error.h"
 #include "M6BitStream.h"
 #include "M6Index.h"
-#include "M6SortedRunArray.h"
 #include "M6Progress.h"
 #include "M6Queue.h"
 
@@ -112,7 +111,7 @@ class M6FullTextIx
 	void			AddWord(uint8 inIndex, uint32 inWord);
 	void			FlushDoc(uint32 inDocNr);
 
-	struct BufferEntry
+	struct M6BufferEntry
 	{
 		M6OBitStream	idl;
 		uint8			ix;
@@ -120,57 +119,14 @@ class M6FullTextIx
 		uint32			term;
 		uint32			doc;
 		
-		bool			operator<(const BufferEntry& inOther) const
+		bool			operator<(const M6BufferEntry& inOther) const
 							{ return term < inOther.term or
 									(term == inOther.term and doc < inOther.doc); }
 	};
-	
-	struct BufferEntryWriter
-	{
-						BufferEntryWriter(M6FullTextIx& inFullTextIndex)
-							: mFirstDoc(0), mFullTextIndex(&inFullTextIndex) { }
 
-		void			PrepareForWrite(const BufferEntry* values, uint32 count);
-		void			WriteSortedRun(M6File& inFile, const BufferEntry* values, uint32 count);
-		
-		uint32			mFirstDoc;
-		M6FullTextIx*	mFullTextIndex;
-	};
-	
-	struct BufferEntryReader
-	{
-						BufferEntryReader(M6File& file, int64 offset);
-		void			ReadSortedRunEntry(BufferEntry& value);
-
-		M6IBitStream	bits;
-		uint32			term;
-		uint32			doc;
-		uint32			mFirstDoc;
-		uint32			idlIxMap;
-	};
-	
-	// the number of buffer entries is one of the most important
-	// variables affecting indexing speed and memory consumption.
-	// The value chosen here seems to be a reasonable tradeoff.
-	enum {
-		kBufferEntryCount = 800000
-//		kBufferEntryCount = 8000
-	};
-	
-	typedef M6SortedRunArray
-	<
-		BufferEntry,
-		less<BufferEntry>,
-		kBufferEntryCount,
-		BufferEntryWriter,
-		BufferEntryReader
-	>	M6EntryBuffer;
-
-	typedef M6EntryBuffer::iterator M6EntryIterator;
-
-
-	M6EntryIterator*Finish()									{ return mEntries.Finish(); }
-	int64			CountEntries() const						{ return mEntries.Size(); }
+	void			PushEntry(const M6BufferEntry& inEntry);
+	int64			Finish();
+	bool			NextEntry(M6BufferEntry& outEntry);
 	
 	fs::path		GetScratchDir() const						{ return mScratchDir; }
 
@@ -190,17 +146,65 @@ class M6FullTextIx
 	};
 
 	typedef set<DocWord> DocWords;
+
+	// the number of buffer entries is one of the most important
+	// variables affecting indexing speed and memory consumption.
+	// The value chosen here seems to be a reasonable tradeoff.
+	enum {
+		kM6BufferEntryCount = 800000
+//		kM6BufferEntryCount = 8000
+	};
+	
+	struct M6EntryRun
+	{
+		uint32			mCount;
+		M6BufferEntry	mEntries[kM6BufferEntryCount];
+	};
+	
+	typedef M6Queue<M6EntryRun*>	M6EntryRunQueue;
+
+	void			FlushEntryRuns();
+	
+	struct M6BufferEntryIterator
+	{
+						M6BufferEntryIterator(M6File& inFile, int64 inOffset, uint32 inCount,
+							uint32 inFirstDoc, uint32 inIDLIxMap)
+							: mBits(inFile, inOffset), mCount(inCount), mFirstDoc(inFirstDoc), mIDLIxMap(inIDLIxMap)
+							, mTerm(1), mDoc(inFirstDoc) {}
+		
+		bool			Next();
+		
+		M6IBitStream	mBits;
+		uint32			mCount;
+		uint32			mFirstDoc;
+		uint32			mIDLIxMap;
+		uint32			mTerm;
+		uint32			mDoc;
+		M6BufferEntry	mEntry;
+	};
+	
+	struct CompareEntryIterator
+	{
+		bool operator()(const M6BufferEntryIterator* a, const M6BufferEntryIterator* b) const
+						{ return not (a->mEntry < b->mEntry); }
+	};
+	
+	typedef vector<M6BufferEntryIterator*>	M6EntryQueue;
 	
 	DocWords		mDocWords;
 	uint32			mDocLocationIxMap, mFullTextIxMap;
 	uint32			mDocWordLocation;
-	BufferEntryWriter
-					mBufferEntryWriter;
 	fs::path		mScratchDir;
-	M6EntryBuffer	mEntries;
+
+	M6File			mEntryBuffer;
+	M6EntryRun*		mEntryRun;
+	M6EntryRunQueue	mEntryRunQueue;
+	boost::thread	mEntryRunThread;
+	M6EntryQueue	mEntryQueue;
+	int64			mEntryCount;
 };
 
-ostream& operator<<(ostream& os, const M6FullTextIx::BufferEntry& e)
+ostream& operator<<(ostream& os, const M6FullTextIx::M6BufferEntry& e)
 {
 	os << e.term << '\t'
 	   << e.doc << '\t'
@@ -212,14 +216,25 @@ ostream& operator<<(ostream& os, const M6FullTextIx::BufferEntry& e)
 M6FullTextIx::M6FullTextIx(const fs::path& inScratchUrl)
 	: mDocLocationIxMap(0), mFullTextIxMap(0)
 	, mDocWordLocation(1)
-	, mBufferEntryWriter(*this)
 	, mScratchDir(inScratchUrl)
-	, mEntries(mScratchDir / "fulltext", less<BufferEntry>(), mBufferEntryWriter)
+	, mEntryBuffer(mScratchDir / "fulltext", eReadWrite)
+	, mEntryRun(nullptr)
+	, mEntryRunThread(boost::bind(&M6FullTextIx::FlushEntryRuns, this))
+	, mEntryCount(0)
 {
 }
 
 M6FullTextIx::~M6FullTextIx()
 {
+	delete mEntryRun;
+	if (mEntryRunThread.joinable())
+	{
+		mEntryRunQueue.Put(nullptr);
+		mEntryRunThread.join();
+		
+		foreach (M6BufferEntryIterator* iter, mEntryQueue)
+			delete iter;
+	}
 }
 
 void M6FullTextIx::AddWord(uint8 inIndex, uint32 inWord)
@@ -261,7 +276,7 @@ void M6FullTextIx::FlushDoc(uint32 inDoc)
 		if (w->freq == 0)
 			continue;
 		
-		BufferEntry e = {};
+		M6BufferEntry e = {};
 		
 		e.term = w->word;
 		e.doc = inDoc;
@@ -274,87 +289,168 @@ void M6FullTextIx::FlushDoc(uint32 inDoc)
 		if (UsesInDocLocation(w->index))
 			WriteArray(e.idl, w->loc);
 
-		mEntries.PushBack(e);
+		PushEntry(e);
 	}
 	
 	mDocWords.clear();
 	mDocWordLocation = 1;
 }
 
-void M6FullTextIx::BufferEntryWriter::PrepareForWrite(const BufferEntry* inValues, uint32 inCount)
+void M6FullTextIx::PushEntry(const M6BufferEntry& inEntry)
 {
-	mFirstDoc = inValues[0].doc;
-}
-
-void M6FullTextIx::BufferEntryWriter::WriteSortedRun(M6File& inFile, const BufferEntry* inValues, uint32 inCount)
-{
-	M6OBitStream bits(inFile);
-	
-	uint32 t = 0;
-	uint32 d = mFirstDoc;	// the first doc in this run
-	int32 ix = -1;
-	
-	uint32 idlIxMap = mFullTextIndex->GetDocLocationIxMap();
-	
-	WriteGamma(bits, mFirstDoc);
-	WriteBinary(bits, 32, idlIxMap);
-
-	for (uint32 i = 0; i < inCount; ++i)
+	if (mEntryRun != nullptr and mEntryRun->mCount >= kM6BufferEntryCount)
 	{
-		assert(inValues[i].term > t or inValues[i].doc > d or inValues[i].ix > ix);
-
-		if (inValues[i].term > t)
-			d = mFirstDoc;
-
-		WriteGamma(bits, inValues[i].term - t + 1);
-		WriteGamma(bits, inValues[i].doc - d + 1);
-		WriteGamma(bits, inValues[i].ix + 1);
-		WriteBinary(bits, kM6WeightBitCount, inValues[i].weight);
-
-		if (idlIxMap & (1 << inValues[i].ix))
-			WriteBits(bits, inValues[i].idl);
-
-		t = inValues[i].term;
-		d = inValues[i].doc;
-		ix = inValues[i].ix;
+		mEntryRunQueue.Put(mEntryRun);
+		mEntryRun = nullptr;
 	}
 	
-	bits.Sync();
-}
-
-M6FullTextIx::BufferEntryReader::BufferEntryReader(M6File& inFile, int64 inOffset)
-	: bits(inFile, inOffset)
-{
-	ReadGamma(bits, mFirstDoc);
-	doc = mFirstDoc;
-	term = 0;
-	ReadBinary(bits, 32, idlIxMap);
-}
-
-void M6FullTextIx::BufferEntryReader::ReadSortedRunEntry(BufferEntry& outValue)
-{
-	uint32 delta;
-	
-	ReadGamma(bits, delta);
-	delta -= 1;
-
-	if (delta)
+	if (mEntryRun == nullptr)
 	{
-		term += delta;
-		doc = mFirstDoc;
+		mEntryRun = new M6EntryRun;
+		mEntryRun->mCount = 0;
 	}
 	
-	outValue.term = term;
-	ReadGamma(bits, delta);
-	delta -= 1;
-	doc += delta;
-	outValue.doc = doc;
-	ReadGamma(bits, outValue.ix);
-	outValue.ix -= 1;
-	ReadBinary(bits, kM6WeightBitCount, outValue.weight);
+	mEntryRun->mEntries[mEntryRun->mCount] = inEntry;
+	++mEntryRun->mCount;
+	++mEntryCount;
+}
+
+void M6FullTextIx::FlushEntryRuns()
+{
+	for (;;)
+	{
+		M6EntryRun* run = mEntryRunQueue.Get();
+		if (run == nullptr)
+			break;
+		
+		M6OBitStream bits(mEntryBuffer);
+		
+		M6BufferEntry* entries = run->mEntries;
+		uint32 count = run->mCount;
+		
+		uint32 t = 1;
+		uint32 firstDoc = entries[0].doc;	// the first doc in this run
+		uint32 d = firstDoc;
+		int32 ix = -1;
+		
+		// create an iterator now that we have all the info
+		mEntryQueue.push_back(new M6BufferEntryIterator(mEntryBuffer, mEntryBuffer.Size(),
+			count, firstDoc, mDocLocationIxMap));
+		
+		stable_sort(entries, entries + count);
 	
-	if (idlIxMap & (1 << outValue.ix))
-		ReadBits(bits, outValue.idl);
+		for (uint32 i = 0; i < count; ++i)
+		{
+			assert(entries[i].term > t or entries[i].doc > d or entries[i].ix > ix);
+	
+			if (entries[i].term > t)
+				d = firstDoc;
+	
+			WriteGamma(bits, entries[i].term - t + 1);
+			WriteGamma(bits, entries[i].doc - d + 1);
+			WriteGamma(bits, entries[i].ix + 1);
+			WriteBinary(bits, kM6WeightBitCount, entries[i].weight);
+	
+			if (mDocLocationIxMap & (1 << entries[i].ix))
+				WriteBits(bits, entries[i].idl);
+	
+			t = entries[i].term;
+			d = entries[i].doc;
+			ix = entries[i].ix;
+		}
+		
+		bits.Sync();
+
+		delete run;
+	}
+}
+
+int64 M6FullTextIx::Finish()
+{
+	// flush the runs and stop the thread
+	if (mEntryRun != nullptr)
+	{
+		mEntryRunQueue.Put(mEntryRun);
+		mEntryRun = nullptr;
+	}
+
+	mEntryRunQueue.Put(nullptr);
+	mEntryRunThread.join();
+	
+	// setup the input queue
+	vector<M6BufferEntryIterator*> iterators;
+	swap(mEntryQueue, iterators);
+	mEntryQueue.reserve(iterators.size());
+	
+	foreach (M6BufferEntryIterator* iter, iterators)
+	{
+		if (iter->Next())
+		{
+			mEntryQueue.push_back(iter);
+			push_heap(mEntryQueue.begin(), mEntryQueue.end(), CompareEntryIterator());
+		}
+		else
+			delete iter;
+	}
+	return mEntryCount;
+}
+
+bool M6FullTextIx::NextEntry(M6BufferEntry& outEntry)
+{
+	bool result = false;
+	
+	if (not mEntryQueue.empty())
+	{
+		pop_heap(mEntryQueue.begin(), mEntryQueue.end(), CompareEntryIterator());
+		M6BufferEntryIterator* iter = mEntryQueue.back();
+		
+		outEntry = iter->mEntry;
+		
+		if (iter->Next())
+			push_heap(mEntryQueue.begin(), mEntryQueue.end(), CompareEntryIterator());
+		else
+		{
+			mEntryQueue.erase(mEntryQueue.end() - 1);
+			delete iter;
+		}
+		
+		result = true;
+	}
+	
+	return result;
+}
+
+bool M6FullTextIx::M6BufferEntryIterator::Next()
+{
+	bool result = false;
+	if (mCount > 0)
+	{
+		uint32 delta;
+		ReadGamma(mBits, delta);
+		delta -= 1;
+	
+		if (delta != 0)
+		{
+			mTerm += delta;
+			mDoc = mFirstDoc;
+		}
+		
+		mEntry.term = mTerm;
+		ReadGamma(mBits, delta);
+		delta -= 1;
+		mDoc += delta;
+		mEntry.doc = mDoc;
+		ReadGamma(mBits, mEntry.ix);
+		mEntry.ix -= 1;
+		ReadBinary(mBits, kM6WeightBitCount, mEntry.weight);
+		
+		if (mIDLIxMap & (1 << mEntry.ix))
+			ReadBits(mBits, mEntry.idl);
+	
+		--mCount;
+		result = true;
+	}
+	return result;
 }
 
 // --------------------------------------------------------------------
@@ -994,17 +1090,15 @@ void M6BatchIndexProcessor::Finish(uint32 inDocCount)
 	// tell indices about the doc count
 	for_each(mIndices.begin(), mIndices.end(), [&inDocCount](M6BasicIxDesc& ix) { ix.mBasicIx->SetDbDocCount(inDocCount); });
 	
-	// get the iterator for all index entries
-	auto_ptr<M6FullTextIx::M6EntryIterator> iter(mFullTextIndex.Finish());
-
-	int64 entryCount = mFullTextIndex.CountEntries(), entriesRead = 0;
+	// Flush the entry buffer and set up for reading back in the sorted entries
+	int64 entryCount = mFullTextIndex.Finish(), entriesRead = 0;
 	
-	M6Progress progress(entryCount, "index assembly");
+	M6Progress progress(entryCount, "assembling index");
 	
 	// the next loop is very *hot*, make sure it is optimized as much as possible.
 	// 
-	M6FullTextIx::BufferEntry ie = {};
-	if (not iter->Next(ie))
+	M6FullTextIx::M6BufferEntry ie = {};
+	if (not mFullTextIndex.NextEntry(ie))
 		THROW(("Nothing was indexed..."));
 
 	uint32 lastTerm = ie.term;
@@ -1015,6 +1109,8 @@ void M6BatchIndexProcessor::Finish(uint32 inDocCount)
 
 	do
 	{
+		assert(ie.term > lastTerm or ie.term == lastTerm and ie.doc >= lastDoc);
+
 		++entriesRead;
 	
 		if ((entriesRead % 10000) == 0)
@@ -1039,7 +1135,7 @@ void M6BatchIndexProcessor::Finish(uint32 inDocCount)
 		if (termFrequency > numeric_limits<uint8>::max())
 			termFrequency = numeric_limits<uint8>::max();
 	}
-	while (iter->Next(ie));
+	while (mFullTextIndex.NextEntry(ie));
 
 	// flush
 	for_each(mIndices.begin(), mIndices.end(), [&ie](M6BasicIxDesc& ix) { ix.mBasicIx->AddDocTerm(0, 0, 0, ie.idl); });

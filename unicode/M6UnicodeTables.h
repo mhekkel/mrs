@@ -28802,7 +28802,7 @@ struct M6NormalisationInfo
 {
 	int16				page_index[4352];
 	M6NormalisedPage	data[32];
-} kNormalisationInfo = {
+} kM6NormalisationInfo = {
 	{
 		  0,  1,  2,  3,  4,  5,  6,  5,  5,  7,  8,  9, 10, 11,  5, 12,
 		 13,  5,  5,  5,  5,  5,  5,  5,  5,  5,  5, 14,  5,  5, 15, 16,

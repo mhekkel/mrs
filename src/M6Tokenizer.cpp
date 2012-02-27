@@ -374,10 +374,10 @@ void M6Tokenizer::Decompose(uint32 inUnicode)
 		uint32 ix = inUnicode >> 8;
 		uint32 p_ix = inUnicode & 0x00FF;
 		
-		ix = kNormalisationInfo.page_index[ix];
+		ix = kM6NormalisationInfo.page_index[ix];
 		
-		c1 = kNormalisationInfo.data[ix][p_ix][0];
-		c2 = kNormalisationInfo.data[ix][p_ix][1];
+		c1 = kM6NormalisationInfo.data[ix][p_ix][0];
+		c2 = kM6NormalisationInfo.data[ix][p_ix][1];
 	}
 	
 	if (c1 == 0 or c1 == inUnicode)

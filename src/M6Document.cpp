@@ -142,7 +142,7 @@ void M6InputDocument::Index(const string& inIndex, M6DataType inDataType,
 {
 	bool tokenize = true;
 #pragma message("TODO implement inIndexNrs")
-	bool inIndexNumbers = false;
+	bool inIndexNumbers = true;
 	
 	if (inDataType != eM6TextData)
 	{
@@ -158,11 +158,11 @@ void M6InputDocument::Index(const string& inIndex, M6DataType inDataType,
 		M6Tokenizer tokenizer(inText, inSize);
 		for (;;)
 		{
-			M6Token token = tokenizer.GetToken();
+			M6Token token = tokenizer.GetNextToken();
 			if (token == eM6TokenEOF)
 				break;
 			
-			uint32 l = tokenizer.GetTokenLength();
+			size_t l = tokenizer.GetTokenLength();
 			if (l == 0)
 			{
 				cerr << endl
@@ -174,7 +174,7 @@ void M6InputDocument::Index(const string& inIndex, M6DataType inDataType,
 
 			assert(l > 0);
 			
-			if ((token == eM6TokenNumber and not inIndexNumbers) or
+			if ((token == eM6TokenCardinal and not inIndexNumbers) or
 				token == eM6TokenPunctuation or
 				l > kM6MaxKeyLength)
 			{
@@ -183,7 +183,7 @@ void M6InputDocument::Index(const string& inIndex, M6DataType inDataType,
 				continue;
 			}
 			
-			if (token != eM6TokenNumber and token != eM6TokenWord)
+			if (token != eM6TokenCardinal and token != eM6TokenWord)
 				continue;
 			
 			uint32 t = mDocLexicon.Store(tokenizer.GetTokenValue(), l);

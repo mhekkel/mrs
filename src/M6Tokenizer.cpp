@@ -5,7 +5,7 @@
 
 #include "M6Tokenizer.h"
 //#include "M6Unicode.h"
-#include "M6UnicodeTables.h"
+#include "../unicode/M6UnicodeTables.h"
 #include "M6Error.h"
 
 using namespace std;
@@ -13,21 +13,38 @@ using namespace std;
 namespace uc
 {
 
-uint32 ToLower(uint32 inUnicode)
+// to lower does case folding
+uint32* ToLower(uint32 inUnicode, uint32* outLower)
 {
-	uint32 result = inUnicode;
-	
 	if (inUnicode < 0x110000)
 	{
 		uint32 ix = inUnicode >> 8;
 		uint32 p_ix = inUnicode & 0x00FF;
 		
-		ix = kUnicodeInfo.page_index[ix];
-		if (kUnicodeInfo.data[ix][p_ix].lower != 0)
-			result = kUnicodeInfo.data[ix][p_ix].lower;
+		ix = kM6UnicodeInfo.page_index[ix];
+		if (kM6UnicodeInfo.data[ix][p_ix].lower == 0)
+			*outLower++ = inUnicode;
+		else if (kM6UnicodeInfo.data[ix][p_ix].lower != 1)
+			*outLower++ = kM6UnicodeInfo.data[ix][p_ix].lower;
+		else
+		{
+			// need a full mapping here
+			int L = 0, R = sizeof(kM6FullCaseFolds) / sizeof(M6FullCaseFold) - 1;
+			while (R >= L)
+			{
+				int i = (L + R) / 2;
+				if (kM6FullCaseFolds[i].uc > inUnicode)
+					R = i - 1;
+				else
+					L = i + 1;
+			}
+			
+			for (uint32* f = kM6FullCaseFolds[R + 1].folded; *f != 0; ++f)
+				*outLower++ = *f;
+		}
 	}
 	
-	return result;
+	return outLower;
 }
 
 uint8 GetProperty(uint32 inUnicode)
@@ -39,8 +56,24 @@ uint8 GetProperty(uint32 inUnicode)
 		uint32 ix = inUnicode >> 8;
 		uint32 p_ix = inUnicode & 0x00FF;
 		
-		ix = kUnicodeInfo.page_index[ix];
-		result = kUnicodeInfo.data[ix][p_ix].prop;
+		ix = kM6UnicodeInfo.page_index[ix];
+		result = kM6UnicodeInfo.data[ix][p_ix].prop;
+	}
+	
+	return result;
+}
+
+uint8 GetCanonicalCombiningClass(uint32 inUnicode)
+{
+	uint8 result = 0;
+	
+	if (inUnicode < 0x110000)
+	{
+		uint32 ix = inUnicode >> 8;
+		uint32 p_ix = inUnicode & 0x00FF;
+		
+		ix = kM6UnicodeInfo.page_index[ix];
+		result = kM6UnicodeInfo.data[ix][p_ix].ccc;
 	}
 	
 	return result;
@@ -93,7 +126,8 @@ uint32 tolower(uint32 c)
 		result = c;
 	}
 	else
-		result = ToLower(c);
+		assert(false);
+		//result = ToLower(c);
 	
 	return result;
 }
@@ -239,19 +273,11 @@ inline bool isspace(uint32 c)
 
 }
 
-M6Tokenizer::M6Tokenizer(const char* inData)
-	: mBuffer(reinterpret_cast<const uint8*>(inData))
-	, mBufferSize(strlen(inData))
-	, mPtr(mBuffer)
-	, mCaseSensitive(true)
-{
-}
+// --------------------------------------------------------------------
 
-M6Tokenizer::M6Tokenizer(const char* inData, size_t inLength, bool inCaseInsensitive)
-	: mBuffer(reinterpret_cast<const uint8*>(inData))
-	, mBufferSize(inLength)
-	, mPtr(mBuffer)
-	, mCaseSensitive(inCaseInsensitive)
+M6Tokenizer::M6Tokenizer(const char* inData, size_t inLength)
+	: mTokenLength(0), mLookaheadLength(0)
+	, mPtr(reinterpret_cast<const uint8*>(inData)), mEnd(reinterpret_cast<const uint8*>(inData) + inLength)
 {
 	assert(inLength > 0);
 }
@@ -259,37 +285,37 @@ M6Tokenizer::M6Tokenizer(const char* inData, size_t inLength, bool inCaseInsensi
 uint32 M6Tokenizer::GetNextCharacter()
 {
 	uint32 result = 0;
-
-	if (mPtr >= mBuffer + mBufferSize)
-	{
-		++mPtr;
-		*mToken++ = 0;
-		return result;
-	}
 	
-	// if it is a simple ascii character:
-	if ((mPtr[0] & 0x080) == 0)
+	if (mLookaheadLength > 0)
+	{
+		--mLookaheadLength;
+		result = mLookahead[mLookaheadLength];
+	}
+	else if (mPtr >= mEnd)
+	{
+		
+	}
+	else if ((*mPtr & 0x080) == 0)		// next byte is a valid ASCII character
 	{
 		result = *mPtr++;
-		if (mCaseSensitive and result >= 'A' and result <= 'Z')
+		if (result >= 'A' and result <= 'Z')
 			result |= fast::kToLowerMask;
-		*mToken++ = static_cast<char>(result);
 	}
-	else
+	else	// decode utf-8
 	{
 		if ((mPtr[0] & 0x0E0) == 0x0C0 and (mPtr[1] & 0x0c0) == 0x080)
 		{
-			result = ((mPtr[0] & 0x01F) << 6) | (mPtr[1] & 0x03F);
+			ToLower(((mPtr[0] & 0x01F) << 6) | (mPtr[1] & 0x03F));
 			mPtr += 2;
 		}
 		else if ((mPtr[0] & 0x0F0) == 0x0E0 and (mPtr[1] & 0x0c0) == 0x080 and (mPtr[2] & 0x0c0) == 0x080)
 		{
-			result = ((mPtr[0] & 0x00F) << 12) | ((mPtr[1] & 0x03F) << 6) | (mPtr[2] & 0x03F);
+			ToLower(((mPtr[0] & 0x00F) << 12) | ((mPtr[1] & 0x03F) << 6) | (mPtr[2] & 0x03F));
 			mPtr += 3;
 		}
 		else if ((mPtr[0] & 0x0F8) == 0x0F0 and (mPtr[1] & 0x0c0) == 0x080 and (mPtr[2] & 0x0c0) == 0x080 and (mPtr[3] & 0x0c0) == 0x080)
 		{
-			result = ((mPtr[0] & 0x007) << 18) | ((mPtr[1] & 0x03F) << 12) | ((mPtr[2] & 0x03F) << 6) | (mPtr[3] & 0x03F);
+			ToLower(((mPtr[0] & 0x007) << 18) | ((mPtr[1] & 0x03F) << 12) | ((mPtr[2] & 0x03F) << 6) | (mPtr[3] & 0x03F));
 			mPtr += 4;
 		}
 		else
@@ -297,177 +323,179 @@ uint32 M6Tokenizer::GetNextCharacter()
 			result = 0xffef;
 			++mPtr;
 		}
-	
-		if (not mCaseSensitive)
-			result = uc::tolower(result);
-
-		// write the unicode to our token mBuffer
-		if (result < 0x080)
-			*mToken++ = static_cast<char>(result);
-		else if (result < 0x0800)
+		
+		if (result == 0)
 		{
-			*mToken++ = static_cast<char> (0x0c0 | (result >> 6));
-			*mToken++ = static_cast<char> (0x080 | (result & 0x03f));
-		}
-		else if (result < 0x00010000)
-		{
-			*mToken++ = static_cast<char> (0x0e0 | (result >> 12));
-			*mToken++ = static_cast<char> (0x080 | ((result >> 6) & 0x03f));
-			*mToken++ = static_cast<char> (0x080 | (result & 0x03f));
-		}
-		else
-		{
-			*mToken++ = static_cast<char> (0x0f0 | (result >> 18));
-			*mToken++ = static_cast<char> (0x080 | ((result >> 12) & 0x03f));
-			*mToken++ = static_cast<char> (0x080 | ((result >> 6) & 0x03f));
-			*mToken++ = static_cast<char> (0x080 | (result & 0x03f));
+			assert(mLookaheadLength > 0);
+			--mLookaheadLength;
+			result = mLookahead[mLookaheadLength];
 		}
 	}
 	
 	return result;
 }
 
-inline void M6Tokenizer::Retract()
+void M6Tokenizer::ToLower(uint32 inUnicode)
 {
-	// skip one valid character back in the input mBuffer
-	if (mPtr > mBuffer + mBufferSize)
-		--mToken, --mPtr;
+	uint32 ix = inUnicode >> 8;
+	uint32 p_ix = inUnicode & 0x00FF;
+	
+	ix = kM6UnicodeInfo.page_index[ix];
+	if (kM6UnicodeInfo.data[ix][p_ix].lower == 0)
+		Decompose(inUnicode);
+	else if (kM6UnicodeInfo.data[ix][p_ix].lower != 1)
+		Decompose(kM6UnicodeInfo.data[ix][p_ix].lower);
 	else
 	{
-		do --mToken; while (mToken > mTokenText and (*mToken & 0x0c0) == 0x080);
-		do --mPtr; while (mPtr > mBuffer and (*mPtr & 0x0c0) == 0x080);
+		// need a full mapping here
+		int L = 0, R = sizeof(kM6FullCaseFolds) / sizeof(M6FullCaseFold) - 1;
+		while (R >= L)
+		{
+			int i = (L + R) / 2;
+			if (kM6FullCaseFolds[i].uc > inUnicode)
+				R = i - 1;
+			else
+				L = i + 1;
+		}
+		
+		assert(kM6FullCaseFolds[R].uc == inUnicode);
+
+		for (uint32* f = kM6FullCaseFolds[R].folded; *f != 0; ++f)
+			Decompose(*f);
 	}
 }
 
-int M6Tokenizer::Restart(int inStart)
+void M6Tokenizer::Decompose(uint32 inUnicode)
 {
-	while (mToken > mTokenText)
-		Retract();
+	uint32 c1 = inUnicode, c2 = 0;
 	
-	int result;
-	switch (inStart)
+	if (inUnicode < 0x110000)
 	{
-		case 10: result = 20; break;
-		case 20: result = 30; break;
+		uint32 ix = inUnicode >> 8;
+		uint32 p_ix = inUnicode & 0x00FF;
+		
+		ix = kNormalisationInfo.page_index[ix];
+		
+		c1 = kNormalisationInfo.data[ix][p_ix][0];
+		c2 = kNormalisationInfo.data[ix][p_ix][1];
 	}
-
-	return result;
+	
+	if (c1 == 0 or c1 == inUnicode)
+	{
+		mLookahead[mLookaheadLength] = inUnicode;
+		++mLookaheadLength;
+	}
+	else
+	{
+		assert(c2 != 0);
+		
+		mLookahead[mLookaheadLength] = c2;
+		++mLookaheadLength;
+		Decompose(c1);
+	}
 }
 
-M6Token M6Tokenizer::GetToken()
+inline void M6Tokenizer::Retract(uint32 inUnicode)
+{
+	mLookahead[mLookaheadLength] = inUnicode;
+	++mLookaheadLength;
+}
+
+M6Token M6Tokenizer::GetNextToken()
 {
 	M6Token result = eM6TokenNone;
 	int start = 10, state = start;
 
-	mToken = mTokenText;
-	
-	while (result == eM6TokenNone and mToken < mTokenText + kMaxTokenLength)
+	mTokenLength = 0;
+	uint32 token[kMaxTokenLength];
+	uint32* t = token;
+		
+	while (result == eM6TokenNone and mTokenLength < kMaxTokenLength)
 	{
 		uint32 c = GetNextCharacter();
+		*t++ = c;
 		
 		switch (state)
 		{
 			case 10:
-				if (c == 0)	// done!
-					result = eM6TokenEOF;
-				else if (fast::isspace(c))
-					mToken = mTokenText;
-				else if (fast::isdigit(c))		// first try a number
-					state = 11;
-				else if (fast::is_han(c))
-					result = eM6TokenWord;
-				else if (fast::isalnum(c) or c == '_')
-					state = 21;
-				else if (fast::ispunct(c))
-					result = eM6TokenPunctuation;
+				switch (c)
+				{
+					case 0:		result = eM6TokenEOF; break;
+					case '-':	result = eM6TokenHyphen; break;
+					case '+':	result = eM6TokenPlus; break;
+					case '?':	result = eM6TokenQuestionMark; break;
+					case '*':	result = eM6TokenAsterisk; break;
+					case '\'':	result = eM6TokenSingleQuote; break;
+					case '"':	result = eM6TokenDoubleQuote; break;
+					case '.':	result = eM6TokenPeriod; break;
+					case '(':	result = eM6TokenOpenParenthesis; break;
+					case ')':	result = eM6TokenCloseParenthesis; break;
+					case ':':	result = eM6TokenColon; break;
+					case '=':	result = eM6TokenEquals; break;
+					case '<':	state = 11; break;
+					case '>':	state = 12; break;
+					default:
+						if (fast::isspace(c))
+							t = token;
+						else if (fast::is_han(c))		// chinese
+							result = eM6TokenWord;
+						else if (fast::isdigit(c))		// first try a number
+							state = 20;
+						else if (fast::isalnum(c) or c == '_')
+							state = 30;
+						else if (fast::ispunct(c))
+							result = eM6TokenPunctuation;
+						else
+							state = 40;
+						break;
+				}
+				break;
+			
+			case 11:	// match <
+				if (c == '=')
+					result = eM6TokenLessEqual;
 				else
+				{
+					Retract(*--t);
+					result = eM6TokenLessThan;
+				}
+				break;
+		
+			case 12:	// match >
+				if (c == '=')
+					result = eM6TokenGreaterEqual;
+				else
+				{
+					Retract(*--t);
+					result = eM6TokenGreaterThan;
+				}
+				break;
+		
+			// matched a digit, allow only cardinals or an identifier starting with a digit
+			case 20:				
+				if (fast::isalpha(c) or c == '_')	
 					state = 30;
-				break;
-			
-			case 11:
-				if (c == '.')		// scientific notation perhaps?
-					state = 12;
-				else if (c == 'e' or c == 'E')
-					state = 14;
-				else if (fast::isalpha(c) or c == '_' or c == '-')		// [:digit:]+[-[:alpha:]_]	=> ident
-					state = start = Restart(start);
 				else if (not fast::isdigit(c))
 				{
-					Retract();
-					result = eM6TokenNumber;
+					Retract(*--t);
+					result = eM6TokenCardinal;
 				}
 				break;
-			
-			case 12:
-				if (c == 'e' or c == 'E')
-					state = 14;
-				else if (fast::isalpha(c) or c == '_' or c == '-')		// [:digit:]+.[:digit:]+[-[:alpha:]_]	=> ident
-					state = start = Restart(start);
-				else if (not fast::isdigit(c))
-				{
-					Retract();
-					result = eM6TokenNumber;
-				}
-				break;
-			
-			case 14:
-				if (c == '+' or c == '-' or fast::isdigit(c))
-					state = 15;
-				else
-					state = start = Restart(start);
-				break;
-			
-			case 15:
-				if (fast::isalpha(c))
-					state = start = Restart(start);
-				else if (not fast::isdigit(c))
-				{
-					Retract();
-					result = eM6TokenNumber;
-				}
-				break;
-			
+		
+			case 30:
 			// parse identifiers
-			case 20:
-				if (fast::isalnum(c) or c == '_')
-					state = 21;
-				else
-					state = start = Restart(start);
-				break;
-			
-			case 21:
-				if (fast::is_han(c))
+				if (fast::is_han(c) or not (fast::isalnum(c) or c == '_' or fast::iscombm(c)))
 				{
-					Retract();
-					result = eM6TokenWord;
-				}
-				else if (c == '.' or c == '-' or c == '\'')
-					state = 22;
-				else if (not (fast::isalnum(c) or c == '_' or fast::iscombm(c)))
-				{
-					Retract();
-					result = eM6TokenWord;
-				}
-				break;
-
-			// no trailing or double dots, hyphens and single quotes
-			case 22:
-				if (fast::isalnum(c) and not fast::is_han(c))
-						// watch out, we only accept one period in between alnum's
-					state = 21;
-				else
-				{
-					Retract();
-					Retract();
+					Retract(*--t);
 					result = eM6TokenWord;
 				}
 				break;
 			
 			// anything else, eat as much as we can
-			case 30:
+			case 40:
 				if (fast::isalnum(c) or c == '_' or c == 0 or fast::ispunct(c))
 				{
-					Retract();
+					Retract(*--t);
 					result = eM6TokenOther;
 				}
 				break;
@@ -477,42 +505,81 @@ M6Token M6Tokenizer::GetToken()
 		}
 	}
 	
-	// can happen if token is too long:
-	if (result == eM6TokenNone and mToken > mTokenText)
-		result = eM6TokenOther;
-
-	if (result == eM6TokenWord and mCaseSensitive)
+	*t = 0;
+	
+	// recorder combining marks
+	uint32* s = token;
+	while (s != t)
 	{
-		int32 lowerCase = 0, upperCase = 0;
-		
-		for (char* mPtr = mTokenText; mPtr != mToken; ++mPtr)
+		if (uc::GetProperty(*s) != kCOMBININGMARK)
 		{
-			if (*mPtr >= 'a' and *mPtr <= 'z')
-				++lowerCase;
-			else if (*mPtr >= 'A' and *mPtr <= 'Z')
-				++upperCase;
+			++s;
+			continue;
 		}
 		
-		if (upperCase < lowerCase)
+		uint8 cc[10];
+		cc[0] = uc::GetCanonicalCombiningClass(*s);
+		
+		uint32 n = 1;
+		
+		uint32* ss = s + 1;
+		while (ss != t)
 		{
-			// only convert latin uppercase letters to lowercase
-			for (char* mPtr = mTokenText; mPtr != mToken; ++mPtr)
+			if (uc::GetProperty(*ss) == kCOMBININGMARK)
 			{
-				if (*mPtr >= 'A' and *mPtr <= 'Z')
-					*mPtr |= fast::kToLowerMask;
+				cc[n] = uc::GetCanonicalCombiningClass(*ss);
+				++ss;
+				++n;
+				if (n < 10)
+					continue;
+			}
+			break;
+		}
+		
+		for (uint32 i = 0; i + 1 < n; ++i)
+		{
+			for (uint32 j = i + 1; j < n; ++j)
+			{
+				if (cc[i] > cc[j])
+				{
+					swap(cc[i], cc[j]);
+					swap(s[i], s[j]);
+				}
 			}
 		}
-	}
 
-	*mToken = 0;
+		s = ss;
+	}
+	
+	char* tp = mTokenText;
+	for (s = token; s != t; ++s)
+	{
+		uint32 uc = *s;
+		
+		// write the unicode to our token mBuffer
+		if (uc < 0x080)
+			*tp++ = static_cast<char>(uc);
+		else if (uc < 0x0800)
+		{
+			*tp++ = static_cast<char> (0x0c0 | (uc >> 6));
+			*tp++ = static_cast<char> (0x080 | (uc & 0x03f));
+		}
+		else if (uc < 0x00010000)
+		{
+			*tp++ = static_cast<char> (0x0e0 | (uc >> 12));
+			*tp++ = static_cast<char> (0x080 | ((uc >> 6) & 0x03f));
+			*tp++ = static_cast<char> (0x080 | (uc & 0x03f));
+		}
+		else
+		{
+			*tp++ = static_cast<char> (0x0f0 | (uc >> 18));
+			*tp++ = static_cast<char> (0x080 | ((uc >> 12) & 0x03f));
+			*tp++ = static_cast<char> (0x080 | ((uc >> 6) & 0x03f));
+			*tp++ = static_cast<char> (0x080 | (uc & 0x03f));
+		}
+	}
+	
+	mTokenLength = static_cast<uint32>(tp - mTokenText);
 
 	return result;
-}
-
-void M6Tokenizer::SetOffset(uint32 inOffset)
-{
-	if (inOffset > mBufferSize)
-		THROW(("Parameter for M6Tokenizer::SetOffset is out of range"));
-
-	mPtr = mBuffer + inOffset;
 }

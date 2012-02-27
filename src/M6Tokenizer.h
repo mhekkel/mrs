@@ -36,7 +36,25 @@ enum M6Token
 	eM6TokenNone,
 	eM6TokenEOF,
 	eM6TokenWord,
-	eM6TokenNumber,
+	eM6TokenCardinal,
+	eM6TokenNumber = eM6TokenCardinal,
+
+	eM6TokenHyphen,
+	eM6TokenPlus,
+	eM6TokenQuestionMark,
+	eM6TokenAsterisk,
+	eM6TokenSingleQuote,
+	eM6TokenDoubleQuote,
+	eM6TokenPeriod,
+	eM6TokenOpenParenthesis,
+	eM6TokenCloseParenthesis,
+	eM6TokenColon,
+	eM6TokenEquals,
+	eM6TokenLessThan,
+	eM6TokenLessEqual,
+	eM6TokenGreaterEqual,
+	eM6TokenGreaterThan,
+	
 	eM6TokenPunctuation,
 	eM6TokenOther
 };
@@ -47,31 +65,29 @@ class M6Tokenizer
 
 	static const uint32 kMaxTokenLength = 255;
 
-					M6Tokenizer(const char* inData);
-					M6Tokenizer(const char* inData, size_t inLength,
-						bool inCaseInsensitive = true);
+//					M6Tokenizer(const char* inData);
+					M6Tokenizer(const char* inData, size_t inLength);
 
-	M6Token			GetToken();
+	M6Token			GetNextToken();
 
 	const char*		GetTokenValue() const			{ return mTokenText; }
-	size_t			GetTokenLength() const			{ return mToken - mTokenText; }
+	size_t			GetTokenLength() const			{ return mTokenLength; }
 	std::string		GetTokenString() const			{ return std::string(GetTokenValue(), GetTokenLength()); }
-	
-	bool			TokenHasUpperCase() const		{ return mHasUpperCase; }
-	
-	size_t			GetOffset() const				{ return mPtr - mBuffer; }
-	void			SetOffset(uint32 inOffset);
 	
   private:
 	
 	uint32			GetNextCharacter();
-	void			Retract();
-	int				Restart(int inStart);
+	void			Retract(uint32 inUnicode);
+	
+	void			ToLower(uint32 inUnicode);
+	void			Decompose(uint32 inUnicode);
 
-	char			mTokenText[kMaxTokenLength + 5];		// private buffer
-	const uint8*	mBuffer;
-	size_t			mBufferSize;
+	char			mTokenText[kMaxTokenLength];		// private buffer
+	uint32			mTokenLength;
+	
+	uint32			mLookahead[10];
+	uint32			mLookaheadLength;
+
 	const uint8*	mPtr;
-	char*			mToken;
-	bool			mCaseSensitive, mHasUpperCase;
+	const uint8*	mEnd;
 };

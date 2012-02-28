@@ -1,7 +1,6 @@
 #pragma once
 
-#include <queue>
-
+// --------------------------------------------------------------------
 // M6Iterator is a base class to iterate over query results
 
 class M6Iterator
@@ -41,12 +40,18 @@ class M6SingleDocIterator : public M6Iterator
 	float			mRank;
 };
 
-//typedef std::vector<M6Iterator*>	M6IteratorList;
-//struct M6CompareIterators
-//{
-//	bool operator()(const M6Iterator* a, const M6Iterator* b) const
-//			{ return a->GetCurrent() > b->GetCurrent(); }
-//};
+// --------------------------------------------------------------------
+//	Unions and intersections use the same 'container'
+
+struct M6IteratorPart
+{
+	M6Iterator*		mIter;
+	uint32			mDoc;
+
+	bool			operator<(const M6IteratorPart& inPart)
+						{ return mDoc < inPart.mDoc; }
+};
+typedef std::vector<M6IteratorPart> M6IteratorParts;
 
 class M6UnionIterator : public M6Iterator
 {
@@ -61,8 +66,8 @@ class M6UnionIterator : public M6Iterator
 	static M6Iterator*
 					Create(M6Iterator* inA, M6Iterator* inB);
 
- // private:
-	//M6IteratorList	mIterators;
+  private:
+	M6IteratorParts	mIterators;
 };
 
 class M6IntersectionIterator : public M6Iterator
@@ -78,8 +83,8 @@ class M6IntersectionIterator : public M6Iterator
 	static M6Iterator*
 					Create(M6Iterator* inA, M6Iterator* inB);
 
- // private:
-	//M6IteratorList	mIterators;
+  private:
+	M6IteratorParts	mIterators;
 };
 
 class M6VectorIterator : public M6Iterator

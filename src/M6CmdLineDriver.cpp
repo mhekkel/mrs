@@ -4,11 +4,14 @@
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem/operations.hpp>
+#include <boost/format.hpp>
 
 #include "M6Builder.h"
 #include "M6Databank.h"
 #include "M6Config.h"
 #include "M6Error.h"
+#include "M6Iterator.h"
+#include "M6Document.h"
 
 using namespace std;
 namespace po = boost::program_options;
@@ -106,7 +109,23 @@ void Query(int argc, char* argv[])
 
 	fs::path path = file->content();
 	M6Databank db(path.string(), eReadOnly);
-	db.Find(vm["query"].as<string>());
+	unique_ptr<M6Iterator> rset(db.Find(vm["query"].as<string>(), true, 100));
+	
+	if (rset)
+	{
+		// print results
+		uint32 docNr;
+		float rank;
+		
+		while (rset->Next(docNr, rank))
+		{
+			unique_ptr<M6Document> doc(db.Fetch(docNr));
+			
+			cout << doc->GetAttribute("id") << "\t"
+				 << boost::format("%1.2f") % rank << "\t"
+				 << doc->GetAttribute("title") << endl;
+		}
+	}
 }
 
 void Info(int argc, char* argv[])
@@ -282,7 +301,7 @@ int main(int argc, char* argv[])
 			Build(argc - 1, argv + 1);
 		else if (strcmp(argv[1], "query") == 0)
 			Query(argc - 1, argv + 1);
-		else if (strcmp(argv[1], "info") == 0)
+		else if (strcmp(argv[1], "info") == 0 or strcmp(argv[1], "dump") == 0)
 			Info(argc - 1, argv + 1);
 		else if (strcmp(argv[1], "vacuum") == 0)
 			Vacuum(argc - 1, argv + 1);

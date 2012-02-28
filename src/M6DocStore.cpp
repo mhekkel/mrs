@@ -17,6 +17,8 @@ using namespace std;
 namespace io = boost::iostreams;
 namespace fs = boost::filesystem;
 
+#define swap_bytes(x) (x)
+
 // --------------------------------------------------------------------
 
 const uint32

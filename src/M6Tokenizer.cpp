@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <cstring>
+#include <vector>
 
 #include "M6Tokenizer.h"
 //#include "M6Unicode.h"
@@ -12,40 +13,6 @@ using namespace std;
 
 namespace uc
 {
-
-// to lower does case folding
-uint32* ToLower(uint32 inUnicode, uint32* outLower)
-{
-	if (inUnicode < 0x110000)
-	{
-		uint32 ix = inUnicode >> 8;
-		uint32 p_ix = inUnicode & 0x00FF;
-		
-		ix = kM6UnicodeInfo.page_index[ix];
-		if (kM6UnicodeInfo.data[ix][p_ix].lower == 0)
-			*outLower++ = inUnicode;
-		else if (kM6UnicodeInfo.data[ix][p_ix].lower != 1)
-			*outLower++ = kM6UnicodeInfo.data[ix][p_ix].lower;
-		else
-		{
-			// need a full mapping here
-			int L = 0, R = sizeof(kM6FullCaseFolds) / sizeof(M6FullCaseFold) - 1;
-			while (R >= L)
-			{
-				int i = (L + R) / 2;
-				if (kM6FullCaseFolds[i].uc > inUnicode)
-					R = i - 1;
-				else
-					L = i + 1;
-			}
-			
-			for (uint32* f = kM6FullCaseFolds[R + 1].folded; *f != 0; ++f)
-				*outLower++ = *f;
-		}
-	}
-	
-	return outLower;
-}
 
 uint8 GetProperty(uint32 inUnicode)
 {
@@ -113,29 +80,6 @@ bool isspace(uint32 c)
 	return c == ' ' or c == '\r' or c == '\n' or c == '\t' or
 		GetProperty(c) == kSEPARATOR;
 }
-
-uint32 tolower(uint32 c)
-{
-	const uint8 kToLowerMask = 0x20;
-	uint32 result;
-	
-	if (c < 128)
-	{
-		if (c >= 'A' and c <= 'Z')
-			c |= kToLowerMask;
-		result = c;
-	}
-	else
-		assert(false);
-		//result = ToLower(c);
-	
-	return result;
-}
-
-//UCProperty property(uint32 c)
-//{
-//	return UCProperty(GetProperty(c));
-//}
 
 bool is_han(uint32 c)
 {
@@ -275,25 +219,210 @@ inline bool isspace(uint32 c)
 
 // --------------------------------------------------------------------
 
+void Decompose(uint32 inUnicode, vector<uint32>& outChars)
+{
+	uint32 c1 = inUnicode, c2 = 0;
+	
+	if (inUnicode < 0x110000)
+	{
+		uint32 ix = inUnicode >> 8;
+		uint32 p_ix = inUnicode & 0x00FF;
+		
+		ix = kM6NormalisationInfo.page_index[ix];
+		
+		c1 = kM6NormalisationInfo.data[ix][p_ix][0];
+		c2 = kM6NormalisationInfo.data[ix][p_ix][1];
+	}
+	
+	if (c1 == 0 or c1 == inUnicode)
+		outChars.push_back(inUnicode);
+	else
+	{
+		assert(c2 != 0);
+		Decompose(c1, outChars);
+		outChars.push_back(c2);
+	}
+}
+
+inline void ToLower(uint32 inUnicode, vector<uint32>& outChars)
+{
+	uint32 ix = inUnicode >> 8;
+	uint32 p_ix = inUnicode & 0x00FF;
+	
+	ix = kM6UnicodeInfo.page_index[ix];
+	if (kM6UnicodeInfo.data[ix][p_ix].lower == 0)
+		Decompose(inUnicode, outChars);
+	else if (kM6UnicodeInfo.data[ix][p_ix].lower != 1)
+		Decompose(kM6UnicodeInfo.data[ix][p_ix].lower, outChars);
+	else
+	{
+		// need a full mapping here
+		int L = 0, R = sizeof(kM6FullCaseFolds) / sizeof(M6FullCaseFold) - 1;
+		while (R >= L)
+		{
+			int i = (L + R) / 2;
+			if (kM6FullCaseFolds[i].uc > inUnicode)
+				R = i - 1;
+			else
+				L = i + 1;
+		}
+		
+		assert(kM6FullCaseFolds[R].uc == inUnicode);
+
+		for (uint32* f = kM6FullCaseFolds[R].folded; *f != 0; ++f)
+			Decompose(*f, outChars);
+	}
+}
+
+void CaseFold(std::string& ioString)
+{
+	vector<uint32> chars;
+	chars.reserve(ioString.length());
+	
+	const char* ptr = ioString.c_str();
+	const char* end = ptr + ioString.length();
+	
+	while (ptr < end)
+	{
+		uint32 uc;
+		
+		if ((*ptr & 0x080) == 0)		// next byte is a valid ASCII character
+		{
+			uc = *ptr++;
+			if (uc >= 'A' and uc <= 'Z')
+				uc |= fast::kToLowerMask;
+		}
+		else	// decode utf-8
+		{
+			if ((ptr[0] & 0x0E0) == 0x0C0 and (ptr[1] & 0x0c0) == 0x080)
+			{
+				uc = ((ptr[0] & 0x01F) << 6) | (ptr[1] & 0x03F);
+				ptr += 2;
+			}
+			else if ((ptr[0] & 0x0F0) == 0x0E0 and (ptr[1] & 0x0c0) == 0x080 and (ptr[2] & 0x0c0) == 0x080)
+			{
+				uc = ((ptr[0] & 0x00F) << 12) | ((ptr[1] & 0x03F) << 6) | (ptr[2] & 0x03F);
+				ptr += 3;
+			}
+			else if ((ptr[0] & 0x0F8) == 0x0F0 and (ptr[1] & 0x0c0) == 0x080 and (ptr[2] & 0x0c0) == 0x080 and (ptr[3] & 0x0c0) == 0x080)
+			{
+				uc = ((ptr[0] & 0x007) << 18) | ((ptr[1] & 0x03F) << 12) | ((ptr[2] & 0x03F) << 6) | (ptr[3] & 0x03F);
+				ptr += 4;
+			}
+			else
+			{
+				uc = 0xffef;
+				++ptr;
+			}
+		}
+		
+		ToLower(uc, chars);
+	}
+
+	// chars now contains a lower case, denormalized string
+	// recorder combining marks
+	uint32* s = &chars[0];
+	uint32* t = s + chars.size();
+	while (s != t)
+	{
+		if (uc::GetProperty(*s) != kCOMBININGMARK)
+		{
+			++s;
+			continue;
+		}
+		
+		uint8 cc[10];
+		cc[0] = uc::GetCanonicalCombiningClass(*s);
+		
+		uint32 n = 1;
+		
+		uint32* ss = s + 1;
+		while (ss != t)
+		{
+			if (uc::GetProperty(*ss) == kCOMBININGMARK)
+			{
+				cc[n] = uc::GetCanonicalCombiningClass(*ss);
+				++ss;
+				++n;
+				if (n < 10)
+					continue;
+			}
+			break;
+		}
+		
+		for (uint32 i = 0; i + 1 < n; ++i)
+		{
+			for (uint32 j = i + 1; j < n; ++j)
+			{
+				if (cc[i] > cc[j])
+				{
+					swap(cc[i], cc[j]);
+					swap(s[i], s[j]);
+				}
+			}
+		}
+
+		s = ss;
+	}
+	
+	// write out valid utf-8
+	ioString.clear();
+	for (s = &chars[0]; s != t; ++s)
+	{
+		uint32 uc = *s;
+		
+		// write the unicode to our token mBuffer
+		if (uc < 0x080)
+			ioString += static_cast<char>(uc);
+		else if (uc < 0x0800)
+		{
+			ioString += static_cast<char> (0x0c0 | (uc >> 6));
+			ioString += static_cast<char> (0x080 | (uc & 0x03f));
+		}
+		else if (uc < 0x00010000)
+		{
+			ioString += static_cast<char> (0x0e0 | (uc >> 12));
+			ioString += static_cast<char> (0x080 | ((uc >> 6) & 0x03f));
+			ioString += static_cast<char> (0x080 | (uc & 0x03f));
+		}
+		else
+		{
+			ioString += static_cast<char> (0x0f0 | (uc >> 18));
+			ioString += static_cast<char> (0x080 | ((uc >> 12) & 0x03f));
+			ioString += static_cast<char> (0x080 | ((uc >> 6) & 0x03f));
+			ioString += static_cast<char> (0x080 | (uc & 0x03f));
+		}
+	}
+}
+
+// --------------------------------------------------------------------
+
 M6Tokenizer::M6Tokenizer(const char* inData, size_t inLength)
 	: mTokenLength(0), mLookaheadLength(0)
-	, mPtr(reinterpret_cast<const uint8*>(inData)), mEnd(reinterpret_cast<const uint8*>(inData) + inLength)
+	, mPtr(reinterpret_cast<const uint8*>(inData)), mEnd(mPtr + inLength)
 {
 	assert(inLength > 0);
+}
+
+M6Tokenizer::M6Tokenizer(const string& inData)
+	: mTokenLength(0), mLookaheadLength(0)
+	, mPtr(reinterpret_cast<const uint8*>(inData.c_str()))
+	, mEnd(mPtr + inData.length())
+{
 }
 
 uint32 M6Tokenizer::GetNextCharacter()
 {
 	uint32 result = 0;
 	
-	if (mLookaheadLength > 0)
+	if (mPtr >= mEnd)
+	{
+		// result = 0
+	}
+	else if (mLookaheadLength > 0)
 	{
 		--mLookaheadLength;
 		result = mLookahead[mLookaheadLength];
-	}
-	else if (mPtr >= mEnd)
-	{
-		
 	}
 	else if ((*mPtr & 0x080) == 0)		// next byte is a valid ASCII character
 	{
@@ -409,6 +538,7 @@ M6Token M6Tokenizer::GetNextToken()
 	mTokenLength = 0;
 	uint32 token[kMaxTokenLength];
 	uint32* t = token;
+	bool hasCombiningMarks = false;
 		
 	while (result == eM6TokenNone and mTokenLength < kMaxTokenLength)
 	{
@@ -425,6 +555,8 @@ M6Token M6Tokenizer::GetNextToken()
 					case '+':	result = eM6TokenPlus; break;
 					case '?':	result = eM6TokenQuestionMark; break;
 					case '*':	result = eM6TokenAsterisk; break;
+					case '|':	result = eM6TokenPipe; break;
+					case '&':	result = eM6TokenAmpersand; break;
 					case '\'':	result = eM6TokenSingleQuote; break;
 					case '"':	result = eM6TokenDoubleQuote; break;
 					case '.':	result = eM6TokenPeriod; break;
@@ -484,7 +616,9 @@ M6Token M6Tokenizer::GetNextToken()
 		
 			case 30:
 			// parse identifiers
-				if (fast::is_han(c) or not (fast::isalnum(c) or c == '_' or fast::iscombm(c)))
+				if (fast::iscombm(c))
+					hasCombiningMarks = true;
+				else if (fast::is_han(c) or not (fast::isalnum(c) or c == '_'))
 				{
 					Retract(*--t);
 					result = eM6TokenWord;
@@ -507,52 +641,56 @@ M6Token M6Tokenizer::GetNextToken()
 	
 	*t = 0;
 	
-	// recorder combining marks
-	uint32* s = token;
-	while (s != t)
+	if (hasCombiningMarks)
 	{
-		if (uc::GetProperty(*s) != kCOMBININGMARK)
+		// recorder combining marks
+		uint32* s = token;
+		while (s != t)
 		{
-			++s;
-			continue;
-		}
-		
-		uint8 cc[10];
-		cc[0] = uc::GetCanonicalCombiningClass(*s);
-		
-		uint32 n = 1;
-		
-		uint32* ss = s + 1;
-		while (ss != t)
-		{
-			if (uc::GetProperty(*ss) == kCOMBININGMARK)
+			if (uc::GetProperty(*s) != kCOMBININGMARK)
 			{
-				cc[n] = uc::GetCanonicalCombiningClass(*ss);
-				++ss;
-				++n;
-				if (n < 10)
-					continue;
+				++s;
+				continue;
 			}
-			break;
-		}
-		
-		for (uint32 i = 0; i + 1 < n; ++i)
-		{
-			for (uint32 j = i + 1; j < n; ++j)
+			
+			uint8 cc[10];
+			cc[0] = uc::GetCanonicalCombiningClass(*s);
+			
+			uint32 n = 1;
+			
+			uint32* ss = s + 1;
+			while (ss != t)
 			{
-				if (cc[i] > cc[j])
+				if (uc::GetProperty(*ss) == kCOMBININGMARK)
 				{
-					swap(cc[i], cc[j]);
-					swap(s[i], s[j]);
+					cc[n] = uc::GetCanonicalCombiningClass(*ss);
+					++ss;
+					++n;
+					if (n < 10)
+						continue;
+				}
+				break;
+			}
+			
+			for (uint32 i = 0; i + 1 < n; ++i)
+			{
+				for (uint32 j = i + 1; j < n; ++j)
+				{
+					if (cc[i] > cc[j])
+					{
+						swap(cc[i], cc[j]);
+						swap(s[i], s[j]);
+					}
 				}
 			}
+	
+			s = ss;
 		}
-
-		s = ss;
 	}
 	
+	// write out valid utf-8
 	char* tp = mTokenText;
-	for (s = token; s != t; ++s)
+	for (uint32* s = token; s != t; ++s)
 	{
 		uint32 uc = *s;
 		

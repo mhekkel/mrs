@@ -22,9 +22,13 @@ extern const uint32 kM6MaxKeyLength;
 class M6BasicIndex
 {
   public:
-					M6BasicIndex(const boost::filesystem::path& inPath, MOpenMode inMode);
-
 	virtual			~M6BasicIndex();
+
+	static M6BasicIndex*
+					Load(const boost::filesystem::path& inPath);
+
+	virtual M6IndexType
+					GetIndexType() const;
 
 	void			Commit();
 	void			Rollback();
@@ -85,6 +89,8 @@ class M6BasicIndex
 	void			Insert(const std::string& inKey, uint32 inValue);
 	void			Erase(const std::string& inKey);
 	bool			Find(const std::string& inKey, uint32& outValue);
+	
+	M6Iterator*		Find(const std::string& inKey);
 
 	uint32			size() const;
 	uint32			depth() const;
@@ -93,18 +99,20 @@ class M6BasicIndex
 	void			Validate() const;
 
   protected:
+					M6BasicIndex(const boost::filesystem::path& inPath,
+						M6IndexType inIndexType, MOpenMode inMode);
 					M6BasicIndex(M6IndexImpl* inImpl);
 
 	M6IndexImpl*	mImpl;
 };
 
-template<class INDEX, class COMPARATOR> class M6Index : public INDEX
+template<class INDEX, class COMPARATOR, M6IndexType TYPE> class M6Index : public INDEX
 {
   public:
 	typedef COMPARATOR			M6Comparator;
 
 					M6Index(const boost::filesystem::path& inPath, MOpenMode inMode)
-						: INDEX(inPath, inMode) {}
+						: INDEX(inPath, TYPE, inMode) {}
 
 	virtual int		CompareKeys(const char* inKeyA, size_t inKeyLengthA,
 								const char* inKeyB, size_t inKeyLengthB) const
@@ -168,42 +176,42 @@ struct M6NumericComparator
 	}
 };
 
-typedef M6Index<M6BasicIndex, M6BasicComparator>	M6SimpleIndex;
-typedef M6Index<M6BasicIndex, M6NumericComparator>	M6NumberIndex;
+typedef M6Index<M6BasicIndex, M6BasicComparator, eM6CharIndex>	M6SimpleIndex;
+typedef M6Index<M6BasicIndex, M6NumericComparator, eM6NumberIndex>	M6NumberIndex;
 
 // --------------------------------------------------------------------
 
 class M6MultiBasicIndex : public M6BasicIndex
 {
   public:
-					M6MultiBasicIndex(const boost::filesystem::path& inPath, MOpenMode inMode);
+					M6MultiBasicIndex(const boost::filesystem::path& inPath, M6IndexType inIndexType, MOpenMode inMode);
 
 	void			Insert(const std::string& inKey, const std::vector<uint32>& inDocuments);
 	bool			Find(const std::string& inKey, M6CompressedArray& outDocuments);
 };
 
-typedef M6Index<M6MultiBasicIndex, M6BasicComparator>	M6SimpleMultiIndex;
-typedef M6Index<M6MultiBasicIndex, M6NumericComparator>	M6NumberMultiIndex;
+typedef M6Index<M6MultiBasicIndex, M6BasicComparator, eM6CharMultiIndex> M6SimpleMultiIndex;
+typedef M6Index<M6MultiBasicIndex, M6NumericComparator, eM6NumberMultiIndex> M6NumberMultiIndex;
 
 // --------------------------------------------------------------------
 
 class M6MultiIDLBasicIndex : public M6BasicIndex
 {
   public:
-					M6MultiIDLBasicIndex(const boost::filesystem::path& inPath, MOpenMode inMode);
+					M6MultiIDLBasicIndex(const boost::filesystem::path& inPath, M6IndexType inIndexType, MOpenMode inMode);
 
 	void			Insert(const std::string& inKey, int64 inIDLOffset, const std::vector<uint32>& inDocuments);
 	bool			Find(const std::string& inKey, M6CompressedArray& outDocuments, int64& outIDLOffset);
 };
 
-typedef M6Index<M6MultiIDLBasicIndex, M6BasicComparator>	M6SimpleIDLMultiIndex;
+typedef M6Index<M6MultiIDLBasicIndex, M6BasicComparator, eM6CharMultiIDLIndex> M6SimpleIDLMultiIndex;
 
 // --------------------------------------------------------------------
 
 class M6WeightedBasicIndex : public M6BasicIndex
 {
   public:
-					M6WeightedBasicIndex(const boost::filesystem::path& inPath, MOpenMode inMode);
+					M6WeightedBasicIndex(const boost::filesystem::path& inPath, M6IndexType inIndexType, MOpenMode inMode);
 
 	class M6WeightedIterator
 	{
@@ -231,5 +239,5 @@ class M6WeightedBasicIndex : public M6BasicIndex
 						M6Progress& inProgress);
 };
 
-typedef M6Index<M6WeightedBasicIndex, M6BasicComparator>	M6SimpleWeightedIndex;
+typedef M6Index<M6WeightedBasicIndex, M6BasicComparator, eM6CharWeightedIndex>	M6SimpleWeightedIndex;
 

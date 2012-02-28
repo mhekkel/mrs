@@ -44,7 +44,24 @@ typedef boost::uint32_t		uint32;
 typedef boost::int64_t		int64;
 typedef boost::uint64_t		uint64;
 
-//#if defined(BIGENDIAN)
+//enum
+//{
+//	kM6BigEndianOrder = 0x0102,
+//	kM6LittleEndianOrder = 0x0201
+//};
+//
+//static const union {
+//	uint8	b[2];
+//	uint16	v;
+//} kM6ByteOrder = { { 1, 2 } };
+//
+//#define M6_BIG_ENDIAN		(kM6ByteOrder.v == kM6BigEndianOrder)
+//#define M6_LITTLE_ENDIAN	(kM6ByteOrder.v == kM6LittleEndianOrder)
+//
+//struct
+//
+//
+//#if M6_BIG_ENDIAN
 //#define FOUR_CHAR_INLINE(x)	x
 //#else
 //#define FOUR_CHAR_INLINE(x)     \
@@ -67,14 +84,16 @@ enum M6DataType
 	eM6DateData
 };
 
-enum M6IndexType
+enum M6IndexType : uint32
 {
-	eM6NoIndexType,
-
-	eM6FullTextIndexType	= 1,
-	eM6StringIndexType,
-	eM6NumberIndexType,
-	eM6DateIndexType
+	eM6CharIndex			= 'M6cu',
+	eM6NumberIndex			= 'M6nu',
+//	eM6DateIndex			= 'M6du',
+	eM6CharMultiIndex		= 'M6cm',
+	eM6NumberMultiIndex		= 'M6nm',
+//	eM6DateMultiIndex		= 'M6dm',
+	eM6CharMultiIDLIndex	= 'M6ci',
+	eM6CharWeightedIndex	= 'M6cw'
 };
 
 extern const uint32

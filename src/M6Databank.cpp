@@ -7,6 +7,7 @@
 #include <boost/foreach.hpp>
 #define foreach BOOST_FOREACH
 #include <boost/algorithm/string.hpp>
+#include <boost/format.hpp>
 
 #include "M6Databank.h"
 #include "M6Document.h"
@@ -16,6 +17,8 @@
 #include "M6Index.h"
 #include "M6Progress.h"
 #include "M6Queue.h"
+#include "M6Query.h"
+#include "M6Iterator.h"
 
 using namespace std;
 namespace fs = boost::filesystem;
@@ -47,13 +50,15 @@ class M6DatabankImpl
 		
 	void			Store(M6Document* inDocument);
 	M6Document*		Fetch(uint32 inDocNr);
-	M6Document*		FindDocument(const string& inIndex, const string& inValue);
-	M6Iterator*		Find(const string& inQuery, uint32 inReportLimit);
+	M6Iterator*		Find(const string& inQuery, bool inAllTermsRequired, uint32 inReportLimit);
+	M6Iterator*		Find(const string& inIndex, const string& inTerm,
+						bool inTermIsPattern);
 	
 	M6DocStore&		GetDocStore()						{ return *mStore; }
 	
-	M6BasicIndexPtr	GetIndex(const string& inName, M6IndexType inType, bool inUnique);
-	M6BasicIndexPtr	CreateIndex(const string& inName, M6IndexType inType, bool inUnique);
+	M6BasicIndexPtr	GetIndex(const string& inName, M6IndexType inType);
+	M6BasicIndexPtr	CreateIndex(const string& inName, M6IndexType inType);
+	M6BasicIndexPtr	LoadIndex(const string& inName);
 	M6BasicIndexPtr	GetAllTextIndex()					{ return mAllTextIndex; }
 	
 	fs::path		GetScratchDir() const				{ return mDbDirectory / "tmp"; }
@@ -71,13 +76,12 @@ class M6DatabankImpl
 
 	struct M6IndexDesc
 	{
-							M6IndexDesc(const string& inName, M6BasicIndexPtr inIndex, M6IndexType inType, bool inUnique)
-								: mName(inName), mIndex(inIndex), mType(inType), mUnique(inUnique) {}
+							M6IndexDesc(const string& inName, M6IndexType inType, M6BasicIndexPtr inIndex)
+								: mName(inName), mType(inType), mIndex(inIndex) {}
 
 		string				mName;
-		M6BasicIndexPtr		mIndex;
 		M6IndexType			mType;
-		bool				mUnique;
+		M6BasicIndexPtr		mIndex;
 	};
 	typedef vector<M6IndexDesc>	M6IndexDescList;
 	
@@ -507,8 +511,6 @@ class M6BasicIx
 };
 
 // --------------------------------------------------------------------
-//	
-//
 
 M6BasicIx::M6BasicIx(M6FullTextIx& inFullTextIndex, M6Lexicon& inLexicon,
 		const string& inName, uint8 inIndexNr)
@@ -662,15 +664,13 @@ void M6StringIx::AddDocTerm(uint32 inDoc, uint8 inFrequency, M6OBitStream& inIDL
 
 void M6StringIx::FlushTerm(uint32 inTerm, uint32 inDocCount)
 {
-	if (mDocs.size() > 0)
+	if (not mDocs.empty())
 	{
 		FlushedTerm* termData = new FlushedTerm;
 		termData->mTerm = mLexicon.GetString(inTerm);
 		termData->mDocs.swap(mDocs);
 		mFlushQueue.Put(termData);
 	}
-	
-	mDocs.clear();
 }
 
 void M6StringIx::FlushTerm(FlushedTerm* inTermData)
@@ -863,8 +863,6 @@ void M6WeightedWordIx::FlushTerm(uint32 inTerm, uint32 inDocCount)
 		// flush the raw index bits
 		mBits.Sync();
 		
-//		vector<pair<uint32,uint8>> docs;
-		
 		M6IBitStream bits(mBits);
 		
 		FlushedWeightedTerm* termData = new FlushedWeightedTerm;
@@ -917,7 +915,7 @@ class M6BatchIndexProcessor
   private:
 
 	template<class T>
-	M6BasicIx*	GetIndexBase(const string& inName, M6IndexType inType, bool inUnique);
+	M6BasicIx*	GetIndexBase(const string& inName, M6IndexType inType);
 
 	M6FullTextIx		mFullTextIndex;
 	M6DatabankImpl&		mDatabank;
@@ -949,14 +947,14 @@ M6BatchIndexProcessor::~M6BatchIndexProcessor()
 }
 
 template<class T>
-M6BasicIx* M6BatchIndexProcessor::GetIndexBase(const string& inName, M6IndexType inType, bool inUnique)
+M6BasicIx* M6BatchIndexProcessor::GetIndexBase(const string& inName, M6IndexType inType)
 {
 	T* result = nullptr;
 	foreach (M6BasicIxDesc& ix, mIndices)
 	{
 		if (inName == ix.mName)
 		{
-			if (inType != ix.mType or inUnique != ix.mUnique)
+			if (inType != ix.mType)
 				THROW(("Inconsistent use of indices (%s)", inName.c_str()));
 			result = dynamic_cast<T*>(ix.mBasicIx);
 			break;
@@ -965,14 +963,14 @@ M6BasicIx* M6BatchIndexProcessor::GetIndexBase(const string& inName, M6IndexType
 	
 	if (result == nullptr)
 	{
-		M6BasicIndexPtr index = mDatabank.CreateIndex(inName, inType, inUnique);
+		M6BasicIndexPtr index = mDatabank.CreateIndex(inName, inType);
 
 		index->SetAutoCommit(false);
 		
 		result = new T(mFullTextIndex, mLexicon, inName,
 			static_cast<uint8>(mIndices.size() + 1), index);
 		
-		M6BasicIxDesc desc = { result, inName, inType, inUnique };
+		M6BasicIxDesc desc = { result, inName, inType };
 		mIndices.push_back(desc);
 	}
 	
@@ -991,7 +989,7 @@ void M6BatchIndexProcessor::IndexTokens(const string& inIndexName,
 		}
 		else
 		{
-			M6BasicIx* index = GetIndexBase<M6TextIx>(inIndexName, eM6FullTextIndexType, false);
+			M6BasicIx* index = GetIndexBase<M6TextIx>(inIndexName, eM6CharMultiIDLIndex);
 			foreach (uint32 t, inTokens)
 				index->AddWord(t);
 		}
@@ -1007,9 +1005,9 @@ void M6BatchIndexProcessor::IndexValue(const string& inIndexName,
 	
 		switch (inDataType)
 		{
-			case eM6StringData:	index = mDatabank.CreateIndex(inIndexName, eM6StringIndexType, true); break;
-			case eM6NumberData:	index = mDatabank.CreateIndex(inIndexName, eM6NumberIndexType, true); break;
-			case eM6DateData:	index = mDatabank.CreateIndex(inIndexName, eM6DateIndexType, true); break;
+			case eM6StringData:	index = mDatabank.CreateIndex(inIndexName, eM6CharIndex); break;
+			case eM6NumberData:	index = mDatabank.CreateIndex(inIndexName, eM6NumberIndex); break;
+//			case eM6DateData:	index = mDatabank.CreateIndex(inIndexName, eM6DateIndex); break;
 			default:			THROW(("Runtime error, unexpected index type"));
 		}
 		
@@ -1017,16 +1015,16 @@ void M6BatchIndexProcessor::IndexValue(const string& inIndexName,
 	
 		index->Insert(inValue, inDocNr);
 	}
-	else if (inValue.length() < kM6MaxKeyLength)
+	else if (inValue.length() <= kM6MaxKeyLength)
 	{
 		// too bad, we still have to go through the old route
 		M6BasicIx* index;
 
 		switch (inDataType)
 		{
-			case eM6StringData:	index = GetIndexBase<M6StringIx>(inIndexName, eM6StringIndexType, false); break;
-			case eM6NumberData:	index = GetIndexBase<M6StringIx>(inIndexName, eM6NumberIndexType, false); break;
-			case eM6DateData:	index = GetIndexBase<M6StringIx>(inIndexName, eM6DateIndexType, false); break;
+			case eM6StringData:	index = GetIndexBase<M6StringIx>(inIndexName, eM6CharMultiIndex); break;
+			case eM6NumberData:	index = GetIndexBase<M6StringIx>(inIndexName, eM6NumberMultiIndex); break;
+//			case eM6DateData:	index = GetIndexBase<M6StringIx>(inIndexName, eM6DateIndexType); break;
 			default:			THROW(("Runtime error, unexpected index type"));
 		}
 
@@ -1046,8 +1044,8 @@ void M6BatchIndexProcessor::FlushDoc(uint32 inDocNr)
 void M6BatchIndexProcessor::Finish(uint32 inDocCount)
 {
 	// add the required 'alltext' index
-	M6BasicIxDesc allDesc = { new M6WeightedWordIx(mFullTextIndex, mLexicon, "all-text",
-		static_cast<uint8>(mIndices.size() + 1), mDatabank.GetAllTextIndex()), "all-text", eM6FullTextIndexType };
+	M6BasicIxDesc allDesc = { new M6WeightedWordIx(mFullTextIndex, mLexicon, "full-text",
+		static_cast<uint8>(mIndices.size() + 1), mDatabank.GetAllTextIndex()), "full-text", eM6CharWeightedIndex };
 	mIndices.push_back(allDesc);
 	
 	// tell indices about the doc count
@@ -1121,23 +1119,23 @@ M6DatabankImpl::M6DatabankImpl(M6Databank& inDatabank, const fs::path& inPath, M
 		fs::create_directory(mDbDirectory / "tmp");
 		
 		mStore = new M6DocStore(mDbDirectory / "data", eReadWrite);
-		mAllTextIndex.reset(new M6SimpleWeightedIndex(mDbDirectory / "all-text.index", eReadWrite));
+		mAllTextIndex.reset(new M6SimpleWeightedIndex(mDbDirectory / "full-text.index", eReadWrite));
 	}
 	else if (not fs::is_directory(mDbDirectory))
 		THROW(("databank path is invalid (%s)", inPath.string().c_str()));
 	else
 	{
 		mStore = new M6DocStore(mDbDirectory / "data", inMode);
-		mAllTextIndex.reset(new M6SimpleWeightedIndex(mDbDirectory / "all-text.index", inMode));
+		mAllTextIndex.reset(new M6SimpleWeightedIndex(mDbDirectory / "full-text.index", inMode));
 		
-		if (fs::exists(mDbDirectory / "all-text.weights"))
+		if (fs::exists(mDbDirectory / "full-text.weights"))
 		{
 			try
 			{
 				uint32 maxDocNr = mStore->NextDocumentNumber();
 				mDocWeights.assign(maxDocNr, 0);
 				
-				M6File file(mDbDirectory / "all-text.weights", eReadOnly);
+				M6File file(mDbDirectory / "full-text.weights", eReadOnly);
 				if (file.Size() == sizeof(float) * maxDocNr)
 					file.Read(&mDocWeights[0], sizeof(float) * maxDocNr);
 				else
@@ -1160,7 +1158,7 @@ M6DatabankImpl::~M6DatabankImpl()
 	delete mStore;
 }
 
-M6BasicIndexPtr M6DatabankImpl::GetIndex(const string& inName, M6IndexType inType, bool inUnique)
+M6BasicIndexPtr M6DatabankImpl::GetIndex(const string& inName, M6IndexType inType)
 {
 	M6BasicIndexPtr result;
 	
@@ -1168,7 +1166,7 @@ M6BasicIndexPtr M6DatabankImpl::GetIndex(const string& inName, M6IndexType inTyp
 	{
 		if (desc.mName == inName)
 		{
-			if (desc.mType != inType or desc.mUnique != inUnique)
+			if (desc.mType != inType)
 				THROW(("Inconsistent use of indices (%s)", inName.c_str()));
 			
 			result = desc.mIndex;
@@ -1179,37 +1177,52 @@ M6BasicIndexPtr M6DatabankImpl::GetIndex(const string& inName, M6IndexType inTyp
 	return result;
 }
 
-M6BasicIndexPtr M6DatabankImpl::CreateIndex(const string& inName, M6IndexType inType, bool inUnique)
+M6BasicIndexPtr M6DatabankImpl::CreateIndex(const string& inName, M6IndexType inType)
 {
-	M6BasicIndexPtr result = GetIndex(inName, inType, inUnique);
+	M6BasicIndexPtr result = GetIndex(inName, inType);
 	if (result == nullptr)
 	{
 		fs::path path = mDbDirectory / (inName + ".index");
 		
-		if (inUnique)
+		switch (inType)
 		{
-			switch (inType)
-			{
-				case eM6StringIndexType:
-				case eM6DateIndexType:		result.reset(new M6SimpleIndex(path, mMode)); break;
-				case eM6NumberIndexType:	result.reset(new M6NumberIndex(path, mMode)); break;
-				default:					THROW(("unsupported"));
-			}
-		}
-		else
-		{
-			switch (inType)
-			{
-				case eM6DateIndexType:		result.reset(new M6SimpleMultiIndex(path, mMode)); break;
-				case eM6NumberIndexType:	result.reset(new M6NumberMultiIndex(path, mMode)); break;
-				case eM6StringIndexType:	result.reset(new M6SimpleMultiIndex(path, mMode)); break;
-				case eM6FullTextIndexType:	result.reset(new M6SimpleIDLMultiIndex(path, mMode)); break;
-				default:					THROW(("unsupported"));
-			}
+			case eM6CharIndex:			result.reset(new M6SimpleIndex(path, mMode)); break;
+//			case eM6DateIndex:			result.reset(new M6SimpleIndex(path, mMode)); break;
+			case eM6NumberIndex:		result.reset(new M6NumberIndex(path, mMode)); break;
+			case eM6CharMultiIndex:		result.reset(new M6SimpleMultiIndex(path, mMode)); break;
+//			case eM6DateIndex:			result.reset(new M6SimpleMultiIndex(path, mMode)); break;
+			case eM6NumberMultiIndex:	result.reset(new M6NumberMultiIndex(path, mMode)); break;
+			case eM6CharMultiIDLIndex:	result.reset(new M6SimpleIDLMultiIndex(path, mMode)); break;
+			default:					THROW(("unsupported"));
 		}
 
-		mIndices.push_back(M6IndexDesc(inName, result, inType, inUnique));
+		mIndices.push_back(M6IndexDesc(inName, inType, result));
 	}
+	return result;
+}
+
+M6BasicIndexPtr M6DatabankImpl::LoadIndex(const string& inName)
+{
+	M6BasicIndexPtr result;
+	
+	foreach (M6IndexDesc& desc, mIndices)
+	{
+		if (desc.mName == inName)
+		{
+			result = desc.mIndex;
+			break;
+		}
+	}
+
+	if (result == nullptr)
+	{
+		fs::path path = mDbDirectory / (inName + ".index");
+		
+		result.reset(M6BasicIndex::Load(path));
+
+		mIndices.push_back(M6IndexDesc(inName, result->GetIndexType(), result));
+	}
+
 	return result;
 }
 
@@ -1257,21 +1270,11 @@ void M6DatabankImpl::Store(M6Document* inDocument)
 	if (doc == nullptr)
 		THROW(("Invalid document"));
 
-//	uint32 docNr = doc->Store();
-//	
+	if (mBatch == nullptr)
+		THROW(("storing documents is only supported in batch mode, for now"));
+
 	if (mBatch != nullptr)
 		mStoreQueue.Put(doc);
-//	{
-//		foreach (const M6InputDocument::M6IndexTokens& d, doc->GetIndexTokens())
-//			mBatch->IndexTokens(d.mIndexName, d.mDataType, d.mTokens);
-//
-//		foreach (const M6InputDocument::M6IndexValue& v, doc->GetIndexValues())
-//			mBatch->IndexValue(v.mIndexName, v.mDataType, v.mIndexValue, v.mUnique, docNr);
-//
-//		mBatch->FlushDoc(docNr);
-//	}
-//	
-//	delete inDocument;
 }
 
 M6Document* M6DatabankImpl::Fetch(uint32 inDocNr)
@@ -1285,19 +1288,10 @@ M6Document* M6DatabankImpl::Fetch(uint32 inDocNr)
 	return result;
 }
 
-M6Document* M6DatabankImpl::FindDocument(const string& inIndex, const string& inValue)
-{
-	//M6BasicIndexPtr index = CreateIndex(inIndex, eM6StringIndexType);
-	//if (not index)
-	//	THROW(("Index %s not found", inIndex.c_str()));
-	//
-	//uint32 v;
-	//if (not index->Find(ba::to_lower_copy(inValue), v))
-	//	THROW(("Value %s not found in index %s", inValue.c_str(), inIndex.c_str()));
-	//
-	//return Fetch(v);
-	return nullptr;
-}
+// --------------------------------------------------------------------
+//	The accumulator is a way to find scoring documents. It uses calloc
+//	as a way to reduce memory usage: only when a page in memory is accessed
+//	it is committed.
 
 class M6Accumulator
 {
@@ -1334,6 +1328,8 @@ class M6Accumulator
 							outDocs.push_back(static_cast<uint32>(item - mItems));
 					}
 				}
+	
+	uint32		GetHitCount() const					{ return mHitCount; }
 
   private:
 	
@@ -1349,96 +1345,120 @@ class M6Accumulator
 	uint32		mDocCount, mHitCount;
 };
 
-M6Iterator* M6DatabankImpl::Find(const string& inQuery, uint32 inReportLimit)
+M6Iterator* M6DatabankImpl::Find(const string& inQuery, bool inAllTermsRequired, uint32 inReportLimit)
 {
 	if (mDocWeights.empty())
 		RecalculateDocumentWeights();
 
 	M6Iterator* result = nullptr;
-
-//	uint32 docCount = mStore->size();
-	uint32 maxDocNr = mStore->NextDocumentNumber();
-	float maxD = static_cast<float>(maxDocNr);
-
-	float queryWeight = 0, Smax = 0;
-	M6Accumulator A(maxDocNr);
+	M6Iterator* filter = nullptr;
 	
-	// for each term
+	vector<string> terms;
+	ParseQuery(mDatabank, inQuery, true, terms, filter);
+	
+	if (terms.empty())
+		result = filter;
+	else
 	{
-		M6WeightedBasicIndex::M6WeightedIterator iter;
-		if (static_cast<M6WeightedBasicIndex*>(mAllTextIndex.get())->Find(inQuery, iter))
-		{
-			uint8 termWeight = 1;	// ?
-		
-			const float c_add = 0.007f;
-			const float c_ins = 0.12f;
+	//	uint32 docCount = mStore->size();
+		uint32 maxDocNr = mStore->NextDocumentNumber();
+		float maxD = static_cast<float>(maxDocNr);
 	
-			float s_add = c_add * Smax;
-			float s_ins = c_ins * Smax;
-			
-			float idf = log(1.f + maxD / iter.Size());
-			float wq = idf * termWeight;
-			queryWeight += wq * wq;
-			
-			uint8 f_add = static_cast<uint8>(s_add / (idf * wq * wq));
-			uint8 f_ins = static_cast<uint8>(s_ins / (idf * wq * wq));
-			
-			uint32 docNr;
-			uint8 weight;
-			while (iter.Next(docNr, weight) and weight >= f_add)
+		float queryWeight = 0, Smax = 0;
+		M6Accumulator A(maxDocNr);
+		
+		foreach (string& term, terms)
+		{
+			M6WeightedBasicIndex::M6WeightedIterator iter;
+			if (static_cast<M6WeightedBasicIndex*>(mAllTextIndex.get())->Find(term, iter))
 			{
-				if (weight >= f_ins or A[docNr] != 0)
+				uint8 termWeight = 1;	// ?
+			
+				const float c_add = 0.007f;
+				const float c_ins = 0.12f;
+		
+				float s_add = c_add * Smax;
+				float s_ins = c_ins * Smax;
+				
+				float idf = log(1.f + maxD / iter.Size());
+				float wq = idf * termWeight;
+				queryWeight += wq * wq;
+				
+				uint8 f_add = static_cast<uint8>(s_add / (idf * wq * wq));
+				uint8 f_ins = static_cast<uint8>(s_ins / (idf * wq * wq));
+				
+				uint32 docNr;
+				uint8 weight;
+				while (iter.Next(docNr, weight) and weight >= f_add)
 				{
-					float wd = weight;
-					float sd = idf * wd * wq;
-					
-					float S = A.Add(docNr, sd);
-					if (Smax < S)
-						Smax = S;
+					if (weight >= f_ins or A[docNr] != 0)
+					{
+						float wd = weight;
+						float sd = idf * wd * wq;
+						
+						float S = A.Add(docNr, sd);
+						if (Smax < S)
+							Smax = S;
+					}
 				}
 			}
 		}
-	}
+			
+		queryWeight = sqrt(queryWeight);
 		
-	queryWeight = sqrt(queryWeight);
-	
-	vector<uint32> docs;
-	A.Collect(docs, 1);
-	
-	auto compare = [](const pair<uint32,float>& a, const pair<uint32,float>& b) -> bool
-						{ return a.second > b.second; };
-	vector<pair<uint32,float>> best;
-	
-	foreach (uint32 doc, docs)
-	{
-		float docWeight = mDocWeights[doc];
-		float rank = A[doc] / (docWeight * queryWeight);
+		vector<uint32> docs;
+		uint32 termCount = terms.size();
+		if (not inAllTermsRequired)
+			termCount = 0;
+		A.Collect(docs, termCount);
 		
-		if (best.size() < inReportLimit)
+		if (filter != nullptr)
 		{
-			best.push_back(make_pair(doc, rank));
-			push_heap(best.begin(), best.end(), compare);
+			sort(docs.begin(), docs.end());
+			M6Iterator::Intersect(docs, filter);
 		}
-		else if (best.front().second < rank)
+		
+		auto compare = [](const pair<uint32,float>& a, const pair<uint32,float>& b) -> bool
+							{ return a.second > b.second; };
+		
+		vector<pair<uint32,float>> best;
+		
+		if (A.GetHitCount() > inReportLimit)
+			best.reserve(inReportLimit);
+		else
+			best.reserve(A.GetHitCount());
+		
+		foreach (uint32 doc, docs)
 		{
-			pop_heap(best.begin(), best.end(), compare);
-			best.back() = make_pair(doc, rank);
-			push_heap(best.begin(), best.end(), compare);
+			float docWeight = mDocWeights[doc];
+			float rank = A[doc] / (docWeight * queryWeight);
+			
+			if (best.size() < inReportLimit)
+			{
+				best.push_back(make_pair(doc, rank));
+				push_heap(best.begin(), best.end(), compare);
+			}
+			else if (best.front().second < rank)
+			{
+				pop_heap(best.begin(), best.end(), compare);
+				best.back() = make_pair(doc, rank);
+				push_heap(best.begin(), best.end(), compare);
+			}
 		}
-	}
-	
-	sort_heap(best.begin(), best.end(), compare);
-	
-	foreach (auto b, best)
-	{
-		auto_ptr<M6Document> doc(Fetch(b.first));
-
-		cout << doc->GetAttribute("id") << '\t'
-			<< b.second << '\t'
-			<< doc->GetAttribute("title") << endl;
+		
+		sort_heap(best.begin(), best.end(), compare);
+		
+		result = new M6VectorIterator(best);
 	}
 	
 	return result;
+}
+
+M6Iterator* M6DatabankImpl::Find(
+	const string& inIndex, const string& inTerm, bool inTermIsPattern)
+{
+	M6BasicIndexPtr index = LoadIndex(inIndex);
+	return index->Find(inTerm);
 }
 
 void M6DatabankImpl::StartBatchImport(M6Lexicon& inLexicon)
@@ -1484,7 +1504,7 @@ void M6DatabankImpl::RecalculateDocumentWeights()
 	M6Progress progress(ix->size(), "calculating weights");
 	ix->CalculateDocumentWeights(docCount, mDocWeights, progress);
 
-	M6File weightFile(mDbDirectory / "all-text.weights", eReadWrite);
+	M6File weightFile(mDbDirectory / "full-text.weights", eReadWrite);
 	weightFile.Write(&mDocWeights[0], sizeof(float) * mDocWeights.size());
 }
 
@@ -1511,10 +1531,9 @@ void M6DatabankImpl::Validate()
 
 void M6DatabankImpl::DumpIndex(const string& inIndex, ostream& inStream)
 {
-	if (inIndex != "all-text")
-		THROW(("Dumping of other indices not supported yet"));
+	M6BasicIndexPtr index = LoadIndex(inIndex);
 	
-	foreach (const string& key, *mAllTextIndex)
+	foreach (const string& key, *index)
 		inStream << key << endl;
 }
 
@@ -1563,14 +1582,19 @@ M6Document* M6Databank::Fetch(uint32 inDocNr)
 	return mImpl->Fetch(inDocNr);
 }
 
-M6Document* M6Databank::FindDocument(const string& inIndex, const string& inValue)
+//M6Document* M6Databank::FindDocument(const string& inIndex, const string& inValue)
+//{
+//	return mImpl->FindDocument(inIndex, inValue);
+//}
+
+M6Iterator* M6Databank::Find(const string& inQuery, bool inAllTermsRequired, uint32 inReportLimit)
 {
-	return mImpl->FindDocument(inIndex, inValue);
+	return mImpl->Find(inQuery, inAllTermsRequired, inReportLimit);
 }
 
-M6Iterator* M6Databank::Find(const string& inQuery, uint32 inReportLimit)
+M6Iterator* M6Databank::Find(const string& inIndex, const string& inQuery, bool inTermIsPattern)
 {
-	return mImpl->Find(inQuery, inReportLimit);
+	return mImpl->Find(inIndex, inQuery, inTermIsPattern);
 }
 
 uint32 M6Databank::size() const

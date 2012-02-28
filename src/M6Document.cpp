@@ -148,6 +148,7 @@ void M6InputDocument::Index(const string& inIndex, M6DataType inDataType,
 	{
 		tokenize = inDataType == eM6StringData;
 		M6IndexValue v = { inDataType, inIndex, string(inText, inSize), isUnique };
+		CaseFold(v.mIndexValue);
 		mValues.push_back(v);
 	}
 	

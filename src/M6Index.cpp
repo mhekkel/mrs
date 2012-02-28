@@ -563,10 +563,6 @@ struct M6IndexPageDataTypeFactory<M6IndexPageDataTraits<eM6IndexMultiIDLLeafPage
 
 // --------------------------------------------------------------------
 
-const uint32
-//	kM6IndexFileSignature	= FOUR_CHAR_INLINE('m6ix');
-	kM6IndexFileSignature	= 'm6ix';
-
 struct M6IxFileHeader
 {
 	uint32		mSignature;
@@ -638,7 +634,8 @@ template<class M6DataType>	class M6BranchPage;
 
 struct M6IndexImpl
 {
-					M6IndexImpl(M6BasicIndex& inIndex, const fs::path& inPath, MOpenMode inMode);
+					M6IndexImpl(M6BasicIndex& inIndex, const fs::path& inPath,
+						M6IndexType inType, MOpenMode inMode);
 	virtual 		~M6IndexImpl();
 
 	void			StoreBits(M6OBitStream& inBits, M6BitVector& outBitVector);
@@ -660,8 +657,12 @@ struct M6IndexImpl
 	virtual bool	Find(const string& inKey, M6MultiData& outValue)				{ THROW(("Incorrect use of index")); }
 	virtual bool	Find(const string& inKey, M6MultiIDLData& outValue)				{ THROW(("Incorrect use of index")); }
 
+	virtual M6Iterator*
+					Find(const string& inKey)										{ return nullptr; }
+
 	uint32			Size() const				{ return mHeader.mSize; }
 	uint32			Depth() const				{ return mHeader.mDepth; }
+	M6IndexType		GetIndexType() const		{ return mIndexType; }
 	
 	int				CompareKeys(const char* inKeyA, size_t inKeyLengthA,
 						const char* inKeyB, size_t inKeyLengthB) const
@@ -700,6 +701,7 @@ struct M6IndexImpl
 
 	fs::path		mPath;
 	M6File			mFile;
+	M6IndexType		mIndexType;
 	M6BasicIndex&	mIndex;
 	M6IxFileHeader	mHeader;
 	bool			mAutoCommit;
@@ -738,7 +740,8 @@ class M6IndexImplT : public M6IndexImpl
 	typedef M6LeafPage<M6DataType>			M6LeafPage;
 	typedef M6BranchPage<M6DataType>		M6BranchPage;
 
-					M6IndexImplT(M6BasicIndex& inIndex, const fs::path& inPath, MOpenMode inMode);
+					M6IndexImplT(M6BasicIndex& inIndex, const fs::path& inPath,
+						M6IndexType inType, MOpenMode inMode);
 	virtual 		~M6IndexImplT();
 
 	virtual void	GetKey(uint32 inPage, uint32 inKeyNr, string& outKey);
@@ -749,6 +752,9 @@ class M6IndexImplT : public M6IndexImpl
 	virtual void	Insert(const string& inKey, const M6DataType& inValue);
 	virtual bool	Erase(const string& inKey);
 	virtual bool	Find(const string& inKey, M6DataType& outValue);
+
+	virtual M6Iterator*
+					Find(const string& inKey);
 
 	void			Remap(M6DataType& ioData, const vector<uint32>& inRemappedBitPageNrs);
 
@@ -1595,9 +1601,10 @@ void M6IBitVectorImpl::Read()
 
 // --------------------------------------------------------------------
 
-M6IndexImpl::M6IndexImpl(M6BasicIndex& inIndex, const fs::path& inPath, MOpenMode inMode)
+M6IndexImpl::M6IndexImpl(M6BasicIndex& inIndex, const fs::path& inPath, M6IndexType inType, MOpenMode inMode)
 	: mPath(inPath)
 	, mFile(inPath, inMode)
+	, mIndexType(inType)
 	, mIndex(inIndex)
 	, mDirty(false)
 	, mAutoCommit(true)
@@ -1605,7 +1612,7 @@ M6IndexImpl::M6IndexImpl(M6BasicIndex& inIndex, const fs::path& inPath, MOpenMod
 {
 	if (inMode == eReadWrite and mFile.Size() == 0)
 	{
-		M6IxFileHeaderPage page = { kM6IndexFileSignature, sizeof(M6IxFileHeader) };
+		M6IxFileHeaderPage page = { inType, sizeof(M6IxFileHeader) };
 		mFile.PWrite(&page, kM6IndexPageSize, 0);
 
 		mHeader = page.mHeader;
@@ -1617,7 +1624,7 @@ M6IndexImpl::M6IndexImpl(M6BasicIndex& inIndex, const fs::path& inPath, MOpenMod
 	else
 		mFile.PRead(mHeader, 0);
 	
-	assert(mHeader.mSignature == kM6IndexFileSignature);
+	assert(mHeader.mSignature == mIndexType);
 	assert(mHeader.mHeaderSize == sizeof(M6IxFileHeader));
 }
 
@@ -1928,8 +1935,9 @@ void M6IndexImpl::SetAutoCommit(bool inAutoCommit)
 // --------------------------------------------------------------------
 
 template<class M6DataType>
-M6IndexImplT<M6DataType>::M6IndexImplT(M6BasicIndex& inIndex, const fs::path& inPath, MOpenMode inMode)
-	: M6IndexImpl(inIndex, inPath, inMode)
+M6IndexImplT<M6DataType>::M6IndexImplT(M6BasicIndex& inIndex, const fs::path& inPath,
+		M6IndexType inType, MOpenMode inMode)
+	: M6IndexImpl(inIndex, inPath, inType, inMode)
 {
 	InitCache(kM6CacheCount);
 }
@@ -2152,6 +2160,33 @@ bool M6IndexImplT<M6DataType>::Find(const string& inKey, M6DataType& outValue)
 		Release(root);
 	}
 	return result;
+}
+
+template<>
+M6Iterator* M6IndexImplT<uint32>::Find(const string& inKey)
+{
+	M6Iterator* result = nullptr;
+	if (mHeader.mRoot != 0)
+	{
+		M6IndexPage* root(Load<M6IndexPage>(mHeader.mRoot));
+		uint32 docNr;
+		if (root->Find(inKey, docNr))
+			result = new M6SingleDocIterator(docNr);
+		Release(root);
+	}
+	return result;
+}
+
+template<>
+M6Iterator* M6IndexImplT<M6MultiData>::Find(const string& inKey)
+{
+	return nullptr;
+}
+
+template<>
+M6Iterator* M6IndexImplT<M6MultiIDLData>::Find(const string& inKey)
+{
+	return nullptr;
 }
 
 template<class M6DataType>
@@ -2466,8 +2501,8 @@ M6BasicIndex::iterator& M6BasicIndex::iterator::operator++()
 
 // --------------------------------------------------------------------
 
-M6BasicIndex::M6BasicIndex(const fs::path& inPath, MOpenMode inMode)
-	: mImpl(new M6IndexImplT<uint32>(*this, inPath, inMode))
+M6BasicIndex::M6BasicIndex(const fs::path& inPath, M6IndexType inIndexType, MOpenMode inMode)
+	: mImpl(new M6IndexImplT<uint32>(*this, inPath, inIndexType, inMode))
 {
 }
 
@@ -2479,6 +2514,11 @@ M6BasicIndex::M6BasicIndex(M6IndexImpl* inImpl)
 M6BasicIndex::~M6BasicIndex()
 {
 	delete mImpl;
+}
+
+M6IndexType M6BasicIndex::GetIndexType() const
+{
+	return mImpl->GetIndexType();
 }
 
 void M6BasicIndex::Vacuum(M6Progress& inProgress)
@@ -2512,6 +2552,11 @@ void M6BasicIndex::Erase(const string& key)
 bool M6BasicIndex::Find(const string& inKey, uint32& outValue)
 {
 	return mImpl->Find(inKey, outValue);
+}
+
+M6Iterator* M6BasicIndex::Find(const string& inKey)
+{
+	return mImpl->Find(inKey);
 }
 
 uint32 M6BasicIndex::size() const
@@ -2574,8 +2619,8 @@ void M6BasicIndex::Validate() const
 
 // --------------------------------------------------------------------
 
-M6MultiBasicIndex::M6MultiBasicIndex(const fs::path& inPath, MOpenMode inMode)
-	: M6BasicIndex(new M6IndexImplT<M6MultiData>(*this, inPath, inMode))
+M6MultiBasicIndex::M6MultiBasicIndex(const fs::path& inPath, M6IndexType inIndexType, MOpenMode inMode)
+	: M6BasicIndex(new M6IndexImplT<M6MultiData>(*this, inPath, inIndexType, inMode))
 {
 }
 
@@ -2606,8 +2651,8 @@ bool M6MultiBasicIndex::Find(const string& inKey, M6CompressedArray& outDocument
 
 // --------------------------------------------------------------------
 
-M6MultiIDLBasicIndex::M6MultiIDLBasicIndex(const fs::path& inPath, MOpenMode inMode)
-	: M6BasicIndex(new M6IndexImplT<M6MultiIDLData>(*this, inPath, inMode))
+M6MultiIDLBasicIndex::M6MultiIDLBasicIndex(const fs::path& inPath, M6IndexType inIndexType, MOpenMode inMode)
+	: M6BasicIndex(new M6IndexImplT<M6MultiIDLData>(*this, inPath, inIndexType, inMode))
 {
 }
 
@@ -2629,8 +2674,8 @@ bool M6MultiIDLBasicIndex::Find(const string& inKey, M6CompressedArray& outDocum
 
 // --------------------------------------------------------------------
 
-M6WeightedBasicIndex::M6WeightedBasicIndex(const fs::path& inPath, MOpenMode inMode)
-	: M6BasicIndex(new M6IndexImplT<M6MultiData>(*this, inPath, inMode))
+M6WeightedBasicIndex::M6WeightedBasicIndex(const fs::path& inPath, M6IndexType inIndexType, MOpenMode inMode)
+	: M6BasicIndex(new M6IndexImplT<M6MultiData>(*this, inPath, inIndexType, inMode))
 {
 }
 
@@ -2812,4 +2857,33 @@ void M6WeightedBasicIndex::CalculateDocumentWeights(uint32 inDocCount,
 	}
 	
 	for_each(outWeights.begin(), outWeights.end(), [](float& w) { w = sqrt(w); });
+}
+
+// --------------------------------------------------------------------
+
+M6BasicIndex* M6BasicIndex::Load(const fs::path& inFile)
+{
+	// first read the signature
+	M6IxFileHeader header;
+	{
+		M6File file(inFile, eReadOnly);
+		file.PRead(header, 0);
+	}
+	
+	M6BasicIndex* index = nullptr;
+	
+	switch (header.mSignature)
+	{
+		case eM6CharIndex:			index = new M6SimpleIndex(inFile, eReadOnly);		break;
+		case eM6NumberIndex:		index = new M6NumberIndex(inFile, eReadOnly);		break;
+//		case eM6DateIndex:			index = new M6SimpleIndex(inFile, eReadOnly);		break;
+		case eM6CharMultiIndex:		index = new M6SimpleMultiIndex(inFile, eReadOnly);	break;
+		case eM6NumberMultiIndex:	index = new M6NumberMultiIndex(inFile, eReadOnly); 	break;
+//		case eM6DateMultiIndex:		index = new M6SimpleMultiIndex(inFile, eReadOnly);	break;
+		case eM6CharMultiIDLIndex:	index = new M6SimpleIDLMultiIndex(inFile, eReadOnly); break;
+		case eM6CharWeightedIndex:	index = new M6SimpleWeightedIndex(inFile, eReadOnly); break;
+		default:					THROW(("Unknown index type"));
+	}
+	
+	return index;
 }

@@ -6,57 +6,33 @@
 #include "M6Query.h"
 #include "M6Tokenizer.h"
 #include "M6Iterator.h"
+#include "M6Error.h"
+#include "M6Databank.h"
 
 using namespace std;
 namespace ba = boost::algorithm;
 
 // --------------------------------------------------------------------
 
-enum M6QueryToken
-{
-	eM6QUndefined	= -1,
-	
-	eM6QOpenParenthesis = '(',
-	eM6QColon = ':',
-	
-	eM6QEnd		=	256,
-	eM6QString,
-	eM6QLiteral,
-	eM6QNumber,
-	eM6QIdent,
-	eM6QPattern,
-	eM6QDocNr,
-	
-	eM6QAND,
-	eM6QOR,
-	eM6QNOT,
-	
-	eM6QLT,
-	eM6QLE,
-	eM6QEQ,
-	eM6QGE,
-	eM6QGT
-};
-
-ostream& operator<<(ostream& os, M6QueryToken inToken)
+ostream& operator<<(ostream& os, M6Token inToken)
 {
 	switch (inToken)
 	{
-		case eM6QEnd:		os << "end of query"; 	break;
-		case eM6QString:	os << "string";			break;
-		case eM6QLiteral:	os << "literal";		break;
-		case eM6QNumber:	os << "number"; 		break;
-		case eM6QIdent:		os << "identifier"; 	break;
-		case eM6QPattern:	os << "pattern";		break;
-		case eM6QDocNr:		os << "document number";break;
-		case eM6QAND:		os << "AND";			break;
-		case eM6QOR:		os << "OR";				break;
-		case eM6QNOT:		os << "NOT";			break;
-		case eM6QLT:		os << "'<='";			break;
-		case eM6QLE:		os << "'<'";			break;
-		case eM6QEQ:		os << "'='";			break;
-		case eM6QGE:		os << "'>='";			break;
-		case eM6QGT:		os << "'>='";			break;
+		case eM6TokenEOF:	os << "end of query"; 	break;
+//		case eM6String:		os << "string";			break;
+//		case eM6Literal:	os << "literal";		break;
+//		case eM6Number:		os << "number"; 		break;
+//		case eM6Ident:		os << "identifier"; 	break;
+//		case eM6Pattern:	os << "pattern";		break;
+//		case eM6DocNr:		os << "document number";break;
+//		case eM6AND:		os << "AND";			break;
+//		case eM6OR:			os << "OR";				break;
+//		case eM6NOT:		os << "NOT";			break;
+//		case eM6LT:			os << "'<='";			break;
+//		case eM6LE:			os << "'<'";			break;
+//		case eM6EQ:			os << "'='";			break;
+//		case eM6GE:			os << "'>='";			break;
+//		case eM6GT:			os << "'>='";			break;
 
 		default:
 		{
@@ -73,116 +49,83 @@ ostream& operator<<(ostream& os, M6QueryToken inToken)
 	return os;
 }
 
-enum M6QueryOperator : char
+class M6QueryParser
 {
-	eM6QContains	= ':',
-	eM6QEquals		= '=',
-	eM6QLessThan	= '<',
-	eM6QGreaterThan	= '>',
+  public:
+					M6QueryParser(M6Databank& inDatabank, const string& inQuery,
+						bool inAllTermsRequired);
+	
+	void			Parse(vector<string>& outTerms, M6Iterator*& outFilter);
+
+  private:
+	M6Iterator*		ParseTest();
+	M6Iterator*		ParseQualifiedTest(const string& inIndex);
+	M6Iterator*		ParseTerm(const string& inIndex);
+
+	M6Token			GetNextToken();
+	void			Match(M6Token inToken);
+	
+	M6Databank&		mDatabank;
+	M6Tokenizer		mTokenizer;
+	bool			mImplicitIntersection;
+	bool			mIsBooleanQuery;
+	vector<string>	mQueryTerms;
+	M6Token			mLookahead;
 };
 
-struct M6QueryParser
+M6QueryParser::M6QueryParser(M6Databank& inDatabank,
+	const string& inQuery, bool inAllTermsRequired)
+	: mDatabank(inDatabank), mTokenizer(inQuery), mImplicitIntersection(inAllTermsRequired), mIsBooleanQuery(false)
 {
-						M6QueryParser(M6Databank& inDatabank);
-
-	
-	
-	M6Iterator*			Parse(const string& inQuery, bool inAllTermsRequired);
-
-	M6QueryToken		GetNextToken();
-	void				Match(M6QueryToken inToken);
-	
-	M6Iterator*			CreateIterator(const string& inIndex,
-							const string& inValue, M6QueryOperator inOp);
-
-	bool				mImplicitIntersection;
-	bool				mIsBooleanQuery;
-};
-
-M6QueryToken M6QueryParser::GetNextToken()
-{
-	
 }
 
-void M6QueryParser::Match(M6QueryToken inToken)
+M6Token M6QueryParser::GetNextToken()
+{
+	return mTokenizer.GetNextToken();
+}
+
+void M6QueryParser::Match(M6Token inToken)
 {
 	if (mLookahead != inToken)
 	{
 		boost::format fmt("Query error: expected %1% but found %2%");
-		THROW(((fmt % inToken % mLookahead).str()));
+		THROW(((fmt % inToken % mLookahead).str().c_str()));
 	}
 	
 	mLookahead = GetNextToken();
 }
 
-M6Iterator* M6QueryParser::Parse(const string& inQuery)
+void M6QueryParser::Parse(vector<string>& outTerms, M6Iterator*& outFilter)
 {
 	unique_ptr<M6Iterator> result;
 	
-	if (inQuery == "*")
-		result.reset(new M6AllIterator(mDatabank.size()));
-	else
-	{
-		mLookahead = GetNextToken();
-		
-		while (mLookahead != eM6QEnd)
-		{
-			switch (mLookahead)
-			{
-				case eM6QOR:
-				case eM6QAND:
-					mIsBooleanQuery = true;
-					Match(mLookahead);
-					if (mLookahead == eM6QAND)
-						result.reset(new M6IntersectionIterator(result.release(), ParseTest()));
-					else
-						result.reset(new M6UnionIterator(result.release(), ParseTest()));
-					break;
-				
-				default:
-					if (mImplicitIntersection)
-						result.reset(new M6IntersectionIterator(result.release(), ParseTest()));
-					else
-						result.reset(new M6UnionIterator(result.release(), ParseTest()));
-					break;
-			}
-		}
-	}
+	mLookahead = GetNextToken();
 	
-	return result.release();
-}
-
-M6Iterator* M6QueryParser::ParseSubQuery()
-{
-	mIsBooleanQuery = true;
-	Match('(');
-
-	unique_ptr<M6Iterator> result = ParseTest();
-
-	while (mLookahead != ')')
+	while (mLookahead != eM6TokenEOF)
 	{
 		switch (mLookahead)
 		{
-			case eM6QOR:
-			case eM6QAND:
-				Match(mLookahead);
-				if (mLookahead == eM6QAND)
-					result.reset(new M6IntersectionIterator(result.release(), ParseTest()));
-				else
-					result.reset(new M6UnionIterator(result.release(), ParseTest()));
-				break;
+//			case eM6QOR:
+//			case eM6QAND:
+//				mIsBooleanQuery = true;
+//				Match(mLookahead);
+//				if (mLookahead == eM6QAND)
+//					result.reset(new M6IntersectionIterator(result.release(), ParseTest()));
+//				else
+//					result.reset(new M6UnionIterator(result.release(), ParseTest()));
+//				break;
 			
 			default:
 				if (mImplicitIntersection)
-					result.reset(new M6IntersectionIterator(result.release(), ParseTest()));
+					result.reset(M6IntersectionIterator::Create(result.release(), ParseTest()));
 				else
-					result.reset(new M6UnionIterator(result.release(), ParseTest()));
+					result.reset(M6UnionIterator::Create(result.release(), ParseTest()));
 				break;
 		}
 	}
-	Match(')');
 	
-	return result.release();
+	outFilter = result.release();
+	swap(outTerms, mQueryTerms);
 }
 
 M6Iterator* M6QueryParser::ParseTest()
@@ -191,33 +134,70 @@ M6Iterator* M6QueryParser::ParseTest()
 	
 	switch (mLookahead)
 	{
-		case '(':		result.reset(ParseSubQuery()); break;
-		case eM6QNOT:	mIsBooleanQuery = true; result.reset(M6NotIterator(ParseTest())); break;
+		//case eM6TokenOpenParenthesis:
+		//{
+		//	Match(eM6TokenOpenParenthesis);
+		//	result.reset(ParseSubQuery());
+		//	Match(eM6TokenCloseParenthesis);
+		//	break;
+		//}
+			
+//		case eM6QNOT:	mIsBooleanQuery = true; result.reset(M6NotIterator(ParseTest())); break;
+
+		case eM6TokenWord:
+		{
+			string s = mTokenizer.GetTokenString();
+			Match(eM6TokenWord);
+			
+			if (mLookahead >= eM6TokenColon and mLookahead <= eM6TokenGreaterThan)
+				result.reset(ParseQualifiedTest(s));
+			else
+				mQueryTerms.push_back(s);
+			break;
+		}
+	}
+	
+	return result.release();
+}
+
+M6Iterator* M6QueryParser::ParseQualifiedTest(const string& inIndex)
+{
+	unique_ptr<M6Iterator> result;
+	
+	switch (mLookahead)
+	{
+		case eM6TokenColon:
+			mIsBooleanQuery = true;
+			Match(eM6TokenColon);
+			result.reset(ParseTerm(inIndex));
+			break;
+
+		case eM6TokenEquals:
+			mIsBooleanQuery = true;
+			Match(eM6TokenEquals);
+			result.reset(ParseTerm(inIndex));
+			break;
+		
+//		case eM6Token
 		
 	}
+	
+	return result.release();	
 }
 
-M6Iterator* M6QueryParser::CreateIterator(
-	const string& inIndex, const string& inValue, M6QueryOperator inOp)
+M6Iterator* M6QueryParser::ParseTerm(const string& inIndex)
 {
-	M6Iterator* result;
-	
-	if (inIndex == "*")
-		result = CreateIteratorForTerm(inIndex, inValue,
-			ba::contains(inValue, "*") or ba::contains(inValue, "?"));
-	else
-		result = CreateIteratorForOperator(inIndex, inValue, inOp);
-	
-	return result;
+	string term = mTokenizer.GetTokenString();
+	Match(eM6TokenWord);
+	return mDatabank.Find(inIndex, term, false);
 }
-
 
 // --------------------------------------------------------------------
 
 void ParseQuery(M6Databank& inDatabank, const string& inQuery,
-	bool inAllTermsRequired,
-	vector<string>& outQueryTerms, M6Iterator*& outIterator)
+	bool inAllTermsRequired, vector<string>& outTerms, M6Iterator*& outFilter)
 {
-	
+	M6QueryParser parser(inDatabank, inQuery, inAllTermsRequired);
+	parser.Parse(outTerms, outFilter);
 }
 

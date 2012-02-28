@@ -30,10 +30,13 @@ class M6Databank
 	void			Store(M6Document* inDocument);
 	M6Document*		Fetch(uint32 inDocNr);
 	
-	M6Document*		FindDocument(const std::string& inIndex,
-						const std::string& inValue);
-
-	M6Iterator*		Find(const std::string& inQuery, uint32 inReportLimit = 1000);
+	// high-level interface
+	M6Iterator*		Find(const std::string& inQuery, bool inAllTermsRequired,
+						uint32 inReportLimit);
+	
+	// low-level interface
+	M6Iterator*		Find(const std::string& inIndex, const std::string& inTerm,
+						bool inTermIsPattern);
 	
 	M6DocStore&		GetDocStore();
 	

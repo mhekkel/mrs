@@ -8,4 +8,4 @@ class M6Iterator;
 
 void ParseQuery(M6Databank& inDatabank, const std::string& inQuery,
 	bool inAllTermsRequired,
-	std::vector<std::string>& outQueryTerms, M6Iterator*& outIterator);
+	std::vector<std::string>& outTerms, M6Iterator*& outFilter);

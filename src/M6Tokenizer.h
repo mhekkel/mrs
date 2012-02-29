@@ -16,29 +16,24 @@
 #include <string>
 
 // --------------------------------------------------------------------
-// some text routines first
-
-void CaseFold(std::string& ioString);
-
-// --------------------------------------------------------------------
 
 enum M6Token
 {
 	eM6TokenNone,
 	eM6TokenEOF,
+	eM6TokenUndefined,		// any garbage not matched
 	eM6TokenWord,
-	eM6TokenCardinal,
-	eM6TokenNumber = eM6TokenCardinal,
+	eM6TokenNumber,
+	eM6TokenPunctuation,	// only returned by GetNextWord
 
+	// tokens returned by GetNextQueryToken:
+
+	eM6TokenString,			// a quoted string
+	eM6TokenPattern,		// a glob-like pattern
 	eM6TokenHyphen,
 	eM6TokenPlus,
-	eM6TokenQuestionMark,
-	eM6TokenAsterisk,
-	eM6TokenPipe,
-	eM6TokenAmpersand,
-	eM6TokenSingleQuote,
-	eM6TokenDoubleQuote,
-	eM6TokenPeriod,
+	eM6TokenOR,
+	eM6TokenAND,
 	eM6TokenOpenParenthesis,
 	eM6TokenCloseParenthesis,
 	eM6TokenColon,
@@ -46,10 +41,7 @@ enum M6Token
 	eM6TokenLessThan,
 	eM6TokenLessEqual,
 	eM6TokenGreaterEqual,
-	eM6TokenGreaterThan,
-	
-	eM6TokenPunctuation,
-	eM6TokenOther
+	eM6TokenGreaterThan
 };
 
 class M6Tokenizer
@@ -61,11 +53,16 @@ class M6Tokenizer
 					M6Tokenizer(const std::string& inData);
 					M6Tokenizer(const char* inData, size_t inLength);
 
-	M6Token			GetNextToken();
+	M6Token			GetNextWord();
+	M6Token			GetNextQueryToken();
 
 	const char*		GetTokenValue() const			{ return mTokenText; }
 	size_t			GetTokenLength() const			{ return mTokenLength; }
 	std::string		GetTokenString() const			{ return std::string(GetTokenValue(), GetTokenLength()); }
+
+	// code reuse
+	static void		CaseFold(std::string& ioString);
+	static void		Normalize(std::string& ioString);
 	
   private:
 	
@@ -74,6 +71,9 @@ class M6Tokenizer
 	
 	void			ToLower(uint32 inUnicode);
 	void			Decompose(uint32 inUnicode);
+
+	static void		Reorder(uint32 inString[], size_t inLength);
+	void			WriteUTF8(uint32 inString[], size_t inLength);
 
 	char			mTokenText[kMaxTokenLength];	// private buffer
 	uint32			mTokenLength;

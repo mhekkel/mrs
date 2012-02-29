@@ -32,12 +32,12 @@ struct M6TokenTest
 } kTestTokens[] = {
 	{ "aap", { eM6TokenWord, eM6TokenEOF }, { "aap" } },
 
-	{ "aap.", { eM6TokenWord, eM6TokenPeriod, eM6TokenEOF }, { "aap", "." } },
+	{ "aap.", { eM6TokenWord, eM6TokenPunctuation, eM6TokenEOF }, { "aap", "." } },
 	
 	{ "aap noot", { eM6TokenWord, eM6TokenWord, eM6TokenEOF }, { "aap", "noot" } },
 
 	{ "1 10 1e0 1.e0 1.0",
-		{ eM6TokenNumber, eM6TokenNumber, eM6TokenWord, eM6TokenNumber, eM6TokenPeriod, eM6TokenWord, eM6TokenNumber, eM6TokenPeriod, eM6TokenNumber, eM6TokenEOF },
+		{ eM6TokenNumber, eM6TokenNumber, eM6TokenWord, eM6TokenNumber, eM6TokenPunctuation, eM6TokenWord, eM6TokenNumber, eM6TokenPunctuation, eM6TokenNumber, eM6TokenEOF },
 		{ "1", "10", "1e0", "1", ".", "e0", "1", ".", "0" }
 	},
 
@@ -64,7 +64,7 @@ BOOST_AUTO_TEST_CASE(test_tok_1)
 		uint32 i = 0;
 		foreach (M6Token testToken, test.tokens)
 		{
-			M6Token token = tok.GetNextToken();
+			M6Token token = tok.GetNextWord();
 			BOOST_CHECK_EQUAL(token, testToken);
 			if (test.words[i] != nullptr)
 				BOOST_CHECK_EQUAL(tok.GetTokenString(), test.words[i]);
@@ -82,15 +82,15 @@ BOOST_AUTO_TEST_CASE(test_tok_2)
 	cout << "testing tokenizer 2" << endl;
 	
 	M6Tokenizer tok("NMH I;", 5);
-	BOOST_CHECK_EQUAL(tok.GetNextToken(), eM6TokenWord);
-	BOOST_CHECK_EQUAL(tok.GetNextToken(), eM6TokenWord);
-	BOOST_CHECK_EQUAL(tok.GetNextToken(), eM6TokenEOF);
+	BOOST_CHECK_EQUAL(tok.GetNextWord(), eM6TokenWord);
+	BOOST_CHECK_EQUAL(tok.GetNextWord(), eM6TokenWord);
+	BOOST_CHECK_EQUAL(tok.GetNextWord(), eM6TokenEOF);
 
 	const char s2[] = "type 1\n";
 	M6Tokenizer tok2(s2, strlen(s2));
-	BOOST_CHECK_EQUAL(tok2.GetNextToken(), eM6TokenWord);
-	BOOST_CHECK_EQUAL(tok2.GetNextToken(), eM6TokenNumber);
-	BOOST_CHECK_EQUAL(tok2.GetNextToken(), eM6TokenEOF);
+	BOOST_CHECK_EQUAL(tok2.GetNextWord(), eM6TokenWord);
+	BOOST_CHECK_EQUAL(tok2.GetNextWord(), eM6TokenNumber);
+	BOOST_CHECK_EQUAL(tok2.GetNextWord(), eM6TokenEOF);
 }
 
 BOOST_AUTO_TEST_CASE(test_tok_3)
@@ -98,14 +98,14 @@ BOOST_AUTO_TEST_CASE(test_tok_3)
 	cout << "testing tokenizer 3" << endl;
 	
 	M6Tokenizer tok("1", 1);
-	BOOST_CHECK_EQUAL(tok.GetNextToken(), eM6TokenNumber);
+	BOOST_CHECK_EQUAL(tok.GetNextWord(), eM6TokenNumber);
 	BOOST_CHECK_EQUAL(tok.GetTokenLength(), 1);
-	BOOST_CHECK_EQUAL(tok.GetNextToken(), eM6TokenEOF);
+	BOOST_CHECK_EQUAL(tok.GetNextWord(), eM6TokenEOF);
 
 	M6Tokenizer tok2("a", 1);
-	BOOST_CHECK_EQUAL(tok2.GetNextToken(), eM6TokenWord);
+	BOOST_CHECK_EQUAL(tok2.GetNextWord(), eM6TokenWord);
 	BOOST_CHECK_EQUAL(tok.GetTokenLength(), 1);
-	BOOST_CHECK_EQUAL(tok.GetNextToken(), eM6TokenEOF);
+	BOOST_CHECK_EQUAL(tok.GetNextWord(), eM6TokenEOF);
 }
 
 BOOST_AUTO_TEST_CASE(test_tok_4)
@@ -129,18 +129,29 @@ BOOST_AUTO_TEST_CASE(test_tok_4)
 			continue;
 		}
 
-		cout << ++nr << endl;
-
-		M6Tokenizer tok(line.c_str(), line.length());
-		BOOST_CHECK_EQUAL(tok.GetNextToken(), eM6TokenWord);
-		string w1 = tok.GetTokenString();
-		BOOST_CHECK_EQUAL(tok.GetNextToken(), eM6TokenWord);
-		string w2 = tok.GetTokenString();
-		BOOST_CHECK_EQUAL(tok.GetNextToken(), eM6TokenEOF);
+		string::size_type p = line.find('\t');
+		if (p == string::npos)
+			continue;
+		
+		string w1 = line.substr(0, p);
+		string w2 = line.substr(p + 1);
+		
+		M6Tokenizer::Normalize(w1);
 		BOOST_CHECK_EQUAL(w1, w2);
+
+//		M6Tokenizer tok(line.c_str(), line.length());
+//		BOOST_CHECK_EQUAL(tok.GetNextWord(), eM6TokenWord);
+//		string w1 = tok.GetTokenString();
+//		BOOST_CHECK_EQUAL(tok.GetNextWord(), eM6TokenWord);
+//		string w2 = tok.GetTokenString();
+//		BOOST_CHECK_EQUAL(tok.GetNextWord(), eM6TokenEOF);
+//		BOOST_CHECK_EQUAL(w1, w2);
 		
 		if (w1 != w2)
-			cout << line << "\t" << w1 << "\t!=\t" << w2 << endl;
+		{
+			cout << nr << "\t" << line << "\t" << w1 << "\t!=\t" << w2 << endl;
+			break;
+		}
 	}	
 }
 
@@ -171,7 +182,7 @@ BOOST_AUTO_TEST_CASE(test_lex_1)
 
 		for (;;)
 		{
-			M6Token token = tokenizer.GetNextToken();
+			M6Token token = tokenizer.GetNextWord();
 			if (token == eM6TokenEOF)
 				break;
 
@@ -208,7 +219,7 @@ BOOST_AUTO_TEST_CASE(test_lex_2)
 		getline(text, w);
 		
 		M6Tokenizer tok(w.c_str(), w.length());
-		M6Token token = tok.GetNextToken();
+		M6Token token = tok.GetNextWord();
 		BOOST_REQUIRE(token == eM6TokenWord);
 		
 		if (gruessen.empty())

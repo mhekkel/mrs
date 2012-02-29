@@ -81,7 +81,7 @@ M6QueryParser::M6QueryParser(M6Databank& inDatabank,
 
 M6Token M6QueryParser::GetNextToken()
 {
-	return mTokenizer.GetNextToken();
+	return mTokenizer.GetNextQueryToken();
 }
 
 void M6QueryParser::Match(M6Token inToken)

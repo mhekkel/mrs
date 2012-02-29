@@ -1,5 +1,8 @@
 #pragma once
 
+#include <vector>
+#include <algorithm>
+
 // --------------------------------------------------------------------
 // M6Iterator is a base class to iterate over query results
 
@@ -48,7 +51,9 @@ struct M6IteratorPart
 	M6Iterator*		mIter;
 	uint32			mDoc;
 
-	bool			operator<(const M6IteratorPart& inPart)
+	bool			operator>(const M6IteratorPart& inPart) const
+						{ return mDoc > inPart.mDoc; }
+	bool			operator<(const M6IteratorPart& inPart) const
 						{ return mDoc < inPart.mDoc; }
 };
 typedef std::vector<M6IteratorPart> M6IteratorParts;
@@ -57,6 +62,7 @@ class M6UnionIterator : public M6Iterator
 {
   public:
 					M6UnionIterator();
+					~M6UnionIterator();
 					M6UnionIterator(M6Iterator* inA, M6Iterator* inB);
 
 	void			AddIterator(M6Iterator* inIter);
@@ -74,6 +80,7 @@ class M6IntersectionIterator : public M6Iterator
 {
   public:
 					M6IntersectionIterator();
+					~M6IntersectionIterator();
 					M6IntersectionIterator(M6Iterator* inA, M6Iterator* inB);
 
 	void			AddIterator(M6Iterator* inIter);
@@ -84,6 +91,7 @@ class M6IntersectionIterator : public M6Iterator
 					Create(M6Iterator* inA, M6Iterator* inB);
 
   private:
+
 	M6IteratorParts	mIterators;
 };
 
@@ -95,6 +103,13 @@ class M6VectorIterator : public M6Iterator
 					M6VectorIterator(M6Vector& inVector)
 					{
 						mVector.swap(inVector);
+						mPtr = mVector.begin();
+					}
+
+					M6VectorIterator(std::vector<uint32>& inVector)
+					{
+						std::transform(inVector.begin(), inVector.end(), std::back_inserter(mVector),
+							[](uint32 doc) -> std::pair<uint32,float> { return std::make_pair(doc, 1.0f); });
 						mPtr = mVector.begin();
 					}
 

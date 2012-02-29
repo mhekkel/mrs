@@ -3,6 +3,12 @@
 #include <cassert>
 #include <cstring>
 #include <vector>
+#include <iterator>
+#include <algorithm>
+
+#include <boost/tr1/tuple.hpp>
+#include <boost/foreach.hpp>
+#define foreach BOOST_FOREACH
 
 #include "M6Tokenizer.h"
 //#include "M6Unicode.h"
@@ -10,6 +16,7 @@
 #include "M6Error.h"
 
 using namespace std;
+using namespace tr1;
 
 namespace uc
 {
@@ -73,6 +80,12 @@ bool ispunct(uint32 c)
 bool iscombm(uint32 c)
 {
 	return GetProperty(c) == kCOMBININGMARK;
+}
+
+bool isprint(uint32 c)
+{
+	int prop = GetProperty(c);
+	return (prop == kNUMBER or prop == kLETTER or prop == kPUNCTUATION);
 }
 
 bool isspace(uint32 c)
@@ -142,7 +155,7 @@ const uint8
 /* 2 */	0x0, 0x4, 0x4, 0x4, 0x4, 0x4, 0x4, 0x4, 0x4, 0x4, 0x4, 0x4, 0x4, 0x4, 0x4, 0x4, 
 /* 3 */	0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x4, 0x4, 0x4, 0x4, 0x4, 0x4, 
 /* 4 */	0x4, 0x2, 0x2, 0x2, 0x2, 0x2, 0x2, 0x2, 0x2, 0x2, 0x2, 0x2, 0x2, 0x2, 0x2, 0x2, 
-/* 5 */	0x2, 0x2, 0x2, 0x2, 0x2, 0x2, 0x2, 0x2, 0x2, 0x2, 0x2, 0x4, 0x4, 0x4, 0x4, 0x4, 
+/* 5 */	0x2, 0x2, 0x2, 0x2, 0x2, 0x2, 0x2, 0x2, 0x2, 0x2, 0x2, 0x4, 0x4, 0x4, 0x4, 0x2, // '_' is alpha in my eyes
 /* 6 */	0x4, 0x2, 0x2, 0x2, 0x2, 0x2, 0x2, 0x2, 0x2, 0x2, 0x2, 0x2, 0x2, 0x2, 0x2, 0x2, 
 /* 7 */	0x2, 0x2, 0x2, 0x2, 0x2, 0x2, 0x2, 0x2, 0x2, 0x2, 0x2, 0x4, 0x4, 0x4, 0x4, 0x0, 
 	};
@@ -199,6 +212,19 @@ inline bool ispunct(uint32 c)
 	return result;
 }
 
+inline bool isprint(uint32 c)
+{
+	bool result = false;
+	if (c >= 0x21)
+	{
+		if (c < 0x080)
+			result = (kCharPropTable[c] & (kCharIsPunctMask | kCharIsAlNumMask)) != 0;
+		else
+			result = uc::isprint(c);
+	}
+	return result;
+}
+
 inline bool is_han(uint32 c)
 {
 	return uc::is_han(c);
@@ -215,12 +241,76 @@ inline bool isspace(uint32 c)
 		uc::isspace(c);
 }
 
+template<class InputIterator>
+inline
+tuple<InputIterator, uint32> ReadUTF8(InputIterator inIterator)
+{
+	uint32 uc;
+	
+	if ((*inIterator & 0x080) == 0)		// next byte is a valid ASCII character
+		uc = *inIterator++;
+	else	// decode utf-8
+	{
+		if ((inIterator[0] & 0x0E0) == 0x0C0 and (inIterator[1] & 0x0c0) == 0x080)
+		{
+			uc = ((inIterator[0] & 0x01F) << 6) | (inIterator[1] & 0x03F);
+			inIterator += 2;
+		}
+		else if ((inIterator[0] & 0x0F0) == 0x0E0 and (inIterator[1] & 0x0c0) == 0x080 and (inIterator[2] & 0x0c0) == 0x080)
+		{
+			uc = ((inIterator[0] & 0x00F) << 12) | ((inIterator[1] & 0x03F) << 6) | (inIterator[2] & 0x03F);
+			inIterator += 3;
+		}
+		else if ((inIterator[0] & 0x0F8) == 0x0F0 and (inIterator[1] & 0x0c0) == 0x080 and (inIterator[2] & 0x0c0) == 0x080 and (inIterator[3] & 0x0c0) == 0x080)
+		{
+			uc = ((inIterator[0] & 0x007) << 18) | ((inIterator[1] & 0x03F) << 12) | ((inIterator[2] & 0x03F) << 6) | (inIterator[3] & 0x03F);
+			inIterator += 4;
+		}
+		else
+		{
+			uc = 0xffef;
+			++inIterator;
+		}
+	}
+
+	return make_tuple(inIterator, uc);
+}
+
+template<class OutputIterator>
+inline
+OutputIterator WriteUTF8(uint32 inUnicode, OutputIterator inIterator)
+{
+	// write out the unicode as a utf-8 string
+	if (inUnicode < 0x080)
+		*inIterator++ = static_cast<char>(inUnicode);
+	else if (inUnicode < 0x0800)
+	{
+		*inIterator++ = static_cast<char> (0x0c0 | (inUnicode >> 6));
+		*inIterator++ = static_cast<char> (0x080 | (inUnicode & 0x03f));
+	}
+	else if (inUnicode < 0x00010000)
+	{
+		*inIterator++ = static_cast<char> (0x0e0 | (inUnicode >> 12));
+		*inIterator++ = static_cast<char> (0x080 | ((inUnicode >> 6) & 0x03f));
+		*inIterator++ = static_cast<char> (0x080 | (inUnicode & 0x03f));
+	}
+	else
+	{
+		*inIterator++ = static_cast<char> (0x0f0 | (inUnicode >> 18));
+		*inIterator++ = static_cast<char> (0x080 | ((inUnicode >> 12) & 0x03f));
+		*inIterator++ = static_cast<char> (0x080 | ((inUnicode >> 6) & 0x03f));
+		*inIterator++ = static_cast<char> (0x080 | (inUnicode & 0x03f));
+	}
+	return inIterator;
+}
+
 }
 
 // --------------------------------------------------------------------
 
-void Decompose(uint32 inUnicode, vector<uint32>& outChars)
+bool Decompose(uint32 inUnicode, vector<uint32>& outChars)
 {
+	bool result = false;
 	uint32 c1 = inUnicode, c2 = 0;
 	
 	if (inUnicode < 0x110000)
@@ -235,25 +325,33 @@ void Decompose(uint32 inUnicode, vector<uint32>& outChars)
 	}
 	
 	if (c1 == 0 or c1 == inUnicode)
+	{
+		result = uc::GetProperty(inUnicode) == kCOMBININGMARK;
 		outChars.push_back(inUnicode);
+	}
 	else
 	{
-		assert(c2 != 0);
+		result = true;
 		Decompose(c1, outChars);
-		outChars.push_back(c2);
+		if (c2 != 0)
+			outChars.push_back(c2);
 	}
+	
+	return result;
 }
 
-inline void ToLower(uint32 inUnicode, vector<uint32>& outChars)
+inline bool ToLower(uint32 inUnicode, vector<uint32>& outChars)
 {
+	bool result = false;
+	
 	uint32 ix = inUnicode >> 8;
 	uint32 p_ix = inUnicode & 0x00FF;
 	
 	ix = kM6UnicodeInfo.page_index[ix];
 	if (kM6UnicodeInfo.data[ix][p_ix].lower == 0)
-		Decompose(inUnicode, outChars);
+		result = Decompose(inUnicode, outChars);
 	else if (kM6UnicodeInfo.data[ix][p_ix].lower != 1)
-		Decompose(kM6UnicodeInfo.data[ix][p_ix].lower, outChars);
+		result = Decompose(kM6UnicodeInfo.data[ix][p_ix].lower, outChars);
 	else
 	{
 		// need a full mapping here
@@ -270,129 +368,13 @@ inline void ToLower(uint32 inUnicode, vector<uint32>& outChars)
 		assert(kM6FullCaseFolds[R].uc == inUnicode);
 
 		for (uint32* f = kM6FullCaseFolds[R].folded; *f != 0; ++f)
-			Decompose(*f, outChars);
-	}
-}
-
-void CaseFold(std::string& ioString)
-{
-	vector<uint32> chars;
-	chars.reserve(ioString.length());
-	
-	const char* ptr = ioString.c_str();
-	const char* end = ptr + ioString.length();
-	
-	while (ptr < end)
-	{
-		uint32 uc;
-		
-		if ((*ptr & 0x080) == 0)		// next byte is a valid ASCII character
 		{
-			uc = *ptr++;
-			if (uc >= 'A' and uc <= 'Z')
-				uc |= fast::kToLowerMask;
+			if (Decompose(*f, outChars))
+				result = true;
 		}
-		else	// decode utf-8
-		{
-			if ((ptr[0] & 0x0E0) == 0x0C0 and (ptr[1] & 0x0c0) == 0x080)
-			{
-				uc = ((ptr[0] & 0x01F) << 6) | (ptr[1] & 0x03F);
-				ptr += 2;
-			}
-			else if ((ptr[0] & 0x0F0) == 0x0E0 and (ptr[1] & 0x0c0) == 0x080 and (ptr[2] & 0x0c0) == 0x080)
-			{
-				uc = ((ptr[0] & 0x00F) << 12) | ((ptr[1] & 0x03F) << 6) | (ptr[2] & 0x03F);
-				ptr += 3;
-			}
-			else if ((ptr[0] & 0x0F8) == 0x0F0 and (ptr[1] & 0x0c0) == 0x080 and (ptr[2] & 0x0c0) == 0x080 and (ptr[3] & 0x0c0) == 0x080)
-			{
-				uc = ((ptr[0] & 0x007) << 18) | ((ptr[1] & 0x03F) << 12) | ((ptr[2] & 0x03F) << 6) | (ptr[3] & 0x03F);
-				ptr += 4;
-			}
-			else
-			{
-				uc = 0xffef;
-				++ptr;
-			}
-		}
-		
-		ToLower(uc, chars);
-	}
-
-	// chars now contains a lower case, denormalized string
-	// recorder combining marks
-	uint32* s = &chars[0];
-	uint32* t = s + chars.size();
-	while (s != t)
-	{
-		if (uc::GetProperty(*s) != kCOMBININGMARK)
-		{
-			++s;
-			continue;
-		}
-		
-		uint8 cc[10];
-		cc[0] = uc::GetCanonicalCombiningClass(*s);
-		
-		uint32 n = 1;
-		
-		uint32* ss = s + 1;
-		while (ss != t)
-		{
-			if (uc::GetProperty(*ss) == kCOMBININGMARK)
-			{
-				cc[n] = uc::GetCanonicalCombiningClass(*ss);
-				++ss;
-				++n;
-				if (n < 10)
-					continue;
-			}
-			break;
-		}
-		
-		for (uint32 i = 0; i + 1 < n; ++i)
-		{
-			for (uint32 j = i + 1; j < n; ++j)
-			{
-				if (cc[i] > cc[j])
-				{
-					swap(cc[i], cc[j]);
-					swap(s[i], s[j]);
-				}
-			}
-		}
-
-		s = ss;
 	}
 	
-	// write out valid utf-8
-	ioString.clear();
-	for (s = &chars[0]; s != t; ++s)
-	{
-		uint32 uc = *s;
-		
-		// write the unicode to our token mBuffer
-		if (uc < 0x080)
-			ioString += static_cast<char>(uc);
-		else if (uc < 0x0800)
-		{
-			ioString += static_cast<char> (0x0c0 | (uc >> 6));
-			ioString += static_cast<char> (0x080 | (uc & 0x03f));
-		}
-		else if (uc < 0x00010000)
-		{
-			ioString += static_cast<char> (0x0e0 | (uc >> 12));
-			ioString += static_cast<char> (0x080 | ((uc >> 6) & 0x03f));
-			ioString += static_cast<char> (0x080 | (uc & 0x03f));
-		}
-		else
-		{
-			ioString += static_cast<char> (0x0f0 | (uc >> 18));
-			ioString += static_cast<char> (0x080 | ((uc >> 12) & 0x03f));
-			ioString += static_cast<char> (0x080 | ((uc >> 6) & 0x03f));
-			ioString += static_cast<char> (0x080 | (uc & 0x03f));
-		}
-	}
+	return result;
 }
 
 // --------------------------------------------------------------------
@@ -530,16 +512,115 @@ inline void M6Tokenizer::Retract(uint32 inUnicode)
 	++mLookaheadLength;
 }
 
-M6Token M6Tokenizer::GetNextToken()
+inline void M6Tokenizer::WriteUTF8(uint32 inString[], size_t inLength)
+{
+	char* t = mTokenText;
+	for (int i = 0; i < inLength; ++i)
+		t = fast::WriteUTF8(inString[i], t);
+	
+	mTokenLength = static_cast<uint32>(t - mTokenText);
+}
+
+M6Token M6Tokenizer::GetNextWord()
 {
 	M6Token result = eM6TokenNone;
-	int start = 10, state = start;
 
 	mTokenLength = 0;
 	uint32 token[kMaxTokenLength];
 	uint32* t = token;
 	bool hasCombiningMarks = false;
 		
+	int state = 10;
+	while (result == eM6TokenNone and mTokenLength < kMaxTokenLength)
+	{
+		uint32 c = GetNextCharacter();
+		*t++ = c;
+		
+		switch (state)
+		{
+			case 10:
+				if (c == 0)
+					result = eM6TokenEOF;
+				else if (fast::isspace(c))
+					t = token;
+				else if (fast::is_han(c))		// chinese
+					result = eM6TokenWord;
+				else if (fast::isdigit(c))		// first try a number
+					state = 20;
+				else if (fast::isalnum(c))
+					state = 30;
+				else if (uc::iscombm(c))
+				{
+					hasCombiningMarks = true;
+					state = 30;
+				}
+				else if (fast::ispunct(c))
+					result = eM6TokenPunctuation;
+				else
+					state = 40;
+				break;
+			
+			// matched a digit, allow only cardinals or an identifier starting with a digit
+			case 20:				
+				if (fast::isalpha(c))	
+					state = 30;
+				else if (uc::iscombm(c))
+				{
+					hasCombiningMarks = true;
+					state = 30;
+				}
+				else if (not fast::isdigit(c))
+				{
+					Retract(*--t);
+					result = eM6TokenNumber;
+				}
+				break;
+		
+			// parse identifiers
+			case 30:
+				if (fast::iscombm(c))
+					hasCombiningMarks = true;
+				else if (fast::is_han(c) or not fast::isalnum(c))
+				{
+					Retract(*--t);
+					result = eM6TokenWord;
+				}
+				break;
+			
+			// anything else, eat as much as we can
+			case 40:
+				if (c == 0 or fast::isprint(c) or fast::isspace(c))
+				{
+					Retract(*--t);
+					result = eM6TokenUndefined;
+				}
+				break;
+			
+			default:
+				THROW(("Inconsisten tokenizer state"));
+		}
+	}
+	
+	*t = 0;
+	
+	if (hasCombiningMarks)
+		Reorder(token, t - token);
+	
+	WriteUTF8(token, t - token);
+
+	return result;
+}
+
+M6Token M6Tokenizer::GetNextQueryToken()
+{
+	M6Token result = eM6TokenNone;
+
+	mTokenLength = 0;
+	uint32 token[kMaxTokenLength];
+	uint32* t = token;
+	bool hasCombiningMarks = false;
+		
+	int state = 10;
 	while (result == eM6TokenNone and mTokenLength < kMaxTokenLength)
 	{
 		uint32 c = GetNextCharacter();
@@ -553,13 +634,13 @@ M6Token M6Tokenizer::GetNextToken()
 					case 0:		result = eM6TokenEOF; break;
 					case '-':	result = eM6TokenHyphen; break;
 					case '+':	result = eM6TokenPlus; break;
-					case '?':	result = eM6TokenQuestionMark; break;
-					case '*':	result = eM6TokenAsterisk; break;
-					case '|':	result = eM6TokenPipe; break;
-					case '&':	result = eM6TokenAmpersand; break;
-					case '\'':	result = eM6TokenSingleQuote; break;
-					case '"':	result = eM6TokenDoubleQuote; break;
-					case '.':	result = eM6TokenPeriod; break;
+					//case '?':	result = eM6TokenQuestionMark; break;
+					//case '*':	result = eM6TokenAsterisk; break;
+					//case '|':	result = eM6TokenPipe; break;
+					//case '&':	result = eM6TokenAmpersand; break;
+					//case '\'':	result = eM6TokenSingleQuote; break;
+					//case '"':	result = eM6TokenDoubleQuote; break;
+					//case '.':	result = eM6TokenPeriod; break;
 					case '(':	result = eM6TokenOpenParenthesis; break;
 					case ')':	result = eM6TokenCloseParenthesis; break;
 					case ':':	result = eM6TokenColon; break;
@@ -573,7 +654,7 @@ M6Token M6Tokenizer::GetNextToken()
 							result = eM6TokenWord;
 						else if (fast::isdigit(c))		// first try a number
 							state = 20;
-						else if (fast::isalnum(c) or c == '_')
+						else if (fast::isalnum(c))
 							state = 30;
 						else if (fast::ispunct(c))
 							result = eM6TokenPunctuation;
@@ -605,12 +686,12 @@ M6Token M6Tokenizer::GetNextToken()
 		
 			// matched a digit, allow only cardinals or an identifier starting with a digit
 			case 20:				
-				if (fast::isalpha(c) or c == '_')	
+				if (fast::isalpha(c))	
 					state = 30;
 				else if (not fast::isdigit(c))
 				{
 					Retract(*--t);
-					result = eM6TokenCardinal;
+					result = eM6TokenNumber;
 				}
 				break;
 		
@@ -618,7 +699,7 @@ M6Token M6Tokenizer::GetNextToken()
 			// parse identifiers
 				if (fast::iscombm(c))
 					hasCombiningMarks = true;
-				else if (fast::is_han(c) or not (fast::isalnum(c) or c == '_'))
+				else if (fast::is_han(c) or not fast::isalnum(c))
 				{
 					Retract(*--t);
 					result = eM6TokenWord;
@@ -627,10 +708,10 @@ M6Token M6Tokenizer::GetNextToken()
 			
 			// anything else, eat as much as we can
 			case 40:
-				if (fast::isalnum(c) or c == '_' or c == 0 or fast::ispunct(c))
+				if (c == 0 or fast::isprint(c) or fast::isspace(c))
 				{
 					Retract(*--t);
-					result = eM6TokenOther;
+					result = eM6TokenUndefined;
 				}
 				break;
 			
@@ -642,82 +723,94 @@ M6Token M6Tokenizer::GetNextToken()
 	*t = 0;
 	
 	if (hasCombiningMarks)
-	{
-		// recorder combining marks
-		uint32* s = token;
-		while (s != t)
-		{
-			if (uc::GetProperty(*s) != kCOMBININGMARK)
-			{
-				++s;
-				continue;
-			}
-			
-			uint8 cc[10];
-			cc[0] = uc::GetCanonicalCombiningClass(*s);
-			
-			uint32 n = 1;
-			
-			uint32* ss = s + 1;
-			while (ss != t)
-			{
-				if (uc::GetProperty(*ss) == kCOMBININGMARK)
-				{
-					cc[n] = uc::GetCanonicalCombiningClass(*ss);
-					++ss;
-					++n;
-					if (n < 10)
-						continue;
-				}
-				break;
-			}
-			
-			for (uint32 i = 0; i + 1 < n; ++i)
-			{
-				for (uint32 j = i + 1; j < n; ++j)
-				{
-					if (cc[i] > cc[j])
-					{
-						swap(cc[i], cc[j]);
-						swap(s[i], s[j]);
-					}
-				}
-			}
+		Reorder(token, t - token);
 	
-			s = ss;
-		}
-	}
-	
-	// write out valid utf-8
-	char* tp = mTokenText;
-	for (uint32* s = token; s != t; ++s)
-	{
-		uint32 uc = *s;
-		
-		// write the unicode to our token mBuffer
-		if (uc < 0x080)
-			*tp++ = static_cast<char>(uc);
-		else if (uc < 0x0800)
-		{
-			*tp++ = static_cast<char> (0x0c0 | (uc >> 6));
-			*tp++ = static_cast<char> (0x080 | (uc & 0x03f));
-		}
-		else if (uc < 0x00010000)
-		{
-			*tp++ = static_cast<char> (0x0e0 | (uc >> 12));
-			*tp++ = static_cast<char> (0x080 | ((uc >> 6) & 0x03f));
-			*tp++ = static_cast<char> (0x080 | (uc & 0x03f));
-		}
-		else
-		{
-			*tp++ = static_cast<char> (0x0f0 | (uc >> 18));
-			*tp++ = static_cast<char> (0x080 | ((uc >> 12) & 0x03f));
-			*tp++ = static_cast<char> (0x080 | ((uc >> 6) & 0x03f));
-			*tp++ = static_cast<char> (0x080 | (uc & 0x03f));
-		}
-	}
-	
-	mTokenLength = static_cast<uint32>(tp - mTokenText);
+	WriteUTF8(token, t - token);
 
 	return result;
 }
+
+void M6Tokenizer::CaseFold(string& ioString)
+{
+	vector<uint32> s;
+	s.reserve(ioString.length());
+	
+	const char* ptr = ioString.c_str();
+	const char* end = ptr + ioString.length();
+	bool hasCombiningMarks = false;
+	
+	while (ptr < end)
+	{
+		uint32 ch = 0;
+		tie(ptr, ch) = fast::ReadUTF8(ptr);
+		if (::ToLower(ch, s))
+			hasCombiningMarks = true;
+	}
+	
+	if (hasCombiningMarks)
+	{
+		Reorder(&s[0], s.size());
+		
+		ioString.clear();
+		foreach (uint32 ch, s)
+			fast::WriteUTF8(ch, back_inserter(ioString));
+	}
+}
+
+void M6Tokenizer::Normalize(string& ioString)
+{
+	vector<uint32> s;
+	s.reserve(ioString.length());
+	
+	const char* ptr = ioString.c_str();
+	const char* end = ptr + ioString.length();
+	bool hasCombiningMarks = false;
+	
+	while (ptr < end)
+	{
+		uint32 ch = 0;
+		tie(ptr, ch) = fast::ReadUTF8(ptr);
+		if (::Decompose(ch, s))
+			hasCombiningMarks = true;
+	}
+	
+	if (hasCombiningMarks)
+	{
+		Reorder(&s[0], s.size());
+		
+		ioString.clear();
+		foreach (uint32 ch, s)
+			fast::WriteUTF8(ch, back_inserter(ioString));
+	}
+}
+
+void M6Tokenizer::Reorder(uint32 inString[], size_t inLength)
+{
+	// recorder combining marks
+	uint32* s = inString;
+	uint32* t = inString + inLength;
+	
+	auto order = [](uint32 a, uint32 b) -> bool
+	{
+		return uc::GetCanonicalCombiningClass(a) < uc::GetCanonicalCombiningClass(b);
+	};
+	
+	while (s + 1 < t)
+	{
+		if (uc::GetProperty(*s) != kCOMBININGMARK)
+		{
+			++s;
+			continue;
+		}
+		
+		uint32* s2 = s + 1;
+		while (uc::GetProperty(*s2) == kCOMBININGMARK)
+			++s2;
+		
+		if (s2 > s + 1)
+			sort(s, s2, order);
+		
+		s = s2;
+	}
+}
+

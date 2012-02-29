@@ -148,7 +148,7 @@ void M6InputDocument::Index(const string& inIndex, M6DataType inDataType,
 	{
 		tokenize = inDataType == eM6StringData;
 		M6IndexValue v = { inDataType, inIndex, string(inText, inSize), isUnique };
-		CaseFold(v.mIndexValue);
+		M6Tokenizer::CaseFold(v.mIndexValue);
 		mValues.push_back(v);
 	}
 	
@@ -159,7 +159,7 @@ void M6InputDocument::Index(const string& inIndex, M6DataType inDataType,
 		M6Tokenizer tokenizer(inText, inSize);
 		for (;;)
 		{
-			M6Token token = tokenizer.GetNextToken();
+			M6Token token = tokenizer.GetNextWord();
 			if (token == eM6TokenEOF)
 				break;
 			
@@ -175,7 +175,7 @@ void M6InputDocument::Index(const string& inIndex, M6DataType inDataType,
 
 			assert(l > 0);
 			
-			if ((token == eM6TokenCardinal and not inIndexNumbers) or
+			if ((token == eM6TokenNumber and not inIndexNumbers) or
 				token == eM6TokenPunctuation or
 				l > kM6MaxKeyLength)
 			{
@@ -184,7 +184,7 @@ void M6InputDocument::Index(const string& inIndex, M6DataType inDataType,
 				continue;
 			}
 			
-			if (token != eM6TokenCardinal and token != eM6TokenWord)
+			if (token != eM6TokenNumber and token != eM6TokenWord)
 				continue;
 			
 			uint32 t = mDocLexicon.Store(tokenizer.GetTokenValue(), l);

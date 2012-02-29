@@ -11,10 +11,13 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\src\M6TestMain.cpp">
+    <ClCompile Include="..\..\unit-tests\M6TestMain.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\M6TestLex.cpp">
+    <ClCompile Include="..\..\unit-tests\M6TestIterators.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\unit-tests\M6TestLex.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

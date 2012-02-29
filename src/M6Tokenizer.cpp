@@ -18,6 +18,39 @@
 using namespace std;
 using namespace tr1;
 
+// --------------------------------------------------------------------
+
+ostream& operator<<(ostream& os, M6Token inToken)
+{
+	switch (inToken)
+	{
+		case eM6TokenNone:				os << "no token?"; break;
+		case eM6TokenEOF:				os << "end of query"; break;
+		case eM6TokenUndefined:			os << "undefined token"; break;
+		case eM6TokenWord:				os << "word"; break;
+		case eM6TokenNumber:			os << "number"; break;
+		case eM6TokenPunctuation:		os << "punctuation character"; break;
+		case eM6TokenString:			os << "quoted string"; break;
+		case eM6TokenPattern:			os << "glob-pattern (word with * or ?)"; break;
+		case eM6TokenHyphen:			os << "hyphen character"; break;
+		case eM6TokenPlus:				os << "plus character"; break;
+		case eM6TokenOR:				os << "OR"; break;
+		case eM6TokenAND:				os << "AND"; break;
+		case eM6TokenOpenParenthesis:	os << "'('"; break;
+		case eM6TokenCloseParenthesis:	os << "')'"; break;
+		case eM6TokenColon:				os << "':'"; break;
+		case eM6TokenEquals:			os << "'='"; break;
+		case eM6TokenLessThan:			os << "'<'"; break;
+		case eM6TokenLessEqual:			os << "'<='"; break;
+		case eM6TokenGreaterEqual:		os << "'>='"; break;
+		case eM6TokenGreaterThan:		os << "'>'"; break;
+	}
+	
+	return os;
+}
+
+// --------------------------------------------------------------------
+
 namespace uc
 {
 
@@ -615,10 +648,13 @@ M6Token M6Tokenizer::GetNextQueryToken()
 {
 	M6Token result = eM6TokenNone;
 
+	const uint8* b = mPtr;
+
 	mTokenLength = 0;
 	uint32 token[kMaxTokenLength];
 	uint32* t = token;
-	bool hasCombiningMarks = false;
+	bool hasCombiningMarks = false, isPattern = false;
+	uint32 quote;
 		
 	int state = 10;
 	while (result == eM6TokenNone and mTokenLength < kMaxTokenLength)
@@ -634,19 +670,18 @@ M6Token M6Tokenizer::GetNextQueryToken()
 					case 0:		result = eM6TokenEOF; break;
 					case '-':	result = eM6TokenHyphen; break;
 					case '+':	result = eM6TokenPlus; break;
-					//case '?':	result = eM6TokenQuestionMark; break;
-					//case '*':	result = eM6TokenAsterisk; break;
-					//case '|':	result = eM6TokenPipe; break;
-					//case '&':	result = eM6TokenAmpersand; break;
-					//case '\'':	result = eM6TokenSingleQuote; break;
-					//case '"':	result = eM6TokenDoubleQuote; break;
-					//case '.':	result = eM6TokenPeriod; break;
 					case '(':	result = eM6TokenOpenParenthesis; break;
 					case ')':	result = eM6TokenCloseParenthesis; break;
 					case ':':	result = eM6TokenColon; break;
 					case '=':	result = eM6TokenEquals; break;
 					case '<':	state = 11; break;
 					case '>':	state = 12; break;
+					case '\'':	
+					case '"':	quote = c; state = 40; break;
+					case '?':
+					case '*':	isPattern = true; state = 30; break;
+					case '|':	result = eM6TokenOR; break;
+					case '&':	result = eM6TokenAND; break;
 					default:
 						if (fast::isspace(c))
 							t = token;
@@ -659,7 +694,7 @@ M6Token M6Tokenizer::GetNextQueryToken()
 						else if (fast::ispunct(c))
 							result = eM6TokenPunctuation;
 						else
-							state = 40;
+							state = 50;
 						break;
 				}
 				break;
@@ -699,15 +734,34 @@ M6Token M6Tokenizer::GetNextQueryToken()
 			// parse identifiers
 				if (fast::iscombm(c))
 					hasCombiningMarks = true;
+				else if (c == '?' or c == '*')
+					isPattern = true;
 				else if (fast::is_han(c) or not fast::isalnum(c))
 				{
 					Retract(*--t);
-					result = eM6TokenWord;
+					result = isPattern ? eM6TokenPattern : eM6TokenWord;
 				}
 				break;
 			
-			// anything else, eat as much as we can
+			// quoted strings
 			case 40:
+				if (c == quote)
+					result = eM6TokenString;
+				else if (c == '\\')
+				{
+					--t;
+					state = 41;
+				}
+				else if (c == 0)
+					throw M6TokenUnterminatedStringException();
+				break;
+			
+			case 41:
+				state = 40;
+				break;
+			
+			// anything else, eat as much as we can
+			case 50:
 				if (c == 0 or fast::isprint(c) or fast::isspace(c))
 				{
 					Retract(*--t);
@@ -725,7 +779,20 @@ M6Token M6Tokenizer::GetNextQueryToken()
 	if (hasCombiningMarks)
 		Reorder(token, t - token);
 	
-	WriteUTF8(token, t - token);
+	if (result == eM6TokenString)
+		WriteUTF8(token + 1, t - token - 2);
+	else
+		WriteUTF8(token, t - token);
+	
+	if (result == eM6TokenWord)
+	{
+		if (mPtr - b == 2 and strncmp(reinterpret_cast<const char*>(b), "OR", 2) == 0)
+			result = eM6TokenOR;
+		else if (mPtr - b == 3 and strncmp(reinterpret_cast<const char*>(b), "AND", 3) == 0)
+			result = eM6TokenAND;
+		else if (mPtr - b == 3 and strncmp(reinterpret_cast<const char*>(b), "NOT", 3) == 0)
+			result = eM6TokenNOT;
+	}
 
 	return result;
 }

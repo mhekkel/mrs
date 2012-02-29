@@ -14,41 +14,6 @@ namespace ba = boost::algorithm;
 
 // --------------------------------------------------------------------
 
-ostream& operator<<(ostream& os, M6Token inToken)
-{
-	switch (inToken)
-	{
-		case eM6TokenEOF:	os << "end of query"; 	break;
-//		case eM6String:		os << "string";			break;
-//		case eM6Literal:	os << "literal";		break;
-//		case eM6Number:		os << "number"; 		break;
-//		case eM6Ident:		os << "identifier"; 	break;
-//		case eM6Pattern:	os << "pattern";		break;
-//		case eM6DocNr:		os << "document number";break;
-//		case eM6AND:		os << "AND";			break;
-//		case eM6OR:			os << "OR";				break;
-//		case eM6NOT:		os << "NOT";			break;
-//		case eM6LT:			os << "'<='";			break;
-//		case eM6LE:			os << "'<'";			break;
-//		case eM6EQ:			os << "'='";			break;
-//		case eM6GE:			os << "'>='";			break;
-//		case eM6GT:			os << "'>='";			break;
-
-		default:
-		{
-			if (inToken == '\'')
-				os << "'";
-			else if (isprint(inToken))
-				os << "'" << char(inToken) << "'";
-			else
-				os << "token(0x" << ios::hex << int(inToken) << ")";
-			break;
-		}
-	}
-	
-	return os;
-}
-
 class M6QueryParser
 {
   public:
@@ -58,6 +23,7 @@ class M6QueryParser
 	void			Parse(vector<string>& outTerms, M6Iterator*& outFilter);
 
   private:
+	M6Iterator*		ParseQuery();
 	M6Iterator*		ParseTest();
 	M6Iterator*		ParseQualifiedTest(const string& inIndex);
 	M6Iterator*		ParseTerm(const string& inIndex);
@@ -97,23 +63,33 @@ void M6QueryParser::Match(M6Token inToken)
 
 void M6QueryParser::Parse(vector<string>& outTerms, M6Iterator*& outFilter)
 {
-	unique_ptr<M6Iterator> result;
-	
 	mLookahead = GetNextToken();
-	
-	while (mLookahead != eM6TokenEOF)
+	outFilter = ParseQuery();
+	if (mLookahead != eM6TokenEOF)
+		THROW(("Parse error"));
+	swap(outTerms, mQueryTerms);
+}
+
+M6Iterator* M6QueryParser::ParseQuery()
+{
+	unique_ptr<M6Iterator> result;
+
+	for (;;)
 	{
+		if (mLookahead == eM6TokenEOF or mLookahead == eM6TokenCloseParenthesis)
+			break;
+		
 		switch (mLookahead)
 		{
-//			case eM6QOR:
-//			case eM6QAND:
-//				mIsBooleanQuery = true;
-//				Match(mLookahead);
-//				if (mLookahead == eM6QAND)
-//					result.reset(new M6IntersectionIterator(result.release(), ParseTest()));
-//				else
-//					result.reset(new M6UnionIterator(result.release(), ParseTest()));
-//				break;
+			case eM6TokenAND:
+			case eM6TokenOR:
+				mIsBooleanQuery = true;
+				Match(mLookahead);
+				if (mLookahead == eM6TokenAND)
+					result.reset(new M6IntersectionIterator(result.release(), ParseTest()));
+				else
+					result.reset(new M6UnionIterator(result.release(), ParseTest()));
+				break;
 			
 			default:
 				if (mImplicitIntersection)
@@ -124,8 +100,7 @@ void M6QueryParser::Parse(vector<string>& outTerms, M6Iterator*& outFilter)
 		}
 	}
 	
-	outFilter = result.release();
-	swap(outTerms, mQueryTerms);
+	return result.release();
 }
 
 M6Iterator* M6QueryParser::ParseTest()
@@ -134,15 +109,18 @@ M6Iterator* M6QueryParser::ParseTest()
 	
 	switch (mLookahead)
 	{
-		//case eM6TokenOpenParenthesis:
-		//{
-		//	Match(eM6TokenOpenParenthesis);
-		//	result.reset(ParseSubQuery());
-		//	Match(eM6TokenCloseParenthesis);
-		//	break;
-		//}
+		case eM6TokenOpenParenthesis:
+		{
+			Match(eM6TokenOpenParenthesis);
+			result.reset(ParseQuery());
+			Match(eM6TokenCloseParenthesis);
+			break;
+		}
 			
-//		case eM6QNOT:	mIsBooleanQuery = true; result.reset(M6NotIterator(ParseTest())); break;
+		case eM6TokenNOT:
+			mIsBooleanQuery = true;
+			result.reset(new M6NotIterator(ParseQuery()));
+			break;
 
 		case eM6TokenWord:
 		{

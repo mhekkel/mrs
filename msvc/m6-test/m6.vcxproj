@@ -18,6 +18,11 @@
       <Platform>x64</Platform>
     </ProjectConfiguration>
   </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\unit-tests\M6TestIterators.cpp" />
+    <ClCompile Include="..\..\unit-tests\M6TestLex.cpp" />
+    <ClCompile Include="..\..\unit-tests\M6TestMain.cpp" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{54EA3A0B-D34F-49C2-900D-B0D442BC63EF}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
@@ -143,10 +148,6 @@
       <AdditionalLibraryDirectories>$(SolutionDir)$(Platform)\$(Configuration);C:\Boost\lib64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
-  <ItemGroup>
-    <ClCompile Include="..\..\src\M6TestLex.cpp" />
-    <ClCompile Include="..\..\src\M6TestMain.cpp" />
-  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

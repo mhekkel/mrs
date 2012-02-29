@@ -1,5 +1,7 @@
 #include "M6Lib.h"
 
+#include <cassert>
+
 #include <boost/foreach.hpp>
 #define foreach BOOST_FOREACH
 
@@ -32,6 +34,31 @@ void M6Iterator::Intersect(vector<uint32>& ioDocs, M6Iterator* inIterator)
 		else
 			inIterator->Next(db, r);
 	}
+}
+
+// --------------------------------------------------------------------
+
+M6NotIterator::M6NotIterator(M6Iterator* inIter)
+	: mIter(inIter)
+	, mCur(0)
+	, mNext(0)
+{
+}
+
+bool M6NotIterator::Next(uint32& outDoc, float& outRank)
+{
+	for (;;)
+	{
+		++mCur;
+		if (mCur < mNext or mNext == 0 or mIter == nullptr)
+			break;
+		
+		assert(mCur == mNext);
+		float rank;
+		if (not mIter->Next(mNext, rank))
+			mNext = 0;
+	}
+	return true;
 }
 
 // --------------------------------------------------------------------

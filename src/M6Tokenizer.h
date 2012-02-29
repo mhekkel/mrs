@@ -14,6 +14,7 @@
 */
 
 #include <string>
+#include <exception>
 
 // --------------------------------------------------------------------
 
@@ -34,6 +35,7 @@ enum M6Token
 	eM6TokenPlus,
 	eM6TokenOR,
 	eM6TokenAND,
+	eM6TokenNOT,
 	eM6TokenOpenParenthesis,
 	eM6TokenCloseParenthesis,
 	eM6TokenColon,
@@ -42,6 +44,13 @@ enum M6Token
 	eM6TokenLessEqual,
 	eM6TokenGreaterEqual,
 	eM6TokenGreaterThan
+};
+
+std::ostream& operator<<(std::ostream& os, M6Token token);
+
+class M6TokenUnterminatedStringException : public std::exception
+{
+	const char*		what() const throw() { return "Unterminated string"; }
 };
 
 class M6Tokenizer

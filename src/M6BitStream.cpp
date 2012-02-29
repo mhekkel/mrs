@@ -14,7 +14,7 @@ using namespace std;
 //	constants
 
 const uint32
-	kBitBufferSize = 64;
+	kBitBufferSize = 1024;
 
 // --------------------------------------------------------------------
 //	M6OBitStream

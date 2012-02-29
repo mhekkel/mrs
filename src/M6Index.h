@@ -91,6 +91,7 @@ class M6BasicIndex
 	bool			Find(const std::string& inKey, uint32& outValue);
 	
 	M6Iterator*		Find(const std::string& inKey);
+	M6Iterator*		FindString(const std::string& inString);
 
 	uint32			size() const;
 	uint32			depth() const;

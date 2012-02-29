@@ -53,6 +53,7 @@ class M6DatabankImpl
 	M6Iterator*		Find(const string& inQuery, bool inAllTermsRequired, uint32 inReportLimit);
 	M6Iterator*		Find(const string& inIndex, const string& inTerm,
 						bool inTermIsPattern);
+	M6Iterator*		FindString(const string& inIndex, const string& inString);
 	
 	M6DocStore&		GetDocStore()						{ return *mStore; }
 	
@@ -1461,6 +1462,13 @@ M6Iterator* M6DatabankImpl::Find(
 	return index->Find(inTerm);
 }
 
+M6Iterator* M6DatabankImpl::FindString(const string& inIndex,
+	const string& inString)
+{
+	M6BasicIndexPtr index = LoadIndex(inIndex);
+	return index->FindString(inString);
+}
+
 void M6DatabankImpl::StartBatchImport(M6Lexicon& inLexicon)
 {
 	mBatch = new M6BatchIndexProcessor(*this, inLexicon);
@@ -1597,9 +1605,10 @@ M6Iterator* M6Databank::Find(const string& inIndex, const string& inQuery, bool 
 	return mImpl->Find(inIndex, inQuery, inTermIsPattern);
 }
 
-uint32 M6Databank::size() const
+M6Iterator* M6Databank::FindString(const string& inIndex,
+	const string& inString)
 {
-	return mImpl->GetDocStore().size();
+	return mImpl->FindString(inIndex, inString);
 }
 
 void M6Databank::RecalculateDocumentWeights()
@@ -1620,4 +1629,14 @@ void M6Databank::Validate()
 void M6Databank::DumpIndex(const string& inIndex, ostream& inStream)
 {
 	mImpl->DumpIndex(inIndex, inStream);
+}
+
+uint32 M6Databank::size() const
+{
+	return mImpl->GetDocStore().size();
+}
+
+uint32 M6Databank::GetMaxDocNr() const
+{
+	return mStore->GetDocStore().NextDocumentNumber();
 }

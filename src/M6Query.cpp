@@ -2,6 +2,7 @@
 
 #include <boost/algorithm/string.hpp>
 #include <boost/format.hpp>
+#include <boost/lexical_cast.hpp>
 
 #include "M6Query.h"
 #include "M6Tokenizer.h"
@@ -27,6 +28,7 @@ class M6QueryParser
 	M6Iterator*		ParseTest();
 	M6Iterator*		ParseQualifiedTest(const string& inIndex);
 	M6Iterator*		ParseTerm(const string& inIndex);
+	M6Iterator*		ParseString();
 
 	M6Token			GetNextToken();
 	void			Match(M6Token inToken);
@@ -116,10 +118,20 @@ M6Iterator* M6QueryParser::ParseTest()
 			Match(eM6TokenCloseParenthesis);
 			break;
 		}
-			
+		
 		case eM6TokenNOT:
 			mIsBooleanQuery = true;
-			result.reset(new M6NotIterator(ParseQuery()));
+			result.reset(new M6NotIterator(ParseQuery(), mDatabank.GetMaxDocNr()));
+			break;
+		
+		case eM6TokenDocNr:
+			result.reset(new M6SingleDocIterator(boost::lexical_cast<uint32>(mTokenizer.GetTokenString())));
+			Match(eM6TokenDocNr);
+			break;
+
+		case eM6TokenString:
+			result.reset(mDatabank.FindString("*", mTokenizer.GetTokenString()));
+			Match(eM6TokenString);
 			break;
 
 		case eM6TokenWord:
@@ -165,9 +177,27 @@ M6Iterator* M6QueryParser::ParseQualifiedTest(const string& inIndex)
 
 M6Iterator* M6QueryParser::ParseTerm(const string& inIndex)
 {
-	string term = mTokenizer.GetTokenString();
-	Match(eM6TokenWord);
-	return mDatabank.Find(inIndex, term, false);
+	unique_ptr<M6Iterator> result;
+	
+	switch (mLookahead)
+	{
+		case eM6TokenString:
+			result.reset(mDatabank.FindString(inIndex, mTokenizer.GetTokenString()));
+			Match(eM6TokenString);
+			break;
+		
+		case eM6TokenPattern:
+			result.reset(mDatabank.Find(inIndex, mTokenizer.GetTokenString(), true));
+			Match(eM6TokenPattern);
+			break;
+		
+		default:
+			result.reset(mDatabank.Find(inIndex, mTokenizer.GetTokenString(), false));
+			Match(eM6TokenWord);
+			break;
+	}
+	
+	return result.release();
 }
 
 // --------------------------------------------------------------------

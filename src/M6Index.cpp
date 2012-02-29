@@ -243,7 +243,7 @@ class M6PageDataAccess
 
 	uint32			GetN() const					{ return mData.mN; }
 	uint32			GetLink() const					{ return mData.mLink; }
-	void			SetLink(uint32 inLink)			{ mData.mLink = inLink; }
+	void			SetLink(uint32 inLink)			{ mData.mLink = inLink; mDirty = true; }
 
 	uint32			Free() const;
 	bool			CanStore(const string& inKey) const;
@@ -603,7 +603,7 @@ class M6BasicPage
 	void			Flush(M6File& inFile);
 	
 	uint32			GetPageNr() const				{ return mPageNr; }
-	void			SetPageNr(uint32 inPageNr)		{ mPageNr = inPageNr; }
+	void			SetPageNr(uint32 inPageNr)		{ mPageNr = inPageNr; SetDirty(true); }
 
 	virtual bool	IsDirty() const = 0;
 	virtual void	SetDirty(bool inDirty) = 0;
@@ -659,6 +659,8 @@ struct M6IndexImpl
 
 	virtual M6Iterator*
 					Find(const string& inKey)										{ return nullptr; }
+	virtual M6Iterator*
+					FindString(const string& inString)								{ return nullptr; }
 
 	uint32			Size() const				{ return mHeader.mSize; }
 	uint32			Depth() const				{ return mHeader.mDepth; }
@@ -2557,6 +2559,11 @@ bool M6BasicIndex::Find(const string& inKey, uint32& outValue)
 M6Iterator* M6BasicIndex::Find(const string& inKey)
 {
 	return mImpl->Find(inKey);
+}
+
+M6Iterator* M6BasicIndex::FindString(const string& inString)
+{
+	return mImpl->FindString(inString);
 }
 
 uint32 M6BasicIndex::size() const

@@ -38,10 +38,11 @@ void M6Iterator::Intersect(vector<uint32>& ioDocs, M6Iterator* inIterator)
 
 // --------------------------------------------------------------------
 
-M6NotIterator::M6NotIterator(M6Iterator* inIter)
+M6NotIterator::M6NotIterator(M6Iterator* inIter, uint32 inMax)
 	: mIter(inIter)
 	, mCur(0)
 	, mNext(0)
+	, mMax(inMax)
 {
 }
 
@@ -50,6 +51,7 @@ bool M6NotIterator::Next(uint32& outDoc, float& outRank)
 	for (;;)
 	{
 		++mCur;
+		outDoc = mCur;
 		if (mCur < mNext or mNext == 0 or mIter == nullptr)
 			break;
 		
@@ -58,7 +60,8 @@ bool M6NotIterator::Next(uint32& outDoc, float& outRank)
 		if (not mIter->Next(mNext, rank))
 			mNext = 0;
 	}
-	return true;
+
+	return outDoc <= mMax;
 }
 
 // --------------------------------------------------------------------
@@ -105,30 +108,27 @@ bool M6UnionIterator::Next(uint32& outDoc, float& outRank)
 		outDoc = mIterators.back().mDoc;
 		outRank = 1.0f;
 		result = true;
-		
-		for (;;)
-		{
-			uint32 d;
-			float r;
 
-			if (mIterators.back().mIter->Next(d, r))
-			{
-				mIterators.back().mDoc = d;
+		float r;
+		if (mIterators.back().mIter->Next(mIterators.back().mDoc, r))
+			push_heap(mIterators.begin(), mIterators.end(), greater<M6IteratorPart>());
+		else
+		{
+			delete mIterators.back().mIter;
+			mIterators.pop_back();
+		}
+		
+		while (not mIterators.empty() and mIterators.front().mDoc <= outDoc)
+		{
+			pop_heap(mIterators.begin(), mIterators.end());
+			
+			if (mIterators.back().mIter->Next(mIterators.back().mDoc, r))
 				push_heap(mIterators.begin(), mIterators.end(), greater<M6IteratorPart>());
-				
-				if (mIterators.front().mDoc > outDoc)
-					break;
-			}
 			else
 			{
 				delete mIterators.back().mIter;
 				mIterators.pop_back();
-
-				if (mIterators.empty())
-					break;
 			}
-			
-			pop_heap(mIterators.begin(), mIterators.end(), greater<M6IteratorPart>());
 		}
 	}
 	
@@ -142,6 +142,10 @@ M6Iterator* M6UnionIterator::Create(M6Iterator* inA, M6Iterator* inB)
 		result = inB;
 	else if (inB == nullptr)
 		result = inA;
+	else if (dynamic_cast<M6UnionIterator*>(inA) != nullptr)
+		static_cast<M6UnionIterator*>(inA)->AddIterator(inB);
+	else if (dynamic_cast<M6UnionIterator*>(inB) != nullptr)
+		static_cast<M6UnionIterator*>(inB)->AddIterator(inA);
 	else
 		result = new M6UnionIterator(inA, inB);
 	return result;
@@ -197,8 +201,17 @@ bool M6IntersectionIterator::Next(uint32& outDoc, float& outRank)
 		
 		foreach (M6IteratorPart& part, mIterators)
 		{
-			while (part.mDoc < outDoc)
-				done = done or part.mIter->Next(part.mDoc, r) == false;
+			for (;;)
+			{
+				if (not part.mIter->Next(part.mDoc, r))
+				{
+					done = true;
+					break;
+				}
+				
+				if (part.mDoc >= outDoc)
+					break;
+			}
 		}
 	}
 
@@ -219,6 +232,10 @@ M6Iterator* M6IntersectionIterator::Create(M6Iterator* inA, M6Iterator* inB)
 		result = inB;
 	else if (inB == nullptr)
 		result = inA;
+	else if (dynamic_cast<M6IntersectionIterator*>(inA) != nullptr)
+		static_cast<M6IntersectionIterator*>(inA)->AddIterator(inB);
+	else if (dynamic_cast<M6IntersectionIterator*>(inB) != nullptr)
+		static_cast<M6IntersectionIterator*>(inB)->AddIterator(inA);
 	else
 		result = new M6IntersectionIterator(inA, inB);
 	return result;

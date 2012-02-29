@@ -46,14 +46,14 @@ class M6SingleDocIterator : public M6Iterator
 class M6NotIterator : public M6Iterator
 {
   public:
-					M6NotIterator(M6Iterator* inIter);
+					M6NotIterator(M6Iterator* inIter, uint32 inMax);
 					~M6NotIterator() { delete mIter; }
 
 	virtual bool	Next(uint32& outDoc, float& outRank);
 
   private:
 	M6Iterator*		mIter;
-	uint32			mCur, mNext;
+	uint32			mCur, mNext, mMax;
 };
 
 // --------------------------------------------------------------------

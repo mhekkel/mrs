@@ -37,10 +37,12 @@ class M6Databank
 	// low-level interface
 	M6Iterator*		Find(const std::string& inIndex, const std::string& inTerm,
 						bool inTermIsPattern);
+	M6Iterator*		FindString(const std::string& inIndex, const std::string& inString);
 	
 	M6DocStore&		GetDocStore();
 	
 	uint32			size() const;
+	uint32			GetMaxDocNr() const;
 
   private:
 

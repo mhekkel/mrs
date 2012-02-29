@@ -682,9 +682,13 @@ M6Token M6Tokenizer::GetNextQueryToken()
 					case '*':	isPattern = true; state = 30; break;
 					case '|':	result = eM6TokenOR; break;
 					case '&':	result = eM6TokenAND; break;
+					case '#':	state = 50; break;
 					default:
 						if (fast::isspace(c))
+						{
 							t = token;
+							b = mPtr;
+						}
 						else if (fast::is_han(c))		// chinese
 							result = eM6TokenWord;
 						else if (fast::isdigit(c))		// first try a number
@@ -694,7 +698,7 @@ M6Token M6Tokenizer::GetNextQueryToken()
 						else if (fast::ispunct(c))
 							result = eM6TokenPunctuation;
 						else
-							state = 50;
+							state = 60;
 						break;
 				}
 				break;
@@ -760,8 +764,27 @@ M6Token M6Tokenizer::GetNextQueryToken()
 				state = 40;
 				break;
 			
-			// anything else, eat as much as we can
+			// document numbers?
 			case 50:
+				if (uc::isdigit(c))
+					state = 51;
+				else
+				{
+					Retract(*--t);
+					result = eM6TokenUndefined;
+				}
+				break;
+
+			case 51:
+				if (not uc::isdigit(c))
+				{
+					Retract(*--t);
+					result = eM6TokenDocNr;
+				}
+				break;
+			
+			// anything else, eat as much as we can
+			case 60:
 				if (c == 0 or fast::isprint(c) or fast::isspace(c))
 				{
 					Retract(*--t);
@@ -781,16 +804,18 @@ M6Token M6Tokenizer::GetNextQueryToken()
 	
 	if (result == eM6TokenString)
 		WriteUTF8(token + 1, t - token - 2);
+	else if (result == eM6TokenDocNr)
+		WriteUTF8(token + 1, t - token - 1);
 	else
 		WriteUTF8(token, t - token);
 	
 	if (result == eM6TokenWord)
 	{
-		if (mPtr - b == 2 and strncmp(reinterpret_cast<const char*>(b), "OR", 2) == 0)
+		if (mTokenLength == 2 and strncmp(reinterpret_cast<const char*>(b), "OR", 2) == 0)
 			result = eM6TokenOR;
-		else if (mPtr - b == 3 and strncmp(reinterpret_cast<const char*>(b), "AND", 3) == 0)
+		else if (mTokenLength == 3 and strncmp(reinterpret_cast<const char*>(b), "AND", 3) == 0)
 			result = eM6TokenAND;
-		else if (mPtr - b == 3 and strncmp(reinterpret_cast<const char*>(b), "NOT", 3) == 0)
+		else if (mTokenLength == 3 and strncmp(reinterpret_cast<const char*>(b), "NOT", 3) == 0)
 			result = eM6TokenNOT;
 	}
 

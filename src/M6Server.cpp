@@ -564,7 +564,7 @@ void M6Server::process_mrs_link(zeep::xml::element* node, const el::scope& scope
 			M6Databank* mdb = Load(db);
 			if (mdb != nullptr)
 			{
-				unique_ptr<M6Iterator> rset = mdb->Find(ix, id, false);
+				unique_ptr<M6Iterator> rset(mdb->Find(ix, id, false));
 				
 				uint32 docNr, docNr2; float rank;
 				if (rset and rset->Next(docNr, rank))

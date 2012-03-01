@@ -7,7 +7,7 @@
 	xmlns:mrs="http://mrs.cmbi.ru.nl/mrs-web/ml"
 	xml:lang="en" lang="en">
 <head>
-    <title>MRS 5</title>
+    <title>M6</title>
 
     <meta name="author" content="Maarten L. Hekkelman" />
     <meta name="generator" content="Japi" />
@@ -39,7 +39,7 @@
 				<li>View</li>
 				<li>
 					<form id="entryForm" method="get" action="entry">
-						<input type="hidden" name="id" value="${id}" />
+						<input type="hidden" name="nr" value="${nr}" />
 						<input type="hidden" name="db" value="${db}" />
 						<select name="format" onchange="document.getElementById('entryForm').submit();">
 							<mrs:option value="entry" selected="${format}">Entry</mrs:option>
@@ -51,7 +51,7 @@
 				<li>
 					<form id="similarForm" method="get" action="similar">
 						<input type="hidden" name="db" value="${db}" />
-						<input type="hidden" name="id" value="${id}" />
+						<input type="hidden" name="nr" value="${nr}" />
 						<input type="button" name="similar" value="Find Similar" onclick="document.getElementById('similarForm').submit();" class="submit" />
 					</form>
 				</li>
@@ -59,13 +59,13 @@
 				<li>
 					<form id="blastForm" method="get" action="blast">
 						<input type="hidden" name="db" value="${db}" />
-						<input type="hidden" name="id" value="${id}" />
+						<input type="hidden" name="nr" value="${nr}" />
 						<input type="button" name="blast" value="Blast" onclick="document.getElementById('blastForm').submit();" class="submit" />
 					</form>
 				</li>
 				</mrs:if>
 				<li>
-					<input value="Download" type="button" class="submit" onclick="window.location='download?db=${db}&amp;id=${id}&amp;format=${format}';" />
+					<input value="Download" type="button" class="submit" onclick="window.location='download?db=${db}&amp;nr=${nr}&amp;format=${format}';" />
 				</li>
 				<li class="linksource">
 					Data provided by <a href="${databank.url}">${databank.url}</a>
@@ -75,7 +75,7 @@
 					<span class="reference" style="padding-left:4px;">
 						<span class="reference-label">References:</span>
 						<mrs:iterate collection="${links}" var="link">
-							<a href="linked?s=${db}&amp;d=${link}&amp;id=${id}">${link}</a>
+							<a href="linked?s=${db}&amp;d=${link}&amp;nr=${nr}">${link}</a>
 						</mrs:iterate>
 					</span>
 				</li>
@@ -84,7 +84,7 @@
 		</div>
 		
 		<div id="entrytext" class="highlightwords">
-			<mrs:entry db="${db}" id="${id}" format="${format}" />
+			<mrs:entry db="${db}" nr="${nr}" format="${format}" />
 		</div>
 	</div>
 </body>

@@ -30,6 +30,10 @@ class M6Server : public zeep::http::webapp
 	void			process_mrs_link(zeep::xml::element* node, const el::scope& scope, boost::filesystem::path dir);
 	void			process_mrs_redirect(zeep::xml::element* node, const el::scope& scope, boost::filesystem::path dir);
 
+	void			create_redirect(const std::string& databank, uint32 inDocNr,
+						const std::string& q, bool redirectForQuery,
+						const zeep::http::request& req, zeep::http::reply& rep);
+
 	void			LoadAllDatabanks();
 	M6Databank*		Load(const std::string& inDatabank);
 	

@@ -9,7 +9,7 @@
 class M6Iterator
 {
   public:
-					M6Iterator() : mCount(0) {}
+					M6Iterator() : mCount(0), mRanked(false) {}
 					~M6Iterator() {}
 
 	virtual bool	Next(uint32& outDoc, float& outRank) = 0;
@@ -20,8 +20,11 @@ class M6Iterator
 	virtual uint32	GetCount() const				{ return mCount; }
 	virtual void	SetCount(uint32 inCount)		{ mCount = inCount; }
 
+	bool			IsRanked() const				{ return mRanked; }
+
   protected:
 	uint32			mCount;
+	bool			mRanked;
 
   private:
 					M6Iterator(const M6Iterator&);
@@ -124,6 +127,7 @@ class M6VectorIterator : public M6Iterator
 					{
 						mVector.swap(inVector);
 						mPtr = mVector.begin();
+						mRanked = true;
 					}
 
 					M6VectorIterator(std::vector<uint32>& inVector)

@@ -2298,6 +2298,7 @@ void M6IndexImplT<M6DataType>::Vacuum(M6Progress& inProgress)
 	}
 	
 	mFile.Truncate(n * kM6IndexPageSize);
+	FlushCache();
 	CreateUpLevels(up);
 	Commit();
 }

@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE xhtml
+	PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/1999/xhtml">
+
+<html xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:mrs="http://mrs.cmbi.ru.nl/mrs-web/ml"
+	xml:lang="en" lang="en">
+<head>
+    <title>MRS 5</title>
+
+    <meta name="author" content="Maarten L. Hekkelman" />
+    <meta name="generator" content="Japi" />
+	<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+
+	<link rel="stylesheet" type="text/css" href="css/mrs-style.css" />
+
+	<script src="scripts/jquery.js" type="text/javascript">
+	</script>
+
+	<script src="scripts/mrs.js" type="text/javascript">
+	</script>
+
+<script type="text/javascript">
+// update status of order/count for find all
+addLoadEvent(updateFindAllStatus);
+</script>
+
+</head>
+<body>
+	<mrs:include file="menu.html" />
+
+	<div id="main">
+		<mrs:include file="form.html" />
+
+		<mrs:if test="${empty hit-databanks}">
+		<div class="no-hits">No hits found</div>
+		</mrs:if>
+
+		<mrs:if test="${not empty hit-databanks}">
+		<div class="nav">
+			<mrs:if test="${ranked}">
+				<span class="left chooseLink" id="chooseOrder">Order by
+					<a href="javascript:orderBy('databank');">databank</a> or
+					<a href="javascript:orderBy('relevance');">relevance</a>
+				</span>
+			</mrs:if>
+			<span class="right chooseLink" id="chooseCount">
+				Show <a href="javascript:nrOfHitsToShow(1);">1</a>
+					 <a href="javascript:nrOfHitsToShow(2, ${count});">2</a>
+					 <a href="javascript:nrOfHitsToShow(3, ${count});">3</a>
+					 <a href="javascript:nrOfHitsToShow(4, ${count});">4</a>
+					 <a href="javascript:nrOfHitsToShow(5, ${count});">5</a> hits per databank
+			</span>
+			&#x00a0;
+		</div>
+
+		<table id="tabel" cellspacing="0" cellpadding="0" style="position:relative;" class="list"
+			xmlns:m2="http://mrs.cmbi.ru.nl/mrs-web/nl/my-ns">
+			<caption>Results for query [${q}]</caption>
+			<tr>
+				<th>Nr</th>
+				<th>Hits</th>
+				<th>ID</th>
+				<mrs:if test="${ranked}"><th>Relevance</th></mrs:if>
+				<th>Title</th>
+			</tr>
+	<mrs:iterate collection="hit-databanks" var="db">
+		<mrs:iterate collection="${db.hits}" var="hit">
+			<tr m2:hitNr="${hit.nr}" m2:db="${db.name}" m2:score="${db.hits[0].score}">
+				<mrs:if test="${hit.nr = 1}">
+					<td rowspan="${db.hits.count}"><a href="search?db=${db.id}&amp;q=${q}">${db.name}</a></td>
+					<td rowspan="${db.hits.count}" style="text-align:right">${db.hitCount}</td>
+				</mrs:if>
+				<td style="${(hit.nr > cookies.hitsToShow) ? 'display:none' : '' }">
+					<mrs:link db="${db.id}" nr="${hit.docNr}" index="id" q="${q}">${hit.id}</mrs:link>
+				</td>
+				<mrs:if test="${ranked}">
+					<td style="${(hit.nr > cookies.hitsToShow) ? 'display:none' : '' }"><img src="images/pixel-red.png" width="${hit.score}" height="7" style="padding-top:4px"/></td>
+				</mrs:if>
+				<td style="${hit.nr > cookies.hitsToShow ? 'display:none' : '' }">${hit.title}</td>
+			</tr>
+		</mrs:iterate>
+	</mrs:iterate>
+		</table>
+		</mrs:if>
+
+		<mrs:include file="spelling-suggestions.html" />
+	</div>
+</body>
+</html>

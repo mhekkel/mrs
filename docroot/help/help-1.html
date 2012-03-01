@@ -1,0 +1,41 @@
+<?xml version="1.0"?>
+<div>
+<!-- $Id: help-1.html,v 1.4 2005/02/28 11:52:41 maarten Exp $
+
+	Copyright 2005, M.L. Hekkelman. CMBI, Radboud Universiteit Nijmegen
+
+-->
+
+<h2>Basic searching with MRS</h2>
+
+<h3>Simple searches</h3>
+
+<p>To do a simple search with MRS you enter a few words in the text box at the top of
+the window and press Enter or click the Search button. MRS will then scan through all
+indexed databanks and displays an overview of hits.</p>
+
+<h3>Case insensitive searches</h3>
+
+<p>Searches are done case insensitive. That means that upper and lowercase is ignored,
+searches for <code>Lysozyme</code>, <code>lysozyme</code> and <code>LYSOZYME</code>
+all yield the same results.</p>
+
+<h3>Wildcards</h3>
+
+<p>MRS indexes are exact, MRS does not use stemming. That means that searches for
+<code>lysozyme</code> and <code>lysozymes</code> yield different results. However,
+MRS does support <a href="?page=2">wildcards</a>. If you would
+have searched for <code>lysozyme*</code> you would have found all records containing
+words that <em>begin</em> with lysozyme.</p>
+
+<h3>Implicit AND</h3>
+
+<p>MRS uses an implicit AND for multiple search terms, i.e. the more search terms you
+enter the narrower the result set since all terms must appear in a records to generate
+a hit. <a href="?page=4">Boolean operators</a> are also available.</p>
+
+<p>However, if you entered more than one search term and there were no hits, MRS relaxes
+the requirement for all terms and displays the records that best matches your query terms.
+</p>
+
+</div>

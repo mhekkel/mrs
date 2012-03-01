@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE xhtml
+	PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/1999/xhtml">
+
+<html xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:mrs="http://mrs.cmbi.ru.nl/mrs-web/ml"
+	xml:lang="en" lang="en">
+<head>
+    <title>MRS 5</title>
+
+    <meta name="author" content="Maarten L. Hekkelman" />
+    <meta name="generator" content="Japi" />
+	<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+
+	<link rel="stylesheet" type="text/css" href="css/mrs-style.css" />
+
+	<script src="scripts/jquery.js" type="text/javascript">
+	</script>
+	
+	<script src="scripts/mrs.js" type="text/javascript">
+	</script>
+</head>
+<body>
+	<mrs:include file="menu.html" />
+
+	<div id="main">
+		<mrs:include file="form.html" />
+
+		<mrs:if test="${empty hits}">
+		<div class="no-hits">No hits found</div>
+		</mrs:if>
+
+		<mrs:if test="${relaxed and hits}">
+			<div class="relaxed">Query did not return an exact result, displaying the closest matches</div>
+		</mrs:if>
+
+		<mrs:if test="${not empty hits}">
+		<div class="nav">
+			<span class="left">
+				Records ${first}-${last} of <mrs:number f="#,##0" n="${hitCount}"/>
+			</span>
+			
+			<span class="right">
+				<mrs:if test="${page > 1}">
+					<mrs:url var="url"><mrs:param name="page" value="${page - 1}"/></mrs:url>
+					<a href="${url}">previous</a>
+				</mrs:if>
+				<mrs:for var="p" begin="${page > 4 ? page - 4 : 1}"
+							end="${lastPage > page + 4 ? page + 4 : lastPage}">
+					<mrs:if test="${p != page}">
+						<mrs:url var="url"><mrs:param name="page" value="${p}"/></mrs:url>
+						<a href="${url}">${p}</a>
+					</mrs:if>
+					<mrs:if test="${p = page}">${p}</mrs:if>
+				</mrs:for>
+				<mrs:if test="${lastPage > page}">
+					<mrs:url var="url"><mrs:param name="page" value="${page + 1}"/></mrs:url>
+					<a href="${url}">next</a>
+				</mrs:if>
+			</span>
+			&#x00a0;
+		</div>
+		
+		<table id="tabel" cellspacing="0" cellpadding="0" style="position:relative;" class="list">
+			<caption>
+				<mrs:if test="${q}">Results for query [${q}]</mrs:if>
+				<mrs:if test="${similar}">Records similar to ${db}/${similar}</mrs:if>
+				<mrs:if test="${linked.db}">Records linked to ${linked.db}/${linked.id}</mrs:if>
+			</caption>
+			<tr>
+				<th colspan="2">Nr</th>
+				<mrs:if test="${ranked}"><th>Relevance</th></mrs:if>
+				<th>ID</th>
+				<th>Title</th>
+			</tr>
+	
+			<mrs:iterate collection="hits" var="hit">
+			<tr>
+				<td><input type="checkbox" id="${db}/${hit.id}" /></td>
+				<td class="nr">${hit.nr}</td>
+				<mrs:if test="${ranked}">
+					<td><img src="images/pixel-red.png" width="${hit.score}" height="7" style="padding-top:4px"/></td>
+				</mrs:if>
+				<td>
+					<mrs:link db="${db}" nr="${hit.docNr}" q="${q}">${hit.id}</mrs:link>
+				</td>
+				<td>
+					<span class="row-title">${hit.title}</span>
+					<mrs:if test="${hit.links}">
+						<span class="reference">
+							<span class="reference-label">References:</span>
+							<mrs:iterate collection="${hit.links}" var="link">
+								<a href="linked?s=${db}&amp;d=${link}&amp;id=${hit.id}">${link}</a>
+							</mrs:iterate>
+						</span>
+					</mrs:if>
+				</td>
+			</tr>
+			</mrs:iterate>
+	
+		</table>
+		</mrs:if>
+
+		<mrs:include file="spelling-suggestions.html" />
+	</div>
+
+	<mrs:include file="select.html" />
+<script type="text/javascript">
+addLoadEvent(function() { GlobalSelection.updateCheckboxes('tabel'); });
+</script>
+</body>
+</html>

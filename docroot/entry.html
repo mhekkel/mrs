@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE xhtml
+	PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/1999/xhtml">
+
+<html xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:mrs="http://mrs.cmbi.ru.nl/mrs-web/ml"
+	xml:lang="en" lang="en">
+<head>
+    <title>MRS 5</title>
+
+    <meta name="author" content="Maarten L. Hekkelman" />
+    <meta name="generator" content="Japi" />
+	<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+
+	<link rel="stylesheet" type="text/css" href="css/mrs-style.css" />
+
+	<script src="scripts/jquery.js" type="text/javascript">
+	</script>
+
+	<script src="scripts/mrs.js" type="text/javascript">
+	</script>
+</head>
+<body>
+	<mrs:include file="menu.html" />
+
+	<div id="main">
+		<mrs:include file="form.html" />
+
+		<mrs:if test="${redirect}">
+			<div id="onlyone" class="redirect">Only one hit for query '${redirect}'</div>
+			<script language="JavaScript">
+			$("#onlyone").delay(2000).slideUp();
+			</script>
+		</mrs:if>
+
+		<div class="nav">
+			<ul>
+				<li>View</li>
+				<li>
+					<form id="entryForm" method="get" action="entry">
+						<input type="hidden" name="id" value="${id}" />
+						<input type="hidden" name="db" value="${db}" />
+						<select name="format" onchange="document.getElementById('entryForm').submit();">
+							<mrs:option value="entry" selected="${format}">Entry</mrs:option>
+							<mrs:option value="plain" selected="${format}">Plain text</mrs:option>
+							<mrs:if test="${databank.blastable}"><mrs:option value="fasta" selected="${format}">FastA</mrs:option></mrs:if>
+						</select>
+					</form>
+				</li>
+				<li>
+					<form id="similarForm" method="get" action="similar">
+						<input type="hidden" name="db" value="${db}" />
+						<input type="hidden" name="id" value="${id}" />
+						<input type="button" name="similar" value="Find Similar" onclick="document.getElementById('similarForm').submit();" class="submit" />
+					</form>
+				</li>
+				<mrs:if test="${databank.blastable}">
+				<li>
+					<form id="blastForm" method="get" action="blast">
+						<input type="hidden" name="db" value="${db}" />
+						<input type="hidden" name="id" value="${id}" />
+						<input type="button" name="blast" value="Blast" onclick="document.getElementById('blastForm').submit();" class="submit" />
+					</form>
+				</li>
+				</mrs:if>
+				<li>
+					<input value="Download" type="button" class="submit" onclick="window.location='download?db=${db}&amp;id=${id}&amp;format=${format}';" />
+				</li>
+				<li class="linksource">
+					Data provided by <a href="${databank.url}">${databank.url}</a>
+				</li>
+			<mrs:if test="${links}">
+				<li>
+					<span class="reference" style="padding-left:4px;">
+						<span class="reference-label">References:</span>
+						<mrs:iterate collection="${links}" var="link">
+							<a href="linked?s=${db}&amp;d=${link}&amp;id=${id}">${link}</a>
+						</mrs:iterate>
+					</span>
+				</li>
+			</mrs:if>
+			</ul>
+		</div>
+		
+		<div id="entrytext" class="highlightwords">
+			<mrs:entry db="${db}" id="${id}" format="${format}" />
+		</div>
+	</div>
+</body>
+</html>

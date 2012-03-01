@@ -1,0 +1,105 @@
+<?xml version="1.0"?>
+<div>
+<!-- $Id: help-20.html,v 1.1 2005/02/28 14:19:39 maarten Exp $
+
+	Copyright 2005, M.L. Hekkelman. CMBI, Radboud Universiteit Nijmegen
+
+-->
+
+<h2>Design overview</h2>
+
+<p>If you're responsible for keeping up-to-date a BioInformatics data
+repository you're faced with quite a challenge. Not only do you have to
+keep track of changing download areas and filenames, you have to cope
+with ever changing file formats as well. This quickly becomes a nightmare.</p>
+
+<p>MRS was designed to make the life of a datamanager bearable. In order to
+do so we have to separate the process into several tasks, identify the
+problems that can occur in each of them and try to find a way in which we
+can elliminate this problem.</p>
+
+<p>The steps we can identify are:</p>
+
+<ul>
+	<li>Mirroring remote data files using rsync or FTP</li>
+	<li>Optionally converting these data files to make the data available
+	to our indexing and retrieval system.</li>
+	<li>Indexing these data files</li>
+	<li>Provide a way to search these data files using these indices</li>
+	<li>Present the data to the end user in a friendly way</li>
+</ul>
+
+<p>MRS tries to offer a solution for the common errors that can occur in
+each of these steps. We'll discuss them here.</p>
+
+<p>The mirroring of data in MRS is not yet described here, it will follow later on.</p>
+
+<!--
+<p>In the ideal world a datamanager can put one line into a crontab
+and never look back. The data will always be fetched, converted and indexed
+automatically. MRS comes close. It uses a set of makefiles to achieve the
+automatic update and indexing. Makefiles are some kind of script files that
+in combination with the application make (GNU make in our case) can build
+dependancy graphs. (In plain English this means that a makefile can state that
+file B depends on A and that means that if A is newer than B we have to do
+something to update B.)</p>
+
+<p>The first step we want our makefile to do after making sure we have all
+the directories 
+-->
+
+<h3>MRS data files</h3>
+
+<p>One of the problems we can find ourselves in is that the index is out of date.
+This can happen when we download a new set of datafiles. Unpack these files by
+overwriting the old ones and then start the indexing tool. From the moment you
+unpack the first data file until the indexing is done you have a stale index
+that points to the wrong location.</p>
+
+<p>This can be avoided by indexing an offline copy of the data. But that also
+means you need to have the diskspace to retain two uncompressed copies of the data.
+With databanks like EMBL this is becomming quite a problem for many. After indexing
+you also have to carefully update the links to the new data and index files.</p>
+
+<p>And now that we're on this topic, why should we have all that data uncompressed
+on our disks? It's a huge waste of capacity.</p>
+
+<p>To avoid these problems altogether MRS puts an entire databank including its
+indices into one file. MRS also compresses the data to reduce diskspace requirements.
+The creation of MRS files happens offline and once the file is finished you only
+have to replace the old file with the new file to atomically change versions.
+The risk of putting a halfway finished index online is completely eliminated this way.</p>
+
+<p>Another advantage to this approach is that you can use one computer for the indexing
+while others provide access to the content. MRS files are endian neutral and location
+independant, that means you can use the files on practically all platforms.</p>
+
+<h3>MRS parsers</h3>
+
+<p>The early development versions of MRS used a custom made script language. The
+disadvantage of this approach quickly became apparent. It is difficult to create a
+fast and still powerful language interpreter and worse, a new language needs a new
+manual to describe it to explain all its features to others. Why not use a script
+language many BioInformaticians are comfortable with?</p>
+
+<p>So MRS was rewritten to become a Perl plugin. To make things easier a wrapper script
+was written to drive the whole process of creating a new databank. Plugin scripts
+can be written to provide parsers for all the available databanks.</p>
+
+<p>A great deal of effort was put into creating fault tolerant parser scripts. Nothing
+is as frustrating to see your parser crash because a new species has been added to 
+the foobar databank and the script doesn't know how to handle it. MRS parsers can
+create new indices on the fly if new fields are added to the databank structure.</p>
+
+<h3>The web interface</h3>
+
+<p>The web interface for MRS is just one of the ways to use MRS datafiles. Nothing
+prevents you from using the MRS plugin in other scripts and in fact, we've already
+created other tools this way.</p>
+
+<p>But a web interface is what people want. And preferably a good one, an easy one.
+One exceptionally good interface offering similar functionality is Google. It contains
+one edit box, two buttons and a couple of links. And why would you need more? MRS
+tries to mimic this minimalistic approach.</p>
+
+</div>

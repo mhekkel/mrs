@@ -1,0 +1,49 @@
+div.ppi * {
+	white-space: pre;
+	font-family: monospace;
+}
+
+.ppi .error {
+	display: block;
+	background-color: #999;
+	color: white;
+	font: bold large sans-serif;
+	margin-top: -8px;
+	padding: 8px;
+}
+
+div.ppi {
+	white-space: pre;
+	font-family: monospace;
+	border: 1px solid #aaa;
+	background-color: #eeeeee;
+	padding: 8px;
+}
+
+.ppi .line_number {
+	color: #555;
+}
+
+.ppi .comment {
+	color: #9b2e35;
+}
+
+.ppi .double {
+	color: #666;
+}
+
+.ppi .single, .ppi .regexp, .ppi .match, .ppi .substitute {
+	color: #ad6739;
+}
+
+.ppi .symbol {
+	color: #008484;
+}
+
+.ppi .keyword, .ppi .operator {
+	color: #3d4c9e;
+}
+
+.ppi .heredoc_content {
+	color: #400;
+}

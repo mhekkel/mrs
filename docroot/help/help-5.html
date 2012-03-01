@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<div>
+<!-- $Id: help-5.html,v 1.4 2005/10/11 13:17:50 maarten Exp $
+
+	Copyright 2005, M.L. Hekkelman. CMBI, Radboud Universiteit Nijmegen
+
+-->
+
+<h2>Searching a specific field</h2>
+
+<p>All flat file databanks indexed by MRS have a specific layout in which you can define fields of information. Some databanks like SwissProt and EMBL use a very straightforward format, for others the layout is less obvious.</p>
+
+<p>MRS uses parsers to split records into a number of fields and indexes each of them into a separate index. When you simply enter a couple of search terms all of these indices are combined for the search. But sometimes you need more flexibility.</p>
+
+<p>If e.g. you are looking for more information about RDS in human in EMBL you could enter '<code>rds human</code>' as query. That will result in 32 hits. 17 of them are not human though, but they do have the word human somewhere in the record. If you want to limit the search to only records for human entries you could enter: '<code>rds os:human</code>'.</p>
+
+<p>In this example you still see the plain rds word but now we prefix the search term human with a code (os) and a colon. If you look at the '<a href="/status">Databanks</a>' page you can see the list of index names that are available for EMBL. In this case we choose the os index to limit our search to records for containing the word human only.</p>
+
+<p>This revised query results in 15 records, all of which are human.</p>
+</div>

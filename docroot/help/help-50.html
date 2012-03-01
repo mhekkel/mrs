@@ -1,0 +1,156 @@
+<?xml version="1.0"?>
+<div>
+<!-- $Id$
+
+	Copyright 2008, M.L. Hekkelman. CMBI, Radboud Universiteit Nijmegen
+-->
+
+<style type="text/css">
+
+div.maindoc {
+	width: 750px;
+}
+
+p.sidenote {
+	padding: 5px;
+	border: solid 1px #ccd;
+	background-color: #eef;
+}
+
+div.command {
+	padding: 10px;
+	margin-bottom: 10px;
+	border: solid 1px #ddd;
+	background-color: #eee;
+	font-family: monospace;
+	overflow: auto;
+	white-space: pre;
+}
+
+</style>
+
+<div class="maindoc">
+
+<h2>Installing MRS</h2>
+
+<p>Installing MRS has been simplyfied considerably in version 5. However, you may still run into problems due to incompatible libraries or compilers. Please read this manual carefully and don't hesitate to contact me if you need more help.</p>
+
+<h3>Ubuntu</h3>
+
+<p>If you're running Ubuntu 10.10 or later, you're lucky. The only thing you have to do to install MRS is this:</p>
+
+<div class="command">sudo apt-add-repository ppa:hekkel/ppa
+sudo apt-get update
+sudo apt-get install mrs-all
+</div>
+
+<p>The way this works is by using the personal package archive at <a href="https://launchpad.net/~hekkel/+archive/ppa/">https://launchpad.net/~hekkel/+archive/ppa/</a>. And by using this PPA, you will receive updates to MRS automatically.</p>
+
+<p>Once you've installed MRS this way, you can run an mrs-update of the enzyme databank to test your installation. Since the data directory is owned by the newly created user <code>mrs-dba</code> you'll have to use sudo.</p>
+
+<div class="command">sudo -u mrs-dba mrs-update enzyme
+</div>
+
+<p>If this finishes without errors, you have created an MRS file called enzyme.cmp in /var/lib/mrs/mrs. Have a look at the MRS config files in <span style="whitespace:nowrap">/etc/mrs</span> to see what other databanks you can create.</p>
+
+<h3>Installing the mrs applications</h3>
+
+<p>For now, MRS is distributed as an archive containing the source code, makefiles and a configure script. The first step is to install the development tools and all the libraries we need in order to build the MRS applications. We will use <em>apt-get</em> to install the software. The shoppinglist is:</p>
+
+<ul>
+	<li>g++</li>
+	<li>make</li>
+	<li>libboost-all-dev</li>
+	<li>zlib1g-dev</li>
+	<li>libbz2-dev</li>
+	<li>libperl-dev</li>
+	<li>clustalw (this is optional)</li>
+	<li>libarchive-dev</li>
+	<li>liburi-perl</li>
+	<li>libxml-xslt-perl</li>
+	<li>snarf</li>
+	<li>rsync</li>
+</ul>
+
+<p>And so we type the command:</p>
+
+<div class="command">sudo apt-get install g++ make libboost-all-dev zlib1g-dev libbz2-dev libperl-dev clustalw (this is optional) libarchive-dev liburi-perl libxml-xslt-perl rsync
+</div>
+
+<img src="images/installation-1.png" />
+
+<p>The OS will ask for your password (since we used sudo) and then it asks whether you want to install all the additional packages that are needed by the ones we typed in as well. Answer yes.</p>
+
+<p>Several minutes later we have our server set up to start building MRS. We now need to download the source code. For this we go to <a href="ftp://ftp.cmbi.ru.nl//pub/software/mrs/">ftp://ftp.cmbi.ru.nl//pub/software/mrs/</a> and download the latest mrs-src-5.0.2b.tgz file. (Have a look at this location to find out which one is latest.)</p>
+
+<div class="command">snarf ftp://ftp.cmbi.ru.nl//pub/software/mrs/mrs-5.0.2b.tgz</div>
+
+<p>Now we extract the tar and cd into the newly created mrs-5 directory.</p>
+
+<img src="images/installation-2.png" />
+
+<p>Now it is time to start the configure script. MRS comes with a handcrafted perl script that does the work, you start it by typing <code>./configure</code>.</p>
+
+<p>As a side-note, the command <code>configure</code> can take several options that influence the way MRS is installed. If you type <code>perl configure.pl --help</code> you will get a list of available options.</p>
+
+<div class="command">perl configure.pl --help
+Using perl /usr/bin/perl
+Usage: perl configure.pl [OPTIONS]
+Using perl /usr/bin/perl
+Reading settings from previous make.config file
+Usage: perl configure [OPTIONS]
+    --help              This help message
+    --prefix            The installation directory prefix string
+                        Default is [/usr/local]
+    --sysconfdir        The base directory for configuration files
+                        Default is [/usr/local/etc]
+    --localstatedir     The directory for configuration files
+                        Default is [/var]
+    --mandir            The directory where man pages are installed.
+                        Default is [/usr/local/man]
+    --data-dir          The directory where MRS will store its data files.
+                        Default is [/data]
+    --use-destdir       Prepend $(DESTDIR) to the installation directories.
+    --cc                The compiler to use, perferrably a GCC &gt;= 4.1
+                        Default is [/usr/bin/c++]
+    --gcc-march-flag=[] The -march=xx flag for gcc. This is used to build
+                        an optimized version of MRS code specifically for
+                        an architecture. Examples are 'nocona', 'prescott'
+                        and 'pentium4'.
+    --rsync             The rsync executable for updating the data.
+    --snarf             The snarf executable for updating the data.
+    --boost_inc=[path]  The path where the boost include files are installed
+    --boost_lib=[path]  The path where the boost library files are installed
+    --zeep=[path]       The path where libzeep is installed
+    --no-blast          Do not compile the BLAST code.
+</div>
+
+<p>Now entering this configure command should print out a few lines about what it is doing and when there were no errors, the result will be a make.config file containing all the options for your machine.</p>
+
+<img src="images/installation-3.png"/>
+
+<p>We're now ready to build MRS. Simply type <code>make</code>. Building MRS will take a couple of minutes and a lot of messages are printed to the screen. When everything finishes OK, you should end up with a screen like this:</p>
+
+<img src="images/installation-4.png"/>
+
+<p>When make finishes, you can type <code>sudo make install</code>. This command again prints out lots of information about what it is doing, when finished your screen should look like this:</p>
+
+<img src="images/installation-5.png"/>
+
+<p>And now you have a complete MRS installation. To test it, you can create your first databank by typing the commands:</p>
+
+<div class="command">mrs-update enzyme
+mrs-test enzyme | head -25</div>
+
+<p>The result should be a dump of the info for the enzyme databank as created in /usr/local/data/mrs/.</p>
+
+<img src="images/installation-6.png"/>
+
+<p>And that's it. Now you may want to start configuring the mrs-config.xml and the databanks.info files. You can read more about those in the chapter about <a href="?page=51">configuring mrs.</a></p>
+
+<h3>Web server</h3>
+
+<p>MRS comes with its own web server implementation that listens to different ports each serving different content. The default installation provides HTML for web browser consumption on one port and has serveral SOAP servers on the rest. You can specify this configuration in the mrs-config.xml file. It is perhaps very wise to put these ports behind a firewall and a reverse proxy.</p>
+
+</div>
+</div>

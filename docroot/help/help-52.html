@@ -1,0 +1,264 @@
+<?xml version="1.0"?>
+<div>
+<!-- $Id$
+
+    Copyright 2008, M.L. Hekkelman. CMBI, Radboud Universiteit Nijmegen
+-->
+
+<style type="text/css">
+
+div.maindoc {
+    width: 750px;
+}
+
+p.sidenote {
+    padding: 5px;
+    border: solid 1px #ccd;
+    background-color: #eef;
+}
+
+div.command {
+    padding: 10px;
+    margin-bottom: 10px;
+    border: solid 1px #ddd;
+    background-color: #eee;
+    font-family: monospace;
+    overflow: auto;
+    white-space: pre;
+}
+
+</style>
+
+<div class="maindoc">
+
+<h2>MRS plugin tutorial</h2>
+
+<p>When designing MRS one of the goals was to keep the complexity as low as possible. One of the ways I tried to accomplish this is to adopt a well known scripting language instead of inventing my own. Given the popularity of (and my familiarity with) I chose Perl. Perl is known as a very fast and powerful language, especially for parsing and processing text. Which is exactly where we use it for in MRS.</p>
+
+<p>The indexing process is started by the <a href="?man=mrs-build.1">mrs-build</a> application. The main parameter is the -d option that supplies the databank name we want to create. Based on this parameter the application chooses a plugin script to provide the necessary information and to do the actual processing. This choice of plugin script can be overridden using the -s option.</p>
+
+<p>A plugin script is a Perl object that inherits from the base object <code>MRS::Script</code>. It should provide some methods and can override some of the methods provided by the base class.</p>
+
+<p>Since the title says this is supposed to be a tutorial, lets get started by inventing our own databank. Let's call this databank 'mydb'. mydb is a so called flat-file databank, records have a well defined layout. Here's an example record</p>
+
+<pre>ID   A0001
+DE   This is a funny peptide
+AA   AABBCCBBAA
+//
+</pre>
+
+<p>As you can see, there are three fields in this databank, an ID field containing a unique value for each record, a DE field containing a description of the record and AA containing an actual protein sequence.</p>
+
+<p>One remark at this point. Our mydb databank as described above contains records. In MRS we do not store records but documents. You should for now consider these terms as synonyms and perhaps skip the rest of this paragraph. The reason MRS stores documents and not records is that MRS is not a database tool, but a tool to index data and there is no limit to what you can store. No structure in the data is assumed.</p>
+
+<p>Lets start writing a mrs plugin for mydb. We will call the plugin mydb and thus we save it as mydb.pm in the parser_scripts directory. The first lines in the script are very straightforward, they are here to tell Perl what this file actuall contains:</p>
+
+<pre>package MRS::Script::mydb;
+
+our @ISA = "MRS::Script";</pre>
+
+<p>The first line defines the name for the package and the third line tells Perl our package inherits from the <code>MRS::Script</code> package. We then continue with a 'new' subroutine. This one is required in all Perl plugins and initialises the plugin object. Here's the code:</p>
+
+<pre>sub new
+{
+    my $invocant = shift;
+    my $self = new MRS::Script(
+        ...
+    );
+    return bless $self, "MRS::Script::mydb";
+}</pre>
+
+<p>Again, this is pretty standard stuff for anyone who has written a Perl object before, with one exception: we have to call the base class constructor first to create our $self object. We will now fill in this method with actual information for our mydb databank. We do this by providing values for a couple of standard fields in this object. Remember, an object in Perl is a actually a hash that is blessed. And hashes are associative arrays. We will now set up a couple of values for this hash.</p>
+
+<pre>sub new
+{
+    my $invocant = shift;
+    my $self = new MRS::Script(
+        name        =&gt; 'MyDB, a databank containing funny peptides',
+        url         =&gt; 'http://www.mydb.org/funny',
+        section     =&gt; 'protein',
+        meta        =&gt; [ 'title' ],
+        raw_files   =&gt; qr/mydb.txt.gz/,
+        indices     =&gt; \%INDICES,
+        @_
+    );
+    return bless $self, "MRS::Script::mydb";
+}</pre>
+
+<p>Let's see what we've got here. First of all there's the name field. This is the pretty name the user interface presents to the end user of MRS.</p>
+
+<p>URL contains the url where users can find more information about this databank.</p>
+
+<p>Section is not used at the moment but will be later on. The idea is to use this information to group databanks in the user interface.</p>
+
+<p>Meta contains an array of the names of meta data fields. MRS needs to know in advance what meta data fields will be constructed. This means that you have to list all meta data fields here before you actually fill them. If you don't you will get the error "Meta data field xxx not defined".</p>
+
+<p>If you provide meta datafields, which is optional, you must make sure that the first meta data field contains the title (or description) of the document. All tools that use MRS files assume this convention is used.</p>
+
+<p>raw_files is a compiled regular expression. It is used to determine which files to process. The mirror process might fetch more files into the 'raw' directory of this databank than only datafiles. Some databanks e.g. have files with release information. Sometimes there is no simple regular expression that describes all datafiles, in the PDB databank e.g. the datafiles are located in sub directories. In that case you can provide a raw_files method to create a list of raw data file paths.</p>
+
+<p>Then there is the indices field. This one contains a reference to a hash which maps a field identifier to a field name. In our case we use a global hash called %INDICES, but if we do, we have to define this hash itself as well of course. Here it is, this code should come before the new subroutine:</p>
+
+<pre>our %INDICES = (
+    'id' =&gt; 'Identifier',
+    'de' =&gt; 'Description',
+    'aa' =&gt; 'sequence'
+);</pre>
+
+<p>A close reading of this piece of code reveals that we use lowercase id's while our databank had uppercase field codes. The reason is that MRS matches a field name case insensitive. Internally the id's are stored lowercase and so I opted for the lowercase in the scripts as well. This is cosmetic, but if you decide to use otherwise I can tell you this is untested.</p>
+
+<p>OK, our databank script object is ready to be initialised and mrs now knows most of the information it needs to start the parsing process. There are a couple of fields that we didn't provide. MRS will create a default value for these.</p>
+
+<p>Before we continue with the parsing, let me spend a couple of words on version information. If you don't provide any, mrs-build will store the date of the most recent raw file as version information. However, you can set the version field or you can provide a method with the same name to fetch this information.</p>
+
+<h3>Parsing</h3>
+
+<p>The only other method you're required to provide is the parse subroutine. This one does the actual parsing of the raw data. mrs.pl will open the files specified by the raw_files value, extract them on the fly if needed. The use of extraction is based on extension of the raw file names.</p>
+
+<p>The parse method is called with no parameters. And so we start our parse method as follows:</p>
+
+<pre>sub parse
+{
+    my $self = shift;
+</pre>
+
+<p>Again, if you know Perl you know what happens here. If you don't know Perl, you'd better simply copy over the lines since I know that Perl syntax can be a bit confusing.</p>
+
+<p>And so we are in the parse method and we're almost ready to start parsing. The data we produce will be put into a new databank and the mrs-build application has already created a new temporary mrs file ready to accept this data.</p>
+
+<p>Since our parser script is derived from MRS::Script, it inherits several functions that can be used. Among these is GetLine to read the raw files line by line, others are the various Store and Index methods. Their use will be explained here.</p>
+
+<p>Lets start parsing. There are several ways to do this, but one of my favorite ways to do this is to read the raw data line by line after we've declared some variables to use later on:</p>
+
+<pre>
+    my ($doc, $title);
+
+    while (my $line = $self-&gt;GetLine)
+    {
+        $doc .= $line;
+        chomp($line);
+</pre>
+
+<p>So we read the file, line by line and add the lines to the $doc variable to collect the data that belongs to the current document. After this we chop off the newline at the end of the line using chomp to make processing easier. Now if we look at the structure of our mydb again we see that a record is always closed with a line containg two forward slashes.</p>
+
+<pre>
+        if ($line eq '//')
+        {
+            $self-&gt;StoreMetaData('title', $title);
+            $self-&gt;Store($doc);
+            $self-&gt;FlushDocument;
+            
+            $doc = undef;
+            $title = undef;
+        }
+</pre>
+
+<p>What happens here is we've finished a document and $doc contains the full text of the original record. $title contains the title for this document (see below) and we store both into the current document of the MRS databank. When we've done that we can flush the document and reset the variables $doc and $title.</p>
+
+<p>Now if a line does not contain the two forward slashes, it must contain a key/value pair. The key is two characters wide followed by three space and then the rest of the line contains the value. We test for this and parse out the key and value values at the same time:</p>
+</div>
+
+<pre>
+        elsif ($line =~ m/^([A-Z]{2}) {3}(.+)/)
+        {
+            my $key = $1;
+            my $value = $2;
+</pre>
+
+<p>OK, so now the $key variable contains the key and the $value variable the value for the next field in the current record. Based on the $key variable we take an action:</p>
+
+<pre>
+            if ($key eq 'ID')
+            {
+                $self-&gt;IndexValue('id', $value);
+            }
+</pre>
+
+<p>If the $key contains 'ID' the $value contains the unique ID for this record. The 'id' index in MRS is a special index and is used to identify records. It is not strictly required but if you omit it, some functionality will not be available. So we store this $value in the 'id' index. We use the IndexValue method since the id index is a unique index (that means each entry in the index points to only one record and thus now two records can have the same value for this index). Of course you can have more unique indices in a databank.</p>
+
+<pre>
+            elsif ($key eq 'DE')
+            {
+                $title = $value;
+                $self-&gt;IndexTextAndNumbers('de', $value);
+            }
+</pre>
+
+<p>When the $key variable contains 'DE' the $value variable contains the descriptive text for this record. For sake of simplicity we use this value for the title as well. And so we copy the value to the $title variable and then we pass the value to the IndexTextAndNumbers method of mrs. This method will take care of splitting the value into words and numbers and store those in the full text index 'de'.</p>
+
+<p>And then we have the 'AA' field. This field contains a very short protein sequence. It is not very useful to store this in a regular index, in fact you should alwasy avoid adding sequences to indices since they tend to be quite unique and long and so they suck up valueable memory space very quickly and they blow up the final indices. However, if we still want to search for these peptides we might store them as a sequence in the databank. This way we can use mrs-blast later on.</p>
+
+<pre>
+            elsif ($key eq 'AA')
+            {
+                $self-&gt;AddSequence($value);
+            }
+</pre>
+
+<p>And that were all the fields. Now suppose we are very paranoia we might add the following:</p>
+
+<pre>
+            else
+            {
+                die "Unknow field '$key' containing value '$value'\n";
+            }
+</pre>
+
+<p>This seems like a good solution. Parsing a databank will fail if it contains a new field. But is this really a good solution? It means that when the maintainer of the mydb databank adds a new field, the parsing will fail. And you have to take some action, and until you do, updating of this databank is halted. We can do better:</p>
+
+<pre>
+            else
+            {
+                $self-&gt;IndexTextAndNumbers(lc($key), $value);
+            }
+</pre>
+
+<p>Now when a new field is added it is automatically picked up by our parser and added to the list of indices.</p>
+
+<p>So we've covered all key/value pairs now. We can close this block. For debugging purposes we might add a check for lines containing something else:</p>
+
+<pre>
+        }
+        else
+        {
+            warn "unprocessed line: $line\n";
+        }
+    }
+</pre>
+
+<p>When we leave this loop, the raw file has been read entirely. If all went well, the $doc and $title fields should be empty now, we can add a debugging check for this:</p>
+
+<pre>
+    if (defined $doc or defined $title)
+    {
+        warn "last record was not closed properly";
+    }
+</pre>
+
+<p>And that's it. We're done with parsing:</p>
+
+<pre>
+}</pre>
+
+<p>We can test this script using the following command:</p>
+
+<code>mrs-build -d mydb -p</code>
+
+<p>Using the -p option is strongly recommended since it will display information about what is going on. You will see progress information for parsing and some information about the indices being created.</p>
+
+<p>If all goes well you will now have a mydb.cmp file. To test this file you can use the <a href="?man=mrs-test.1">mrs-test</a> tool. This is a command line application that can be used to test mrs files and print some statistics and other information about these files. You can also use <a href="?man=mrs-query.1">mrs-query</a> to search the newly created databank. Since we stored a title meta data field, this mrs-query tool is also capable of displaying the title along with the ID of each hit making it easier to verify the results.</p>
+
+<h3>Display</h3>
+
+<p>If you access mydb from the webinterface you will notice that the record is rendered verbatim using the PRE tags. Sometimes this is good enough, sometimes you want a bit more and then you have to provide the pretty printing method 'pp'.</p>
+
+<p>This pp method gets four parameters:</p>
+<ul>
+<li>a pre constructed CGI object, very handy to create all kinds of HTML constructs.</li>
+<li>the text of the document</li>
+<li>the id of the document</li>
+<li>the base url (this is not fully functional though)</li>
+</ul>
+
+<p>What you do next is up to you. You might want to use the inherited link_url function that cleans up regular text and makes it HTML, escaping reserved characters and adding clickable links to urls.</p>
+</div>

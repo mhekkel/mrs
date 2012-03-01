@@ -67,3 +67,7 @@ zx::element* M6Config::LoadParser(const std::string& inParser)
 	return dbConfig.front();
 }
 
+zeep::xml::element_set M6Config::LoadServers()
+{
+	return mConfig->find("/m6-config/server");
+}

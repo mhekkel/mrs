@@ -9,12 +9,19 @@
 class M6Iterator
 {
   public:
-					M6Iterator() {}
+					M6Iterator() : mCount(0) {}
 					~M6Iterator() {}
 
 	virtual bool	Next(uint32& outDoc, float& outRank) = 0;
 
 	static void		Intersect(std::vector<uint32>& ioDocs, M6Iterator* inIterator);
+
+	// count is a heuristic, it is a best guess, don't trust it!
+	virtual uint32	GetCount() const				{ return mCount; }
+	virtual void	SetCount(uint32 inCount)		{ mCount = inCount; }
+
+  protected:
+	uint32			mCount;
 
   private:
 					M6Iterator(const M6Iterator&);
@@ -28,7 +35,7 @@ class M6SingleDocIterator : public M6Iterator
 {
   public:
 					M6SingleDocIterator(uint32 inDoc, float inRank = 1.0f)
-						: mDoc(inDoc), mRank(inRank) {}
+						: mDoc(inDoc), mRank(inRank) { mCount = 1; }
 
 	virtual bool	Next(uint32& outDoc, float& outRank)
 					{

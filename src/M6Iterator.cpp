@@ -44,6 +44,9 @@ M6NotIterator::M6NotIterator(M6Iterator* inIter, uint32 inMax)
 	, mNext(0)
 	, mMax(inMax)
 {
+	mCount = inMax;
+	if (inIter != nullptr)
+		mCount -= inIter->GetCount();
 }
 
 bool M6NotIterator::Next(uint32& outDoc, float& outRank)

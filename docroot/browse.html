@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE xhtml
+	PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/1999/xhtml">
+
+<html xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:mrs="http://mrs.cmbi.ru.nl/mrs-web/ml"
+	xml:lang="en" lang="en">
+<head>
+    <title>MRS 5</title>
+
+    <meta name="author" content="Maarten L. Hekkelman" />
+    <meta name="generator" content="Japi" />
+	<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+
+	<link rel="stylesheet" type="text/css" href="css/mrs-style.css" />
+
+	<script src="scripts/jquery.js" type="text/javascript">
+	</script>
+	
+	<script src="scripts/mrs.js" type="text/javascript">
+	</script>
+</head>
+<body>
+	<mrs:include file="menu.html" />
+
+	<div id="main">
+		<mrs:include file="form.html" />
+
+		<div class="nav">
+			<span class="left">
+				Records ${first}-${last} of <mrs:number f="#,##0" n="${keyCount}"/>
+			</span>
+			
+			<span class="right">
+				<mrs:if test="${page > 1}">
+					<mrs:url var="url"><mrs:param name="page" value="${page - 1}"/></mrs:url>
+					<a href="${url}">previous</a>
+				</mrs:if>
+				<mrs:for var="p" begin="${page > 4 ? page - 4 : 1}"
+							end="${lastPage > page + 4 ? page + 4 : lastPage}">
+					<mrs:if test="${p != page}">
+						<mrs:url var="url"><mrs:param name="page" value="${p}"/></mrs:url>
+						<a href="${url}">${p}</a>
+					</mrs:if>
+					<mrs:if test="${p = page}">${p}</mrs:if>
+				</mrs:for>
+				<mrs:if test="${lastPage > page}">
+					<mrs:url var="url"><mrs:param name="page" value="${page + 1}"/></mrs:url>
+					<a href="${url}">next</a>
+				</mrs:if>
+			</span>
+			&#x00a0;
+		</div>
+		
+		<table id="tabel" cellspacing="0" cellpadding="0" style="position:relative;" class="list">
+			<caption style="white-space:nowrap;">
+				Index entries for index ${index.id}${not empty index.name ? ' index.name' : ''}
+				in databank <a style="color:white; text-decoration:underline;" href="info?db=${db}">${db}</a>
+			</caption>
+			<tr>
+				<th>Nr</th>
+				<th style="min-width:300px;">Value</th>
+			</tr>
+	
+			<mrs:iterate collection="keys" var="key">
+			<tr>
+				<td class="nr">${key.nr}</td>
+				<td>
+					<a href="search?db=${db}&amp;q=${index.id}='${key.value}'">${key.value}</a>
+				</td>
+			</tr>
+			</mrs:iterate>
+	
+		</table>
+	</div>
+</body>
+</html>

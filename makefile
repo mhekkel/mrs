@@ -63,6 +63,9 @@ m6: $(OBJECTS) $(OBJDIR)/M6CmdLineDriver.o
 m6-test: $(OBJECTS) $(OBJDIR)/M6TestMain.o obj/M6TestDocStore.o
 	$(CC) $(BOOST_INC_DIR:%=-I%) -o $@ -I. $^ $(LDFLAGS) $(BOOST_LIB_DIR)/libboost_unit_test_framework.a
 
+m6: $(OBJECTS) $(OBJDIR)/M6Server.o $(OBJDIR)/M6ServerDriver.o
+	$(CC) $(BOOST_INC_DIR:%=-I%) -o $@ -I. $^ $(LDFLAGS)
+
 $(OBJDIR)/%.o: %.cpp
 	$(CC) -MD -c -o $@ $< $(CFLAGS)
 

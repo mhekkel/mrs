@@ -1,0 +1,26 @@
+<?xml version="1.0"?>
+<div>
+<!-- $Id: help-4.html,v 1.2 2005/02/28 11:52:41 maarten Exp $
+
+	Copyright 2005, M.L. Hekkelman. CMBI, Radboud Universiteit Nijmegen
+
+-->
+
+<h2>Boolean operators</h2>
+
+<p>MRS uses an implicit AND for multiple search terms. To create more complex queries you can enter boolean operators. The operators supported are AND (&amp;), OR (|) and NOT (!). You can also combine terms using parenthesis. Please note that the operator names should be in upper case.</p>
+
+<p>Parenthesis are also supported, i.e. you can now group boolean expressions together in more complex expressions.</p>
+
+<dl>
+	<dt>To find both 'lysosyme' and 'lysozyme'</dt>
+	<dd>Enter the query <code>'lysosyme OR lysozyme'</code></dd>
+
+	<dt>To find all records containing lysozyme but excluding the EST records from EMBL.</dt>
+	<dd>Enter the query <code>'lysozyme AND NOT kw:est'</code><br />
+	<small>(EMBL records have a keyword EST for all EST records, we use this to search the separate kw index. See <a href="?page=5">Searching a specific field</a> for more information on indices).</small></dd>
+
+	<dt>To find both lysosyme and lysozyme and also exclude the EST records</dt>
+	<dd>Enter the query <code>'(lysosyme OR lysozyme) AND NOT kw:est'</code></dd>
+</dl>
+</div>

@@ -1320,7 +1320,7 @@ class M6Accumulator
 
 	float		operator[](uint32 inIndex) const	{ return mItems[inIndex].mValue; }
 	
-	void		Collect(vector<uint32>& outDocs, uint32 inTermCount)
+	void		Collect(vector<uint32>& outDocs, size_t inTermCount)
 				{
 					outDocs.reserve(mHitCount);
 					for (M6Item* item = mFirst; item != nullptr; item = item->mNext)
@@ -1408,7 +1408,7 @@ M6Iterator* M6DatabankImpl::Find(const string& inQuery, bool inAllTermsRequired,
 		queryWeight = sqrt(queryWeight);
 		
 		vector<uint32> docs;
-		uint32 termCount = terms.size();
+		size_t termCount = terms.size();
 		if (not inAllTermsRequired)
 			termCount = 0;
 		A.Collect(docs, termCount);
@@ -1424,10 +1424,11 @@ M6Iterator* M6DatabankImpl::Find(const string& inQuery, bool inAllTermsRequired,
 		
 		vector<pair<uint32,float>> best;
 		
-		if (A.GetHitCount() > inReportLimit)
+		uint32 count = A.GetHitCount();
+		if (count > inReportLimit)
 			best.reserve(inReportLimit);
 		else
-			best.reserve(A.GetHitCount());
+			best.reserve(count);
 		
 		foreach (uint32 doc, docs)
 		{
@@ -1448,8 +1449,13 @@ M6Iterator* M6DatabankImpl::Find(const string& inQuery, bool inAllTermsRequired,
 		}
 		
 		sort_heap(best.begin(), best.end(), compare);
-		
+
+		if (best.size() < inReportLimit)
+			count = best.size();
+
 		result = new M6VectorIterator(best);
+		
+		result->SetCount(count);
 	}
 	
 	return result;
@@ -1638,5 +1644,5 @@ uint32 M6Databank::size() const
 
 uint32 M6Databank::GetMaxDocNr() const
 {
-	return mStore->GetDocStore().NextDocumentNumber();
+	return mImpl->GetDocStore().NextDocumentNumber();
 }

@@ -1,0 +1,50 @@
+/* styles for multiple alignments */
+
+.result {
+	margin-top: 10px;
+}
+
+.msa * {
+	white-space: pre;
+	font-family: monospace;
+	font-size: 9pt;
+}
+
+.msa-nocolour * {
+	white-space: pre;
+	font-family: monospace;
+	font-size: 9pt;
+}
+
+.msa .c1 {
+	background-color: #fc7878;
+}
+
+.msa .c2 {
+	background-color: #918bf8;
+}
+
+.msa .c3 {
+	background-color: #9ee3f8;
+}
+
+.msa .c4 {
+	background-color: #f398ed;
+}
+
+.msa .c5 {
+	background-color: #f8f59c;
+}
+
+.msa .c6 {
+	background-color: #c9c9c9;
+}
+
+.msa .c7 {
+	background-color: #cbfa85;
+}
+
+.msa .c8 {
+	background-color: #9aefaf;
+}
+

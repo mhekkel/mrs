@@ -1,0 +1,149 @@
+<?xml version="1.0"?>
+<div>
+<!-- $Id$
+
+	Copyright 2008, M.L. Hekkelman. CMBI, Radboud Universiteit Nijmegen
+-->
+
+<style type="text/css">
+
+div.maindoc {
+	width: 750px;
+}
+
+p.sidenote {
+	padding: 5px;
+	border: solid 1px #ccd;
+	background-color: #eef;
+}
+
+div.command {
+	padding: 10px;
+	margin-bottom: 10px;
+	border: solid 1px #ddd;
+	background-color: #eee;
+	font-family: monospace;
+	overflow: auto;
+	white-space: pre;
+}
+
+</style>
+
+<div class="maindoc">
+
+<h2>Configuring MRS</h2>
+
+<h3>The configurable settings</h3>
+
+<p>MRS performs several tasks, each of which can be configured.</p>
+
+<h3>Updating</h3>
+
+<p>Each databank configured in this task will typically be fetched from some location and then has to be indexed using MRS. The scripts distributed with MRS can take care of these steps. To add a databank to the the update process you have to decide how to download the data, options are <em>rsync</em> and <em>FTP</em>. You can specify additional information for this download step. Next you can specify which MRS files need to be created and what extra options to pass to mrs-build.</p>
+
+<p>For the simplest databanks, only two lines are needed:</p>
+
+<div class="command">DATABANKS        += enzyme
+RSYNC_URL.enzyme = rsync://bio-mirror.net/biomirror/enzyme/release_with_updates/</div>
+
+<p>The first line adds the <em>enzyme</em> databank to the list of databanks we want to process. The second line specifies where to fetch the data for this databank.</p>
+
+<p>As you can see in this example, the first step always defines a new databank name and adds it to the list contained in the variable DATABANKS. Adding is done with the <code>+=</code> operator, if you use <code>=</code> here you will throw away the current content and replace it with the new databank, don't do this.</p>
+
+<p>The next steps define the details for the steps to take for this databank. Each databank has a set of variables that can be defined and each of those variables names start with a common name part, a dot and then the name of the variable. Therefore the rsync location for the enzyme databank consists of the <code>RSYNC_URL</code> variable name and the <code>enzyme</code> databank name: <code>RSYNC_URL.enzyme</code>.</p>
+
+<p>Variables that can be set for each databank are:</p>
+
+<dl>
+<dt>FTP_URL</dt>
+<dd>If you want to use FTP to fetch the data, use this variable to set the URL to use.</dd>
+<dt>FTP_OPTIONS</dt>
+<dd>The MRS update process uses <a href="?man=mrs-mirror.1">mrs-mirror</a> to transfer data using the FTP protocol. You can specify extra options to <a href="?man=mrs-mirror.1">mrs-mirror</a> here. Extra options e.g. can be used to limit the number of files to transfer or to fetch recursively.</dd>
+<dt>RSYNC_URL</dt>
+<dd>If you prefer to use rsync (which is much more efficient than FTP) you can specify a location here.</dd>
+<dt>RSYNC_OPTIONS</dt>
+<dd>As with FTP_OPTIONS, you can specify additional options to RSYNC here.</dd>
+<dt>DATA_POST_PROCESS</dt>
+<dd>An optional command to execute after succesfully updating the data</dd>
+<dt>MRS_FILES</dt>
+<dd>The list of MRS databanks to create for this databank. Usually this is not needed. An exception is e.g. <em>UniProt</em> which consists of the two databanks <em>SwissProt</em> and <em>TrEMBL</em>.</dd>
+<dt>MRS_SCRIPT</dt>
+<dd>The MRS script to use, scripts can be shared among databanks and so you might want to add the name of the script here. E.g. RefSeq uses the Genbank layout and so it uses the genbank script.</dd>
+<dt>MRS_OPTIONS</dt>
+<dd>extra options for mrs-build, e.g. -I suppresses the creation of IDL data. See the <a href="?man=mrs-build.1">mrs-build</a> manual page for more information on the available options.</dd>
+</dl>
+
+<h3>Configuration files</h3>
+
+<p>The goal is to have just one configuration file for MRS, unfortunately we're not there yet. And so MRS-4 has two configuration files: mrs-config.xml and databanks.info.</p>
+
+<h4>mrs-config.xml</h4>
+
+<p>The first, and eventually only, configuration file mrs-config.xml is located by default in <code>/usr/local/etc</code>. This file is XML based and contains several sections. For now we have to edit this file by hand, it is a good idea to use a syntax highlighting editor for this.</p>
+
+<h5>globals section</h5>
+
+<p>The file starts with a number of global settings. These include: </p>
+
+<dl>
+	<dt>datadir</dt>
+	<dd>The directory where the MRS datafiles are located.</dd>
+	
+	<dt>rawdir</dt>
+	<dd>The directory where MRS stores the so-called raw files, these are the files that are downloaded from the mirror site</dd>
+
+	<dt>scratchdir</dt>
+	<dd>During indexing MRS needs to create scratch files to store temporary data. You can specify a separate directory here. If this variable is not specified, the datadir will be used instead. Scratch files are read in random order and so it is sensible to specify a partition on your fastest disks here. Scratch files can become up to half the size of the eventual MRS file.</dd>
+
+	<dt>scriptdir</dt>
+	<dd>The directory containing the MRS parser scripts.</dd>
+	
+	<dt>logfile</dt>
+	<dd>The path to the logfile that will be created by the mrs-ws application. This file must be writable by the user running mrs-ws.</dd>
+
+	<dt>user</dt>
+	<dd>If specified, mrs-ws will drop priviliges when starting as a daemon.</dd>
+</dl>
+
+<h5>Servers section</h5>
+
+<p> What follows is a section that specifies the servers to start up. You can specify as many servers as you want. Each of them will run as a separate process. The options per server are:</p>
+
+<dl>
+	<dt>service</dt>
+	<dd>The type of service to start. Valid options are: <em>www</em>, <em>search</em>, <em>blast</em>, <em>clustal</em> and <em>admin</em>.</dd>
+
+	<dt>docroot</dt>
+	<dd>This is the location on disk containing the XHMTL files that act as templates for the web interface. Obviously, this option is useful for www services only.</dd>
+
+	<dt>address</dt>
+	<dd>The IP address to bind to. If you specify 0.0.0.0 here, you will bind to all available addresses. </dd>
+
+	<dt>port</dt>
+	<dd>The port to listen to. This should be a unique port number, you cannot share portnumbers with other processes.</dd>
+
+	<dt>threads</dt>
+	<dd>This option is only valid for the <em>search</em> and <em>blast</em> servers. It specifies how many threads should run simultaneously.</dd>
+
+	<dt>dbs</dt>
+	<dd>This is the list of logical databanks the server can provide. Each databank is listed in a <code>&lt;db&gt;</code> tag. These <code>db</code> tags have the optional parameter <code>ignore-in-all</code>. When specified, it tells mrs-ws to ignore this particular databank when searching all databanks. This is useful when the databank is in fact a joined databank of which the parts are also listed. (E.g. Uniprot consists of SwissProt and TrEMBL, both of which are separately searchable).</dd>
+
+	<dt>clustalw-exe</dt>
+	<dd>This option is for clustal servers only, of course. It specifies where the clustalw executable is located.</dd>
+
+	<dt>max-run-time</dt>
+	<dd>This option is also for clustal servers, it specifies the maximum amount of time a clustal run may take. This is to protect your server.</dd>
+</dl>
+
+<h5>Databanks section</h5>
+
+<p>The rest of the configuration file contains a list of databanks. There are two kinds of files: regular MRS data files and joined data files. Each has an id that can be used to specify the databank. This ID can also be used from the commandline by tools like mrs-build and mrs-query. Joined databanks are groups of other databanks that are accessed under one id.</p>
+
+<p>Regular databanks are specified by the <code>&lt;db-file&gt;</code> tag. This tag takes two attributes: <code>id</code> specifies the ID for the databank and <code>file</code> specifies the file name.</p>
+
+<p>Joined databanks are specified by the <code>&lt;db-join&gt;</code> tag. This tag has three attributes: <code>id</code> is the attribute for the ID, <code>name</code> is the attribute used to set a human readable name for this logical databank and <code>update</code> is the attribute that specifies that this databank is an update databank. The last attribute is optional. The <code>&lt;db-join&gt;</code> tag encloses a list of <code>&lt;db-part&gt;</code> tags specifying the parts contained by this joined databank.</p>
+
+<p>Update databanks are special, in this case the order of the parts is important. If a query results in an ID which is also contained in a databank part that is further down the list of db-parts, the ID is dropped. E.g. EMBL consists of an EMBL release and an EMBL updates file. When a query results in an entry that is also contained in the update file, you want to discard the one from the release file since it is now out of date.</p>
+
+</div>
+</div>

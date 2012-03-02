@@ -67,6 +67,8 @@ void Query(int argc, char* argv[])
 		("databank,d",	po::value<string>(),	"Databank to build")
 		("query,q", po::value<string>(),		"Query term")
 		("config-file,c", po::value<string>(),	"Configuration file")
+		("count", po::value<uint32>(),			"Result count (default = 10)")
+		("offset", po::value<uint32>(),			"Result offset (default = 0)")
 		("verbose,v",							"Be verbose")
 		("help,h",								"Display help message")
 		;
@@ -107,15 +109,25 @@ void Query(int argc, char* argv[])
 	if (not file)
 		THROW(("Invalid config-file, file is missing"));
 
+	uint32 count = 10;
+	if (vm.count("count"))
+		count = vm["count"].as<uint32>();
+	uint32 offset = 0;
+	if (vm.count("offset"))
+		offset = vm["offset"].as<uint32>();
+
 	fs::path path = file->content();
 	M6Databank db(path.string(), eReadOnly);
-	unique_ptr<M6Iterator> rset(db.Find(vm["query"].as<string>(), true, 100));
+	unique_ptr<M6Iterator> rset(db.Find(vm["query"].as<string>(), true, offset + count));
 	
 	if (rset)
 	{
 		// print results
 		uint32 docNr;
 		float rank;
+
+		while (offset-- > 0 and rset->Next(docNr, rank))
+			;
 		
 		while (rset->Next(docNr, rank))
 		{

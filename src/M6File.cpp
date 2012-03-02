@@ -166,8 +166,6 @@ void pwrite(MHandle inHandle, const void* inBuffer, int64 inSize, int64 inOffset
 
 void pread(MHandle inHandle, void* inBuffer, int64 inSize, int64 inOffset)
 {
-//cout << "pread(" << inSize << ", " << inOffset << ')' << endl;
-
 	char* buffer = reinterpret_cast<char*>(inBuffer);
 
 	// read in blocks of at most max_int32 size
@@ -203,6 +201,7 @@ void pread(MHandle inHandle, void* inBuffer, int64 inSize, int64 inOffset)
 		inOffset += read;
 		buffer += read;
 	}
+
 }
 
 #else
@@ -276,6 +275,12 @@ void pread(MHandle inHandle, void* inBuffer, int64 inSize, int64 inOffset)
 	int64 result = ::pread(inHandle, inBuffer, inSize, inOffset);
 	if (result < 0)
 		THROW(("Error reading file: %s", strerror(errno)));
+
+//char byte = *static_cast<char*>(inBuffer);
+//if (isprint(byte))
+//	cout << "pread(" << inSize << ", " << inOffset << ", '" << byte << "')" << endl;
+//else
+//	cout << "pread(" << inSize << ", " << inOffset << ", " << int(byte) << ")" << endl;
 }
 
 #endif

@@ -1168,7 +1168,7 @@ M6DocStoreImpl::M6CachedPagePtr M6DocStoreImpl::GetCachePage(uint32 inPageNr)
 //		result = mLRUTail;
 //	}
 
-	if (result == mLRUTail or (result != mLRUHead and n > mCacheCount / 4))
+	if (result != mLRUHead)
 	{
 		if (result == mLRUTail)
 			mLRUTail = result->mPrev;

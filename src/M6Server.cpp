@@ -1,5 +1,7 @@
 #include "M6Lib.h"
 
+#include <iostream>
+
 #include <boost/bind.hpp>
 #include <boost/tr1/cmath.hpp>
 #include <boost/foreach.hpp>

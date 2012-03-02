@@ -27,7 +27,7 @@ LDFLAGS				+= $(BOOST_LIB_DIR:%=-L%) $(LIBS:%=-l%) -g $(BOOST_LIBS:%=$(BOOST_LIB
 
 CC					= icpc
 CFLAGS				+= $(BOOST_INC_DIR:%=-I%) -I. -pthread -std=c++0x -I../libzeep/
-CFLAGS				+= -I $(HOME)/projects/pcre/include
+CFLAGS				+= -I $(HOME)/projects/pcre/include -Wno-multichar
 LDFLAGS				+= -L $(HOME)/projects/pcre/lib
 CFLAGS				+= -I $(HOME)/projects/libarchive/include
 LDFLAGS				+= -L $(HOME)/projects/libarchive/lib
@@ -53,8 +53,10 @@ OBJECTS = \
 	$(OBJDIR)/M6FastLZ.o \
 	$(OBJDIR)/M6File.o \
 	$(OBJDIR)/M6Index.o \
+	$(OBJDIR)/M6Iterator.o \
 	$(OBJDIR)/M6Lexicon.o \
 	$(OBJDIR)/M6Progress.o \
+	$(OBJDIR)/M6Query.o \
 	$(OBJDIR)/M6Tokenizer.o \
 
 m6: $(OBJECTS) $(OBJDIR)/M6CmdLineDriver.o
@@ -63,7 +65,7 @@ m6: $(OBJECTS) $(OBJDIR)/M6CmdLineDriver.o
 m6-test: $(OBJECTS) $(OBJDIR)/M6TestMain.o obj/M6TestDocStore.o
 	$(CC) $(BOOST_INC_DIR:%=-I%) -o $@ -I. $^ $(LDFLAGS) $(BOOST_LIB_DIR)/libboost_unit_test_framework.a
 
-m6: $(OBJECTS) $(OBJDIR)/M6Server.o $(OBJDIR)/M6ServerDriver.o
+m6-server: $(OBJECTS) $(OBJDIR)/M6Server.o $(OBJDIR)/M6ServerDriver.o
 	$(CC) $(BOOST_INC_DIR:%=-I%) -o $@ -I. $^ $(LDFLAGS)
 
 $(OBJDIR)/%.o: %.cpp

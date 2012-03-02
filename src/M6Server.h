@@ -6,6 +6,7 @@
 #include <zeep/http/webapp/el.hpp>
 
 namespace zh = zeep::http;
+namespace zx = zeep::xml;
 namespace el = zeep::http::el;
 
 class M6Iterator;
@@ -14,7 +15,7 @@ class M6Databank;
 class M6Server : public zeep::http::webapp
 {
   public:
-					M6Server(zeep::xml::element* inConfig);
+					M6Server(zx::element* inConfig);
 
 	virtual void	handle_request(const zh::request& req, zh::reply& rep);
 
@@ -26,9 +27,9 @@ class M6Server : public zeep::http::webapp
 	void			handle_search(const zh::request& request, const el::scope& scope, zh::reply& reply);
 	void			handle_welcome(const zh::request& request, const el::scope& scope, zh::reply& reply);
 
-	void			process_mrs_entry(zeep::xml::element* node, const el::scope& scope, boost::filesystem::path dir);
-	void			process_mrs_link(zeep::xml::element* node, const el::scope& scope, boost::filesystem::path dir);
-	void			process_mrs_redirect(zeep::xml::element* node, const el::scope& scope, boost::filesystem::path dir);
+	void			process_mrs_entry(zx::element* node, const el::scope& scope, boost::filesystem::path dir);
+	void			process_mrs_link(zx::element* node, const el::scope& scope, boost::filesystem::path dir);
+	void			process_mrs_redirect(zx::element* node, const el::scope& scope, boost::filesystem::path dir);
 
 	void			create_redirect(const std::string& databank, uint32 inDocNr,
 						const std::string& q, bool redirectForQuery,
@@ -40,11 +41,10 @@ class M6Server : public zeep::http::webapp
 	struct M6LoadedDatabank
 	{
 		M6Databank*	mDatabank;
-		std::string	mName;
+		std::string	mID, mName;
 	};
 	typedef std::vector<M6LoadedDatabank> M6DbList;
 
-	zeep::xml::element*
-					mConfig;
+	zx::element*	mConfig;
 	M6DbList		mLoadedDatabanks;
 };

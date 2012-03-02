@@ -50,7 +50,7 @@
 	</parser>
 
 	<parser id="omim">
-		<match regex="^\*FIELD\* (\w\w)\n((?(?=\*FIELD\*)(*ACCEPT)|.*\n)+)">
+		<match regex="^\*FIELD\* (\w\w)\n((?:(?:\n|[^*\n].*\n)++|\*(?!FIELD).*\n)+)">
 			<switch test="1">
 				<case value="NO">
 					<capture nr="2">
@@ -101,7 +101,9 @@
 					<match regex="\w+: ((?:[^:;]+;\s*)+)" capture="1">
 						<if iteration="1">
 							<match regex="\w+=([^;]+);" capture="1">
-								<attr name="title"/>
+								<if iteration="1">
+									<attr name="title"/>
+								</if>
 							</match>
 						</if>
 						<match regex="\w+=(.+)" capture="1">
@@ -167,7 +169,7 @@
 	<databank id="pdbfinder" parser="pdbfinder">
 		<name>PDBFINDER</name>
 <!--		<file>C:\Users\maarten\projects\m6\test\pdbfinder.m6</file> -->
-		<file>test/pdbfinder.m6</file>
+		<file>/data/mrs/pdbfinder.m6</file>
 		<locale>en_US.UTF-8</locale>
 		
 		<!-- source type can be path, glob or regex -->
@@ -196,8 +198,9 @@
 	
 	<!-- omim -->
 	<databank id="omim" parser="omim">
-		<name>OMIM</name>
-		<file>test/omim.m6</file>
+		<name>OMIM - Online Mendelian Inheritance in Man™</name>
+		<info>http://www.ncbi.nlm.nih.gov/entrez/query.fcgi?db=OMIM</info>
+		<file>/data/mrs/omim.m6</file>
 		<locale>en_US.UTF-8</locale>
 		<source type="path">test/omim.dat.gz</source>
 		<document-separator type="first-line-equals">*RECORD*</document-separator>
@@ -205,21 +208,24 @@
 	
 	<databank id="sprot" parser="uniprot">
 		<name>SwissProt</name>
-		<file>/data/md1120/tmp/sprot.m6</file>
+		<info>http://www.uniprot.org/</info>
+		<file>/data/mrs/sprot.m6</file>
 		<source type="path">/data/raw/uniprot/uniprot_sprot.dat.gz</source>
 		<document-separator type="last-line-equals">//</document-separator>
 	</databank>
 
 	<databank id="sprotw" parser="uniprot">
-		<name>SwissProt</name>
-		<file>test/sprot.m6</file>
+		<name>SwissProt - mini version</name>
+		<info>http://www.uniprot.org/</info>
+		<file>/data/mrs/sprot.m6</file>
 		<source type="path">test/sprot-mini.dat</source>
 		<document-separator type="last-line-equals">//</document-separator>
 	</databank>
 	
 	<databank id="trembl" parser="uniprot">
 		<name>TrEMBL</name>
-		<file>/data/md1120/tmp/trembl.m6</file>
+		<info>http://www.uniprot.org/</info>
+		<file>/data/mrs/trembl.m6</file>
 		<source type="path">/data/raw/uniprot/uniprot_trembl.dat.gz</source>
 		<document-separator type="last-line-equals">//</document-separator>
 	</databank>

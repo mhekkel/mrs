@@ -67,8 +67,8 @@ void M6Server::init_scope(el::scope& scope)
 	foreach (M6LoadedDatabank& db, mLoadedDatabanks)
 	{
 		el::object databank;
-		databank["id"] = db.mName; //dbi.GetID();
-		databank["name"] = db.mName; // db->GetName();
+		databank["id"] = db.mID;
+		databank["name"] = db.mName;
 		databanks.push_back(databank);
 	}
 	scope.put("databanks", el::object(databanks));
@@ -160,14 +160,19 @@ void M6Server::handle_entry(const zh::request& request, const el::scope& scope, 
 //	}
 
 	M6Databank* mdb = Load(db);
+	zx::element* dbConfig = M6Config::Instance().LoadConfig(db);
 //	unique_ptr<M6Document> document(mdb->Fetch(docNr));
 
 	// first stuff some data into scope
 	
 	el::object databank;
 	databank["id"] = db;
-	databank["name"] = db;//mdb->GetName();
-//	databank["url"] = ;//mdb->GetInfoURL();
+	if (zx::element* name = dbConfig->find_first("name"))
+		databank["name"] = name->content();
+	else
+		databank["name"] = db;
+	if (zx::element* info = dbConfig->find_first("info"))
+		databank["url"] = info->content();
 	
 //#ifndef NO_BLAST
 //	databank["blastable"] = mNoBlast.count(db) == 0 and mdb->GetBlastDbCount() > 0;
@@ -264,15 +269,15 @@ void M6Server::handle_search(const zh::request& request,
 			int32 maxresultcount = hits_per_page;
 
 			el::object databank;
-			databank["id"] = db.mName;
-			databank["name"] = db.mName; // mdb->GetName();
+			databank["id"] = db.mID;
+			databank["name"] = db.mName;
 			
 			unique_ptr<M6Iterator> rset(db.mDatabank->Find(q, true, maxresultcount));
 			if (not rset)
 				continue;
 			
 			if (firstDb.empty())
-				firstDb = db.mName;
+				firstDb = db.mID;
 
 			ranked = rset->IsRanked();
 	
@@ -704,7 +709,17 @@ void M6Server::LoadAllDatabanks()
 		
 		try
 		{
-			M6LoadedDatabank db = { new M6Databank(path, eReadOnly), databank };
+			string name = databank;
+			if (zx::element* n = db->find_first("name"))
+				name = n->content();
+			
+			M6LoadedDatabank db =
+			{
+				new M6Databank(path, eReadOnly),
+				databank,
+				name
+			};
+
 			mLoadedDatabanks.push_back(db);
 		}
 		catch (exception& e)
@@ -721,7 +736,7 @@ M6Databank* M6Server::Load(const std::string& inDatabank)
 
 	foreach (M6LoadedDatabank& db, mLoadedDatabanks)
 	{
-		if (db.mName == inDatabank)
+		if (db.mID == inDatabank)
 		{
 			result = db.mDatabank;
 			break;

@@ -11,6 +11,7 @@
 #include "M6Config.h"
 #include "M6Error.h"
 #include "M6Server.h"
+#include "M6AdminServer.h"
 
 using namespace std;
 namespace po = boost::program_options;
@@ -36,7 +37,7 @@ void RunMainLoop()
 		if (VERBOSE)
 			cout << "listening at " << addr << ':' << port << endl;
 		
-		unique_ptr<zeep::http::server> server(new M6Server(config));
+		unique_ptr<zeep::http::server> server(new M6AdminServer(config));
 		
 		uint32 nrOfThreads = boost::thread::hardware_concurrency();
 

@@ -5,7 +5,7 @@
 <!--	<srvdir>/srv/mrs</srvdir>-->
 	<srvdir>srv</srvdir>
 
-	<server addr="0.0.0.0" port="18090">
+	<server type="www" addr="0.0.0.0" port="18090">
 		<docroot>./docroot/</docroot>
 		<dbs>
 			<db>omim</db>
@@ -13,6 +13,12 @@
 			<db>sprot</db>
 			<db>trembl</db>
 		</dbs>
+	</server>
+
+	<server type="admin" addr="0.0.0.0" port="18091">
+		<docroot>./docroot/</docroot>
+		<user>scott</user>
+		<password>tiger</password>
 	</server>
 	
 	<parser id="pdbfinder">
@@ -27,7 +33,7 @@
 				<case value="header">
 					<capture nr="2">
 						<to-lower />
-						<index name="header" type="text"/>
+						<index name="header" type="string"/>
 						<attr name="title"/>
 					</capture>
 				</case>
@@ -120,11 +126,11 @@
 					</split>
 				</case>
 				<case value="OS">
-					<replace what="^OS   (.+)\n" with="$1 "/>
+					<replace what="^OS   (.+?)\.?\n" with="$1 "/>
 					<index name="os" type="string" />
 				</case>
 				<case value="OC">
-					<replace what="^OC   (.+)\n" with="$1 "/>
+					<replace what="^OC   (.+?)\.?\n" with="$1 "/>
 					<split separator=";\s*">
 						<index name="oc" type="string" />
 					</split>
@@ -135,7 +141,7 @@
 					<index name="dr" type="string" />
 				</case>
 				<case value="KW">
-					<replace what="^KW   (.+)\n" with="$1 "/>
+					<replace what="^KW   (.+?)\.?\n" with="$1 "/>
 					<split separator=";\s*">
 						<index name="kw" type="string"/>
 					</split>

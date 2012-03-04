@@ -117,6 +117,8 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\src\M6AdminServer.cpp" />
+    <ClCompile Include="..\..\src\M6MD5.cpp" />
     <ClCompile Include="..\..\src\M6Server.cpp" />
     <ClCompile Include="..\..\src\M6ServerDriver.cpp" />
   </ItemGroup>

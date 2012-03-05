@@ -4,11 +4,13 @@
 
 #include <boost/bind.hpp>
 #include <boost/tr1/cmath.hpp>
+#include <boost/format.hpp>
 #include <boost/foreach.hpp>
 #define foreach BOOST_FOREACH
 #include <boost/filesystem/fstream.hpp>
 #include <boost/algorithm/string.hpp>
 #include <boost/random/random_device.hpp>
+#include <boost/date_time/posix_time/posix_time_types.hpp>
 
 #include "M6Databank.h"
 #include "M6AdminServer.h"
@@ -21,8 +23,81 @@
 using namespace std;
 namespace fs = boost::filesystem;
 namespace ba = boost::algorithm;
+namespace pt = boost::posix_time;
 
 const string kM6AdminServerNS = "http://mrs.cmbi.ru.nl/mrs-web/ml";
+
+// --------------------------------------------------------------------
+
+struct not_authorized : public std::exception
+{
+		not_authorized(bool inStale = false) : mStale(inStale) {}
+
+	bool mStale;
+};
+
+struct M6AuthInfo
+{
+						M6AuthInfo(const string& inRealm);
+	
+	bool				Validate(const string& inMethod, const string& inURI,
+							const string& inHA1, map<string,string>& inInfo);
+	string				GetChallenge() const;
+	bool				Stale() const;
+	
+	string				mNonce, mRealm;
+	uint32				mLastNC;
+	pt::ptime			mCreated;
+};
+
+M6AuthInfo::M6AuthInfo(const string& inRealm)
+	: mRealm(inRealm)
+	, mLastNC(0)
+{
+	using namespace boost::gregorian;
+	
+	boost::random::random_device rng;
+	uint32 data[4] = { rng(), rng(), rng(), rng() };
+
+	mNonce = M6MD5(data, sizeof(data)).Finalise();
+	mCreated = pt::second_clock::local_time();
+}
+
+string M6AuthInfo::GetChallenge() const
+{
+	string challenge = "Digest ";
+	challenge += "realm=\"" + mRealm + "\", qop=\"auth\", nonce=\"" + mNonce + '"';
+	return challenge;
+}
+
+bool M6AuthInfo::Stale() const
+{
+	pt::time_duration age = pt::second_clock::local_time() - mCreated;
+	return age.total_seconds() > 5;
+}
+
+bool M6AuthInfo::Validate(const string& inMethod, const string& inURI,
+	const string& inHA1, map<string,string>& inInfo)
+{
+	bool valid = false;
+	
+	uint32 nc = strtol(inInfo["nc"].c_str(), nullptr, 16);
+	if (nc > mLastNC)
+	{
+		string ha2 = M6MD5(inMethod + ':' + inInfo["uri"]).Finalise();
+		
+		string response = M6MD5(
+			inHA1 + ':' +
+			inInfo["nonce"] + ':' +
+			inInfo["nc"] + ':' +
+			inInfo["cnonce"] + ':' +
+			inInfo["qop"] + ':' +
+			ha2).Finalise();
+		
+		valid = inInfo["response"] == response;
+	}
+	return valid;
+}
 
 // --------------------------------------------------------------------
 
@@ -50,13 +125,6 @@ void M6AdminServer::init_scope(el::scope& scope)
 
 // --------------------------------------------------------------------
 
-struct not_authorized : public std::exception
-{
-		not_authorized(bool inStale = false) : mStale(inStale) {}
-
-	bool mStale;
-};
-
 void M6AdminServer::handle_request(const zh::request& req, zh::reply& rep)
 {
 	string authorization, host;
@@ -73,26 +141,25 @@ void M6AdminServer::handle_request(const zh::request& req, zh::reply& rep)
 		if (authorization.empty())
 			throw not_authorized(false);
 
-		ValidateAuthentication(req.uri, authorization);
+		ValidateAuthentication(req.method, req.uri, authorization);
 		
 		zh::webapp::handle_request(req, rep);
 	}
 	catch (not_authorized& na)
 	{
+		boost::mutex::scoped_lock lock(mAuthMutex);
+		
 		rep = zh::reply::stock_reply(zh::unauthorized);
 		
-		string realm = "admin@" + host;
+		if (zx::element* realm = mConfig->find_first("realm"))
+			mAuthInfo.push_back(new M6AuthInfo(realm->get_attribute("name")));
+		else
+			THROW(("Realm missing from config file"));
 		
-		boost::random::random_device rng;
-		uint32 data[4] = { rng(), rng(), rng(), rng() };
-		M6MD5 nonceHash;
-		nonceHash.Update(data, sizeof(data));
-		string nonce = nonceHash.Finalise();
+		string challenge = mAuthInfo.back()->GetChallenge();
 		
-		bool stale = na.mStale;
-
-		string challenge = "Digest ";
-		challenge += "realm=\"" + realm + "\", qop=\"auth\", nonce=\"" + nonce + '"';
+		if (na.mStale)
+			challenge += ", stale=\"true\"";
 
 		rep.set_header("WWW-Authenticate", challenge); 
 	}
@@ -109,10 +176,12 @@ void M6AdminServer::handle_request(const zh::request& req, zh::reply& rep)
 	}
 }
 
-void M6AdminServer::ValidateAuthentication(const string& inURI, const string& inAuthentication)
+void M6AdminServer::ValidateAuthentication(
+	const string& inMethod, const string& inURI, const string& inAuthentication)
 {
 	map<string,string> info;
-	boost::regex re("(?|(username|realm|nonce|uri|qop|cnonce|response)=\"([^\"]+)\"|(nc)=(\\d+)|(qop)=(\\w+))");
+	
+	boost::regex re("(\\w+)=(?|\"([^\"]*)\"|'([^']*)'|(\\w+))(?:,\\s*)?");
 	const char* b = inAuthentication.c_str();
 	const char* e = b + inAuthentication.length();
 	boost::match_results<const char*> m;
@@ -121,29 +190,32 @@ void M6AdminServer::ValidateAuthentication(const string& inURI, const string& in
 		info[string(m[1].first, m[1].second)] = string(m[2].first, m[2].second);
 		b = m[0].second;
 	}
+
+	bool authorized = false, stale = false;
+
+	boost::format f("realm[@name='%1%']/user[@name='%2%']");
+	if (zx::element* user = mConfig->find_first((f % info["realm"] % info["username"]).str()))
+	{
+		string ha1 = user->content();
+
+		boost::mutex::scoped_lock lock(mAuthMutex);
 	
-	string user = info["username"];
-	string realm = info["realm"];
-	string nonce = info["nonce"];
-	string nc = info["nc"];
-	string cnonce = info["cnonce"];
-	string qop = info["qop"];
+		foreach (M6AuthInfo* auth, mAuthInfo)
+		{
+			if (auth->mRealm == info["realm"] and auth->mNonce == info["nonce"]
+				and auth->Validate(inMethod, inURI, ha1, info))
+			{
+				authorized = true;
+				stale = auth->Stale();
+				if (stale)
+					mAuthInfo.erase(find(mAuthInfo.begin(), mAuthInfo.end(), auth));
+				break;
+			}
+		}
+	}
 	
-	string password = "tiger";
-	
-	M6MD5 ha1(user + ':' + realm + ':' + password);
-	M6MD5 ha2("GET:");
-	ha2.Update(inURI.c_str(), inURI.length());
-	M6MD5 h(
-		ha1.Finalise() + ':' +
-		nonce + ':' +
-		nc + ':' +
-		cnonce + ':' +
-		qop + ':' +
-		ha2.Finalise());
-	
-	if (info["response"] != h.Finalise())
-		throw not_authorized(true);
+	if (stale or not authorized)
+		throw not_authorized(stale);
 }
 
 // --------------------------------------------------------------------

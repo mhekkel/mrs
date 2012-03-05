@@ -17,8 +17,9 @@
 
 	<server type="admin" addr="0.0.0.0" port="18091">
 		<docroot>./docroot/</docroot>
-		<user>scott</user>
-		<password>tiger</password>
+		<realm name="M6 Administrator">
+			<user name="scott">b92ff7d60b994c8a0d2941ad9349e841</user>
+		</realm>
 	</server>
 	
 	<parser id="pdbfinder">

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vector>
+#include <boost/thread/mutex.hpp>
 
 #include <zeep/http/webapp.hpp>
 #include <zeep/http/webapp/el.hpp>
@@ -27,8 +28,10 @@ class M6AdminServer : public zeep::http::webapp
 	void			handle_welcome(const zh::request& request, const el::scope& scope, zh::reply& reply);
 	void			handle_file(const zh::request& request, const el::scope& scope, zh::reply& reply);
 
-	void			ValidateAuthentication(const std::string& inURI, const std::string& inAuthentication);
+	void			ValidateAuthentication(const std::string& inMethod,
+						const std::string& inURI, const std::string& inAuthentication);
 
 	zx::element*	mConfig;
 	M6AuthInfoList	mAuthInfo;
+	boost::mutex	mAuthMutex;
 };

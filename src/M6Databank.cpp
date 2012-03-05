@@ -45,6 +45,8 @@ class M6DatabankImpl
 					M6DatabankImpl(M6Databank& inDatabank, const fs::path& inPath, MOpenMode inMode);
 	virtual			~M6DatabankImpl();
 
+	void			GetInfo(M6DatabankInfo& outInfo);
+
 	void			StartBatchImport(M6Lexicon& inLexicon);
 	void			CommitBatchImport();
 		
@@ -1159,6 +1161,30 @@ M6DatabankImpl::~M6DatabankImpl()
 	delete mStore;
 }
 
+void M6DatabankImpl::GetInfo(M6DatabankInfo& outInfo)
+{
+	mStore->GetInfo(outInfo.mDocCount, outInfo.mDataStoreSize, outInfo.mRawTextSize);
+	
+	map<string,int64> sizes;
+
+	fs::directory_iterator end;
+	for (fs::directory_iterator ix(mDbDirectory); ix != end; ++ix)
+	{
+		if (ix->path().extension().string() != ".index")
+			continue;
+
+		string name = ix->path().stem().string();
+		sizes[name] = fs::file_size(ix->path());
+		LoadIndex(name);
+	}
+	
+	foreach (const M6IndexDesc& desc, mIndices)
+	{
+		M6IndexInfo info = { desc.mName, desc.mType, desc.mIndex->size(), sizes[desc.mName] };
+		outInfo.mIndexInfo.push_back(info);
+	}
+}
+
 M6BasicIndexPtr M6DatabankImpl::GetIndex(const string& inName, M6IndexType inType)
 {
 	M6BasicIndexPtr result;
@@ -1451,7 +1477,7 @@ M6Iterator* M6DatabankImpl::Find(const string& inQuery, bool inAllTermsRequired,
 		sort_heap(best.begin(), best.end(), compare);
 
 		if (best.size() < inReportLimit)
-			count = best.size();
+			count = static_cast<uint32>(best.size());
 
 		result = new M6VectorIterator(best);
 		
@@ -1561,6 +1587,11 @@ M6Databank::M6Databank(const fs::path& inPath, MOpenMode inMode)
 M6Databank::~M6Databank()
 {
 	delete mImpl;
+}
+
+void M6Databank::GetInfo(M6DatabankInfo& outInfo)
+{
+	mImpl->GetInfo(outInfo);
 }
 
 M6Databank* M6Databank::CreateNew(const fs::path& inPath)

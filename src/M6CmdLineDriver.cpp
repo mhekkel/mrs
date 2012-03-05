@@ -5,6 +5,8 @@
 #include <boost/program_options.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <boost/format.hpp>
+#include <boost/foreach.hpp>
+#define foreach BOOST_FOREACH
 
 #include "M6Builder.h"
 #include "M6Databank.h"
@@ -143,6 +145,112 @@ void Query(int argc, char* argv[])
 void Info(int argc, char* argv[])
 {
 	po::options_description desc("m6 info");
+	desc.add_options()
+		("databank,d",	po::value<string>(),	"Databank to build")
+		("config-file,c", po::value<string>(),	"Configuration file")
+		("verbose,v",							"Be verbose")
+		("help,h",								"Display help message")
+		;
+
+	po::positional_options_description p;
+	p.add("databank", 1);
+	
+	po::variables_map vm;
+	po::store(po::command_line_parser(argc, argv).options(desc).positional(p).run(), vm);
+	po::notify(vm);
+
+	if (vm.count("help") or vm.count("databank") == 0)
+	{
+		cout << desc << "\n";
+		exit(1);
+	}
+	
+	if (vm.count("verbose"))
+		VERBOSE = 1;
+	
+	string databank = vm["databank"].as<string>();
+
+	fs::path configFile("config/m6-config.xml");
+	if (vm.count("config-file"))
+		configFile = vm["config-file"].as<string>();
+	
+	if (not fs::exists(configFile))
+		THROW(("Configuration file not found (\"%s\")", configFile.string().c_str()));
+	
+	M6Config::SetConfigFile(configFile);
+
+	zeep::xml::element* config = M6Config::Instance().LoadConfig(databank);
+	if (not config)
+		THROW(("Configuration for %s is missing", databank.c_str()));
+
+	zeep::xml::element* file = config->find_first("file");
+	if (not file)
+		THROW(("Invalid config-file, file is missing"));
+
+	fs::path path = file->content();
+	M6Databank db(path.string(), eReadOnly);
+	
+	M6DatabankInfo info;
+	db.GetInfo(info);
+	
+	auto formatNr = [](int64 nr, int width) -> string
+	{
+		string result;
+		int digits = 0;
+		
+		if (nr == 0)
+			result = "0";
+		
+		while (nr > 0)
+		{
+			result += ('0' + nr % 10);
+			nr /= 10;
+			if (nr > 0 and ++digits % 3 == 0)
+				result += '.';
+		}
+
+		if (result.length() < width)
+			result.append(width - result.length(), ' ');
+
+		reverse(result.begin(), result.end());
+		
+		return result;
+	};
+
+	auto descIxType = [](M6IndexType inType) -> const char*
+	{
+		const char* desc;
+		switch (inType)
+		{
+			case eM6CharIndex:			desc = "unique string     "; break;
+			case eM6NumberIndex:		desc = "unique number     "; break;
+			case eM6CharMultiIndex:		desc = "string            "; break;
+			case eM6NumberMultiIndex:	desc = "number            "; break;
+			case eM6CharMultiIDLIndex:	desc = "word with position"; break;
+			case eM6CharWeightedIndex:	desc = "weighted word     "; break;
+		}
+		return desc;
+	};
+	
+	cout << "Statistics for databank " << path << endl
+		 << endl
+		 << "Number of documents : " << formatNr(info.mDocCount, 16) << endl
+		 << "Raw text in bytes   : " << formatNr(info.mRawTextSize, 16) << endl
+		 << "Data store size     : " << formatNr(info.mDataStoreSize, 16) << endl
+		 << endl
+		 << "Index Name           |                    | Nr of keys   | File size" << endl
+		 << "-----------------------------------------------------------------------" << endl;
+	
+	foreach (M6IndexInfo& ix, info.mIndexInfo)
+		cout << ix.mName << string(20 - ix.mName.length(), ' ') << " | "
+			 << descIxType(ix.mType) << " | "
+			 << formatNr(ix.mCount, 12) << " | "
+			 << formatNr(ix.mFileSize, 12) << endl;
+}
+
+void Dump(int argc, char* argv[])
+{
+	po::options_description desc("m6 dump");
 	desc.add_options()
 		("databank,d",	po::value<string>(),	"Databank to build")
 		("config-file,c", po::value<string>(),	"Configuration file")
@@ -313,8 +421,10 @@ int main(int argc, char* argv[])
 			Build(argc - 1, argv + 1);
 		else if (strcmp(argv[1], "query") == 0)
 			Query(argc - 1, argv + 1);
-		else if (strcmp(argv[1], "info") == 0 or strcmp(argv[1], "dump") == 0)
+		else if (strcmp(argv[1], "info") == 0)
 			Info(argc - 1, argv + 1);
+		else if (strcmp(argv[1], "dump") == 0)
+			Dump(argc - 1, argv + 1);
 		else if (strcmp(argv[1], "vacuum") == 0)
 			Vacuum(argc - 1, argv + 1);
 		else if (strcmp(argv[1], "validate") == 0)

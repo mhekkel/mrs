@@ -416,7 +416,7 @@ M6Tokenizer::M6Tokenizer(const char* inData, size_t inLength)
 	: mTokenLength(0), mLookaheadLength(0)
 	, mPtr(reinterpret_cast<const uint8*>(inData)), mEnd(mPtr + inLength)
 {
-	assert(inLength > 0);
+//	assert(inLength > 0);
 }
 
 M6Tokenizer::M6Tokenizer(const string& inData)

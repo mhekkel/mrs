@@ -3,6 +3,8 @@
 #include <vector>
 #include <algorithm>
 
+#include "M6BitStream.h"
+
 // --------------------------------------------------------------------
 // M6Iterator is a base class to iterate over query results
 
@@ -51,6 +53,35 @@ class M6SingleDocIterator : public M6Iterator
   private:
 	uint32			mDoc;
 	float			mRank;
+};
+
+class M6MultiDocIterator : public M6Iterator
+{
+  public:
+					M6MultiDocIterator(const M6IBitStream& inBits, uint32 inLength)
+						: mArray(inBits, inLength)
+						, mBegin(mArray.begin())
+						, mEnd(mArray.end())
+					{
+						mCount = inLength;
+					}
+
+	virtual bool	Next(uint32& outDoc, float& outRank)
+					{
+						bool result = false;
+						if (mBegin != mEnd)
+						{
+							result = true;
+							outDoc = *mBegin;
+							++mBegin;
+							outRank = 1.0f;
+						}
+						return result;
+					}
+	
+  private:
+	M6CompressedArray					mArray;
+	M6CompressedArray::const_iterator	mBegin, mEnd;
 };
 
 class M6NotIterator : public M6Iterator

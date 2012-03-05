@@ -128,7 +128,7 @@
 				</case>
 				<case value="OS">
 					<replace what="^OS   (.+?)\.?\n" with="$1 "/>
-					<index name="os" type="string" />
+					<index name="os" />
 				</case>
 				<case value="OC">
 					<replace what="^OC   (.+?)\.?\n" with="$1 "/>
@@ -168,6 +168,70 @@
 				<default>
 					<replace what="^.{5}(.+)\n" with="$1\n"/>
 					<index name="text"/>
+				</default>
+			</switch>
+		</match>
+	</parser>
+
+	<parser id="genbank">
+		<match regex="^\s*(\w+)\s+((?:.+)(?:\n\s{5,}.+)*)">
+			<switch test="1">
+				<case value='locus'>
+					<capture nr="2">
+						<substr start="0" length="15" />
+						<index name="id" unique="true" type="string"/>
+						<attr name="id"/>
+					</capture>
+<!--					<capture nr="2">-->
+<!--						<substr start="56" length="12" />-->
+<!--						<index name="date" type="string"/>-->
+<!--					</capture>-->
+				</case>
+				
+				<case value='definition'>
+					<replace what="\s\s+" with=" "/>
+					<index name="title" />
+					<attr name="title"/>
+				</case>
+
+				<case value='accession'>
+					<capture nr="2">
+						<split separator="\s+">
+							<index name="accession" unique="true" type="string"/>
+						</split>
+					</capture>
+				</case>
+				
+				<case value='version'>
+					<match regex="(\S+) GI:(\d+)">
+						<capture nr="1">
+							<index name="version" unique="true" type="string"/>
+						</capture>
+						<capture nr="2">
+							<index name="gi" unique="true" type="string" />
+						</capture>
+					</match>
+				</case>
+				
+				<case value='features'>
+					<match regex="^\s{5}\w+\s+((?:\S.+)(?:\n\s{20,}.+)*)" capture="1">
+						<match regex='/(\w+)="((?:\n|[^"])*?)"'>
+							<switch test="1">
+								<case value="translation"/>
+								<default>
+									<capture nr="2"><index name="feature"/></capture>
+								</default>
+							</switch>
+						</match>
+					</match>
+				</case>
+				
+				<case value='origin'>
+					<stop />
+				</case>
+				
+				<default>
+					<capture nr="2"><index name="text"/></capture>
 				</default>
 			</switch>
 		</match>
@@ -237,66 +301,12 @@
 		<document-separator type="last-line-equals">//</document-separator>
 	</databank>
 	
-<!--
-	<databank id="genbank">
+	<databank id="genbank" parser="genbank">
 		<name>Genbank</name>
-		<file>test/genbank.m6</file>
-		<locale>en_US.UTF-8</locale>
+		<file>/data/mrs/genbank.m6</file>
+		<source type="path">/data/raw/genbank/genbank-test.seq.gz</source>
 		
-		<source type="path">/data/raw/genbank_release/*.seq.gz</source>
-		
-		<document-separator type="first-line-matches">^LOCUS </document-separator>
 		<document-separator type="last-line-equals">//</document-separator>
-
-		<match regex="^\s*(\w+)\s+((?:.+)(?:\n\s{5,}.+)*)">
-			<switch>
-				<case test="$1 eq 'locus'">
-					<substring location="13-28">
-						<store action="index attr unique" name="id"/>
-					</substring>
-					<substring location="69-79">
-						<store action="index" name="date" type="date" format="dd-MMM-yyyy" />
-					</substring>
-				</case>
-				
-				<case test="$1 eq 'definition'">
-					<store name="title" action="index attr" />
-				</case>
-
-				<case test="$1 eq 'accession'">
-					<match split="\s+">
-						<store name="accession" action="index unique" />
-					</match>
-				</case>
-				
-				<case test="$1 eq 'version'">
-					<match regex="(\S+) GI:(\d+)">
-						<capture nr="1">
-							<store name="version" action="index unique"/>
-						</capture>
-						<capture nr="2">
-							<store name="gi" action="index unique" />
-						</capture>
-					</match>
-				</case>
-				
-				<case test="$1 eq 'features'">
-					<match regex="^\s{5}(\w+)\s+((?:\S.+)(?:\n\s{20,}.+)*)">
-						<match regex="/(\w+)="((?:\n|[^"]|"")*?)">
-							<store name="feature" action="index"/>
-						</match>
-					</match>
-				</case>
-				
-				<case test="$1 eq 'origin'">
-					<stop />
-				</case>
-				
-				<default>
-				</default>
-			</switch>
-		</match>
 	</databank>
-	-->
 	
 </m6-config>

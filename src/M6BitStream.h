@@ -2,6 +2,7 @@
 
 #include <iterator>
 #include <vector>
+#include <cassert>
 
 class M6IBitStream;
 class M6OBitStream;

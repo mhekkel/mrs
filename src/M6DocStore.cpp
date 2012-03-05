@@ -81,9 +81,10 @@ struct M6DocStoreHdr
 	uint32			mLastDataPage;
 	uint32			mFirstFreeDataPage;
 	uint32			mAttributeOffset;
+	int64			mRawTextSize;
 
 	static const uint32
-		kHeaderSize = 8 * sizeof(uint32),
+		kHeaderSize = 8 * sizeof(uint32) + 1 * sizeof(int64),
 		kTextSize = kM6DataPageSize - kHeaderSize;
 
 	uint8			mText[kTextSize];
@@ -93,7 +94,7 @@ struct M6DocStoreHdr
 	{
 		ar & mSignature & mDocCount & mIndexRoot & mNextDocNumber
 		   & mFirstDataPage & mLastDataPage & mFirstFreeDataPage
-		   & mAttributeOffset & mText;
+		   & mAttributeOffset & mRawTextSize & mText;
 	}
 };
 
@@ -258,8 +259,10 @@ class M6DocStoreImpl
 
 	uint32			Size() const					{ return mHeader.mDocCount; }
 	uint32			NextDocumentNumber() const		{ return mHeader.mNextDocNumber; }
+	int64			GetRawSize() const				{ return mHeader.mRawTextSize; }
+	int64			GetFileSize() const				{ return mFile.Size(); }
 
-	uint32			StoreDocument(const char* inData, size_t inSize);
+	uint32			StoreDocument(const char* inData, size_t inSize, size_t inRawSize);
 	void			EraseDocument(uint32 inDocNr);
 	bool			FetchDocument(uint32 inDocNr, uint32& outPageNr, uint32& outDocSize);
 	void			OpenDataStream(uint32 inDocNr, uint32 inPageNr, uint32 inDocSize,
@@ -933,7 +936,7 @@ string M6DocStoreImpl::GetAttributeName(uint8 inAttrNr) const
 	return result;
 }
 
-uint32 M6DocStoreImpl::StoreDocument(const char* inData, size_t inSize)
+uint32 M6DocStoreImpl::StoreDocument(const char* inData, size_t inSize, size_t inRawSize)
 {
 	if (inSize == 0 or inData == nullptr)
 		THROW(("Empty document"));
@@ -1008,6 +1011,7 @@ uint32 M6DocStoreImpl::StoreDocument(const char* inData, size_t inSize)
 	
 	++mHeader.mNextDocNumber;
 	++mHeader.mDocCount;
+	mHeader.mRawTextSize += inRawSize;
 
 	mDirty = true;
 	
@@ -1307,6 +1311,13 @@ M6DocStore::~M6DocStore()
 	delete mImpl;
 }
 
+void M6DocStore::GetInfo(uint32& outDocCount, int64& outFileSize, int64& outRawSize)
+{
+	outDocCount = mImpl->Size();
+	outFileSize = mImpl->GetFileSize();
+	outRawSize = mImpl->GetRawSize();
+}	
+
 uint8 M6DocStore::RegisterAttribute(const string& inName)
 {
 	return mImpl->RegisterAttribute(inName);
@@ -1317,9 +1328,9 @@ string M6DocStore::GetAttributeName(uint8 inAttrNr) const
 	return mImpl->GetAttributeName(inAttrNr);
 }
 
-uint32 M6DocStore::StoreDocument(const char* inData, size_t inSize)
+uint32 M6DocStore::StoreDocument(const char* inData, size_t inSize, size_t inRawSize)
 {
-	return mImpl->StoreDocument(inData, inSize);
+	return mImpl->StoreDocument(inData, inSize, inRawSize);
 }
 
 void M6DocStore::EraseDocument(uint32 inDocNr)
@@ -1363,3 +1374,4 @@ void M6DocStore::Dump()
 {
 	mImpl->Dump();
 }
+

@@ -45,7 +45,7 @@ M6OBitStreamFileImpl::~M6OBitStreamFileImpl()
 
 void M6OBitStreamFileImpl::Write(const uint8* inData, size_t inSize)
 {
-	int64 free = kFileBufferSize - (mBufferPtr - mBuffer);
+	size_t free = kFileBufferSize - (mBufferPtr - mBuffer);
 	if (free >= inSize)
 	{
 		memcpy(mBufferPtr, inData, inSize);
@@ -53,7 +53,7 @@ void M6OBitStreamFileImpl::Write(const uint8* inData, size_t inSize)
 	}
 	else
 	{
-		int64 n = free;
+		size_t n = free;
 		if (n > inSize)
 			n = inSize;
 		

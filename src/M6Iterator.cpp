@@ -88,16 +88,19 @@ M6UnionIterator::~M6UnionIterator()
 
 void M6UnionIterator::AddIterator(M6Iterator* inIter)
 {
-	M6IteratorPart p = { inIter };
-	
-	float r;
-	if (inIter->Next(p.mDoc, r))
+	if (inIter != nullptr)
 	{
-		mIterators.push_back(p);
-		push_heap(mIterators.begin(), mIterators.end(), greater<M6IteratorPart>());
+		M6IteratorPart p = { inIter };
+	
+		float r;
+		if (inIter->Next(p.mDoc, r))
+		{
+			mIterators.push_back(p);
+			push_heap(mIterators.begin(), mIterators.end(), greater<M6IteratorPart>());
+		}
+		else
+			delete inIter;
 	}
-	else
-		delete inIter;
 }
 
 bool M6UnionIterator::Next(uint32& outDoc, float& outRank)
@@ -162,8 +165,16 @@ M6IntersectionIterator::M6IntersectionIterator()
 
 M6IntersectionIterator::M6IntersectionIterator(M6Iterator* inA, M6Iterator* inB)
 {
-	AddIterator(inA);
-	AddIterator(inB);
+	if (inA != nullptr and inB != nullptr)
+	{
+		AddIterator(inA);
+		AddIterator(inB);
+	}
+	else
+	{
+		delete inA;
+		delete inB;
+	}
 }
 
 M6IntersectionIterator::~M6IntersectionIterator()
@@ -175,13 +186,22 @@ M6IntersectionIterator::~M6IntersectionIterator()
 
 void M6IntersectionIterator::AddIterator(M6Iterator* inIter)
 {
-	M6IteratorPart p = { inIter };
-	
-	float r;
-	if (inIter->Next(p.mDoc, r))
-		mIterators.push_back(p);
+	if (inIter == nullptr)
+	{
+		foreach (M6IteratorPart& part, mIterators)
+			delete part.mIter;
+		mIterators.clear();
+	}
 	else
-		delete inIter;
+	{
+		M6IteratorPart p = { inIter };
+	
+		float r;
+		if (inIter->Next(p.mDoc, r))
+			mIterators.push_back(p);
+		else
+			delete inIter;
+	}
 }
 
 bool M6IntersectionIterator::Next(uint32& outDoc, float& outRank)
@@ -230,16 +250,15 @@ bool M6IntersectionIterator::Next(uint32& outDoc, float& outRank)
 
 M6Iterator* M6IntersectionIterator::Create(M6Iterator* inA, M6Iterator* inB)
 {
-	M6Iterator* result;
-	if (inA == nullptr)
-		result = inB;
-	else if (inB == nullptr)
-		result = inA;
-	else if (dynamic_cast<M6IntersectionIterator*>(inA) != nullptr)
-		static_cast<M6IntersectionIterator*>(inA)->AddIterator(inB);
-	else if (dynamic_cast<M6IntersectionIterator*>(inB) != nullptr)
-		static_cast<M6IntersectionIterator*>(inB)->AddIterator(inA);
-	else
+	M6Iterator* result = nullptr;
+
+	if (inA != nullptr and inB != nullptr)
 		result = new M6IntersectionIterator(inA, inB);
+	else
+	{
+		delete inA;
+		delete inB;
+	}
+
 	return result;
 }

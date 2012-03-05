@@ -74,7 +74,7 @@ void M6QueryParser::Parse(vector<string>& outTerms, M6Iterator*& outFilter)
 
 M6Iterator* M6QueryParser::ParseQuery()
 {
-	unique_ptr<M6Iterator> result;
+	unique_ptr<M6Iterator> result(ParseTest());
 
 	for (;;)
 	{
@@ -84,13 +84,15 @@ M6Iterator* M6QueryParser::ParseQuery()
 		switch (mLookahead)
 		{
 			case eM6TokenAND:
+				mIsBooleanQuery = true;
+				Match(mLookahead);
+				result.reset(M6IntersectionIterator::Create(result.release(), ParseTest()));
+				break;
+
 			case eM6TokenOR:
 				mIsBooleanQuery = true;
 				Match(mLookahead);
-				if (mLookahead == eM6TokenAND)
-					result.reset(new M6IntersectionIterator(result.release(), ParseTest()));
-				else
-					result.reset(new M6UnionIterator(result.release(), ParseTest()));
+				result.reset(M6UnionIterator::Create(result.release(), ParseTest()));
 				break;
 			
 			default:
@@ -168,8 +170,8 @@ M6Iterator* M6QueryParser::ParseQualifiedTest(const string& inIndex)
 			result.reset(ParseTerm(inIndex));
 			break;
 		
-//		case eM6Token
-		
+		default:
+			THROW(("relational operators are unsupported for now"));
 	}
 	
 	return result.release();	

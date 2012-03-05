@@ -112,7 +112,7 @@ void M6InputDocument::Store()
 		out.write(mText.c_str(), mText.length());
 	}
 
-	mDocNr = store.StoreDocument(&buffer[0], buffer.size());
+	mDocNr = store.StoreDocument(&buffer[0], buffer.size(), mText.length());
 }
 
 M6InputDocument::M6IndexTokenList::iterator M6InputDocument::GetIndexTokens(

@@ -37,7 +37,14 @@ void RunMainLoop()
 		if (VERBOSE)
 			cout << "listening at " << addr << ':' << port << endl;
 		
-		unique_ptr<zeep::http::server> server(new M6AdminServer(config));
+		unique_ptr<zeep::http::server> server;
+		
+		if (config->get_attribute("type") == "www")
+			server.reset(new M6Server(config));
+		else if (config->get_attribute("type") == "admin")
+			server.reset(new M6AdminServer(config));
+		else  
+			THROW(("Invalid server type %s", config->get_attribute("type").c_str()));
 		
 		uint32 nrOfThreads = boost::thread::hardware_concurrency();
 

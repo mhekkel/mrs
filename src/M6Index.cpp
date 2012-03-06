@@ -834,13 +834,13 @@ class M6LeafPage : public M6IndexPage<M6DataType>
 																					{ return mAccess.BinarySearch(inKey, outIndex, outMatch, mIndex); }
 	string				GetKey(uint32 inIndex) const								{ return mAccess.GetKey(inIndex); }
 	M6DataType			GetValue(uint32 inIndex) const								{ return mAccess.GetValue(inIndex); }
-	void				SetValue(uint32 inIndex, const M6DataType& inValue)			{ mAccess.SetValue(inIndex, inValue); mDirty = true; }
+	void				SetValue(uint32 inIndex, const M6DataType& inValue)			{ mAccess.SetValue(inIndex, inValue); this->mDirty = true; }
 	void				InsertKeyValue(const string& inKey, const M6DataType& inValue, uint32 inIndex)
-																					{ mAccess.InsertKeyValue(inKey, inValue, inIndex); mDirty = true; }
+																					{ mAccess.InsertKeyValue(inKey, inValue, inIndex); this->mDirty = true; }
 	void				GetKeyValue(uint32 inIndex, string& outKey, M6DataType& outValue) const
 																					{ mAccess.GetKeyValue(inIndex, outKey, outValue); }
 	void				EraseEntry(uint32 inIndex)									{ mAccess.EraseEntry(inIndex); mDirty = true; }
-	void				ReplaceKey(uint32 inIndex, const string& inKey)				{ mAccess.ReplaceKey(inIndex, inKey); mDirty = true; }
+	void				ReplaceKey(uint32 inIndex, const string& inKey)				{ mAccess.ReplaceKey(inIndex, inKey); this->mDirty = true; }
 
 
 	virtual bool		IsLeaf() const												{ return true; }
@@ -889,13 +889,13 @@ class M6BranchPage : public M6IndexPage<M6DataType>
 																					{ return mAccess.BinarySearch(inKey, outIndex, outMatch, mIndex); }
 	string				GetKey(uint32 inIndex) const								{ return mAccess.GetKey(inIndex); }
 	uint32				GetValue(uint32 inIndex) const								{ return mAccess.GetValue(inIndex); }
-	void				SetValue(uint32 inIndex, uint32 inValue)					{ mAccess.SetValue(inIndex, inValue); mDirty = true; }
+	void				SetValue(uint32 inIndex, uint32 inValue)					{ mAccess.SetValue(inIndex, inValue); this->mDirty = true; }
 	void				InsertKeyValue(const string& inKey, uint32 inValue, uint32 inIndex)
-																					{ mAccess.InsertKeyValue(inKey, inValue, inIndex); mDirty = true; }
+																					{ mAccess.InsertKeyValue(inKey, inValue, inIndex); this->mDirty = true; }
 	void				GetKeyValue(uint32 inIndex, string& outKey, uint32& outValue) const
 																					{ mAccess.GetKeyValue(inIndex, outKey, outValue); }
-	void				EraseEntry(uint32 inIndex)									{ mAccess.EraseEntry(inIndex); mDirty = true; }
-	void				ReplaceKey(uint32 inIndex, const string& inKey)				{ mAccess.ReplaceKey(inIndex, inKey); mDirty = true; }
+	void				EraseEntry(uint32 inIndex)									{ mAccess.EraseEntry(inIndex); this->mDirty = true; }
+	void				ReplaceKey(uint32 inIndex, const string& inKey)				{ mAccess.ReplaceKey(inIndex, inKey); this->mDirty = true; }
 
 	virtual bool		IsLeaf() const												{ return false; }
 	

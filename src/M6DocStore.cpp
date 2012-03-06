@@ -61,12 +61,6 @@ struct M6DocStorePageData
 					mData[kM6DataPageIndexCount];
 		uint8		mText[kM6DataPageTextSize];
 	};
-
-	template<class Archive>
-	void serialize(Archive& ar)
-	{
-		ar & mType & mFlags & mN & mLink & mText;
-	}
 };
 
 BOOST_STATIC_ASSERT(sizeof(M6DocStorePageData) == kM6DataPageSize);
@@ -88,14 +82,6 @@ struct M6DocStoreHdr
 		kTextSize = kM6DataPageSize - kHeaderSize;
 
 	uint8			mText[kTextSize];
-
-	template<class Archive>
-	void serialize(Archive& ar)
-	{
-		ar & mSignature & mDocCount & mIndexRoot & mNextDocNumber
-		   & mFirstDataPage & mLastDataPage & mFirstFreeDataPage
-		   & mAttributeOffset & mRawTextSize & mText;
-	}
 };
 
 BOOST_STATIC_ASSERT(sizeof(M6DocStoreHdr) == kM6DataPageSize);

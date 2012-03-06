@@ -28,6 +28,7 @@
 #include "M6BitStream.h"
 #include "M6Progress.h"
 #include "M6Iterator.h"
+#include "M6DiskCache.h"
 
 using namespace std;
 namespace fs = boost::filesystem;
@@ -243,14 +244,11 @@ class M6PageDataAccess
 
 	uint32			GetN() const					{ return mData.mN; }
 	uint32			GetLink() const					{ return mData.mLink; }
-	void			SetLink(uint32 inLink)			{ mData.mLink = inLink; mDirty = true; }
+	void			SetLink(uint32 inLink)			{ mData.mLink = inLink; }
 
 	uint32			Free() const;
 	bool			CanStore(const string& inKey) const;
 	bool			TooSmall() const				{ return Free() > kM6MinKeySpace; }
-
-	bool			IsDirty() const					{ return mDirty; }
-	void			SetDirty(bool inDirty)			{ mDirty = inDirty; }
 
 	void			BinarySearch(const string& inKey, int32& outIndex, bool& outMatch, M6IndexImpl& inIndex) const;
 
@@ -270,13 +268,11 @@ class M6PageDataAccess
   private:
 	M6PageData&		mData;
 	uint16			mKeyOffsets[kM6EntryCount + 1];
-	bool			mDirty;
 };
 
 template<class M6DataPage>
 M6PageDataAccess<M6DataPage>::M6PageDataAccess(M6IndexPageData* inData)
 	: mData(*reinterpret_cast<M6DataPage*>(inData))
-	, mDirty(false)
 {
 	uint8* key = mData.mKeys;
 	for (uint32 i = 0; i <= mData.mN; ++i)
@@ -349,7 +345,6 @@ inline void M6PageDataAccess<M6DataPage>::SetValue(uint32 inIndex, const M6DataT
 {
 	assert(inIndex < mData.mN);
 	mData.mData[kM6DataCount - inIndex - 1] = inValue;
-	mDirty = true;
 }
 
 template<class M6DataPage>
@@ -394,7 +389,6 @@ void M6PageDataAccess<M6DataPage>::InsertKeyValue(const string& inKey, const M6D
 		mKeyOffsets[i] = mKeyOffsets[i - 1] + mData.mKeys[mKeyOffsets[i - 1]] + 1;
 
 	assert(mKeyOffsets[mData.mN] <= (kM6DataCount - mData.mN) * sizeof(M6DataType));
-	mDirty = true;
 }
 
 template<class M6DataPage>
@@ -420,7 +414,6 @@ void M6PageDataAccess<M6DataPage>::EraseEntry(uint32 inIndex)
 	}
 	
 	--mData.mN;
-	mDirty = true;
 }
 
 template<class M6DataPage>
@@ -449,8 +442,6 @@ void M6PageDataAccess<M6DataPage>::ReplaceKey(uint32 inIndex, const string& inKe
 		mKeyOffsets[i] += delta;
 
 	assert(mKeyOffsets[mData.mN] <= (kM6DataCount - mData.mN) * sizeof(M6DataType));
-	
-	mDirty = true;
 }
 
 // move entries (keys and data) taking into account insertions and such
@@ -530,9 +521,6 @@ void M6PageDataAccess<M6DataPage>::MoveEntries(M6PageDataAccess& inSrc, M6PageDa
 	}
 
 	assert(inDst.mKeyOffsets[inDst.mData.mN] <= (kM6DataCount - inDst.mData.mN) * sizeof(M6DataType));
-	
-	inSrc.mDirty = true;
-	inDst.mDirty = true;
 }
 
 template<class M6DataType>
@@ -573,13 +561,6 @@ struct M6IxFileHeader
 	uint32		mFirstBitsPage;
 	uint32		mLastBitsPage;
 	uint32		mFirstLeafPage;
-
-	template<class Archive>
-	void serialize(Archive& ar)
-	{
-		ar & mSignature & mHeaderSize & mSize & mDepth & mRoot
-		   & mFirstBitsPage & mLastBitsPage & mFirstLeafPage;
-	}
 };
 
 union M6IxFileHeaderPage
@@ -600,13 +581,12 @@ class M6BasicPage
 	virtual			~M6BasicPage();
 	
 	void			Deallocate();
-	void			Flush(M6File& inFile);
 	
 	uint32			GetPageNr() const				{ return mPageNr; }
 	void			SetPageNr(uint32 inPageNr)		{ mPageNr = inPageNr; SetDirty(true); }
 
-	virtual bool	IsDirty() const = 0;
-	virtual void	SetDirty(bool inDirty) = 0;
+	virtual bool	IsDirty() const					{ return mDirty; }
+	virtual void	SetDirty(bool inDirty)			{ mDirty = inDirty; }
 
 	uint32			GetN() const					{ return mData->mN; }
 	void			SetLink(uint32 inLink)			{ mData->mLink = inLink; SetDirty(true); }
@@ -616,7 +596,7 @@ class M6BasicPage
   protected:
 	M6IndexPageHeader*	mData;
 	uint32				mPageNr;
-	bool				mLocked;
+	bool				mDirty;
 
   private:
 					M6BasicPage(const M6BasicPage&);
@@ -708,6 +688,7 @@ struct M6IndexImpl
 	M6BasicIndex&	mIndex;
 	M6IxFileHeader	mHeader;
 	bool			mAutoCommit;
+	bool			mBatchMode;
 	bool			mDirty;
 
 	// cache
@@ -730,8 +711,6 @@ struct M6IndexImpl
 	M6CachedPagePtr	GetCachePage();
 
 	M6CachedPagePtr	mCache,	mLRUHead, mLRUTail;
-	vector<M6BasicPage*>
-					mBatchCache;
 	
 	uint32			mCacheCount;
 	const static uint32
@@ -786,28 +765,19 @@ class M6IndexImplT : public M6IndexImpl
 M6BasicPage::M6BasicPage(M6IndexPageData* inData, uint32 inPageNr)
 	: mPageNr(inPageNr)
 	, mData(&inData->branch)
-	, mLocked(false)
+	, mDirty(false)
 {
 }
 
 M6BasicPage::~M6BasicPage()
 {
-//	assert(not IsDirty());
-	delete mData;
+	M6DiskCache::Instance().Release(mData, mDirty);
 }
 
 void M6BasicPage::Deallocate()
 {
+	mDirty = true;
 	mData->mType = eM6IndexEmptyPage;
-}
-
-void M6BasicPage::Flush(M6File& inFile)
-{
-	if (IsDirty())
-	{
-		inFile.PWrite(mData, kM6IndexPageSize, mPageNr * kM6IndexPageSize);
-		SetDirty(false);
-	}
 }
 
 // --------------------------------------------------------------------
@@ -861,18 +831,16 @@ class M6LeafPage : public M6IndexPage<M6DataType>
 																					{ return mAccess.BinarySearch(inKey, outIndex, outMatch, mIndex); }
 	string				GetKey(uint32 inIndex) const								{ return mAccess.GetKey(inIndex); }
 	M6DataType			GetValue(uint32 inIndex) const								{ return mAccess.GetValue(inIndex); }
-	void				SetValue(uint32 inIndex, const M6DataType& inValue)			{ mAccess.SetValue(inIndex, inValue); }
+	void				SetValue(uint32 inIndex, const M6DataType& inValue)			{ mAccess.SetValue(inIndex, inValue); mDirty = true; }
 	void				InsertKeyValue(const string& inKey, const M6DataType& inValue, uint32 inIndex)
-																					{ mAccess.InsertKeyValue(inKey, inValue, inIndex); }
+																					{ mAccess.InsertKeyValue(inKey, inValue, inIndex); mDirty = true; }
 	void				GetKeyValue(uint32 inIndex, string& outKey, M6DataType& outValue) const
 																					{ mAccess.GetKeyValue(inIndex, outKey, outValue); }
-	void				EraseEntry(uint32 inIndex)									{ mAccess.EraseEntry(inIndex); }
-	void				ReplaceKey(uint32 inIndex, const string& inKey)				{ mAccess.ReplaceKey(inIndex, inKey); }
+	void				EraseEntry(uint32 inIndex)									{ mAccess.EraseEntry(inIndex); mDirty = true; }
+	void				ReplaceKey(uint32 inIndex, const string& inKey)				{ mAccess.ReplaceKey(inIndex, inKey); mDirty = true; }
 
 
 	virtual bool		IsLeaf() const												{ return true; }
-	virtual bool		IsDirty() const												{ return mAccess.IsDirty(); }
-	virtual void		SetDirty(bool inDirty)										{ mAccess.SetDirty(inDirty); }
 	
 	virtual bool		Find(const string& inKey, M6DataType& outValue);
 	virtual bool		Insert(string& ioKey, const M6DataType& inValue, uint32& outLink);
@@ -918,17 +886,15 @@ class M6BranchPage : public M6IndexPage<M6DataType>
 																					{ return mAccess.BinarySearch(inKey, outIndex, outMatch, mIndex); }
 	string				GetKey(uint32 inIndex) const								{ return mAccess.GetKey(inIndex); }
 	uint32				GetValue(uint32 inIndex) const								{ return mAccess.GetValue(inIndex); }
-	void				SetValue(uint32 inIndex, uint32 inValue)					{ mAccess.SetValue(inIndex, inValue); }
+	void				SetValue(uint32 inIndex, uint32 inValue)					{ mAccess.SetValue(inIndex, inValue); mDirty = true; }
 	void				InsertKeyValue(const string& inKey, uint32 inValue, uint32 inIndex)
-																					{ mAccess.InsertKeyValue(inKey, inValue, inIndex); }
+																					{ mAccess.InsertKeyValue(inKey, inValue, inIndex); mDirty = true; }
 	void				GetKeyValue(uint32 inIndex, string& outKey, uint32& outValue) const
 																					{ mAccess.GetKeyValue(inIndex, outKey, outValue); }
-	void				EraseEntry(uint32 inIndex)									{ mAccess.EraseEntry(inIndex); }
-	void				ReplaceKey(uint32 inIndex, const string& inKey)				{ mAccess.ReplaceKey(inIndex, inKey); }
+	void				EraseEntry(uint32 inIndex)									{ mAccess.EraseEntry(inIndex); mDirty = true; }
+	void				ReplaceKey(uint32 inIndex, const string& inKey)				{ mAccess.ReplaceKey(inIndex, inKey); mDirty = true; }
 
 	virtual bool		IsLeaf() const												{ return false; }
-	virtual bool		IsDirty() const												{ return mAccess.IsDirty(); }
-	virtual void		SetDirty(bool inDirty)										{ mAccess.SetDirty(inDirty); }
 	
 	virtual bool		Find(const string& inKey, M6DataType& outValue);
 	virtual bool		Insert(string& ioKey, const M6DataType& inValue, uint32& outLink);
@@ -995,6 +961,9 @@ bool M6LeafPage<M6DataType>::Insert(string& ioKey, const M6DataType& inValue, ui
 		uint32 split = mData->mN / 2;
 
 		mAccess.MoveEntries(mAccess, next->mAccess, split, 0, mData->mN - split);
+		SetDirty(true);
+		next->SetDirty(true);
+
 		next->mData->mLink = mData->mLink;
 		mData->mLink = next->GetPageNr();
 		
@@ -1005,7 +974,7 @@ bool M6LeafPage<M6DataType>::Insert(string& ioKey, const M6DataType& inValue, ui
 		
 		ioKey = next->GetKey(0);
 		outLink = next->GetPageNr();
-		
+
 		mIndex.Release(next);
 		
 		result = true;
@@ -1094,6 +1063,8 @@ bool M6LeafPage<M6DataType>::Underflow(M6LeafPage& inRight, uint32 inIndex, M6Br
 	
 		inParent->EraseEntry(inIndex);
 		inRight.Deallocate();
+
+		SetDirty(true);
 	}
 	else		// redistribute the data
 	{
@@ -1124,6 +1095,8 @@ bool M6LeafPage<M6DataType>::Underflow(M6LeafPage& inRight, uint32 inIndex, M6Br
 			// move the data
 			mAccess.MoveEntries(inRight.mAccess, mAccess, 0, mData->mN, ln);
 			inParent->ReplaceKey(inIndex, inRight.GetKey(0));
+			
+			SetDirty(true);
 		}
 		else if (inRight.Free() > Free() and inRight.mData->mN < kM6EntryCount)
 		{
@@ -1148,6 +1121,7 @@ bool M6LeafPage<M6DataType>::Underflow(M6LeafPage& inRight, uint32 inIndex, M6Br
 			// move the data
 			mAccess.MoveEntries(mAccess, inRight.mAccess, mData->mN - ln, 0, ln);
 			inParent->ReplaceKey(inIndex, inRight.GetKey(0));
+			SetDirty(true);
 		}
 	}
 	
@@ -1278,6 +1252,7 @@ bool M6BranchPage<M6DataType>::Insert(string& ioKey, const M6DataType& inValue, 
 				downPage = link;
 
 				mAccess.MoveEntries(mAccess, next->mAccess, split, 0, mData->mN - split);
+				SetDirty(true);
 			}
 			else if (ix < split)
 			{
@@ -1290,6 +1265,9 @@ bool M6BranchPage<M6DataType>::Insert(string& ioKey, const M6DataType& inValue, 
 					InsertKeyValue(ioKey, link, ix);
 				else
 					next->InsertKeyValue(ioKey, link, ix - split - 1);
+
+				SetDirty(true);
+				next->SetDirty(true);
 			}
 			else
 			{
@@ -1303,6 +1281,9 @@ bool M6BranchPage<M6DataType>::Insert(string& ioKey, const M6DataType& inValue, 
 					InsertKeyValue(ioKey, link, ix);
 				else
 					next->InsertKeyValue(ioKey, link, ix - split - 1);
+
+				SetDirty(true);
+				next->SetDirty(true);
 			}
 
 			next->SetLink(downPage);
@@ -1487,22 +1468,16 @@ class M6IndexBitVectorPage : public M6BasicPage
 					M6IndexBitVectorPage(M6IndexImpl& inIndexImpl, M6IndexPageData* inData, uint32 inPageNr)
 						: M6BasicPage(inData, inPageNr)
 						, mPageData(inData->bit_vector)
-						, mDirty(false)
 					{
 						mPageData.mType = M6IndexBitVectorPageData::kIndexPageType;
 					}
 
-	virtual bool	IsDirty() const												{ return mDirty; }
-	virtual void	SetDirty(bool inDirty)										{ mDirty = inDirty; }
-
-	
 	uint32			StoreBitVector(const uint8* inData, size_t inSize);
 	
 	uint8*			GetData(uint32 inOffset)		{ return mPageData.mBits + inOffset; }
 	
   private:
 	M6IndexBitVectorPageData&	mPageData;
-	bool			mDirty;
 };
 
 uint32 M6IndexBitVectorPage::StoreBitVector(const uint8* inData, size_t inSize)
@@ -1614,6 +1589,7 @@ M6IndexImpl::M6IndexImpl(M6BasicIndex& inIndex, const fs::path& inPath, M6IndexT
 	, mIndex(inIndex)
 	, mDirty(false)
 	, mAutoCommit(true)
+	, mBatchMode(false)
 	, mCache(nullptr), mLRUHead(nullptr), mLRUTail(nullptr), mCacheCount(0)
 {
 	if (inMode == eReadWrite and mFile.Size() == 0)
@@ -1740,32 +1716,16 @@ void M6IndexImpl::InitCache(uint32 inCacheCount)
 
 void M6IndexImpl::FlushCache()
 {
-	if (mBatchCache.empty())
+	M6DiskCache::Instance().Flush(mFile);
+
+	for (uint32 ix = 0; ix < mCacheCount; ++ix)
 	{
-		for (uint32 ix = 0; ix < mCacheCount; ++ix)
+		if (mCache[ix].mPage != nullptr)
 		{
-			if (mCache[ix].mPage != nullptr)
-			{
-				if (mCache[ix].mPage->IsDirty())
-					mCache[ix].mPage->Flush(mFile);
-				delete mCache[ix].mPage;
-				mCache[ix].mPage = nullptr;
-			}
-			mCache[ix].mPageNr = 0;
+			delete mCache[ix].mPage;
+			mCache[ix].mPage = nullptr;
 		}
-	}
-	else
-	{
-		for (uint32 ix = 1; ix < mBatchCache.size(); ++ix)
-		{
-			if (mBatchCache[ix] != nullptr)
-			{
-				if (mBatchCache[ix]->IsDirty())
-					mBatchCache[ix]->Flush(mFile);
-				delete mBatchCache[ix];
-				mBatchCache[ix] = nullptr;
-			}
-		}
+		mCache[ix].mPageNr = 0;
 	}
 }
 
@@ -1806,9 +1766,6 @@ M6IndexImpl::M6CachedPagePtr M6IndexImpl::GetCachePage()
 	
 	if (result->mPage != nullptr)
 	{
-		if (result->mPage->IsDirty())
-			result->mPage->Flush(mFile);
-
 		delete result->mPage;
 		result->mPage = nullptr;
 	}
@@ -1826,27 +1783,18 @@ Page* M6IndexImpl::Allocate()
 	int64 offset = pageNr * kM6IndexPageSize;
 	mFile.Truncate(offset + kM6IndexPageSize);
 	
-	M6IndexPageData* data = new M6IndexPageData;
+//	M6IndexPageData* data = new M6IndexPageData;
+	M6IndexPageData* data = static_cast<M6IndexPageData*>(M6DiskCache::Instance().Load(mFile, offset));
 	memset(data, 0, kM6IndexPageSize);
 	data->leaf.mType = Page::M6DataPageType::kIndexPageType;
 
 	page = new Page(*this, data, pageNr);
 	page->SetDirty(true);
-	page->Flush(mFile);
 
-	if (mBatchCache.empty())
-	{
-		M6CachedPagePtr cp = GetCachePage();
-		cp->mPage = page;
-		cp->mPageNr = pageNr;
-		cp->mRefCount = 1;
-	}
-	else
-	{
-		if (inPageNr >= mBatchCache.size())
-			mBatchCache.append(inPageNr - mBatchCache.size() + 1, nullptr);
-		mBatchCache[inPageNr] = page;
-	}
+	M6CachedPagePtr cp = GetCachePage();
+	cp->mPage = page;
+	cp->mPageNr = pageNr;
+	cp->mRefCount = 1;
 	
 	return page;
 }
@@ -1857,65 +1805,37 @@ Page* M6IndexImpl::Load(uint32 inPageNr)
 	if (inPageNr == 0)
 		THROW(("Invalid page number"));
 		
-	M6BasicPage* page;
+	M6CachedPagePtr cp = mLRUHead;
+
+	while (cp != nullptr and cp->mPageNr != inPageNr)
+		cp = cp->mNext; 
+
+	if (cp == nullptr or cp->mPage == nullptr)
+	{
+//		M6IndexPageData* data = new M6IndexPageData;
+//		mFile.PRead(data, kM6IndexPageSize, inPageNr * kM6IndexPageSize);
+		M6IndexPageData* data = static_cast<M6IndexPageData*>(M6DiskCache::Instance().Load(mFile, inPageNr * kM6IndexPageSize));
+
+		cp = GetCachePage();
+
+		switch (data->leaf.mType)
+		{
+			case eM6IndexEmptyPage:			THROW(("Empty page!")); break;
+			case eM6IndexBranchPage:		cp->mPage = CreateBranchPage(data, inPageNr); break;
+			case eM6IndexSimpleLeafPage:
+			case eM6IndexMultiLeafPage:
+			case eM6IndexMultiIDLLeafPage:	cp->mPage = CreateLeafPage(data, inPageNr); break;
+			case eM6IndexBitVectorPage:		cp->mPage = new M6IndexBitVectorPage(*this, data, inPageNr); break;
+			default:						THROW(("Invalid index type in load (%c/%x)", data->leaf.mType, data->leaf.mType));
+		}
 		
-	if (mBatchCache.empty())
-	{
-		M6CachedPagePtr cp = mLRUHead;
-	
-		while (cp != nullptr and cp->mPageNr != inPageNr)
-			cp = cp->mNext; 
-	
-		if (cp == nullptr or cp->mPage == nullptr)
-		{
-			M6IndexPageData* data = new M6IndexPageData;
-			mFile.PRead(data, kM6IndexPageSize, inPageNr * kM6IndexPageSize);
-	
-			switch (data->leaf.mType)
-			{
-				case eM6IndexEmptyPage:			THROW(("Empty page!")); break;
-				case eM6IndexBranchPage:		page = CreateBranchPage(data, inPageNr); break;
-				case eM6IndexSimpleLeafPage:
-				case eM6IndexMultiLeafPage:
-				case eM6IndexMultiIDLLeafPage:	page = CreateLeafPage(data, inPageNr); break;
-				case eM6IndexBitVectorPage:		page = new M6IndexBitVectorPage(*this, data, inPageNr); break;
-				default:						THROW(("Invalid index type in load (%c/%x)", data->leaf.mType, data->leaf.mType));
-			}
-			
-			cp = GetCachePage();
-			cp->mPage = page;
-			cp->mPageNr = inPageNr;
-			cp->mRefCount = 0;
-		}
-
-		cp->mRefCount += 1;
-		page = cp->mPage;
-	}
-	else
-	{
-		if (inPageNr >= mBatchCache.size())
-			mBatchCache.append(inPageNr - mBatchCache.size() + 1, nullptr);
-
-		page = mBatchCache[inPageNr];
-		if (page == nullptr)
-		{
-			M6IndexPageData* data = new M6IndexPageData;
-			mFile.PRead(data, kM6IndexPageSize, inPageNr * kM6IndexPageSize);
-	
-			switch (data->leaf.mType)
-			{
-				case eM6IndexEmptyPage:			THROW(("Empty page!")); break;
-				case eM6IndexBranchPage:		page = CreateBranchPage(data, inPageNr); break;
-				case eM6IndexSimpleLeafPage:
-				case eM6IndexMultiLeafPage:
-				case eM6IndexMultiIDLLeafPage:	page = CreateLeafPage(data, inPageNr); break;
-				case eM6IndexBitVectorPage:		page = new M6IndexBitVectorPage(*this, data, inPageNr); break;
-				default:						THROW(("Invalid index type in load (%c/%x)", data->leaf.mType, data->leaf.mType));
-			}
-		}
+		cp->mPageNr = inPageNr;
+		cp->mRefCount = 0;
 	}
 
-	Page* result = dynamic_cast<Page*>(page);
+	cp->mRefCount += 1;
+
+	Page* result = dynamic_cast<Page*>(cp->mPage);
 	if (result == nullptr)
 		THROW(("Error loading cache page"));
 	return result;
@@ -1934,6 +1854,13 @@ void M6IndexImpl::Release(Page*& ioPage)
 		THROW(("Invalid page in Release"));
 	
 	cp->mRefCount -= 1;
+	
+	if (cp->mRefCount == 0 and mBatchMode and ioPage->GetKind() == eM6IndexBitVectorPage)
+	{
+		delete ioPage;
+		cp->mPage = nullptr;
+		cp->mPageNr = 0;
+	}
 	
 	ioPage = nullptr;
 }
@@ -1995,21 +1922,7 @@ void M6IndexImpl::SetAutoCommit(bool inAutoCommit)
 
 void M6IndexImpl::SetBatchMode(bool inBatchMode)
 {
-	FlushCache();
-	
-	if (inBatchMode)
-	{
-		delete[] mCache;
-		mCache = mLRUHead = mLRUTail = nullptr;
-		
-		int64 fileSize = mFile.Size();
-		uint32 pageCount = static_cast<uint32>(fileSize / kM6IndexPageSize);
-		mBatchCache.append(pageCount, nullptr);
-	}
-	else
-	{
-		mBatchCache.clear();
-	}
+	mBatchMode = inBatchMode;
 }
 
 // --------------------------------------------------------------------
@@ -2049,16 +1962,17 @@ M6IndexImplT<M6DataType>::~M6IndexImplT()
 template<class M6DataType>
 void M6IndexImplT<M6DataType>::Commit()
 {
+	M6DiskCache::Instance().Flush(mFile);
+
 	for (uint32 ix = 0; ix < mCacheCount; ++ix)
-	{
-		if (mCache[ix].mPage and mCache[ix].mPage->IsDirty())
-			mCache[ix].mPage->Flush(mFile);
-	}
+		mCache[ix].mPage->SetDirty(false);
 }
 
 template<class M6DataType>
 void M6IndexImplT<M6DataType>::Rollback()
 {
+	M6DiskCache::Instance().Purge(mFile);
+
 	for (uint32 ix = 0; ix < mCacheCount; ++ix)
 	{
 		if (mCache[ix].mPage and mCache[ix].mPage->IsDirty())

@@ -969,6 +969,7 @@ M6BasicIx* M6BatchIndexProcessor::GetIndexBase(const string& inName, M6IndexType
 		M6BasicIndexPtr index = mDatabank.CreateIndex(inName, inType);
 
 		index->SetAutoCommit(false);
+		index->SetBatchMode(true);
 		
 		result = new T(mFullTextIndex, mLexicon, inName,
 			static_cast<uint8>(mIndices.size() + 1), index);
@@ -1520,7 +1521,10 @@ void M6DatabankImpl::CommitBatchImport()
 	mBatch = nullptr;
 
 	foreach (M6IndexDesc& desc, mIndices)
+	{
 		desc.mIndex->SetAutoCommit(true);
+		desc.mIndex->SetBatchMode(false);
+	}
 	
 	// And clean up
 	fs::remove_all(mDbDirectory / "tmp");

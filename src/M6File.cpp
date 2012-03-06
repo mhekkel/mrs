@@ -68,7 +68,7 @@ void MWinIOEvent::Wait()
 
 // --------------------------------------------------------------------
 
-MHandle open(const std::string& inFile, MOpenMode inMode)
+M6Handle open(const std::string& inFile, MOpenMode inMode)
 {
 	unsigned long access = 0;
 	unsigned long shareMode = 0;
@@ -87,7 +87,7 @@ MHandle open(const std::string& inFile, MOpenMode inMode)
 	}
 	
 	unsigned long flags = FILE_FLAG_OVERLAPPED;
-	MHandle result = reinterpret_cast<MHandle>(::CreateFileA(inFile.c_str(),
+	M6Handle result = reinterpret_cast<M6Handle>(::CreateFileA(inFile.c_str(),
 		access, shareMode, nullptr, create, flags, nullptr));
 
 	if (result < 0)
@@ -96,18 +96,18 @@ MHandle open(const std::string& inFile, MOpenMode inMode)
 	return result;
 }
 
-MHandle open_tempfile(const std::string& inFileNameTemplate)
+M6Handle open_tempfile(const std::string& inFileNameTemplate)
 {
 	THROW(("Unimplemented"));
-	return MHandle(-1);
+	return M6Handle(-1);
 }
  
-void close(MHandle inHandle)
+void close(M6Handle inHandle)
 {
 	::CloseHandle(reinterpret_cast<HANDLE>(inHandle));
 }
 
-void truncate(MHandle inHandle, int64 inSize)
+void truncate(M6Handle inHandle, int64 inSize)
 {
 	LARGE_INTEGER offset;
 	offset.QuadPart = inSize;
@@ -117,7 +117,7 @@ void truncate(MHandle inHandle, int64 inSize)
 		THROW(("Error truncating file"));
 }
 
-int64 file_size(MHandle inHandle)
+int64 file_size(M6Handle inHandle)
 {
 	LARGE_INTEGER offset = { 0 };
 	int64 size = 0;
@@ -128,7 +128,7 @@ int64 file_size(MHandle inHandle)
 	return size;
 }
 
-void pwrite(MHandle inHandle, const void* inBuffer, int64 inSize, int64 inOffset)
+void pwrite(M6Handle inHandle, const void* inBuffer, int64 inSize, int64 inOffset)
 {
 	const char* buffer = reinterpret_cast<const char*>(inBuffer);
 	
@@ -164,7 +164,7 @@ void pwrite(MHandle inHandle, const void* inBuffer, int64 inSize, int64 inOffset
 	}
 }
 
-void pread(MHandle inHandle, void* inBuffer, int64 inSize, int64 inOffset)
+void pread(M6Handle inHandle, void* inBuffer, int64 inSize, int64 inOffset)
 {
 	char* buffer = reinterpret_cast<char*>(inBuffer);
 
@@ -208,7 +208,7 @@ void pread(MHandle inHandle, void* inBuffer, int64 inSize, int64 inOffset)
 
 #include <fcntl.h>
 
-MHandle open(const std::string& inFile, MOpenMode inMode)
+M6Handle open(const std::string& inFile, MOpenMode inMode)
 {
 	int mode;
 	
@@ -224,7 +224,7 @@ MHandle open(const std::string& inFile, MOpenMode inMode)
 	return fd;
 }
 
-MHandle open_tempfile(const std::string& inFileNameTemplate)
+M6Handle open_tempfile(const std::string& inFileNameTemplate)
 {
 //	char path[PATH_MAX] = {};
 //
@@ -241,19 +241,19 @@ MHandle open_tempfile(const std::string& inFileNameTemplate)
 	return -1;
 }
  
-void close(MHandle inHandle)
+void close(M6Handle inHandle)
 {
 	::close(inHandle);
 }
 
-void truncate(MHandle inHandle, int64 inSize)
+void truncate(M6Handle inHandle, int64 inSize)
 {
 	int err = ftruncate(inHandle, inSize);
 	if (err < 0)
 		THROW(("truncate error: %s", strerror(errno)));
 }
 
-int64 file_size(MHandle inHandle)
+int64 file_size(M6Handle inHandle)
 {
 	int64 size = lseek(inHandle, 0, SEEK_END);
 	if (size < 0)
@@ -261,7 +261,7 @@ int64 file_size(MHandle inHandle)
 	return size;
 }
 
-void pwrite(MHandle inHandle, const void* inBuffer, int64 inSize, int64 inOffset)
+void pwrite(M6Handle inHandle, const void* inBuffer, int64 inSize, int64 inOffset)
 {
 //cout << "pwrite(" << inSize << ", " << inOffset << ')' << endl;
 	int64 result = ::pwrite(inHandle, inBuffer, inSize, inOffset);
@@ -269,7 +269,7 @@ void pwrite(MHandle inHandle, const void* inBuffer, int64 inSize, int64 inOffset
 		THROW(("Error writing file: %s", strerror(errno)));
 }
 
-void pread(MHandle inHandle, void* inBuffer, int64 inSize, int64 inOffset)
+void pread(M6Handle inHandle, void* inBuffer, int64 inSize, int64 inOffset)
 {
 //cout << "pread(" << inSize << ", " << inOffset << ')' << endl;
 	int64 result = ::pread(inHandle, inBuffer, inSize, inOffset);

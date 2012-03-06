@@ -28,7 +28,9 @@ void lock_memory(void* ptr, size_t size)
 	::VirtualLock(ptr, size);
 }
 
-#elif defined(linux)
+#elif defined(linux) || defined(__linux__)
+
+#include <sys/mman.h>
 
 void lock_memory(void* ptr, size_t size)
 {

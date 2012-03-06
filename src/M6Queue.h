@@ -24,7 +24,7 @@ class M6Queue
 
 	std::deque<T>		mQueue;
 	boost::mutex		mMutex;
-	std::auto_ptr<boost::condition>
+	std::unique_ptr<boost::condition>
 						mEmptyCondition, mFullCondition;
 	bool				mWasFull, mWasEmpty;
 };

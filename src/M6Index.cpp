@@ -839,7 +839,7 @@ class M6LeafPage : public M6IndexPage<M6DataType>
 																					{ mAccess.InsertKeyValue(inKey, inValue, inIndex); this->mDirty = true; }
 	void				GetKeyValue(uint32 inIndex, string& outKey, M6DataType& outValue) const
 																					{ mAccess.GetKeyValue(inIndex, outKey, outValue); }
-	void				EraseEntry(uint32 inIndex)									{ mAccess.EraseEntry(inIndex); mDirty = true; }
+	void				EraseEntry(uint32 inIndex)									{ mAccess.EraseEntry(inIndex); this->mDirty = true; }
 	void				ReplaceKey(uint32 inIndex, const string& inKey)				{ mAccess.ReplaceKey(inIndex, inKey); this->mDirty = true; }
 
 
@@ -964,7 +964,7 @@ bool M6LeafPage<M6DataType>::Insert(string& ioKey, const M6DataType& inValue, ui
 		uint32 split = mData->mN / 2;
 
 		mAccess.MoveEntries(mAccess, next->mAccess, split, 0, mData->mN - split);
-		SetDirty(true);
+		this->SetDirty(true);
 		next->SetDirty(true);
 
 		next->mData->mLink = mData->mLink;
@@ -1067,7 +1067,7 @@ bool M6LeafPage<M6DataType>::Underflow(M6LeafPage& inRight, uint32 inIndex, M6Br
 		inParent->EraseEntry(inIndex);
 		inRight.Deallocate();
 
-		SetDirty(true);
+		this->SetDirty(true);
 	}
 	else		// redistribute the data
 	{
@@ -1099,7 +1099,7 @@ bool M6LeafPage<M6DataType>::Underflow(M6LeafPage& inRight, uint32 inIndex, M6Br
 			mAccess.MoveEntries(inRight.mAccess, mAccess, 0, mData->mN, ln);
 			inParent->ReplaceKey(inIndex, inRight.GetKey(0));
 			
-			SetDirty(true);
+			this->SetDirty(true);
 		}
 		else if (inRight.Free() > Free() and inRight.mData->mN < kM6EntryCount)
 		{
@@ -1124,7 +1124,7 @@ bool M6LeafPage<M6DataType>::Underflow(M6LeafPage& inRight, uint32 inIndex, M6Br
 			// move the data
 			mAccess.MoveEntries(mAccess, inRight.mAccess, mData->mN - ln, 0, ln);
 			inParent->ReplaceKey(inIndex, inRight.GetKey(0));
-			SetDirty(true);
+			this->SetDirty(true);
 		}
 	}
 	
@@ -1255,7 +1255,7 @@ bool M6BranchPage<M6DataType>::Insert(string& ioKey, const M6DataType& inValue, 
 				downPage = link;
 
 				mAccess.MoveEntries(mAccess, next->mAccess, split, 0, mData->mN - split);
-				SetDirty(true);
+				this->SetDirty(true);
 			}
 			else if (ix < split)
 			{
@@ -1269,7 +1269,7 @@ bool M6BranchPage<M6DataType>::Insert(string& ioKey, const M6DataType& inValue, 
 				else
 					next->InsertKeyValue(ioKey, link, ix - split - 1);
 
-				SetDirty(true);
+				this->SetDirty(true);
 				next->SetDirty(true);
 			}
 			else
@@ -1285,7 +1285,7 @@ bool M6BranchPage<M6DataType>::Insert(string& ioKey, const M6DataType& inValue, 
 				else
 					next->InsertKeyValue(ioKey, link, ix - split - 1);
 
-				SetDirty(true);
+				this->SetDirty(true);
 				next->SetDirty(true);
 			}
 

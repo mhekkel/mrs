@@ -25,6 +25,8 @@ class M6DiskCache
 	void				Flush(M6File& inFile);
 	void				Purge(M6File& inFile);
 	
+	void				Truncate(M6File& inFile, int64 inSize);
+	
   private:
 						M6DiskCache();
 						~M6DiskCache();

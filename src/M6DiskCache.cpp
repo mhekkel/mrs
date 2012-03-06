@@ -285,3 +285,26 @@ void M6DiskCache::Purge(M6File& inFile)
 		}
 	}
 }
+
+void M6DiskCache::Truncate(M6File& inFile, int64 inSize)
+{
+	boost::mutex::scoped_lock lock(mMutex);
+
+	M6Handle handle = inFile.GetHandle();
+	
+	for (uint32 ix = 0; ix < kM6DiskCacheSize; ++ix)
+	{
+		if (mCache[ix].mFileHandle == handle and mCache[ix].mOffset >= inSize)
+		{
+			size_t hash = hash_value(mCache[ix].mFileHandle, mCache[ix].mOffset);
+			size_t bucket = hash % kM6BucketCount;
+
+			mBuckets[bucket].erase(
+				remove(mBuckets[bucket].begin(), mBuckets[bucket].end(), ix),
+				mBuckets[bucket].end());
+
+			mCache[ix].mDirty = false;
+			mCache[ix].mFileHandle = -1;
+		}
+	}
+}

@@ -1906,10 +1906,7 @@ void M6IndexImpl::SwapPages(uint32 inPageA, uint32 inPageB)
 	M6DiskCache::Instance().Swap(pageA->GetData(), pageB->GetData());
 
 	pageA->SetPageNr(inPageB);
-	pageA->SetDirty(true);
-
 	pageB->SetPageNr(inPageA);
-	pageB->SetDirty(true);
 	
 	--cpa->mRefCount;
 	--cpb->mRefCount;
@@ -2316,8 +2313,9 @@ void M6IndexImplT<M6DataType>::Vacuum(M6Progress& inProgress)
 		Release(page);
 	}
 	
-//	mFile.Truncate(n * kM6IndexPageSize);
 	FlushCache();
+	mFile.Truncate(n * kM6IndexPageSize);
+	M6DiskCache::Instance().Truncate(mFile, n * kM6IndexPageSize);
 	CreateUpLevels(up);
 	Commit();
 }

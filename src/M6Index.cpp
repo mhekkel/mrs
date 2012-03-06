@@ -63,21 +63,21 @@ struct M6IndexPageHeader
 	uint32			mLink;
 };
 
-//#if DEBUG
-//
-//const int64
-////	kM6IndexPageSize		= 8192,
-//	kM6IndexPageSize		= 512,
-//	kM6IndexPageHeaderSize	= sizeof(M6IndexPageHeader),
-//	kM6KeySpace				= kM6IndexPageSize - kM6IndexPageHeaderSize,
-//	kM6MinKeySpace			= kM6KeySpace / 2,
-//	kM6MaxEntriesPerPage	= 4;
-////	kM6MaxEntriesPerPage	= kM6KeySpace / 8;	// see above
-//
-//const uint32
-//	kM6MaxKeyLength			= (kM6MinKeySpace / 2 > 255 ? 255 : kM6MinKeySpace / 2);
-//
-//#else
+#if DEBUG
+
+const int64
+//	kM6IndexPageSize		= 8192,
+	kM6IndexPageSize		= 512,
+	kM6IndexPageHeaderSize	= sizeof(M6IndexPageHeader),
+	kM6KeySpace				= kM6IndexPageSize - kM6IndexPageHeaderSize,
+	kM6MinKeySpace			= kM6KeySpace / 2,
+	kM6MaxEntriesPerPage	= 4;
+//	kM6MaxEntriesPerPage	= kM6KeySpace / 8;	// see above
+
+const uint32
+	kM6MaxKeyLength			= (kM6MinKeySpace / 2 > 255 ? 255 : kM6MinKeySpace / 2);
+
+#else
 
 const int64
 	kM6IndexPageSize		= 8192,
@@ -89,7 +89,7 @@ const int64
 const uint32
 	kM6MaxKeyLength			= (kM6MinKeySpace / 2 > 255 ? 255 : kM6MinKeySpace / 2);
 
-//#endif
+#endif
 
 template<M6IndexPageKind>
 struct M6IndexPageDataTraits {};
@@ -592,6 +592,8 @@ class M6BasicPage
 	void			SetLink(uint32 inLink)			{ mData->mLink = inLink; SetDirty(true); }
 	uint32			GetLink() const					{ return mData->mLink; }
 	M6IndexPageKind	GetKind() const					{ return mData->mType; }
+	
+	void*			GetData()						{ return mData; }
 
   protected:
 	M6IndexPageHeader*	mData;
@@ -713,8 +715,9 @@ struct M6IndexImpl
 	M6CachedPagePtr	mCache,	mLRUHead, mLRUTail;
 	
 	uint32			mCacheCount;
-	const static uint32
-					kM6CacheCount = 16;
+	const static uint32	
+					kM6CacheCount = 8;
+					//kM6CacheCount = 16;
 };
 
 template<class M6DataType>
@@ -1776,6 +1779,8 @@ M6IndexImpl::M6CachedPagePtr M6IndexImpl::GetCachePage()
 template<class Page>
 Page* M6IndexImpl::Allocate()
 {
+	assert(kM6DiskPageSize == kM6IndexPageSize);
+
 	Page* page = nullptr;
 	
 	int64 fileSize = mFile.Size();
@@ -1898,6 +1903,7 @@ void M6IndexImpl::SwapPages(uint32 inPageA, uint32 inPageB)
 	assert(cpb->mPage == pageB);
 	
 	swap(cpa->mPageNr, cpb->mPageNr);
+	M6DiskCache::Instance().Swap(pageA->GetData(), pageB->GetData());
 
 	pageA->SetPageNr(inPageB);
 	pageA->SetDirty(true);
@@ -1965,7 +1971,10 @@ void M6IndexImplT<M6DataType>::Commit()
 	M6DiskCache::Instance().Flush(mFile);
 
 	for (uint32 ix = 0; ix < mCacheCount; ++ix)
-		mCache[ix].mPage->SetDirty(false);
+	{
+		if (mCache[ix].mPage != nullptr)
+			mCache[ix].mPage->SetDirty(false);
+	}
 }
 
 template<class M6DataType>

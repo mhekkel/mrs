@@ -244,10 +244,10 @@
 		<locale>en_US.UTF-8</locale>
 		
 		<!-- source type can be path, glob or regex -->
-		<source type="path">test/PDBFIND2.TXT.gz</source>
+<!--		<source type="path">test/PDBFIND2.TXT.gz</source>-->
 <!--		<source type="path">C:\Users\maarten\projects\m6\test\PDBFIND2.TXT</source> -->
 <!--		<source type="path">C:\Users\maarten\projects\m6\test\pdbfind2-head-2.txt</source>-->
-<!--		<source type="path">C:\Users\maarten\projects\m6\test\pdbfind2-head.txt</source> -->
+		<source type="path">C:\Users\maarten\projects\m6\test\pdbfind2-head.txt</source> 
 		
 		<!-- if no header-line or document-separator element is specified, the
 			 entire file is considered to be one document. -->
@@ -273,7 +273,7 @@
 		<info>http://www.ncbi.nlm.nih.gov/entrez/query.fcgi?db=OMIM</info>
 		<file>/data/mrs/omim.m6</file>
 		<locale>en_US.UTF-8</locale>
-		<source type="path">test/omim.dat.gz</source>
+		<source type="path">/data/raw/omim/omim.dat.gz</source>
 		<document-separator type="first-line-equals">*RECORD*</document-separator>
 	</databank>
 	

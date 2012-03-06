@@ -656,6 +656,8 @@ M6StringIx::M6StringIx(M6FullTextIx& inFullTextIndex, M6Lexicon& inLexicon,
 	, mIndex(dynamic_cast<M6MultiBasicIndex*>(inIndex.get()))
 {
 	assert(mIndex);
+	mIndex->SetAutoCommit(false);
+	mIndex->SetBatchMode(true);
 	mFullTextIndex.SetExcludeInFullText(mIndexNr);
 }
 	
@@ -718,6 +720,8 @@ M6TextIx::M6TextIx(M6FullTextIx& inFullTextIndex, M6Lexicon& inLexicon,
 	, mIndex(dynamic_cast<M6MultiIDLBasicIndex*>(inIndex.get()))
 {
 	assert(mIndex);
+	mIndex->SetAutoCommit(false);
+	mIndex->SetBatchMode(true);
 	mFullTextIndex.SetUsesInDocLocation(mIndexNr);
 	mIDLFile = new M6File(
 		mFullTextIndex.GetScratchDir().parent_path() / (inName + ".idl"), eReadWrite);
@@ -829,6 +833,8 @@ M6WeightedWordIx::M6WeightedWordIx(M6FullTextIx& inFullTextIndex, M6Lexicon& inL
 	, mIndex(dynamic_cast<M6WeightedBasicIndex*>(inIndex.get()))
 {
 	assert(mIndex);
+	mIndex->SetAutoCommit(false);
+	mIndex->SetBatchMode(true);
 }
 
 void M6WeightedWordIx::AddDocTerm(uint32 inDoc, uint8 inFrequency, M6OBitStream& inIDL)
@@ -968,9 +974,6 @@ M6BasicIx* M6BatchIndexProcessor::GetIndexBase(const string& inName, M6IndexType
 	{
 		M6BasicIndexPtr index = mDatabank.CreateIndex(inName, inType);
 
-		index->SetAutoCommit(false);
-		index->SetBatchMode(true);
-		
 		result = new T(mFullTextIndex, mLexicon, inName,
 			static_cast<uint8>(mIndices.size() + 1), index);
 		
@@ -1016,6 +1019,7 @@ void M6BatchIndexProcessor::IndexValue(const string& inIndexName,
 		}
 		
 		index->SetAutoCommit(false);
+		index->SetBatchMode(true);
 	
 		index->Insert(inValue, inDocNr);
 	}
@@ -1529,7 +1533,7 @@ void M6DatabankImpl::CommitBatchImport()
 	// And clean up
 	fs::remove_all(mDbDirectory / "tmp");
 
-	Vacuum();
+//	Vacuum();
 	RecalculateDocumentWeights();
 }
 

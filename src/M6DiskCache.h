@@ -1,42 +1,10 @@
 #pragma once
 
+#include <boost/thread/mutex.hpp>
+
 extern const uint32 kM6DiskPageSize;
 
 class M6File;
-
-class M6DiskPage
-{
-  public:
-						M6DiskPage(M6File& inFile, int64 inOffset);
-						M6DiskPage(const M6DiskPage& inPage);
-	M6DiskPage&			operator=(const M6DiskPage& inPage);
-						~M6DiskPage();
-  protected:
-	void*				mPage;
-	bool				mDirty;
-};
-
-//template<class T>
-//class M6DiskPageT
-//{
-//  public:
-//						M6DiskPageT(M6File& inFile, int64 inOffset)
-//							: M6DiskPage(inFile, inOffset) {}
-//						M6DiskPageT(const M6DiskPageT& inPage)
-//							: M6DiskPage(inPage) {}
-//
-//	M6DiskPageT&		operator=(const M6DiskPageT& inPage)
-//						{
-//							M6DiskPage::operator=(inPage);
-//							return *this;
-//						}
-//
-//	const T&			operator*() const	{ return *static_cast<T*>(mPage); }
-//	const T*			operator->() const	{ return static_cast<T*>(mPage); }
-//
-//	T&					operator*()			{ mDirty = true; return *static_cast<T*>(mPage); }
-//	T*					operator->()		{ mDirty = true; return static_cast<T*>(mPage); }
-//};
 
 // --------------------------------------------------------------------
 
@@ -52,6 +20,7 @@ class M6DiskCache
 
 	void				Reference(void* inPage);
 	void				Release(void* inPage, bool inDirty);
+	void				Swap(void* inPageA, void* inPageB);
 
 	void				Flush(M6File& inFile);
 	void				Purge(M6File& inFile);
@@ -60,10 +29,9 @@ class M6DiskCache
 						M6DiskCache();
 						~M6DiskCache();
 
-	void				EmptyBucket(uint32 inIndex);
-
 	uint8*				mData;
 	M6DiskPageInfoPtr	mCache, mLRUHead, mLRUTail;
-	uint32*				mBuckets;
+	std::vector<uint32>*mBuckets;
+	boost::mutex		mMutex;
 };
 

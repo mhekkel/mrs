@@ -11,10 +11,10 @@
 using namespace std;
 
 const uint32
-	//kM6DiskPageSize = 8192,
-	kM6DiskPageSize = 512,
-	//kM6DiskCacheSize = 65536,
-	kM6DiskCacheSize = 128,
+	kM6DiskPageSize = 8192,
+//	kM6DiskPageSize = 512,
+	kM6DiskCacheSize = 65536,
+//	kM6DiskCacheSize = 128,
 	kM6BucketCount = 4 * kM6DiskCacheSize;
 
 // --------------------------------------------------------------------
@@ -79,6 +79,9 @@ M6DiskCache::M6DiskCache()
 		mCache[ix].mPrev = mCache + ix - 1;
 	}
 	
+	mCache[0].mPrev = nullptr;
+	mCache[kM6DiskCacheSize - 1].mNext = nullptr;
+	
 	mLRUHead = mCache;
 	mLRUTail = mCache + kM6DiskCacheSize - 1;
 	
@@ -119,6 +122,8 @@ void* M6DiskCache::Load(M6File& inFile, int64 inOffset)
 	{
 		foreach (uint32 index, mBuckets[bucket])
 		{
+			assert(index < kM6DiskCacheSize);
+			
 			if (mCache[index].mFileHandle == inFile.GetHandle() and
 				mCache[index].mOffset == inOffset)
 			{

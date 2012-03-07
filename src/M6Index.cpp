@@ -63,7 +63,7 @@ struct M6IndexPageHeader
 	uint32			mLink;
 };
 
-#if DEBUG
+#if 0 //DEBUG
 
 const int64
 //	kM6IndexPageSize		= 8192,
@@ -586,7 +586,7 @@ class M6BasicPage
 	void			SetPageNr(uint32 inPageNr)		{ mPageNr = inPageNr; SetDirty(true); }
 
 	virtual bool	IsDirty() const					{ return mDirty; }
-	virtual void	SetDirty(bool inDirty)			{ mDirty = inDirty; M6DiskCache::Instance().Touch(mData); }
+	virtual void	SetDirty(bool inDirty)			{ mDirty = inDirty; }
 
 	uint32			GetN() const					{ return mData->mN; }
 	void			SetLink(uint32 inLink)			{ mData->mLink = inLink; SetDirty(true); }
@@ -1849,6 +1849,9 @@ Page* M6IndexImpl::Load(uint32 inPageNr)
 template<class Page>
 void M6IndexImpl::Release(Page*& ioPage)
 {
+	if (ioPage->IsDirty())
+		M6DiskCache::Instance().Touch(ioPage->M6BasicPage::GetData());
+	
 	assert(ioPage != nullptr);
 	
 	M6CachedPagePtr cp = mLRUHead;

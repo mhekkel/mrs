@@ -11,10 +11,10 @@
 using namespace std;
 
 const uint32
-//	kM6DiskPageSize = 8192,
-	kM6DiskPageSize = 512,
-//	kM6DiskCacheSize = 65536,
-	kM6DiskCacheSize = 128,
+	kM6DiskPageSize = 8192,
+//	kM6DiskPageSize = 512,
+	kM6DiskCacheSize = 65536,
+//	kM6DiskCacheSize = 128,
 	kM6BucketCount = 4 * kM6DiskCacheSize;
 
 // --------------------------------------------------------------------
@@ -125,6 +125,7 @@ void* M6DiskCache::Load(M6File& inFile, int64 inOffset)
 	assert(inOffset % kM6DiskPageSize == 0);
 
 	uint8* result = nullptr;
+	M6DiskPageInfoPtr info = nullptr;
 
 	// Try to find the page in our cache
 	size_t bucket = hash_value(inFile.GetHandle(), inOffset) % kM6BucketCount;
@@ -135,7 +136,10 @@ void* M6DiskCache::Load(M6File& inFile, int64 inOffset)
 			mCache[index].mOffset == inOffset)
 		{
 			result = mData + index * kM6DiskPageSize;
-			mCache[index].mRefCount += 1;
+
+			info = mCache + index;
+			info->mRefCount += 1;
+
 			break;
 		}
 		
@@ -144,7 +148,7 @@ void* M6DiskCache::Load(M6File& inFile, int64 inOffset)
 	
 	if (result == nullptr)
 	{
-		M6DiskPageInfoPtr info = mLRUTail;
+		info = mLRUTail;
 		
 		// now search backwards for a cached page that can be recycled
 		while (info != nullptr and info->mRefCount > 0)
@@ -155,22 +159,6 @@ void* M6DiskCache::Load(M6File& inFile, int64 inOffset)
 		if (info == nullptr)
 			THROW(("Panic: disk cache full"));
 	
-		if (info != mLRUHead)
-		{
-			if (info == mLRUTail)
-				mLRUTail = info->mPrev;
-			
-			if (info->mPrev)
-				info->mPrev->mNext = info->mNext;
-			if (info->mNext)
-				info->mNext->mPrev = info->mPrev;
-			
-			info->mPrev = nullptr;
-			info->mNext = mLRUHead;
-			mLRUHead->mPrev = info;
-			mLRUHead = info;
-		}
-		
 		size_t index = info - mCache;
 		result = mData + index * kM6DiskPageSize;
 		
@@ -183,13 +171,29 @@ void* M6DiskCache::Load(M6File& inFile, int64 inOffset)
 		info->mRefCount = 1;
 		info->mLink = mBuckets[bucket];
 
-		assert(hash_value(*info) == bucket);
-
 		mBuckets[bucket] = index;
 		
 		M6IO::pread(info->mFileHandle, result, kM6DiskPageSize, info->mOffset);
 	}
 	
+	assert(info != nullptr);
+	
+	if (info != mLRUHead)
+	{
+		if (info == mLRUTail)
+			mLRUTail = info->mPrev;
+		
+		if (info->mPrev)
+			info->mPrev->mNext = info->mNext;
+		if (info->mNext)
+			info->mNext->mPrev = info->mPrev;
+		
+		info->mPrev = nullptr;
+		info->mNext = mLRUHead;
+		mLRUHead->mPrev = info;
+		mLRUHead = info;
+	}
+
 	return result;
 }
 
@@ -295,15 +299,26 @@ void M6DiskCache::Flush(M6File& inFile)
 
 	M6Handle handle = inFile.GetHandle();
 	
+	// avoid scattering around the disk, write data sorted
+	vector<int64> offsets;
+	offset.reserve(kM6DiskCacheSize);
+	
 	for (uint32 ix = 0; ix < kM6DiskCacheSize; ++ix)
 	{
 		if (mCache[ix].mDirty and mCache[ix].mFileHandle == handle)
 		{
-			uint8* page = mData + ix * kM6DiskPageSize;
-			assert(*page != 0);
-			M6IO::pwrite(mCache[ix].mFileHandle, page, kM6DiskPageSize, mCache[ix].mOffset);
+			offsets.push_back(ix);
 			mCache[ix].mDirty = false;
 		}
+	}
+	
+	sort(offsets.begin(), offsets.end());
+	
+	foreach (int64 offset, offsets)
+	{
+		uint8* page = mData + ix * kM6DiskPageSize;
+		assert(*page != 0);
+		M6IO::pwrite(mCache[ix].mFileHandle, page, kM6DiskPageSize, mCache[ix].mOffset);
 	}
 }
 

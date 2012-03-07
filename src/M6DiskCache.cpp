@@ -300,25 +300,25 @@ void M6DiskCache::Flush(M6File& inFile)
 	M6Handle handle = inFile.GetHandle();
 	
 	// avoid scattering around the disk, write data sorted
-	vector<int64> offsets;
-	offset.reserve(kM6DiskCacheSize);
+	vector<pair<uint32,int64>> offsets;
+	offsets.reserve(kM6DiskCacheSize);
 	
 	for (uint32 ix = 0; ix < kM6DiskCacheSize; ++ix)
 	{
 		if (mCache[ix].mDirty and mCache[ix].mFileHandle == handle)
 		{
-			offsets.push_back(ix);
+			offsets.push_back(make_pair(ix, mCache[ix].mOffset));
 			mCache[ix].mDirty = false;
 		}
 	}
 	
-	sort(offsets.begin(), offsets.end());
+	sort(offsets.begin(), offsets.end(),
+		[](pair<uint32,int64>& a, pair<uint32,int64>& b) -> bool { return a.second < b.second; });
 	
-	foreach (int64 offset, offsets)
+	foreach (auto p, offsets)
 	{
-		uint8* page = mData + ix * kM6DiskPageSize;
-		assert(*page != 0);
-		M6IO::pwrite(mCache[ix].mFileHandle, page, kM6DiskPageSize, mCache[ix].mOffset);
+		uint8* page = mData + p.first * kM6DiskPageSize;
+		M6IO::pwrite(handle, page, kM6DiskPageSize, p.second);
 	}
 }
 

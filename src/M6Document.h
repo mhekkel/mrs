@@ -62,8 +62,11 @@ class M6InputDocument : public M6Document
 	
 	typedef std::vector<M6IndexValue>			M6IndexValueList;
 
+						M6InputDocument(M6Databank& inDatabank);
 						M6InputDocument(M6Databank& inDatabank,
 							const std::string& inText);
+
+	void				SetText(const std::string& inText);
 
 	virtual std::string	GetText();
 	const std::string&	Peek() const						{ return mText; }

@@ -237,6 +237,16 @@
 		</match>
 	</parser>
 	
+	<parser id="mediawiki" type="sax" docxpath="/mediawiki/page">
+		<match xpath="title">
+			<index name="title" />
+		</match>
+		<match xpath="text">
+			<preprocess plugin="mediawiki"/>
+			<index name="text" />
+		</match>
+	</parser>
+	
 	<databank id="pdbfinder" parser="pdbfinder">
 		<name>PDBFINDER</name>
 <!--		<file>C:\Users\maarten\projects\m6\test\pdbfinder.m6</file> -->
@@ -307,6 +317,12 @@
 		<source type="path">/data/raw/genbank/genbank-test.seq.gz</source>
 		
 		<document-separator type="last-line-equals">//</document-separator>
+	</databank>
+
+	<databank id="nlwiki" parser="mediawiki">
+		<name>Wikipedia - Nederlandstalig</name>
+		<file>/data/mrs/nlwiki.m6</file>
+		<source type="path">/data/raw/nlwiki/nlwiki-latest-pages-articles.xml.bz2</source>
 	</databank>
 	
 </m6-config>

@@ -46,11 +46,22 @@ M6Document::~M6Document()
 
 // --------------------------------------------------------------------
 
+M6InputDocument::M6InputDocument(M6Databank& inDatabank)
+	: M6Document(inDatabank)
+	, mDocNr(0)
+{
+}
+
 M6InputDocument::M6InputDocument(M6Databank& inDatabank, const string& inText)
 	: M6Document(inDatabank)
 	, mText(inText)
 	, mDocNr(0)
 {
+}
+
+void M6InputDocument::SetText(const string& inText)
+{
+	mText = inText;
 }
 
 string M6InputDocument::GetText()

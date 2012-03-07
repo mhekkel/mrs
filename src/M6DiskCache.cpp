@@ -313,7 +313,8 @@ void M6DiskCache::Flush(M6File& inFile)
 	}
 	
 	sort(offsets.begin(), offsets.end(),
-		[](pair<uint32,int64>& a, pair<uint32,int64>& b) -> bool { return a.second < b.second; });
+		[](const pair<uint32,int64>& a, const pair<uint32,int64>& b) -> bool
+		{ return a.second < b.second; });
 	
 	foreach (auto p, offsets)
 	{

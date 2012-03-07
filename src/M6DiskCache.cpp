@@ -43,7 +43,7 @@ void lock_memory(void* ptr, size_t size)
 
 size_t hash_value(M6Handle inFileHandle, int64 inOffset)
 {
-	size_t result;
+	size_t result = 0;
 	boost::hash_combine(result, inFileHandle);
 	boost::hash_combine(result, inOffset / kM6DiskPageSize);
 	return result;
@@ -96,9 +96,6 @@ M6DiskCache::M6DiskCache()
 	mLRUTail = mCache + kM6DiskCacheSize - 1;
 	
 	fill(mBuckets, mBuckets + kM6BucketCount, kM6DiskCacheSize);
-#if DEBUG
-	memset(mData, 0xfd, kM6DiskCacheSize * kM6DiskPageSize);
-#endif
 	
 	// make sure our cache is never swapped out
 	lock_memory(mBuckets, sizeof(vector<uint32>) * kM6BucketCount);
@@ -185,17 +182,13 @@ void* M6DiskCache::Load(M6File& inFile, int64 inOffset)
 		info->mDirty = false;
 		info->mRefCount = 1;
 		info->mLink = mBuckets[bucket];
+
+		assert(hash_value(*info) == bucket);
+
 		mBuckets[bucket] = index;
 		
 		M6IO::pread(info->mFileHandle, result, kM6DiskPageSize, info->mOffset);
-
-#if DEBUG		
-		if (*result == 0 and inOffset < inFile.Size() - kM6DiskPageSize)
-			cout << "null?" << endl;
-#endif
 	}
-	
-	Validate();
 	
 	return result;
 }
@@ -208,8 +201,6 @@ void M6DiskCache::Reference(void* inPage)
 	if (index >= kM6DiskCacheSize)
 		THROW(("Invalid page for Reference"));
 	mCache[index].mRefCount += 1;
-
-	Validate();
 }
 
 void M6DiskCache::Touch(void *inPage)
@@ -220,8 +211,6 @@ void M6DiskCache::Touch(void *inPage)
 	if (index >= kM6DiskCacheSize)
 		THROW(("Invalid page for Reference"));
 	mCache[index].mDirty = true;
-
-	Validate();
 }
 
 void M6DiskCache::Release(void* inPage, bool inDirty)
@@ -235,17 +224,15 @@ void M6DiskCache::Release(void* inPage, bool inDirty)
 	mCache[index].mRefCount -= 1;
 	if (inDirty)
 		mCache[index].mDirty = true;
-#if DEBUG
-	else if (not mCache[index].mDirty)
-	{
-		// make sure it really isn't dirty
-		uint8 data[kM6DiskPageSize];
-		M6IO::pread(mCache[index].mFileHandle, data, kM6DiskPageSize, mCache[index].mOffset);
-		assert(memcmp(data, inPage, kM6DiskPageSize) == 0);
-	}
-#endif
-
-	Validate();
+//#if DEBUG
+//	else if (not mCache[index].mDirty)
+//	{
+//		// make sure it really isn't dirty
+//		uint8 data[kM6DiskPageSize];
+//		M6IO::pread(mCache[index].mFileHandle, data, kM6DiskPageSize, mCache[index].mOffset);
+//		assert(memcmp(data, inPage, kM6DiskPageSize) == 0);
+//	}
+//#endif
 }
 
 void M6DiskCache::Swap(void* inPageA, void* inPageB)
@@ -300,8 +287,6 @@ void M6DiskCache::Swap(void* inPageA, void* inPageB)
 	mCache[indexA].mLink = mBuckets[bucketB];
 	mBuckets[bucketB] = indexA;
 	assert(hash_value(mCache[indexA]) % kM6BucketCount == bucketB);
-
-	Validate();
 }
 
 void M6DiskCache::Flush(M6File& inFile)
@@ -320,8 +305,6 @@ void M6DiskCache::Flush(M6File& inFile)
 			mCache[ix].mDirty = false;
 		}
 	}
-
-	Validate();
 }
 
 void M6DiskCache::Purge(M6File& inFile)
@@ -335,8 +318,6 @@ void M6DiskCache::Purge(M6File& inFile)
 		if (mCache[ix].mFileHandle == handle)
 			PurgePage(ix);
 	}
-
-	Validate();
 }
 
 void M6DiskCache::PurgePage(uint32 inPage)
@@ -349,9 +330,6 @@ void M6DiskCache::PurgePage(uint32 inPage)
 		uint8* page = mData + inPage * kM6DiskPageSize;
 		assert(*page != 0);
 		M6IO::pwrite(mCache[inPage].mFileHandle, page, kM6DiskPageSize, mCache[inPage].mOffset);
-#if DEBUG
-		memset(page, 0xfe, kM6DiskPageSize);
-#endif
 	}
 	
 	size_t bucket = hash_value(mCache[inPage]) % kM6BucketCount;
@@ -391,35 +369,33 @@ void M6DiskCache::Truncate(M6File& inFile, int64 inSize)
 		if (mCache[ix].mFileHandle == handle and mCache[ix].mOffset >= inSize)
 			PurgePage(ix);
 	}
-
-	Validate();
 }
 
-void M6DiskCache::Validate()
-{
-	for (uint32 ix = 0; ix < kM6DiskCacheSize; ++ix)
-	{
-		if (mCache[ix].mFileHandle >= 0)
-		{
-			uint32 bucket = hash_value(mCache[ix]) % kM6BucketCount;
-			
-			uint32 i = mBuckets[bucket];
-			while (i != ix)
-			{
-				i = mCache[i].mLink;
-				assert(i < kM6DiskCacheSize);
-			}
-			assert(i == ix);
-		}
-	}
-	
-	for (uint32 ix = 0; ix < kM6BucketCount; ++ix)
-	{
-		uint32 i = mBuckets[ix];
-		while (i != kM6DiskCacheSize)
-		{
-			assert(hash_value(mCache[i]) % kM6BucketCount == ix);
-			i = mCache[i].mLink;
-		}
-	}
-}
+//void M6DiskCache::Validate()
+//{
+//	for (uint32 ix = 0; ix < kM6DiskCacheSize; ++ix)
+//	{
+//		if (mCache[ix].mFileHandle >= 0)
+//		{
+//			uint32 bucket = hash_value(mCache[ix]) % kM6BucketCount;
+//			
+//			uint32 i = mBuckets[bucket];
+//			while (i != ix)
+//			{
+//				i = mCache[i].mLink;
+//				assert(i < kM6DiskCacheSize);
+//			}
+//			assert(i == ix);
+//		}
+//	}
+//	
+//	for (uint32 ix = 0; ix < kM6BucketCount; ++ix)
+//	{
+//		uint32 i = mBuckets[ix];
+//		while (i != kM6DiskCacheSize)
+//		{
+//			assert(hash_value(mCache[i]) % kM6BucketCount == ix);
+//			i = mCache[i].mLink;
+//		}
+//	}
+//}

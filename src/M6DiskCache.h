@@ -34,7 +34,6 @@ class M6DiskCache
 						~M6DiskCache();
 
 	void				PurgePage(uint32 inIndex);
-	void				Validate();
 
 	uint8*				mData;
 	M6DiskPageInfoPtr	mCache, mLRUHead, mLRUTail;

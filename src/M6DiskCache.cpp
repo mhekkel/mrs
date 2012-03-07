@@ -195,6 +195,8 @@ void* M6DiskCache::Load(M6File& inFile, int64 inOffset)
 #endif
 	}
 	
+	Validate();
+	
 	return result;
 }
 
@@ -206,6 +208,8 @@ void M6DiskCache::Reference(void* inPage)
 	if (index >= kM6DiskCacheSize)
 		THROW(("Invalid page for Reference"));
 	mCache[index].mRefCount += 1;
+
+	Validate();
 }
 
 void M6DiskCache::Touch(void *inPage)
@@ -216,6 +220,8 @@ void M6DiskCache::Touch(void *inPage)
 	if (index >= kM6DiskCacheSize)
 		THROW(("Invalid page for Reference"));
 	mCache[index].mDirty = true;
+
+	Validate();
 }
 
 void M6DiskCache::Release(void* inPage, bool inDirty)
@@ -238,6 +244,8 @@ void M6DiskCache::Release(void* inPage, bool inDirty)
 		assert(memcmp(data, inPage, kM6DiskPageSize) == 0);
 	}
 #endif
+
+	Validate();
 }
 
 void M6DiskCache::Swap(void* inPageA, void* inPageB)
@@ -292,6 +300,8 @@ void M6DiskCache::Swap(void* inPageA, void* inPageB)
 	mCache[indexA].mLink = mBuckets[bucketB];
 	mBuckets[bucketB] = indexA;
 	assert(hash_value(mCache[indexA]) % kM6BucketCount == bucketB);
+
+	Validate();
 }
 
 void M6DiskCache::Flush(M6File& inFile)
@@ -310,6 +320,8 @@ void M6DiskCache::Flush(M6File& inFile)
 			mCache[ix].mDirty = false;
 		}
 	}
+
+	Validate();
 }
 
 void M6DiskCache::Purge(M6File& inFile)
@@ -323,6 +335,8 @@ void M6DiskCache::Purge(M6File& inFile)
 		if (mCache[ix].mFileHandle == handle)
 			PurgePage(ix);
 	}
+
+	Validate();
 }
 
 void M6DiskCache::PurgePage(uint32 inPage)
@@ -376,5 +390,36 @@ void M6DiskCache::Truncate(M6File& inFile, int64 inSize)
 	{
 		if (mCache[ix].mFileHandle == handle and mCache[ix].mOffset >= inSize)
 			PurgePage(ix);
+	}
+
+	Validate();
+}
+
+void M6DiskCache::Validate()
+{
+	for (uint32 ix = 0; ix < kM6DiskCacheSize; ++ix)
+	{
+		if (mCache[ix].mFileHandle >= 0)
+		{
+			uint32 bucket = hash_value(mCache[ix]) % kM6BucketCount;
+			
+			uint32 i = mBuckets[bucket];
+			while (i != ix)
+			{
+				i = mCache[i].mLink;
+				assert(i < kM6DiskCacheSize);
+			}
+			assert(i == ix);
+		}
+	}
+	
+	for (uint32 ix = 0; ix < kM6BucketCount; ++ix)
+	{
+		uint32 i = mBuckets[ix];
+		while (i != kM6DiskCacheSize)
+		{
+			assert(hash_value(mCache[i]) % kM6BucketCount == ix);
+			i = mCache[i].mLink;
+		}
 	}
 }

@@ -19,7 +19,9 @@ class M6DiskCache
 	void*				Load(M6File& inFile, int64 inOffset);
 
 	void				Reference(void* inPage);
+	void				Touch(void* inPage);
 	void				Release(void* inPage, bool inDirty);
+
 	void				Swap(void* inPageA, void* inPageB);
 
 	void				Flush(M6File& inFile);
@@ -31,9 +33,11 @@ class M6DiskCache
 						M6DiskCache();
 						~M6DiskCache();
 
+	void				PurgePage(uint32 inIndex);
+
 	uint8*				mData;
 	M6DiskPageInfoPtr	mCache, mLRUHead, mLRUTail;
-	std::vector<uint32>*mBuckets;
+	uint32*				mBuckets;
 	boost::mutex		mMutex;
 };
 

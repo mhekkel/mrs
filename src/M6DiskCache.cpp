@@ -11,10 +11,10 @@
 using namespace std;
 
 const uint32
-	kM6DiskPageSize = 8192,
-//	kM6DiskPageSize = 512,
-	kM6DiskCacheSize = 65536,
-//	kM6DiskCacheSize = 128,
+//	kM6DiskPageSize = 8192,
+	kM6DiskPageSize = 512,
+//	kM6DiskCacheSize = 65536,
+	kM6DiskCacheSize = 128,
 	kM6BucketCount = 4 * kM6DiskCacheSize;
 
 // --------------------------------------------------------------------
@@ -58,8 +58,14 @@ struct M6DiskPageInfo
 	M6Handle		mFileHandle;
 	int64			mOffset;
 	uint32			mRefCount;
+	uint32			mLink;
 	bool			mDirty;
 };
+
+inline size_t hash_value(const M6DiskPageInfo& inInfo)
+{
+	return hash_value(inInfo.mFileHandle, inInfo.mOffset);
+}
 
 M6DiskCache& M6DiskCache::Instance()
 {
@@ -70,15 +76,17 @@ M6DiskCache& M6DiskCache::Instance()
 M6DiskCache::M6DiskCache()
 	: mData(new uint8[kM6DiskPageSize * kM6DiskCacheSize])
 	, mCache(new M6DiskPageInfo[kM6DiskCacheSize])
-	, mBuckets(new vector<uint32>[kM6BucketCount])
+	, mBuckets(new uint32[kM6BucketCount])
 {
 	for (uint32 ix = 0; ix < kM6DiskCacheSize; ++ix)
 	{
+		mCache[ix].mFileHandle = -1;
 		mCache[ix].mOffset = 0;
 		mCache[ix].mRefCount = 0;
 		mCache[ix].mDirty = false;
 		mCache[ix].mNext = mCache + ix + 1;
 		mCache[ix].mPrev = mCache + ix - 1;
+		mCache[ix].mLink = kM6DiskCacheSize;
 	}
 	
 	mCache[0].mPrev = nullptr;
@@ -86,6 +94,11 @@ M6DiskCache::M6DiskCache()
 	
 	mLRUHead = mCache;
 	mLRUTail = mCache + kM6DiskCacheSize - 1;
+	
+	fill(mBuckets, mBuckets + kM6BucketCount, kM6DiskCacheSize);
+#if DEBUG
+	memset(mData, 0xfd, kM6DiskCacheSize * kM6DiskPageSize);
+#endif
 	
 	// make sure our cache is never swapped out
 	lock_memory(mBuckets, sizeof(vector<uint32>) * kM6BucketCount);
@@ -110,30 +123,26 @@ M6DiskCache::~M6DiskCache()
 
 void* M6DiskCache::Load(M6File& inFile, int64 inOffset)
 {
-	assert(inOffset % kM6DiskPageSize == 0);
-
 	boost::mutex::scoped_lock lock(mMutex);
 	
+	assert(inOffset % kM6DiskPageSize == 0);
+
+	uint8* result = nullptr;
+
 	// Try to find the page in our cache
-	size_t bucket = hash_value(inFile.GetHandle(), inOffset);
-	bucket = bucket % kM6BucketCount;
-	
-	void* result = nullptr;
-	
-	if (not mBuckets[bucket].empty())
+	size_t bucket = hash_value(inFile.GetHandle(), inOffset) % kM6BucketCount;
+	uint32 index = mBuckets[bucket];
+	while (index < kM6DiskCacheSize)
 	{
-		foreach (uint32 index, mBuckets[bucket])
+		if (mCache[index].mFileHandle == inFile.GetHandle() and
+			mCache[index].mOffset == inOffset)
 		{
-			assert(index < kM6DiskCacheSize);
-			
-			if (mCache[index].mFileHandle == inFile.GetHandle() and
-				mCache[index].mOffset == inOffset)
-			{
-				result = mData + index * kM6DiskPageSize;
-				mCache[index].mRefCount += 1;
-				break;
-			}
+			result = mData + index * kM6DiskPageSize;
+			mCache[index].mRefCount += 1;
+			break;
 		}
+		
+		index = mCache[index].mLink;
 	}
 	
 	if (result == nullptr)
@@ -145,6 +154,7 @@ void* M6DiskCache::Load(M6File& inFile, int64 inOffset)
 			info = info->mPrev;
 	
 		// we could end up with a full cache, if so, PANIC!!!
+		// (of course, a panic is not really needed, there are better ways to handle this)
 		if (info == nullptr)
 			THROW(("Panic: disk cache full"));
 	
@@ -167,22 +177,22 @@ void* M6DiskCache::Load(M6File& inFile, int64 inOffset)
 		size_t index = info - mCache;
 		result = mData + index * kM6DiskPageSize;
 		
-		if (info->mDirty)
-		{
-			M6IO::pwrite(info->mFileHandle, result, kM6DiskPageSize, info->mOffset);
-			mBuckets[bucket].erase(
-				remove(mBuckets[bucket].begin(), mBuckets[bucket].end(), index),
-				mBuckets[bucket].end());
-		}
+		if (info->mFileHandle >= 0)
+			PurgePage(index);
 		
 		info->mFileHandle = inFile.GetHandle();
 		info->mOffset = inOffset;
 		info->mDirty = false;
 		info->mRefCount = 1;
+		info->mLink = mBuckets[bucket];
+		mBuckets[bucket] = index;
 		
 		M6IO::pread(info->mFileHandle, result, kM6DiskPageSize, info->mOffset);
 
-		mBuckets[bucket].push_back(index);
+#if DEBUG		
+		if (*result == 0 and inOffset < inFile.Size() - kM6DiskPageSize)
+			cout << "null?" << endl;
+#endif
 	}
 	
 	return result;
@@ -198,6 +208,16 @@ void M6DiskCache::Reference(void* inPage)
 	mCache[index].mRefCount += 1;
 }
 
+void M6DiskCache::Touch(void *inPage)
+{
+	boost::mutex::scoped_lock lock(mMutex);
+
+	size_t index = (static_cast<uint8*>(inPage) - mData) / kM6DiskPageSize;
+	if (index >= kM6DiskCacheSize)
+		THROW(("Invalid page for Reference"));
+	mCache[index].mDirty = true;
+}
+
 void M6DiskCache::Release(void* inPage, bool inDirty)
 {
 	boost::mutex::scoped_lock lock(mMutex);
@@ -209,6 +229,15 @@ void M6DiskCache::Release(void* inPage, bool inDirty)
 	mCache[index].mRefCount -= 1;
 	if (inDirty)
 		mCache[index].mDirty = true;
+#if DEBUG
+	else if (not mCache[index].mDirty)
+	{
+		// make sure it really isn't dirty
+		uint8 data[kM6DiskPageSize];
+		M6IO::pread(mCache[index].mFileHandle, data, kM6DiskPageSize, mCache[index].mOffset);
+		assert(memcmp(data, inPage, kM6DiskPageSize) == 0);
+	}
+#endif
 }
 
 void M6DiskCache::Swap(void* inPageA, void* inPageB)
@@ -218,28 +247,51 @@ void M6DiskCache::Swap(void* inPageA, void* inPageB)
 	size_t indexA = (static_cast<uint8*>(inPageA) - mData) / kM6DiskPageSize;
 	if (indexA >= kM6DiskCacheSize)
 		THROW(("Invalid page for Swap"));
+	size_t bucketA = hash_value(mCache[indexA]) % kM6BucketCount;
+	
+	if (mBuckets[bucketA] == indexA)
+		mBuckets[bucketA] = mCache[indexA].mLink;
+	else
+	{
+		uint32 ix = mBuckets[bucketA];
+		while (mCache[ix].mLink != indexA)
+		{
+			ix = mCache[ix].mLink;
+			assert(ix < kM6DiskCacheSize);
+		}
+		mCache[ix].mLink = mCache[indexA].mLink;
+	}
 
 	size_t indexB = (static_cast<uint8*>(inPageB) - mData) / kM6DiskPageSize;
 	if (indexB >= kM6DiskCacheSize)
 		THROW(("Invalid page for Swap"));
+	size_t bucketB = hash_value(mCache[indexB]) % kM6BucketCount;
 
-	size_t bucketA = hash_value(mCache[indexA].mFileHandle, mCache[indexA].mOffset);
-	bucketA %= kM6BucketCount;
-
-	size_t bucketB = hash_value(mCache[indexB].mFileHandle, mCache[indexB].mOffset);
-	bucketB %= kM6BucketCount;
+	if (mBuckets[bucketB] == indexB)
+		mBuckets[bucketB] = mCache[indexB].mLink;
+	else
+	{
+		uint32 ix = mBuckets[bucketB];
+		while (mCache[ix].mLink != indexB)
+		{
+			ix = mCache[ix].mLink;
+			assert(ix < kM6DiskCacheSize);
+		}
+		mCache[ix].mLink = mCache[indexB].mLink;
+	}
 
 	assert(mCache[indexA].mFileHandle == mCache[indexB].mFileHandle);
 	swap(mCache[indexA].mOffset, mCache[indexB].mOffset);
 	swap(mCache[indexA].mRefCount, mCache[indexB].mRefCount);
 	mCache[indexA].mDirty = mCache[indexB].mDirty = true;
+	
+	mCache[indexB].mLink = mBuckets[bucketA];
+	mBuckets[bucketA] = indexB;
+	assert(hash_value(mCache[indexB]) % kM6BucketCount == bucketA);
 
-	// swap bucket entries
-	mBuckets[bucketA].erase(remove(mBuckets[bucketA].begin(), mBuckets[bucketA].end(), indexA), mBuckets[bucketA].end());
-	mBuckets[bucketB].erase(remove(mBuckets[bucketB].begin(), mBuckets[bucketB].end(), indexB), mBuckets[bucketB].end());
-
-	mBuckets[bucketA].push_back(indexB);
-	mBuckets[bucketB].push_back(indexA);
+	mCache[indexA].mLink = mBuckets[bucketB];
+	mBuckets[bucketB] = indexA;
+	assert(hash_value(mCache[indexA]) % kM6BucketCount == bucketB);
 }
 
 void M6DiskCache::Flush(M6File& inFile)
@@ -252,7 +304,8 @@ void M6DiskCache::Flush(M6File& inFile)
 	{
 		if (mCache[ix].mDirty and mCache[ix].mFileHandle == handle)
 		{
-			void* page = mData + ix * kM6DiskPageSize;
+			uint8* page = mData + ix * kM6DiskPageSize;
+			assert(*page != 0);
 			M6IO::pwrite(mCache[ix].mFileHandle, page, kM6DiskPageSize, mCache[ix].mOffset);
 			mCache[ix].mDirty = false;
 		}
@@ -268,24 +321,49 @@ void M6DiskCache::Purge(M6File& inFile)
 	for (uint32 ix = 0; ix < kM6DiskCacheSize; ++ix)
 	{
 		if (mCache[ix].mFileHandle == handle)
-		{
-			if (mCache[ix].mDirty)
-			{
-				void* page = mData + ix * kM6DiskPageSize;
-				M6IO::pwrite(mCache[ix].mFileHandle, page, kM6DiskPageSize, mCache[ix].mOffset);
-			}
-			
-			size_t hash = hash_value(mCache[ix].mFileHandle, mCache[ix].mOffset);
-			size_t bucket = hash % kM6BucketCount;
-
-			mBuckets[bucket].erase(
-				remove(mBuckets[bucket].begin(), mBuckets[bucket].end(), ix),
-				mBuckets[bucket].end());
-
-			mCache[ix].mDirty = false;
-			mCache[ix].mFileHandle = -1;
-		}
+			PurgePage(ix);
 	}
+}
+
+void M6DiskCache::PurgePage(uint32 inPage)
+{
+	assert(mCache[inPage].mFileHandle >= 0);
+	assert(mCache[inPage].mRefCount == 0);
+
+	if (mCache[inPage].mDirty)
+	{
+		uint8* page = mData + inPage * kM6DiskPageSize;
+		assert(*page != 0);
+		M6IO::pwrite(mCache[inPage].mFileHandle, page, kM6DiskPageSize, mCache[inPage].mOffset);
+#if DEBUG
+		memset(page, 0xfe, kM6DiskPageSize);
+#endif
+	}
+	
+	size_t bucket = hash_value(mCache[inPage]) % kM6BucketCount;
+	uint32 index = mBuckets[bucket];
+	assert(index < kM6DiskCacheSize);
+	uint32 next = mCache[index].mLink;
+	
+	if (index == inPage)
+		mBuckets[bucket] = next;
+	else
+	{
+		while (next != inPage and next != kM6DiskCacheSize)
+		{
+			index = next;
+			next = mCache[index].mLink;
+		}
+		
+		assert(next == inPage);
+		mCache[index].mLink = mCache[next].mLink;
+	}
+	
+	mCache[inPage].mFileHandle = -1;
+	mCache[inPage].mOffset = 0;
+	mCache[inPage].mDirty = false;
+	mCache[inPage].mRefCount = 0;
+	mCache[inPage].mLink = kM6DiskCacheSize;
 }
 
 void M6DiskCache::Truncate(M6File& inFile, int64 inSize)
@@ -297,16 +375,6 @@ void M6DiskCache::Truncate(M6File& inFile, int64 inSize)
 	for (uint32 ix = 0; ix < kM6DiskCacheSize; ++ix)
 	{
 		if (mCache[ix].mFileHandle == handle and mCache[ix].mOffset >= inSize)
-		{
-			size_t hash = hash_value(mCache[ix].mFileHandle, mCache[ix].mOffset);
-			size_t bucket = hash % kM6BucketCount;
-
-			mBuckets[bucket].erase(
-				remove(mBuckets[bucket].begin(), mBuckets[bucket].end(), ix),
-				mBuckets[bucket].end());
-
-			mCache[ix].mDirty = false;
-			mCache[ix].mFileHandle = -1;
-		}
+			PurgePage(ix);
 	}
 }

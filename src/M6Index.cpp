@@ -63,21 +63,21 @@ struct M6IndexPageHeader
 	uint32			mLink;
 };
 
-//#if DEBUG
-//
-//const int64
-////	kM6IndexPageSize		= 8192,
-//	kM6IndexPageSize		= 512,
-//	kM6IndexPageHeaderSize	= sizeof(M6IndexPageHeader),
-//	kM6KeySpace				= kM6IndexPageSize - kM6IndexPageHeaderSize,
-//	kM6MinKeySpace			= kM6KeySpace / 2,
-//	kM6MaxEntriesPerPage	= 4;
-////	kM6MaxEntriesPerPage	= kM6KeySpace / 8;	// see above
-//
-//const uint32
-//	kM6MaxKeyLength			= (kM6MinKeySpace / 2 > 255 ? 255 : kM6MinKeySpace / 2);
-//
-//#else
+#if DEBUG
+
+const int64
+//	kM6IndexPageSize		= 8192,
+	kM6IndexPageSize		= 512,
+	kM6IndexPageHeaderSize	= sizeof(M6IndexPageHeader),
+	kM6KeySpace				= kM6IndexPageSize - kM6IndexPageHeaderSize,
+	kM6MinKeySpace			= kM6KeySpace / 2,
+	kM6MaxEntriesPerPage	= 4;
+//	kM6MaxEntriesPerPage	= kM6KeySpace / 8;	// see above
+
+const uint32
+	kM6MaxKeyLength			= (kM6MinKeySpace / 2 > 255 ? 255 : kM6MinKeySpace / 2);
+
+#else
 
 const int64
 	kM6IndexPageSize		= 8192,
@@ -89,7 +89,7 @@ const int64
 const uint32
 	kM6MaxKeyLength			= (kM6MinKeySpace / 2 > 255 ? 255 : kM6MinKeySpace / 2);
 
-//#endif
+#endif
 
 template<M6IndexPageKind>
 struct M6IndexPageDataTraits {};
@@ -586,7 +586,7 @@ class M6BasicPage
 	void			SetPageNr(uint32 inPageNr)		{ mPageNr = inPageNr; SetDirty(true); }
 
 	virtual bool	IsDirty() const					{ return mDirty; }
-	virtual void	SetDirty(bool inDirty)			{ mDirty = inDirty; }
+	virtual void	SetDirty(bool inDirty)			{ mDirty = inDirty; M6DiskCache::Instance().Touch(mData); }
 
 	uint32			GetN() const					{ return mData->mN; }
 	void			SetLink(uint32 inLink)			{ mData->mLink = inLink; SetDirty(true); }
@@ -2314,7 +2314,7 @@ void M6IndexImplT<M6DataType>::Vacuum(M6Progress& inProgress)
 	}
 	
 	FlushCache();
-	mFile.Truncate(n * kM6IndexPageSize);
+//	mFile.Truncate(n * kM6IndexPageSize);
 	M6DiskCache::Instance().Truncate(mFile, n * kM6IndexPageSize);
 	CreateUpLevels(up);
 	Commit();

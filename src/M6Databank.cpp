@@ -1533,7 +1533,7 @@ void M6DatabankImpl::CommitBatchImport()
 	// And clean up
 	fs::remove_all(mDbDirectory / "tmp");
 
-//	Vacuum();
+	Vacuum();
 	RecalculateDocumentWeights();
 }
 

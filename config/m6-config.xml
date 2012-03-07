@@ -237,13 +237,23 @@
 		</match>
 	</parser>
 	
-	<parser id="mediawiki" type="sax" docxpath="/mediawiki/page">
-		<match xpath="title">
-			<index name="title" />
+<!--	<parser id="mediawiki" type="sax" docxpath="/mediawiki/page">-->
+<!--		<match xpath="title">-->
+<!--			<index name="title" />-->
+<!--		</match>-->
+<!--		<match xpath="text">-->
+<!--			<preprocess plugin="mediawiki"/>-->
+<!--			<index name="text" />-->
+<!--		</match>-->
+<!--	</parser>-->
+
+	<parser id="mediawiki">
+		<match regex="&lt;title&gt;(.+)&lt;/title&gt;" capture="1">
+			<index name="title" type="string"/>
+			<attr name="title"/>
 		</match>
-		<match xpath="text">
-			<preprocess plugin="mediawiki"/>
-			<index name="text" />
+		<match regex="&lt;text.+?&gt;((?:.|\n)+)&lt;/text&gt;" capture="1">
+			<index name="text"/>
 		</match>
 	</parser>
 	
@@ -323,6 +333,9 @@
 		<name>Wikipedia - Nederlandstalig</name>
 		<file>/data/mrs/nlwiki.m6</file>
 		<source type="path">/data/raw/nlwiki/nlwiki-latest-pages-articles.xml.bz2</source>
+
+		<document-separator type="first-line-equals">  &lt;page&gt;</document-separator>
+		<document-separator type="last-line-equals">  &lt;/page&gt;</document-separator>
 	</databank>
 	
 </m6-config>

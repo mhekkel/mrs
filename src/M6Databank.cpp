@@ -173,11 +173,14 @@ class M6FullTextIx
 
 	void			FlushEntryRuns();
 	
+	static const uint32 kM6LargeBitBufferSize = 65536;
+	
 	struct M6BufferEntryIterator
 	{
 						M6BufferEntryIterator(M6File& inFile, int64 inOffset, uint32 inCount,
 							uint32 inFirstDoc, uint32 inIDLIxMap)
-							: mBits(inFile, inOffset), mCount(inCount), mFirstDoc(inFirstDoc), mIDLIxMap(inIDLIxMap)
+							: mBits(inFile, inOffset, kM6LargeBitBufferSize)
+							, mCount(inCount), mFirstDoc(inFirstDoc), mIDLIxMap(inIDLIxMap)
 							, mTerm(1), mDoc(inFirstDoc) {}
 		
 		bool			Next();
@@ -334,6 +337,7 @@ void M6FullTextIx::FlushEntryRuns()
 		if (run == nullptr)
 			break;
 		
+		int64 offset = mEntryBuffer.Size();
 		M6OBitStream bits(mEntryBuffer);
 		
 		M6BufferEntry* entries = run->mEntries;
@@ -343,10 +347,6 @@ void M6FullTextIx::FlushEntryRuns()
 		uint32 firstDoc = entries[0].doc;	// the first doc in this run
 		uint32 d = firstDoc;
 		int32 ix = -1;
-		
-		// create an iterator now that we have all the info
-		mEntryQueue.push_back(new M6BufferEntryIterator(mEntryBuffer, mEntryBuffer.Size(),
-			count, firstDoc, mDocLocationIxMap));
 		
 		stable_sort(entries, entries + count);
 	
@@ -371,6 +371,10 @@ void M6FullTextIx::FlushEntryRuns()
 		}
 		
 		bits.Sync();
+
+		// create an iterator now that we have all the info
+		mEntryQueue.push_back(new M6BufferEntryIterator(mEntryBuffer, offset,
+			count, firstDoc, mDocLocationIxMap));
 
 		delete run;
 	}

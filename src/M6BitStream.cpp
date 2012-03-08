@@ -11,12 +11,6 @@
 using namespace std;
 
 // --------------------------------------------------------------------
-//	constants
-
-const uint32
-	kBitBufferSize = 1024;
-
-// --------------------------------------------------------------------
 //	M6OBitStream
 
 struct M6OBitStreamFileImpl : public M6OBitStreamImpl
@@ -273,27 +267,32 @@ size_t M6OBitStream::Size() const
 
 struct M6IBitStreamFileImpl : public M6IBitStreamImpl
 {
-					M6IBitStreamFileImpl(M6File& inData, int64 inOffset);
+					M6IBitStreamFileImpl(M6File& inData, int64 inOffset, uint32 inBitBufferSize);
 					M6IBitStreamFileImpl(const M6IBitStreamFileImpl& inImpl);
 
 	virtual void	Read();
 
 	virtual M6IBitStreamImpl*
-					Clone()					{ return new M6IBitStreamFileImpl(*this); }
+					Clone()					{ return new (mBitBufferSize) M6IBitStreamFileImpl(*this); }
+
+	void*			operator new(size_t inSize, uint32 inBitBufferSize);
+	void			operator delete(void* inPtr, uint32);
 
 	M6File&			mData;
 	int64			mOffset;
-	char			mDataBuffer[kBitBufferSize];
+	uint32			mBitBufferSize;
+	char			mDataBuffer[1];
 };
 
-M6IBitStreamFileImpl::M6IBitStreamFileImpl(M6File& inData, int64 inOffset)
+M6IBitStreamFileImpl::M6IBitStreamFileImpl(M6File& inData, int64 inOffset, uint32 inBitBufferSize)
 	: mData(inData)
 	, mOffset(inOffset)
+	, mBitBufferSize(inBitBufferSize)
 {
 }
 
 M6IBitStreamFileImpl::M6IBitStreamFileImpl(const M6IBitStreamFileImpl& inImpl)
-	: M6IBitStreamImpl(inImpl), mData(inImpl.mData), mOffset(inImpl.mOffset)
+	: M6IBitStreamImpl(inImpl), mData(inImpl.mData), mOffset(inImpl.mOffset), mBitBufferSize(inImpl.mBitBufferSize)
 {
 	memcpy(mDataBuffer, inImpl.mBufferPtr, mBufferSize);
 	mBufferPtr = reinterpret_cast<uint8*>(mDataBuffer);
@@ -301,7 +300,7 @@ M6IBitStreamFileImpl::M6IBitStreamFileImpl(const M6IBitStreamFileImpl& inImpl)
 
 void M6IBitStreamFileImpl::Read()
 {
-	mBufferSize = kBitBufferSize;
+	mBufferSize = mBitBufferSize;
 
 	if (mBufferSize > mData.Size() - mOffset)
 		mBufferSize = mData.Size() - mOffset;
@@ -309,6 +308,16 @@ void M6IBitStreamFileImpl::Read()
 	mData.PRead(mDataBuffer, mBufferSize, mOffset);
 	mOffset += mBufferSize;
 	mBufferPtr = reinterpret_cast<uint8*>(mDataBuffer);
+}
+
+void* M6IBitStreamFileImpl::operator new(size_t inSize, uint32 inBitBufferSize)
+{
+	return ::malloc(inSize + inBitBufferSize);
+}
+
+void M6IBitStreamFileImpl::operator delete(void* inPtr, uint32)
+{
+	::free(inPtr);
 }
 
 // --------------------------------------------------------------------
@@ -365,8 +374,8 @@ M6IBitStream::M6IBitStream(M6IBitStreamImpl* inImpl)
 	mImpl->Get(mByte);
 }
 
-M6IBitStream::M6IBitStream(M6File& inData, int64 inOffset)
-	: mImpl(new M6IBitStreamFileImpl(inData, inOffset))
+M6IBitStream::M6IBitStream(M6File& inData, int64 inOffset, uint32 inBitBufferSize)
+	: mImpl(new (inBitBufferSize) M6IBitStreamFileImpl(inData, inOffset, inBitBufferSize))
 	, mBitOffset(7)
 {
 	mImpl->Get(mByte);

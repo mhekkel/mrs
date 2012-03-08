@@ -104,12 +104,15 @@ struct M6IBitStreamImpl
 	int64			mBufferSize;
 };
 
+const uint32
+	kM6DefaultBitBufferSize = 1024;
+
 class M6IBitStream
 {
   public:
 						M6IBitStream();
 						M6IBitStream(M6IBitStreamImpl* inImpl);
-						M6IBitStream(M6File& inFile, int64 inOffset);
+						M6IBitStream(M6File& inFile, int64 inOffset, uint32 inBitBufferSize = kM6DefaultBitBufferSize);
 						M6IBitStream(const M6IBitStream& inBits);
 	explicit			M6IBitStream(const M6OBitStream& inBits);
 	M6IBitStream&		operator=(const M6IBitStream& inStream);

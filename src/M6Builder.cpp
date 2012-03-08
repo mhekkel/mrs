@@ -26,8 +26,6 @@
 #include <boost/pool/pool.hpp>
 #include <boost/thread/tss.hpp>
 
-#include <zeep/xml/parser.hpp>
-
 #include "M6DocStore.h"
 #include "M6Error.h"
 #include "M6Databank.h"
@@ -63,17 +61,6 @@ struct M6Expr;
 typedef shared_ptr<M6Expr>	M6ExprPtr;
 typedef list<M6ExprPtr>		M6ExprList;
 
-struct M6XMLExpr;
-typedef shared_ptr<M6XMLExpr>	M6XMLExprPtr;
-typedef list<M6XMLExprPtr>		M6XMLExprList;
-
-struct M6XMLContext
-{
-	M6InputDocument*	document;
-	string				text;
-	M6XMLExprPtr		handler;
-};
-
 // --------------------------------------------------------------------
 
 class M6Processor
@@ -105,25 +92,13 @@ class M6Processor
 							ProcessDocument(inDoc);
 					}
 
-	// XML parsers
-	
-	void			ProcessXML(istream& inFileStream);
-	void			StartElement(const string& name, const string& uri,
-						const zx::parser::attr_list_type& atts);
-	void			EndElement(const string& name, const string& uri);
-	void			CharacterData(const string& data);
-	
-	stack<M6XMLContext>
-					mXMLContextStack;
-	
 	M6Databank&		mDatabank;
 	M6Lexicon&		mLexicon;
 	zx::element*	mConfig;
 	M6ExprPtr		mScript;
-	M6XMLExprPtr	mXMLScript;
 	M6FileQueue		mFileQueue;
 	M6DocQueue		mDocQueue;
-	bool			mUseDocQueue, mIsXMLParser;
+	bool			mUseDocQueue;
 };
 
 // --------------------------------------------------------------------
@@ -594,69 +569,6 @@ struct M6StopExpr : public M6Expr
 };
 
 // --------------------------------------------------------------------
-//	XML expressions
-
-struct M6XMLExpr
-{
-	typedef map<string,M6XMLExprPtr>	M6XMLExprMap;
-
-							~M6XMLExpr() {}
-
-	virtual M6XMLExprPtr	Start(M6XMLContext& context, const string& name,
-								const string& uri, const zx::parser::attr_list_type& atts)
-							{
-								return mHandlers[name];
-							}
-
-	virtual void			End(M6XMLContext& context, const string& name, const string& uri) {}
-	virtual void			CharacterData(M6XMLContext& context, const string& data) {}
-	
-	M6XMLExprMap			mHandlers;
-};
-
-struct M6XMLDocumentExpr : public M6XMLExpr
-{
-					M6XMLDocumentExpr(M6Databank& inDatabank) : mDatabank(inDatabank) {}
-
-	virtual void	End(M6XMLContext& context, const string& name, const string& uri)
-					{
-						context.document->SetText(context.text);
-						mDatabank.Store(context.document);
-					}
-					
-	virtual void	CharacterData(M6XMLContext& context, const string& data)
-					{
-						if (context.document == nullptr)
-							context.document = new M6InputDocument(mDatabank);
-						context.text += data;
-					}
-	
-	M6Databank&		mDatabank;
-};
-
-struct M6XMLIndexExpr : public M6XMLExpr
-{
-					M6XMLIndexExpr(const string& inName, M6DataType inType, bool inUnique)
-						: mName(inName), mType(inType), mUnique(inUnique) {}
-
-	virtual void	End(M6XMLContext& context, const string& name, const string& uri)
-					{
-						assert(context.document);
-						context.document->Index(mName, mType, mUnique,
-							context.text.c_str(), context.text.length());
-					}
-					
-	virtual void	CharacterData(M6XMLContext& context, const string& data)
-					{
-						context.text += data;
-					}
-	
-	string			mName;
-	M6DataType		mType;
-	bool			mUnique;
-};
-
-// --------------------------------------------------------------------
 
 M6Processor::M6Processor(M6Databank& inDatabank, M6Lexicon& inLexicon,
 		zx::element* inTemplate)
@@ -667,35 +579,7 @@ M6Processor::M6Processor(M6Databank& inDatabank, M6Lexicon& inLexicon,
 		THROW(("Missing parser attribute"));
 	
 	zx::element* script = M6Config::Instance().LoadParser(parser);
-	if (script == nullptr)
-		THROW(("Missing script"));
-
-	if (script->get_attribute("type") == "sax")
-	{
-		M6XMLExprPtr expr(new M6XMLExpr);
-		mXMLScript = expr;
-		
-		string docxpath = script->get_attribute("docxpath");
-		if (docxpath.empty())
-			THROW(("Empty docxpath"));
-
-		string::size_type i = docxpath.find('/');
-		if (i == string::npos)
-			THROW(("no / in docxpath"));
-		
-		string::size_type j;
-		while ((j = docxpath.find('/', i + 1)) != string::npos)
-		{
-			string name(docxpath.substr(i + 1, j - i - 1));
-			M6XMLExprPtr next(new M6XMLExpr);
-			expr->mHandlers[name] = next;
-			expr = next;
-			i = j;
-		}
-		
-		expr->mHandlers[docxpath.substr(i + 1)] = M6XMLExprPtr(new M6XMLDocumentExpr(inDatabank));
-	}
-	else
+	if (script != nullptr)
 		mScript = ParseScript(script);
 }
 
@@ -883,12 +767,7 @@ void M6Processor::ProcessFile(M6Progress& inProgress)
 		
 		M6DataSource data(path, inProgress);
 		for (M6DataSource::iterator i = data.begin(); i != data.end(); ++i)
-		{
-			if (mXMLScript)
-				ProcessXML(i->mStream);
-			else
-				ProcessFile(i->mFilename, i->mStream);
-		}
+			ProcessFile(i->mFilename, i->mStream);
 	}
 	
 	mFileQueue.Put(fs::path());
@@ -924,9 +803,6 @@ void M6Processor::Process(vector<fs::path>& inFiles, M6Progress& inProgress)
 	uint32 nrOfThreads = boost::thread::hardware_concurrency();
 	if (nrOfThreads > 4)
 		nrOfThreads -= 1;
-
-	if (mXMLScript)
-		nrOfThreads = 1;
 	
 	boost::thread_group fileThreads, docThreads;
 	
@@ -943,12 +819,7 @@ void M6Processor::Process(vector<fs::path>& inFiles, M6Progress& inProgress)
 	{
 		M6DataSource data(inFiles.front(), inProgress);
 		for (M6DataSource::iterator i = data.begin(); i != data.end(); ++i)
-		{
-			if (mXMLScript)
-				ProcessXML(i->mStream);
-			else
-				ProcessFile(i->mFilename, i->mStream);
-		}
+			ProcessFile(i->mFilename, i->mStream);
 	}
 	else
 	{
@@ -978,47 +849,6 @@ void M6Processor::Process(vector<fs::path>& inFiles, M6Progress& inProgress)
 		mDocQueue.Put(string());
 		docThreads.join_all();
 	}
-}
-
-// XML processor
-
-void M6Processor::ProcessXML(istream& inFileStream)
-{
-	zx::parser parser(inFileStream);
-	parser.start_element_handler = boost::bind(&M6Processor::StartElement, this, _1, _2, _3);
-	parser.end_element_handler = boost::bind(&M6Processor::EndElement, this, _1, _2);
-	parser.character_data_handler = boost::bind(&M6Processor::CharacterData, this, _1);
-	
-	M6XMLContext context = { nullptr, "", mXMLScript };
-	mXMLContextStack.push(context);
-	
-	parser.parse(false);
-}
-
-void M6Processor::StartElement(const string& name, const string& uri, const zx::parser::attr_list_type& atts)
-{
-	assert(mXMLScript);
-	
-	const M6XMLContext& current(mXMLContextStack.top());
-	M6XMLContext context = { current.document };
-	if (current.handler)
-		context.handler = current.handler->Start(context, name, uri, atts);
-	mXMLContextStack.push(context);
-}
-
-void M6Processor::EndElement(const string& name, const string& uri)
-{
-	M6XMLContext& context(mXMLContextStack.top());
-	if (context.handler)
-		context.handler->End(context, name, uri);
-	mXMLContextStack.pop();
-}
-
-void M6Processor::CharacterData(const string& data)
-{
-	M6XMLContext& context(mXMLContextStack.top());
-	if (context.handler)
-		context.handler->CharacterData(context, data);
 }
 
 // --------------------------------------------------------------------

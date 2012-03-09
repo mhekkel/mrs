@@ -15,6 +15,7 @@
 #include "M6Iterator.h"
 #include "M6Document.h"
 #include "M6Config.h"
+#include "M6Query.h"
 
 using namespace std;
 namespace fs = boost::filesystem;
@@ -272,7 +273,15 @@ void M6Server::handle_search(const zh::request& request,
 			databank["id"] = db.mID;
 			databank["name"] = db.mName;
 			
-			unique_ptr<M6Iterator> rset(db.mDatabank->Find(q, true, maxresultcount));
+			unique_ptr<M6Iterator> rset;
+			
+			M6Iterator* filter;
+			ParseQuery(*db.mDatabank, q, true, queryTerms, filter);
+			if (queryTerms.empty())
+				rset.reset(filter);
+			else
+				rset.reset(db.mDatabank->Find(queryTerms, filter, true, maxresultcount));
+
 			if (not rset)
 				continue;
 			
@@ -349,7 +358,17 @@ void M6Server::handle_search(const zh::request& request,
 			resultoffset = (page - 1) * maxresultcount;
 		
 		M6Databank* mdb = Load(db);
-		unique_ptr<M6Iterator> rset(mdb->Find(q, true, page * maxresultcount));
+
+		M6Iterator* filter;
+		ParseQuery(*mdb, q, true, queryTerms, filter);
+
+		unique_ptr<M6Iterator> rset;
+		if (queryTerms.empty())
+			rset.reset(filter);
+		else
+			rset.reset(mdb->Find(queryTerms, filter, true, maxresultcount));
+
+//		unique_ptr<M6Iterator> rset(mdb->Find(q, true, page * maxresultcount));
 		if (not rset)
 		{
 			rset.reset(mdb->Find(q, false, page * maxresultcount));
@@ -411,52 +430,52 @@ void M6Server::handle_search(const zh::request& request,
 		create_redirect(firstDb, firstDocNr, q, true, request, reply);
 	else
 	{
-//		// add some spelling suggestions
-//		sort(queryTerms.begin(), queryTerms.end());
-//		queryTerms.erase(unique(queryTerms.begin(), queryTerms.end()), queryTerms.end());
-//		
-//		if (not queryTerms.empty())
-//		{
-//			vector<el::object> suggestions;
-//			
-//			foreach (string& term, queryTerms)
-//			{
-//				try
-//				{
-//					boost::regex re(string("\\b") + term + "\\b");
-//	
-//					vector<string> s;
-//					SpellCheck(db, term, s);
-//					
-//					vector<el::object> alternatives;
-//					foreach (string& at, s)
-//					{
-//						el::object alt;
-//						alt["term"] = at;
-//	
-//						// construct new query, with the term replaced by the alternative
-//						ostringstream t;
-//						ostream_iterator<char, char> oi(t);
-//						boost::regex_replace(oi, q.begin(), q.end(), re, at,
-//							boost::match_default | boost::format_all);
-//	
-//						alt["q"] = t.str();
-//						alternatives.push_back(alt);
-//					}
-//					
-//					el::object so;
-//					so["term"] = term;
-//					so["alternatives"] = alternatives;
-//					
-//					suggestions.push_back(so);
-//				}
-//				catch (...) {}	// silently ignore errors
-//			}
-//				
-//			if (not suggestions.empty())
-//				sub.put("suggestions", el::object(suggestions));
-//		}
-//
+		// add some spelling suggestions
+		sort(queryTerms.begin(), queryTerms.end());
+		queryTerms.erase(unique(queryTerms.begin(), queryTerms.end()), queryTerms.end());
+		
+		if (not queryTerms.empty())
+		{
+			vector<el::object> suggestions;
+			
+			foreach (string& term, queryTerms)
+			{
+				try
+				{
+					boost::regex re(string("\\b") + term + "\\b");
+	
+					vector<string> s;
+					SpellCheck(db, term, s);
+					
+					vector<el::object> alternatives;
+					foreach (string& at, s)
+					{
+						el::object alt;
+						alt["term"] = at;
+	
+						// construct new query, with the term replaced by the alternative
+						ostringstream t;
+						ostream_iterator<char, char> oi(t);
+						boost::regex_replace(oi, q.begin(), q.end(), re, at,
+							boost::match_default | boost::format_all);
+	
+						alt["q"] = t.str();
+						alternatives.push_back(alt);
+					}
+					
+					el::object so;
+					so["term"] = term;
+					so["alternatives"] = alternatives;
+					
+					suggestions.push_back(so);
+				}
+				catch (...) {}	// silently ignore errors
+			}
+				
+			if (not suggestions.empty())
+				sub.put("suggestions", el::object(suggestions));
+		}
+
 		create_reply_from_template(db == "all" ? "results-for-all.html" : "results.html",
 			sub, reply);
 	}
@@ -745,3 +764,16 @@ M6Databank* M6Server::Load(const std::string& inDatabank)
 	
 	return result;
 }
+
+void M6Server::SpellCheck(const string& inDatabank, const string& inTerm,
+	vector<string>& outSuggestions)
+{
+	if (inDatabank == "all")
+		;
+	else
+	{
+		M6Databank* db = Load(inDatabank);
+		db->SuggestCorrection(inTerm, outSuggestions);
+	}
+}
+

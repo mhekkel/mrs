@@ -38,6 +38,9 @@ class M6Server : public zeep::http::webapp
 	void			LoadAllDatabanks();
 	M6Databank*		Load(const std::string& inDatabank);
 	
+	void			SpellCheck(const std::string& inDatabank, const std::string& inTerm,
+						std::vector<std::string>& outSuggestions);
+	
 	struct M6LoadedDatabank
 	{
 		M6Databank*	mDatabank;

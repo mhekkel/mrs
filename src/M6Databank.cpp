@@ -19,6 +19,7 @@
 #include "M6Queue.h"
 #include "M6Query.h"
 #include "M6Iterator.h"
+#include "M6Dictionary.h"
 
 using namespace std;
 namespace fs = boost::filesystem;
@@ -53,9 +54,14 @@ class M6DatabankImpl
 	void			Store(M6Document* inDocument);
 	M6Document*		Fetch(uint32 inDocNr);
 	M6Iterator*		Find(const string& inQuery, bool inAllTermsRequired, uint32 inReportLimit);
+	M6Iterator*		Find(const vector<string>& inQueryTerms,
+						M6Iterator* inFilter, bool inAllTermsRequired, uint32 inReportLimit);
 	M6Iterator*		Find(const string& inIndex, const string& inTerm,
 						bool inTermIsPattern);
 	M6Iterator*		FindString(const string& inIndex, const string& inString);
+
+	void			SuggestCorrection(const string& inWord, vector<string>& outCorrections);
+	void			SuggestSearchTerms(const string& inWord, vector<string>& outSearchTerms);
 	
 	M6DocStore&		GetDocStore()						{ return *mStore; }
 	
@@ -67,6 +73,7 @@ class M6DatabankImpl
 	fs::path		GetScratchDir() const				{ return mDbDirectory / "tmp"; }
 
 	void			RecalculateDocumentWeights();
+	void			CreateDictionary();
 	void			Vacuum();
 
 	void			Validate();
@@ -92,6 +99,7 @@ class M6DatabankImpl
 	fs::path				mDbDirectory;
 	MOpenMode				mMode;
 	M6DocStore*				mStore;
+	M6Dictionary*			mDictionary;
 	M6BatchIndexProcessor*	mBatch;
 	M6IndexDescList			mIndices;
 	M6BasicIndexPtr			mAllTextIndex;
@@ -1123,6 +1131,7 @@ M6DatabankImpl::M6DatabankImpl(M6Databank& inDatabank, const fs::path& inPath, M
 	, mDbDirectory(inPath)
 	, mMode(inMode)
 	, mStore(nullptr)
+	, mDictionary(nullptr)
 	, mBatch(nullptr)
 {
 	if (not fs::exists(mDbDirectory) and inMode == eReadWrite)
@@ -1229,6 +1238,7 @@ M6BasicIndexPtr M6DatabankImpl::CreateIndex(const string& inName, M6IndexType in
 //			case eM6DateIndex:			result.reset(new M6SimpleMultiIndex(path, mMode)); break;
 			case eM6NumberMultiIndex:	result.reset(new M6NumberMultiIndex(path, mMode)); break;
 			case eM6CharMultiIDLIndex:	result.reset(new M6SimpleIDLMultiIndex(path, mMode)); break;
+			case eM6CharWeightedIndex:	result.reset(new M6SimpleWeightedIndex(path, mMode)); break;
 			default:					THROW(("unsupported"));
 		}
 
@@ -1395,104 +1405,107 @@ M6Iterator* M6DatabankImpl::Find(const string& inQuery, bool inAllTermsRequired,
 	if (terms.empty())
 		result = filter;
 	else
-	{
-	//	uint32 docCount = mStore->size();
-		uint32 maxDocNr = mStore->NextDocumentNumber();
-		float maxD = static_cast<float>(maxDocNr);
+		result = Find(terms, filter, inAllTermsRequired, inReportLimit);
+
+	return result;
+}
+
+M6Iterator* M6DatabankImpl::Find(const vector<string>& inQueryTerms,
+	M6Iterator* inFilter, bool inAllTermsRequired, uint32 inReportLimit)
+{
+	uint32 maxDocNr = mStore->NextDocumentNumber();
+	float maxD = static_cast<float>(maxDocNr);
+
+	float queryWeight = 0, Smax = 0;
+	M6Accumulator A(maxDocNr);
 	
-		float queryWeight = 0, Smax = 0;
-		M6Accumulator A(maxDocNr);
-		
-		foreach (string& term, terms)
+	foreach (const string& term, inQueryTerms)
+	{
+		M6WeightedBasicIndex::M6WeightedIterator iter;
+		if (static_cast<M6WeightedBasicIndex*>(mAllTextIndex.get())->Find(term, iter))
 		{
-			M6WeightedBasicIndex::M6WeightedIterator iter;
-			if (static_cast<M6WeightedBasicIndex*>(mAllTextIndex.get())->Find(term, iter))
-			{
-				uint8 termWeight = 1;	// ?
-			
-				const float c_add = 0.007f;
-				const float c_ins = 0.12f;
+			uint8 termWeight = 1;	// ?
 		
-				float s_add = c_add * Smax;
-				float s_ins = c_ins * Smax;
-				
-				float idf = log(1.f + maxD / iter.Size());
-				float wq = idf * termWeight;
-				queryWeight += wq * wq;
-				
-				uint8 f_add = static_cast<uint8>(s_add / (idf * wq * wq));
-				uint8 f_ins = static_cast<uint8>(s_ins / (idf * wq * wq));
-				
-				uint32 docNr;
-				uint8 weight;
-				while (iter.Next(docNr, weight) and weight >= f_add)
+			const float c_add = 0.007f;
+			const float c_ins = 0.12f;
+	
+			float s_add = c_add * Smax;
+			float s_ins = c_ins * Smax;
+			
+			float idf = log(1.f + maxD / iter.Size());
+			float wq = idf * termWeight;
+			queryWeight += wq * wq;
+			
+			uint8 f_add = static_cast<uint8>(s_add / (idf * wq * wq));
+			uint8 f_ins = static_cast<uint8>(s_ins / (idf * wq * wq));
+			
+			uint32 docNr;
+			uint8 weight;
+			while (iter.Next(docNr, weight) and weight >= f_add)
+			{
+				if (weight >= f_ins or A[docNr] != 0)
 				{
-					if (weight >= f_ins or A[docNr] != 0)
-					{
-						float wd = weight;
-						float sd = idf * wd * wq;
-						
-						float S = A.Add(docNr, sd);
-						if (Smax < S)
-							Smax = S;
-					}
+					float wd = weight;
+					float sd = idf * wd * wq;
+					
+					float S = A.Add(docNr, sd);
+					if (Smax < S)
+						Smax = S;
 				}
 			}
 		}
-			
-		queryWeight = sqrt(queryWeight);
+	}
 		
-		vector<uint32> docs;
-		size_t termCount = terms.size();
-		if (not inAllTermsRequired)
-			termCount = 0;
-		A.Collect(docs, termCount);
-		
-		if (filter != nullptr)
-		{
-			sort(docs.begin(), docs.end());
-			M6Iterator::Intersect(docs, filter);
-		}
-		
-		auto compare = [](const pair<uint32,float>& a, const pair<uint32,float>& b) -> bool
-							{ return a.second > b.second; };
-		
-		vector<pair<uint32,float>> best;
-		
-		uint32 count = A.GetHitCount();
-		if (count > inReportLimit)
-			best.reserve(inReportLimit);
-		else
-			best.reserve(count);
-		
-		foreach (uint32 doc, docs)
-		{
-			float docWeight = mDocWeights[doc];
-			float rank = A[doc] / (docWeight * queryWeight);
-			
-			if (best.size() < inReportLimit)
-			{
-				best.push_back(make_pair(doc, rank));
-				push_heap(best.begin(), best.end(), compare);
-			}
-			else if (best.front().second < rank)
-			{
-				pop_heap(best.begin(), best.end(), compare);
-				best.back() = make_pair(doc, rank);
-				push_heap(best.begin(), best.end(), compare);
-			}
-		}
-		
-		sort_heap(best.begin(), best.end(), compare);
-
-		if (best.size() < inReportLimit)
-			count = static_cast<uint32>(best.size());
-
-		result = new M6VectorIterator(best);
-		
-		result->SetCount(count);
+	queryWeight = sqrt(queryWeight);
+	
+	vector<uint32> docs;
+	size_t termCount = inQueryTerms.size();
+	if (not inAllTermsRequired)
+		termCount = 0;
+	A.Collect(docs, termCount);
+	
+	if (inFilter != nullptr)
+	{
+		sort(docs.begin(), docs.end());
+		M6Iterator::Intersect(docs, inFilter);
 	}
 	
+	auto compare = [](const pair<uint32,float>& a, const pair<uint32,float>& b) -> bool
+						{ return a.second > b.second; };
+	
+	vector<pair<uint32,float>> best;
+	
+	uint32 count = A.GetHitCount();
+	if (count > inReportLimit)
+		best.reserve(inReportLimit);
+	else
+		best.reserve(count);
+	
+	foreach (uint32 doc, docs)
+	{
+		float docWeight = mDocWeights[doc];
+		float rank = A[doc] / (docWeight * queryWeight);
+		
+		if (best.size() < inReportLimit)
+		{
+			best.push_back(make_pair(doc, rank));
+			push_heap(best.begin(), best.end(), compare);
+		}
+		else if (best.front().second < rank)
+		{
+			pop_heap(best.begin(), best.end(), compare);
+			best.back() = make_pair(doc, rank);
+			push_heap(best.begin(), best.end(), compare);
+		}
+	}
+	
+	sort_heap(best.begin(), best.end(), compare);
+
+	if (best.size() < inReportLimit)
+		count = static_cast<uint32>(best.size());
+
+	M6Iterator* result = new M6VectorIterator(best);
+	result->SetCount(count);
 	return result;
 }
 
@@ -1508,6 +1521,30 @@ M6Iterator* M6DatabankImpl::FindString(const string& inIndex,
 {
 	M6BasicIndexPtr index = LoadIndex(inIndex);
 	return index->FindString(inString);
+}
+
+void M6DatabankImpl::SuggestCorrection(const string& inWord, vector<string>& outCorrections)
+{
+	if (mDictionary == nullptr)
+	{
+		fs::path dict(mDbDirectory / "full-text.dict");
+		if (not fs::exists(dict))
+			CreateDictionary();
+		mDictionary = new M6Dictionary(dict);
+	}
+	mDictionary->SuggestCorrection(inWord, outCorrections);
+}
+
+void M6DatabankImpl::SuggestSearchTerms(const string& inWord, vector<string>& outSearchTerms)
+{
+	if (mDictionary == nullptr)
+	{
+		fs::path dict(mDbDirectory / "full-text.dict");
+		if (not fs::exists(dict))
+			CreateDictionary();
+		mDictionary = new M6Dictionary(dict);
+	}
+	mDictionary->SuggestSearchTerms(inWord, outSearchTerms);
 }
 
 void M6DatabankImpl::StartBatchImport(M6Lexicon& inLexicon)
@@ -1539,6 +1576,7 @@ void M6DatabankImpl::CommitBatchImport()
 
 	Vacuum();
 	RecalculateDocumentWeights();
+	CreateDictionary();
 }
 
 void M6DatabankImpl::RecalculateDocumentWeights()
@@ -1558,6 +1596,16 @@ void M6DatabankImpl::RecalculateDocumentWeights()
 
 	M6File weightFile(mDbDirectory / "full-text.weights", eReadWrite);
 	weightFile.Write(&mDocWeights[0], sizeof(float) * mDocWeights.size());
+}
+
+void M6DatabankImpl::CreateDictionary()
+{
+	uint32 docCount = mStore->size();
+	
+	// recalculate document weights
+	M6Progress progress(mAllTextIndex->size(), "creating dictionary");
+	M6File dictFile(mDbDirectory / "full-text.dict", eReadWrite);
+	M6Dictionary::Create(*mAllTextIndex, docCount, dictFile, progress);
 }
 
 void M6DatabankImpl::Vacuum()
@@ -1649,6 +1697,12 @@ M6Iterator* M6Databank::Find(const string& inQuery, bool inAllTermsRequired, uin
 	return mImpl->Find(inQuery, inAllTermsRequired, inReportLimit);
 }
 
+M6Iterator* M6Databank::Find(const vector<string>& inQueryTerms, M6Iterator* inFilter,
+	bool inAllTermsRequired, uint32 inReportLimit)
+{
+	return mImpl->Find(inQueryTerms, inFilter, inAllTermsRequired, inReportLimit);
+}
+
 M6Iterator* M6Databank::Find(const string& inIndex, const string& inQuery, bool inTermIsPattern)
 {
 	return mImpl->Find(inIndex, inQuery, inTermIsPattern);
@@ -1658,6 +1712,16 @@ M6Iterator* M6Databank::FindString(const string& inIndex,
 	const string& inString)
 {
 	return mImpl->FindString(inIndex, inString);
+}
+
+void M6Databank::SuggestCorrection(const string& inWord, vector<string>& outCorrections)
+{
+	mImpl->SuggestCorrection(inWord, outCorrections);
+}
+
+void M6Databank::SuggestSearchTerms(const string& inWord, vector<string>& outSearchTerms)
+{
+	mImpl->SuggestSearchTerms(inWord, outSearchTerms);
 }
 
 void M6Databank::RecalculateDocumentWeights()
@@ -1689,3 +1753,4 @@ uint32 M6Databank::GetMaxDocNr() const
 {
 	return mImpl->GetDocStore().NextDocumentNumber();
 }
+

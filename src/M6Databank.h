@@ -56,10 +56,18 @@ class M6Databank
 						uint32 inReportLimit);
 	
 	// low-level interface
+	M6Iterator*		Find(const std::vector<std::string>& inQueryTerms,
+						M6Iterator* inFilter, bool inAllTermsRequired, uint32 inReportLimit);
 	M6Iterator*		Find(const std::string& inIndex, const std::string& inTerm,
 						bool inTermIsPattern);
 	M6Iterator*		FindString(const std::string& inIndex, const std::string& inString);
 	
+	// dictionary interface
+	void			SuggestCorrection(const std::string& inWord,
+						std::vector<std::string>& outCorrections);
+	void			SuggestSearchTerms(const std::string& inWord,
+						std::vector<std::string>& outSearchTerms);
+
 	M6DocStore&		GetDocStore();
 	
 	uint32			size() const;

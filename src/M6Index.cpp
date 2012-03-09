@@ -630,6 +630,7 @@ struct M6IndexImpl
 	virtual bool	GetNextKey(uint32& ioPage, uint32& ioKeyNr, string& outKey) = 0;
 	virtual M6Iterator*
 					GetIterator(uint32 inPage, uint32 inKeyNr) = 0;
+	virtual uint32	GetCount(uint32 inPage, uint32 inKeyNr) = 0;
 
 	virtual void	Insert(const string& inKey, const uint32& inValue)				{ THROW(("Incorrect use of index")); }
 	virtual void	Insert(const string& inKey, const M6MultiData& inValue)			{ THROW(("Incorrect use of index")); }
@@ -736,6 +737,7 @@ class M6IndexImplT : public M6IndexImpl
 	virtual bool	GetNextKey(uint32& ioPage, uint32& ioKeyNr, string& outKey);
 	virtual M6Iterator*
 					GetIterator(uint32 inPage, uint32 inKeyNr);
+	virtual uint32	GetCount(uint32 inPage, uint32 inKeyNr);
 
 	virtual void	Insert(const string& inKey, const M6DataType& inValue);
 	virtual bool	Erase(const string& inKey);
@@ -2052,6 +2054,38 @@ M6Iterator* M6IndexImplT<M6MultiIDLData>::GetIterator(uint32 inPage, uint32 inKe
 	return nullptr;
 }
 
+template<>
+uint32 M6IndexImplT<uint32>::GetCount(uint32 inPage, uint32 inKeyNr)
+{
+	return 1;
+}
+
+template<>
+uint32 M6IndexImplT<M6MultiData>::GetCount(uint32 inPage, uint32 inKeyNr)
+{
+	uint32 result = 0;
+	M6LeafPage* page = Load<M6LeafPage>(inPage);
+
+	if (inKeyNr < page->GetN())
+		result = page->GetValue(inKeyNr).mCount;
+	
+	Release(page);
+	return result;
+}
+
+template<>
+uint32 M6IndexImplT<M6MultiIDLData>::GetCount(uint32 inPage, uint32 inKeyNr)
+{
+	uint32 result = 0;
+	M6LeafPage* page = Load<M6LeafPage>(inPage);
+
+	if (inKeyNr < page->GetN())
+		result = page->GetValue(inKeyNr).mCount;
+	
+	Release(page);
+	return result;
+}
+
 template<class M6DataType>
 void M6IndexImplT<M6DataType>::Insert(const string& inKey, const M6DataType& inValue)
 {
@@ -2520,6 +2554,11 @@ M6BasicIndex::iterator& M6BasicIndex::iterator::operator++()
 	}
 
 	return *this;
+}
+
+uint32 M6BasicIndex::iterator::GetCount() const
+{
+	return mIndex->GetCount(mPage, mKeyNr);
 }
 
 // --------------------------------------------------------------------

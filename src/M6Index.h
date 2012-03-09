@@ -65,6 +65,7 @@ class M6BasicIndex
 		bool			operator!=(const iterator& iter) const		{ return not operator==(iter); }
 
 		M6Iterator*		GetDocuments() const;
+		uint32			GetCount() const;
 	
 	  private:
 		friend struct M6IndexImpl;

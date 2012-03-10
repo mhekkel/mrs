@@ -16,6 +16,7 @@
 #include "M6Document.h"
 #include "M6Config.h"
 #include "M6Query.h"
+#include "M6Tokenizer.h"
 
 using namespace std;
 namespace fs = boost::filesystem;
@@ -33,12 +34,12 @@ struct M6Redirect
 
 // --------------------------------------------------------------------
 
-M6Server::M6Server(zeep::xml::element* inConfig)
+M6Server::M6Server(zx::element* inConfig)
 	: webapp(kM6ServerNS)
 	, mConfig(inConfig)
 {
 	string docroot = "docroot";
-	zeep::xml::element* e = mConfig->find_first("docroot");
+	zx::element* e = mConfig->find_first("docroot");
 	if (e != nullptr)
 		docroot = e->content();
 	set_docroot(docroot);
@@ -117,7 +118,7 @@ void M6Server::handle_entry(const zh::request& request, const el::scope& scope, 
 {
 	string db, nr;
 
-	zeep::http::parameter_map params;
+	zh::parameter_map params;
 	get_parameters(scope, params);
 
 	db = params.get("db", "").as<string>();
@@ -182,43 +183,81 @@ void M6Server::handle_entry(const zh::request& request, const el::scope& scope, 
 //	sub.put("title", document->GetAttribute("title"));
 	
 	fs::ifstream data(get_docroot() / "entry.html");
-	zeep::xml::document doc;
+	zx::document doc;
 	doc.set_preserve_cdata(true);
 	doc.read(data);
 
-	zeep::xml::element* root = doc.child();
+	zx::element* root = doc.child();
 
 	try
 	{
 		process_xml(root, sub, "/");	
 		
-//		try
-//		{
-//			CParsedQueryObject qo(*mdb, q, false, true);
-//			
-//			vector<string> terms;
-//			qo.GetHighlightTerms(terms);
-//			
-//			if (not terms.empty())
-//			{
-//				string pattern = ba::join(terms, "|");
-//				
-//				if (uc::contains_han(pattern))
-//					pattern = string("(") + pattern + ")";
-//				else
-//					pattern = string("\\b(") + pattern + ")\\b";
-//				
-//				boost::regex re(pattern, boost::regex_constants::icase);
-//				highlight_query_terms(root, re);
-//			}
-//		}
-//		catch (...) {}
+		try
+		{
+			M6Iterator* filter;
+			vector<string> terms;
+			ParseQuery(*mdb, q, false, terms, filter);
+			delete filter;
+			
+			if (not terms.empty())
+			{
+				string pattern = ba::join(terms, "|");
+				
+				if (uc::contains_han(pattern))
+					pattern = string("(") + pattern + ")";
+				else
+					pattern = string("\\b(") + pattern + ")\\b";
+				
+				boost::regex re(pattern, boost::regex_constants::icase);
+				highlight_query_terms(root, re);
+			}
+		}
+		catch (...) {}
 		
 		reply.set_content(doc);
 	}
 	catch (M6Redirect& redirect)
 	{
 		create_redirect(redirect.db, redirect.nr, "", false, request, reply);
+	}
+}
+
+void M6Server::highlight_query_terms(zx::element* node, boost::regex& expr)
+{
+	foreach (zx::element* e, *node)
+		highlight_query_terms(e, expr);
+
+	foreach (zx::node* n, node->nodes())
+	{
+		zx::text* text = dynamic_cast<zx::text*>(n);
+		
+		if (text == nullptr)
+			continue;
+
+		for (;;)
+		{
+			boost::smatch m;
+
+			// somehow boost::regex_search works incorrectly with a const std::string...
+#if defined(_MSC_VER)
+			string s = text->str();
+#else
+			const string& s = text->str();
+#endif
+			if (not boost::regex_search(s, m, expr) or not m[0].matched or m[0].length() == 0)
+				break;
+
+			// split the text
+			node->insert(text, new zx::text(m.prefix()));
+			
+			zx::element* span = new zx::element("span");
+			span->add_text(m[0]);
+			span->set_attribute("class", "highlight");
+			node->insert(text, span);
+			
+			text->str(m.suffix());
+		}
 	}
 }
 
@@ -483,10 +522,10 @@ void M6Server::handle_search(const zh::request& request,
 
 // --------------------------------------------------------------------
 
-void M6Server::process_mrs_entry(zeep::xml::element* node, const el::scope& scope, fs::path dir)
+void M6Server::process_mrs_entry(zx::element* node, const el::scope& scope, fs::path dir)
 {
 	// evaluate attributes first
-	foreach (zeep::xml::attribute& a, boost::iterator_range<zeep::xml::element::attribute_iterator>(node->attr_begin(), node->attr_end()))
+	foreach (zx::attribute& a, boost::iterator_range<zx::element::attribute_iterator>(node->attr_begin(), node->attr_end()))
 	{
 		string s = a.value();
 		if (process_el(scope, s))
@@ -503,20 +542,20 @@ void M6Server::process_mrs_entry(zeep::xml::element* node, const el::scope& scop
 		THROW(("databank not loaded"));
 	unique_ptr<M6Document> doc(mdb->Fetch(boost::lexical_cast<uint32>(nr)));
 	
-	zeep::xml::node* replacement = nullptr;
+	zx::node* replacement = nullptr;
 	
 	if (format == "title")
-		replacement = new zeep::xml::text(doc->GetAttribute("title"));
+		replacement = new zx::text(doc->GetAttribute("title"));
 	else // if (format == "plain")
 	{
-		zeep::xml::element* pre = new zeep::xml::element("pre");
+		zx::element* pre = new zx::element("pre");
 		pre->add_text(doc->GetText());
 		replacement = pre;
 	}
 //#ifndef NO_BLAST
 //	else if (format == "fasta")
 //	{
-//		zeep::xml::element* pre = new zeep::xml::element("pre");
+//		zx::element* pre = new zx::element("pre");
 //		pre->add_text(doc->GetText());
 //		replacement = pre;
 //	}
@@ -528,7 +567,7 @@ void M6Server::process_mrs_entry(zeep::xml::element* node, const el::scope& scop
 //		try
 //		{
 //			// turn into XML... this is tricky
-//			zeep::xml::document doc;
+//			zx::document doc;
 //			doc.set_preserve_cdata(true);
 //			doc.read(entry);
 //		
@@ -540,19 +579,19 @@ void M6Server::process_mrs_entry(zeep::xml::element* node, const el::scope& scop
 //			// parsing the pretty printed entry went wrong, try
 //			// to display the plain text along with a warning
 //			
-//			zeep::xml::element* e = new zeep::xml::element("div");
+//			zx::element* e = new zx::element("div");
 //			
-//			zeep::xml::element* m = new zeep::xml::element("div");
+//			zx::element* m = new zx::element("div");
 //			m->set_attribute("class", "format-error");
 //			m->add_text("Error formatting entry: ");
 //			m->add_text(ex.what());
 //			e->push_back(m);
 //			e->add_text("\n");
-//			zeep::xml::comment* cmt = new zeep::xml::comment(entry);
+//			zx::comment* cmt = new zx::comment(entry);
 //			e->push_back(cmt);
 //			e->add_text("\n");
 //			
-//			zeep::xml::element* pre = new zeep::xml::element("pre");
+//			zx::element* pre = new zx::element("pre");
 //			pre->set_attribute("class", "format-error");
 //			pre->add_text(mrsDb->GetDocument(id));
 //			e->push_back(pre);
@@ -563,7 +602,7 @@ void M6Server::process_mrs_entry(zeep::xml::element* node, const el::scope& scop
 	
 	if (replacement != nullptr)
 	{
-		zeep::xml::container* parent = node->parent();
+		zx::container* parent = node->parent();
 		assert(parent);
 		parent->insert(node, replacement);
 
@@ -571,7 +610,7 @@ void M6Server::process_mrs_entry(zeep::xml::element* node, const el::scope& scop
 	}
 }
 
-void M6Server::process_mrs_link(zeep::xml::element* node, const el::scope& scope, fs::path dir)
+void M6Server::process_mrs_link(zx::element* node, const el::scope& scope, fs::path dir)
 {
 	string db = node->get_attribute("db");				process_el(scope, db);
 	string nr = node->get_attribute("nr");				process_el(scope, nr);
@@ -604,25 +643,25 @@ void M6Server::process_mrs_link(zeep::xml::element* node, const el::scope& scope
 		catch (...) {}
 	}
 	
-	zeep::xml::element* a = new zeep::xml::element("a");
+	zx::element* a = new zx::element("a");
 	
 	if (not nr.empty())
 		a->set_attribute("href",
 			(boost::format("entry?db=%1%&nr=%2%%3%%4%")
-				% zeep::http::encode_url(db)
-				% zeep::http::encode_url(nr)
-				% (q.empty() ? "" : ("&q=" + zeep::http::encode_url(q)).c_str())
-				% (an.empty() ? "" : (string("#") + zeep::http::encode_url(an)).c_str())
+				% zh::encode_url(db)
+				% zh::encode_url(nr)
+				% (q.empty() ? "" : ("&q=" + zh::encode_url(q)).c_str())
+				% (an.empty() ? "" : (string("#") + zh::encode_url(an)).c_str())
 			).str());
 	else
 	{
 		a->set_attribute("href",
 			(boost::format("link?db=%1%&ix=%2%&id=%3%%4%%5%")
-				% zeep::http::encode_url(db)
-				% zeep::http::encode_url(ix)
-				% zeep::http::encode_url(id)
-				% (q.empty() ? "" : ("&q=" + zeep::http::encode_url(q)).c_str())
-				% (an.empty() ? "" : (string("#") + zeep::http::encode_url(an)).c_str())
+				% zh::encode_url(db)
+				% zh::encode_url(ix)
+				% zh::encode_url(id)
+				% (q.empty() ? "" : ("&q=" + zh::encode_url(q)).c_str())
+				% (an.empty() ? "" : (string("#") + zh::encode_url(an)).c_str())
 			).str());
 	
 		if (not exists)
@@ -632,19 +671,19 @@ void M6Server::process_mrs_link(zeep::xml::element* node, const el::scope& scope
 	if (not title.empty())
 		a->set_attribute("title", title);
 
-	zeep::xml::container* parent = node->parent();
+	zx::container* parent = node->parent();
 	assert(parent);
 	parent->insert(node, a);
 	
-	foreach (zeep::xml::node* c, node->nodes())
+	foreach (zx::node* c, node->nodes())
 	{
-		zeep::xml::node* clone = c->clone();
+		zx::node* clone = c->clone();
 		a->push_back(clone);
 		process_xml(clone, scope, dir);
 	}
 }
 
-void M6Server::process_mrs_redirect(zeep::xml::element* node, const el::scope& scope, fs::path dir)
+void M6Server::process_mrs_redirect(zx::element* node, const el::scope& scope, fs::path dir)
 {
 }
 
@@ -654,7 +693,7 @@ void M6Server::create_redirect(const string& databank, uint32 inDocNr,
 	const string& q, bool redirectForQuery, const zh::request& request, zh::reply& reply)
 {
 	string host = request.local_address;
-	foreach (const zeep::http::header& h, request.headers)
+	foreach (const zh::header& h, request.headers)
 	{
 		if (ba::iequals(h.name, "Host"))
 		{
@@ -684,13 +723,13 @@ void M6Server::create_redirect(const string& databank, uint32 inDocNr,
 		string location =
 			(boost::format("http://%1%/entry?db=%2%&nr=%3%&%4%=%5%")
 				% host
-				% zeep::http::encode_url(databank)
+				% zh::encode_url(databank)
 				% inDocNr
 				% (redirectForQuery ? "rq" : "q")
-				% zeep::http::encode_url(q)
+				% zh::encode_url(q)
 			).str();
 
-		reply = zeep::http::reply::redirect(location);
+		reply = zh::reply::redirect(location);
 	}
 }
 
@@ -698,11 +737,11 @@ void M6Server::create_redirect(const string& databank, uint32 inDocNr,
 
 void M6Server::LoadAllDatabanks()
 {
-	foreach (zeep::xml::element* db, mConfig->find("dbs/db"))
+	foreach (zx::element* db, mConfig->find("dbs/db"))
 	{
 		string databank = db->content();
 
-		zeep::xml::element* config = M6Config::Instance().LoadConfig(databank);
+		zx::element* config = M6Config::Instance().LoadConfig(databank);
 		if (not config)
 		{
 			if (VERBOSE)
@@ -710,7 +749,7 @@ void M6Server::LoadAllDatabanks()
 			continue;
 		}
 		
-		zeep::xml::element* file = config->find_first("file");
+		zx::element* file = config->find_first("file");
 		if (file == nullptr)
 		{
 			if (VERBOSE)

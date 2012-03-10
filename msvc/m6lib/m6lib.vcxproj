@@ -19,14 +19,14 @@
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <CharacterSet>Unicode</CharacterSet>
-    <PlatformToolset>Intel C++ Compiler XE 12.1</PlatformToolset>
+    <PlatformToolset>v100</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
-    <PlatformToolset>Intel C++ Compiler XE 12.1</PlatformToolset>
+    <PlatformToolset>v100</PlatformToolset>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -80,6 +80,7 @@
     <ClCompile Include="..\..\src\M6Config.cpp" />
     <ClCompile Include="..\..\src\M6Databank.cpp" />
     <ClCompile Include="..\..\src\M6DataSource.cpp" />
+    <ClCompile Include="..\..\src\M6Dictionary.cpp" />
     <ClCompile Include="..\..\src\M6DiskCache.cpp" />
     <ClCompile Include="..\..\src\M6DocStore.cpp" />
     <ClCompile Include="..\..\src\M6Document.cpp" />

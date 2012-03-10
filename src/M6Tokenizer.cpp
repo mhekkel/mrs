@@ -51,6 +51,69 @@ ostream& operator<<(ostream& os, M6Token inToken)
 
 // --------------------------------------------------------------------
 
+template<class InputIterator>
+inline
+tuple<InputIterator, uint32> ReadUTF8(InputIterator inIterator)
+{
+	uint32 uc;
+	
+	if ((*inIterator & 0x080) == 0)		// next byte is a valid ASCII character
+		uc = *inIterator++;
+	else	// decode utf-8
+	{
+		if ((inIterator[0] & 0x0E0) == 0x0C0 and (inIterator[1] & 0x0c0) == 0x080)
+		{
+			uc = ((inIterator[0] & 0x01F) << 6) | (inIterator[1] & 0x03F);
+			inIterator += 2;
+		}
+		else if ((inIterator[0] & 0x0F0) == 0x0E0 and (inIterator[1] & 0x0c0) == 0x080 and (inIterator[2] & 0x0c0) == 0x080)
+		{
+			uc = ((inIterator[0] & 0x00F) << 12) | ((inIterator[1] & 0x03F) << 6) | (inIterator[2] & 0x03F);
+			inIterator += 3;
+		}
+		else if ((inIterator[0] & 0x0F8) == 0x0F0 and (inIterator[1] & 0x0c0) == 0x080 and (inIterator[2] & 0x0c0) == 0x080 and (inIterator[3] & 0x0c0) == 0x080)
+		{
+			uc = ((inIterator[0] & 0x007) << 18) | ((inIterator[1] & 0x03F) << 12) | ((inIterator[2] & 0x03F) << 6) | (inIterator[3] & 0x03F);
+			inIterator += 4;
+		}
+		else
+		{
+			uc = 0xffef;
+			++inIterator;
+		}
+	}
+
+	return make_tuple(inIterator, uc);
+}
+
+template<class OutputIterator>
+inline
+OutputIterator WriteUTF8(uint32 inUnicode, OutputIterator inIterator)
+{
+	// write out the unicode as a utf-8 string
+	if (inUnicode < 0x080)
+		*inIterator++ = static_cast<char>(inUnicode);
+	else if (inUnicode < 0x0800)
+	{
+		*inIterator++ = static_cast<char> (0x0c0 | (inUnicode >> 6));
+		*inIterator++ = static_cast<char> (0x080 | (inUnicode & 0x03f));
+	}
+	else if (inUnicode < 0x00010000)
+	{
+		*inIterator++ = static_cast<char> (0x0e0 | (inUnicode >> 12));
+		*inIterator++ = static_cast<char> (0x080 | ((inUnicode >> 6) & 0x03f));
+		*inIterator++ = static_cast<char> (0x080 | (inUnicode & 0x03f));
+	}
+	else
+	{
+		*inIterator++ = static_cast<char> (0x0f0 | (inUnicode >> 18));
+		*inIterator++ = static_cast<char> (0x080 | ((inUnicode >> 12) & 0x03f));
+		*inIterator++ = static_cast<char> (0x080 | ((inUnicode >> 6) & 0x03f));
+		*inIterator++ = static_cast<char> (0x080 | (inUnicode & 0x03f));
+	}
+	return inIterator;
+}
+
 namespace uc
 {
 
@@ -137,30 +200,26 @@ bool is_han(uint32 c)
 		 (c >= 0x00F900 and c <= 0x00FAFF));
 }
 
-//bool contains_han(const string& s)
-//{
-//	bool result = false;
-//	string::const_iterator si = s.begin();
-//	
-//	while (si != s.end())
-//	{
-//		uint32 uc;
-//		uint32 length;
-//		
-//		tie(uc, length) = ReadUnicode(si);
-//		
-//		if (is_han(uc))
-//		{
-//			result = true;
-//			break;
-//		}
-//		
-//		si += length;
-//	}
-//	
-//	return result;
-//}
-//
+bool contains_han(const string& s)
+{
+	bool result = false;
+	string::const_iterator si = s.begin();
+	
+	while (si != s.end())
+	{
+		uint32 uc;
+		tie(si, uc) = ReadUTF8(si);
+		
+		if (is_han(uc))
+		{
+			result = true;
+			break;
+		}
+	}
+	
+	return result;
+}
+
 //bool is_katakana(uint32 c)
 //{
 //	return isalnum(c) and c >= 0x0030a0 and c <= 0x0030ff;
@@ -272,69 +331,6 @@ inline bool isspace(uint32 c)
 {
 	return c == ' ' or c == '\r' or c == '\n' or c == '\t' or
 		uc::isspace(c);
-}
-
-template<class InputIterator>
-inline
-tuple<InputIterator, uint32> ReadUTF8(InputIterator inIterator)
-{
-	uint32 uc;
-	
-	if ((*inIterator & 0x080) == 0)		// next byte is a valid ASCII character
-		uc = *inIterator++;
-	else	// decode utf-8
-	{
-		if ((inIterator[0] & 0x0E0) == 0x0C0 and (inIterator[1] & 0x0c0) == 0x080)
-		{
-			uc = ((inIterator[0] & 0x01F) << 6) | (inIterator[1] & 0x03F);
-			inIterator += 2;
-		}
-		else if ((inIterator[0] & 0x0F0) == 0x0E0 and (inIterator[1] & 0x0c0) == 0x080 and (inIterator[2] & 0x0c0) == 0x080)
-		{
-			uc = ((inIterator[0] & 0x00F) << 12) | ((inIterator[1] & 0x03F) << 6) | (inIterator[2] & 0x03F);
-			inIterator += 3;
-		}
-		else if ((inIterator[0] & 0x0F8) == 0x0F0 and (inIterator[1] & 0x0c0) == 0x080 and (inIterator[2] & 0x0c0) == 0x080 and (inIterator[3] & 0x0c0) == 0x080)
-		{
-			uc = ((inIterator[0] & 0x007) << 18) | ((inIterator[1] & 0x03F) << 12) | ((inIterator[2] & 0x03F) << 6) | (inIterator[3] & 0x03F);
-			inIterator += 4;
-		}
-		else
-		{
-			uc = 0xffef;
-			++inIterator;
-		}
-	}
-
-	return make_tuple(inIterator, uc);
-}
-
-template<class OutputIterator>
-inline
-OutputIterator WriteUTF8(uint32 inUnicode, OutputIterator inIterator)
-{
-	// write out the unicode as a utf-8 string
-	if (inUnicode < 0x080)
-		*inIterator++ = static_cast<char>(inUnicode);
-	else if (inUnicode < 0x0800)
-	{
-		*inIterator++ = static_cast<char> (0x0c0 | (inUnicode >> 6));
-		*inIterator++ = static_cast<char> (0x080 | (inUnicode & 0x03f));
-	}
-	else if (inUnicode < 0x00010000)
-	{
-		*inIterator++ = static_cast<char> (0x0e0 | (inUnicode >> 12));
-		*inIterator++ = static_cast<char> (0x080 | ((inUnicode >> 6) & 0x03f));
-		*inIterator++ = static_cast<char> (0x080 | (inUnicode & 0x03f));
-	}
-	else
-	{
-		*inIterator++ = static_cast<char> (0x0f0 | (inUnicode >> 18));
-		*inIterator++ = static_cast<char> (0x080 | ((inUnicode >> 12) & 0x03f));
-		*inIterator++ = static_cast<char> (0x080 | ((inUnicode >> 6) & 0x03f));
-		*inIterator++ = static_cast<char> (0x080 | (inUnicode & 0x03f));
-	}
-	return inIterator;
 }
 
 }
@@ -549,7 +545,7 @@ inline void M6Tokenizer::WriteUTF8(uint32 inString[], size_t inLength)
 {
 	char* t = mTokenText;
 	for (int i = 0; i < inLength; ++i)
-		t = fast::WriteUTF8(inString[i], t);
+		t = ::WriteUTF8(inString[i], t);
 	
 	mTokenLength = static_cast<uint32>(t - mTokenText);
 }
@@ -834,7 +830,7 @@ void M6Tokenizer::CaseFold(string& ioString)
 	while (ptr < end)
 	{
 		uint32 ch = 0;
-		tie(ptr, ch) = fast::ReadUTF8(ptr);
+		tie(ptr, ch) = ReadUTF8(ptr);
 		if (::ToLower(ch, s))
 			hasCombiningMarks = true;
 	}
@@ -845,7 +841,7 @@ void M6Tokenizer::CaseFold(string& ioString)
 		
 		ioString.clear();
 		foreach (uint32 ch, s)
-			fast::WriteUTF8(ch, back_inserter(ioString));
+			::WriteUTF8(ch, back_inserter(ioString));
 	}
 }
 
@@ -861,7 +857,7 @@ void M6Tokenizer::Normalize(string& ioString)
 	while (ptr < end)
 	{
 		uint32 ch = 0;
-		tie(ptr, ch) = fast::ReadUTF8(ptr);
+		tie(ptr, ch) = ReadUTF8(ptr);
 		if (::Decompose(ch, s))
 			hasCombiningMarks = true;
 	}
@@ -872,7 +868,7 @@ void M6Tokenizer::Normalize(string& ioString)
 		
 		ioString.clear();
 		foreach (uint32 ch, s)
-			fast::WriteUTF8(ch, back_inserter(ioString));
+			::WriteUTF8(ch, back_inserter(ioString));
 	}
 }
 

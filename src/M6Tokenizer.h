@@ -98,3 +98,7 @@ class M6Tokenizer
 	M6Tokenizer&	operator=(const M6Tokenizer&);
 };
 
+namespace uc
+{
+bool contains_han(const std::string& s);
+}

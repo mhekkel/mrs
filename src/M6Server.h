@@ -12,7 +12,7 @@ namespace el = zeep::http::el;
 class M6Iterator;
 class M6Databank;
 
-class M6Server : public zeep::http::webapp
+class M6Server : public zh::webapp
 {
   public:
 					M6Server(zx::element* inConfig);
@@ -33,7 +33,8 @@ class M6Server : public zeep::http::webapp
 
 	void			create_redirect(const std::string& databank, uint32 inDocNr,
 						const std::string& q, bool redirectForQuery,
-						const zeep::http::request& req, zeep::http::reply& rep);
+						const zh::request& req, zh::reply& rep);
+	void			highlight_query_terms(zx::element* node, boost::regex& expr);
 
 	void			LoadAllDatabanks();
 	M6Databank*		Load(const std::string& inDatabank);

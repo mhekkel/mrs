@@ -485,6 +485,8 @@ void M6Server::handle_search(const zh::request& request,
 	
 					vector<string> s;
 					SpellCheck(db, term, s);
+					if (s.empty())
+						continue;
 					
 					vector<el::object> alternatives;
 					foreach (string& at, s)

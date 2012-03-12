@@ -6,6 +6,8 @@
 
 using namespace std;
 
+int VERBOSE;
+
 // --------------------------------------------------------------------
 
 #if defined(_MSC_VER)
@@ -28,7 +30,7 @@ void SetStdinEcho(bool inEnable)
 
 // --------------------------------------------------------------------
     
-#if defined(linux)
+#if defined(linux) || defined(__linux) || defined (__linux__)
 #include <termio.h>
 
 void SetStdinEcho(bool inEnable)

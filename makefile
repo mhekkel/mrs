@@ -19,7 +19,7 @@ MANDIR				?= $(PREFIX)/man/man3
 
 OBJDIR				= obj
 
-BOOST_LIBS			= system thread filesystem regex math_c99 math_c99f program_options iostreams timer chrono
+BOOST_LIBS			= system thread filesystem regex math_c99 math_c99f program_options iostreams timer chrono random
 BOOST_LIBS			:= $(BOOST_LIBS:%=boost_%$(BOOST_LIB_SUFFIX))
 LIBS				= m pthread archive bz2 z zeep pcre rt
 LDFLAGS				+= $(BOOST_LIB_DIR:%=-L%) $(LIBS:%=-l%) -g $(BOOST_LIBS:%=$(BOOST_LIB_DIR)/lib%.a) \
@@ -47,7 +47,7 @@ OBJECTS = \
 	$(OBJDIR)/M6Config.o \
 	$(OBJDIR)/M6Databank.o \
 	$(OBJDIR)/M6DataSource.o \
-	$(OBJDIR)/M6Dicionary.o \
+	$(OBJDIR)/M6Dictionary.o \
 	$(OBJDIR)/M6DiskCache.o \
 	$(OBJDIR)/M6DocStore.o \
 	$(OBJDIR)/M6Document.o \
@@ -57,21 +57,43 @@ OBJECTS = \
 	$(OBJDIR)/M6Index.o \
 	$(OBJDIR)/M6Iterator.o \
 	$(OBJDIR)/M6Lexicon.o \
+	$(OBJDIR)/M6MD5.o \
 	$(OBJDIR)/M6Progress.o \
 	$(OBJDIR)/M6Query.o \
 	$(OBJDIR)/M6Tokenizer.o \
 
-m6: $(OBJECTS) $(OBJDIR)/M6CmdLineDriver.o
-	$(CC) $(BOOST_INC_DIR:%=-I%) -o $@ -I. $^ $(LDFLAGS)
+OBJECTS.m6 = \
+	$(OBJECTS) \
+	$(OBJDIR)/M6CmdLineDriver.o
 
-m6-test: $(OBJECTS) $(OBJDIR)/M6TestMain.o obj/M6TestDocStore.o
-	$(CC) $(BOOST_INC_DIR:%=-I%) -o $@ -I. $^ $(LDFLAGS) $(BOOST_LIB_DIR)/libboost_unit_test_framework.a
+OBJECTS.m6-test = \
+	$(OBJECTS) \
+	$(OBJDIR)/M6TestMain.o \
+	$(OBJDIR)/M6TestDocStore.o 
 
-m6-server: $(OBJECTS) $(OBJDIR)/M6Server.o $(OBJDIR)/M6ServerDriver.o
-	$(CC) $(BOOST_INC_DIR:%=-I%) -o $@ -I. $^ $(LDFLAGS)
+OBJECTS.m6-server = \
+	$(OBJECTS) \
+	$(OBJDIR)/M6Server.o \
+	$(OBJDIR)/M6ServerDriver.o \
+	$(OBJDIR)/M6AdminServer.o 
+
+OBJECTS.m6-passwd = \
+	$(OBJECTS) \
+	$(OBJDIR)/M6Passwd.o
+
+all: m6 m6-server m6-passwd
+
+m6 m6-server m6-passwd: $(OBJECTS.$@)
+	@ echo ">>" $@
+	@ $(CC) $(BOOST_INC_DIR:%=-I%) -o $@ -I. $^ $(LDFLAGS)
+
+m6-test: $(OBJECTS.m6-test)
+	@ echo ">>" $@
+	@ $(CC) $(BOOST_INC_DIR:%=-I%) -o $@ -I. $^ $(LDFLAGS) $(BOOST_LIB_DIR)/libboost_unit_test_framework.a
 
 $(OBJDIR)/%.o: %.cpp
-	$(CC) -MD -c -o $@ $< $(CFLAGS)
+	@ echo ">>" $<
+	@ $(CC) -MD -c -o $@ $< $(CFLAGS)
 
 include $(OBJECTS:%.o=%.d)
 

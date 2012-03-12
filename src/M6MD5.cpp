@@ -1,5 +1,7 @@
 #include "M6Lib.h"
 
+#include <cstring>
+
 #include "M6MD5.h"
 
 using namespace std;

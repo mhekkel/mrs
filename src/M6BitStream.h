@@ -10,6 +10,11 @@ class M6File;
 
 // --------------------------------------------------------------------
 
+const uint32
+	kM6DefaultBitBufferSize = 2048;
+
+// --------------------------------------------------------------------
+
 struct M6OBitStreamImpl
 {
 					M6OBitStreamImpl() : mRefCount(1)	{ }
@@ -103,9 +108,6 @@ struct M6IBitStreamImpl
 	uint8*			mBufferPtr;
 	int64			mBufferSize;
 };
-
-const uint32
-	kM6DefaultBitBufferSize = 1024;
 
 class M6IBitStream
 {

@@ -315,11 +315,20 @@ void M6Server::handle_search(const zh::request& request,
 			unique_ptr<M6Iterator> rset;
 			
 			M6Iterator* filter;
-			ParseQuery(*db.mDatabank, q, true, queryTerms, filter);
-			if (queryTerms.empty())
-				rset.reset(filter);
-			else
-				rset.reset(db.mDatabank->Find(queryTerms, filter, true, maxresultcount));
+			try
+			{
+				ParseQuery(*db.mDatabank, q, true, queryTerms, filter);
+				if (queryTerms.empty())
+					rset.reset(filter);
+				else
+					rset.reset(db.mDatabank->Find(queryTerms, filter, true, maxresultcount));
+			}
+			catch (...)	// silently ignore errors in find all
+			{
+				if (filter)
+					delete filter;
+				continue;
+			}
 
 			if (not rset)
 				continue;

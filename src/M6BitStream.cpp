@@ -91,7 +91,7 @@ struct M6OBitStreamMemImpl : public M6OBitStreamImpl
 
 M6OBitStreamMemImpl::M6OBitStreamMemImpl()
 {
-	mBufferSize = 256;
+	mBufferSize = kM6DefaultBitBufferSize;
 	mBufferPtr = mBuffer = new uint8[mBufferSize];
 }
 

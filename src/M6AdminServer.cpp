@@ -127,13 +127,11 @@ void M6AdminServer::init_scope(el::scope& scope)
 
 void M6AdminServer::handle_request(const zh::request& req, zh::reply& rep)
 {
-	string authorization, host;
+	string authorization;
 	foreach (const zeep::http::header& h, req.headers)
 	{
 		if (ba::iequals(h.name, "Authorization"))
 			authorization = h.value;
-		if (ba::iequals(h.name, "Host"))
-			host = h.value;
 	}
 
 	try
@@ -152,7 +150,7 @@ void M6AdminServer::handle_request(const zh::request& req, zh::reply& rep)
 		rep = zh::reply::stock_reply(zh::unauthorized);
 		
 		if (zx::element* realm = mConfig->find_first("realm"))
-			mAuthInfo.push_back(new M6AuthInfo(realm->get_attribute("name") + '@' + host));
+			mAuthInfo.push_back(new M6AuthInfo(realm->get_attribute("name")));
 		else
 			THROW(("Realm missing from config file"));
 		

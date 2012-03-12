@@ -13,8 +13,12 @@ class M6Config
 
 	std::string			FindGlobal(const std::string& inXPath);
 
-	zeep::xml::element*	LoadConfig(const std::string& inDatabank);
+	zeep::xml::element*	LoadDatabank(const std::string& inDatabank);
+	zeep::xml::element_set
+						LoadDatabanks();
+
 	zeep::xml::element*	LoadParser(const std::string& inParser);
+
 	zeep::xml::element_set
 						LoadServers();
 

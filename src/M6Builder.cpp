@@ -855,7 +855,7 @@ void M6Processor::Process(vector<fs::path>& inFiles, M6Progress& inProgress)
 // --------------------------------------------------------------------
 
 M6Builder::M6Builder(const string& inDatabank)
-	: mConfig(M6Config::Instance().LoadConfig(inDatabank))
+	: mConfig(M6Config::Instance().LoadDatabank(inDatabank))
 	, mDatabank(nullptr)
 {
 }

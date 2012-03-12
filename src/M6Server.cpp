@@ -8,6 +8,8 @@
 #define foreach BOOST_FOREACH
 #include <boost/filesystem/fstream.hpp>
 #include <boost/algorithm/string.hpp>
+#include <boost/random/random_device.hpp>
+#include <boost/date_time/posix_time/posix_time_types.hpp>
 
 #include "M6Databank.h"
 #include "M6Server.h"
@@ -17,12 +19,79 @@
 #include "M6Config.h"
 #include "M6Query.h"
 #include "M6Tokenizer.h"
+#include "M6MD5.h"
 
 using namespace std;
 namespace fs = boost::filesystem;
 namespace ba = boost::algorithm;
+namespace pt = boost::posix_time;
 
 const string kM6ServerNS = "http://mrs.cmbi.ru.nl/mrs-web/ml";
+
+// --------------------------------------------------------------------
+
+struct M6AuthInfo
+{
+						M6AuthInfo(const string& inRealm);
+	
+	bool				Validate(const string& inMethod, const string& inURI,
+							const string& inHA1, map<string,string>& inInfo);
+	string				GetChallenge() const;
+	bool				Stale() const;
+	
+	string				mNonce, mRealm;
+	uint32				mLastNC;
+	pt::ptime			mCreated;
+};
+
+M6AuthInfo::M6AuthInfo(const string& inRealm)
+	: mRealm(inRealm)
+	, mLastNC(0)
+{
+	using namespace boost::gregorian;
+	
+	boost::random::random_device rng;
+	uint32 data[4] = { rng(), rng(), rng(), rng() };
+
+	mNonce = M6MD5(data, sizeof(data)).Finalise();
+	mCreated = pt::second_clock::local_time();
+}
+
+string M6AuthInfo::GetChallenge() const
+{
+	string challenge = "Digest ";
+	challenge += "realm=\"" + mRealm + "\", qop=\"auth\", nonce=\"" + mNonce + '"';
+	return challenge;
+}
+
+bool M6AuthInfo::Stale() const
+{
+	pt::time_duration age = pt::second_clock::local_time() - mCreated;
+	return age.total_seconds() > 1800;
+}
+
+bool M6AuthInfo::Validate(const string& inMethod, const string& inURI,
+	const string& inHA1, map<string,string>& inInfo)
+{
+	bool valid = false;
+	
+	uint32 nc = strtol(inInfo["nc"].c_str(), nullptr, 16);
+	if (nc > mLastNC)
+	{
+		string ha2 = M6MD5(inMethod + ':' + inInfo["uri"]).Finalise();
+		
+		string response = M6MD5(
+			inHA1 + ':' +
+			inInfo["nonce"] + ':' +
+			inInfo["nc"] + ':' +
+			inInfo["cnonce"] + ':' +
+			inInfo["qop"] + ':' +
+			ha2).Finalise();
+		
+		valid = inInfo["response"] == response;
+	}
+	return valid;
+}
 
 // --------------------------------------------------------------------
 
@@ -47,6 +116,7 @@ M6Server::M6Server(zx::element* inConfig)
 	mount("",				boost::bind(&M6Server::handle_welcome, this, _1, _2, _3));
 	mount("entry",			boost::bind(&M6Server::handle_entry, this, _1, _2, _3));
 	mount("search",			boost::bind(&M6Server::handle_search, this, _1, _2, _3));
+	mount("admin",			boost::bind(&M6Server::handle_admin, this, _1, _2, _3));
 	mount("scripts",		boost::bind(&M6Server::handle_file, this, _1, _2, _3));
 	mount("css",			boost::bind(&M6Server::handle_file, this, _1, _2, _3));
 	mount("man",			boost::bind(&M6Server::handle_file, this, _1, _2, _3));
@@ -95,6 +165,25 @@ void M6Server::handle_request(const zh::request& req, zh::reply& rep)
 
 		create_reply_from_template("error.html", scope, rep);
 	}
+}
+
+void M6Server::create_unauth_reply(bool stale, zh::reply& rep)
+{
+	boost::mutex::scoped_lock lock(mAuthMutex);
+	
+	rep = zh::reply::stock_reply(zh::unauthorized);
+	
+	if (zx::element* realm = mConfig->find_first("realm"))
+		mAuthInfo.push_back(new M6AuthInfo(realm->get_attribute("name")));
+	else
+		THROW(("Realm missing from config file"));
+	
+	string challenge = mAuthInfo.back()->GetChallenge();
+	
+	if (stale)
+		challenge += ", stale=\"true\"";
+
+	rep.set_header("WWW-Authenticate", challenge); 
 }
 
 void M6Server::handle_welcome(const zh::request& request,
@@ -162,7 +251,7 @@ void M6Server::handle_entry(const zh::request& request, const el::scope& scope, 
 //	}
 
 	M6Databank* mdb = Load(db);
-	zx::element* dbConfig = M6Config::Instance().LoadConfig(db);
+	zx::element* dbConfig = M6Config::Instance().LoadDatabank(db);
 //	unique_ptr<M6Document> document(mdb->Fetch(docNr));
 
 	// first stuff some data into scope
@@ -531,6 +620,13 @@ void M6Server::handle_search(const zh::request& request,
 	}
 }
 
+void M6Server::handle_admin(const zh::request& request,
+	const el::scope& scope, zh::reply& reply)
+{
+	ValidateAuthentication(request);
+	create_reply_from_template("admin.html", scope, reply);
+}
+
 // --------------------------------------------------------------------
 
 void M6Server::process_mrs_entry(zx::element* node, const el::scope& scope, fs::path dir)
@@ -752,7 +848,7 @@ void M6Server::LoadAllDatabanks()
 	{
 		string databank = db->content();
 
-		zx::element* config = M6Config::Instance().LoadConfig(databank);
+		zx::element* config = M6Config::Instance().LoadDatabank(databank);
 		if (not config)
 		{
 			if (VERBOSE)
@@ -825,6 +921,59 @@ void M6Server::SpellCheck(const string& inDatabank, const string& inTerm,
 		M6Databank* db = Load(inDatabank);
 		db->SuggestCorrection(inTerm, outSuggestions);
 	}
+}
+
+void M6Server::ValidateAuthentication(const zh::request& request)
+{
+	string authorization;
+	foreach (const zeep::http::header& h, request.headers)
+	{
+		if (ba::iequals(h.name, "Authorization"))
+			authorization = h.value;
+	}
+
+	if (authorization.empty())
+		throw zh::not_authorized(false);
+
+	// That was easy, now check the response
+	
+	map<string,string> info;
+	
+	boost::regex re("(\\w+)=(?|\"([^\"]*)\"|'([^']*)'|(\\w+))(?:,\\s*)?");
+	const char* b = authorization.c_str();
+	const char* e = b + authorization.length();
+	boost::match_results<const char*> m;
+	while (b < e and boost::regex_search(b, e, m, re))
+	{
+		info[string(m[1].first, m[1].second)] = string(m[2].first, m[2].second);
+		b = m[0].second;
+	}
+
+	bool authorized = false, stale = false;
+
+	boost::format f("realm[@name='%1%']/user[@name='%2%']");
+	if (zx::element* user = mConfig->find_first((f % info["realm"] % info["username"]).str()))
+	{
+		string ha1 = user->content();
+
+		boost::mutex::scoped_lock lock(mAuthMutex);
+	
+		foreach (M6AuthInfo* auth, mAuthInfo)
+		{
+			if (auth->mRealm == info["realm"] and auth->mNonce == info["nonce"]
+				and auth->Validate(request.method, request.uri, ha1, info))
+			{
+				authorized = true;
+				stale = auth->Stale();
+				if (stale)
+					mAuthInfo.erase(find(mAuthInfo.begin(), mAuthInfo.end(), auth));
+				break;
+			}
+		}
+	}
+	
+	if (stale or not authorized)
+		throw zh::not_authorized(stale);
 }
 
 

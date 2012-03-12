@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE xhtml
+	PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/1999/xhtml">
+
+<html xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:mrs="http://mrs.cmbi.ru.nl/mrs-web/ml"
+	xml:lang="en" lang="en">
+<head>
+    <title>M6 Administration</title>
+
+    <meta name="author" content="Maarten L. Hekkelman" />
+    <meta name="generator" content="Japi" />
+	<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+
+	<link rel="stylesheet" type="text/css" href="css/mrs-style.css" />
+
+	<script src="scripts/mrs.js" type="text/javascript">
+	</script>
+
+	<script src="scripts/status.js" type="text/javascript">
+	</script>
+</head>
+<body>
+	<mrs:include file="menu.html" />
+	<div id="main">
+		<mrs:include file="form.html" />
+		<div class="nav">
+			<ul>
+				<li><a href="#" id="stats_databanks" onclick="Status.changeStatsView('databanks');">Databanks</a></li>
+				<li><a href="#" id="stats_files" onclick="Status.changeStatsView('parsers');">Parsers</a></li>
+				<li><a href="#" id="stats_update" onclick="Status.changeStatsView('update');">Update</a></li>
+			</ul>
+		</div>
+
+		<table id="databanks" class="list status" cellspacing="0" cellpadding="0" width="100%"
+			xmlns:m2="http://mrs.cmbi.ru.nl/mrs-web/nl/my-ns">
+		<caption>Configured databanks</caption>
+		<tr>
+			<th><a href="#" onclick="Status.sortTable('databanks', 0);">ID</a> </th>
+			<th><a href="#" onclick="Status.sortTable('databanks', 1);">Name</a></th>
+			<th><a href="#" onclick="Status.sortTable('databanks', 2);">Parser</a></th>
+			<th>Status</th>
+		</tr>
+
+		<mrs:iterate collection="databanks" var="db">
+		<tr m2:keys="s=${db.id}|s=${db.name}|s=${db.parser}">
+			<td><a href="info?db=${db.id}">${db.id}</a></td>
+			<td><a href="info?db=${db.id}">${db.name}</a></td>
+			<td>${db.parser}</td>
+			<td width="40%">${db.status}</td>
+		</tr>
+		</mrs:iterate>
+		</table>
+
+		<table id="files" class="list status" cellspacing="0" cellpadding="0" style="width:100%; display: none;"
+			xmlns:m2="http://mrs.cmbi.ru.nl/mrs-web/nl/my-ns">
+		<caption>Files</caption>
+		<tr>
+	        <th><a href="#" onclick="Status.sortTable('files', 0);">File</a></th>
+	        <th style="text-align:right"><a href="#" onclick="Status.sortTable('files', 1);">Entries</a></th>
+	        <th style="text-align:right"><a href="#" onclick="Status.sortTable('files', 2);">File Size</a></th>
+	        <th style="text-align:right"><a href="#" onclick="Status.sortTable('files', 3);">Raw Text Size</a></th>
+	        <th style="text-align:right"><a href="#" onclick="Status.sortTable('files', 4);">Last Update</a></th>
+	        <th>Status</th>
+	    </tr>
+
+		<mrs:iterate collection="files" var="file">
+		<tr id="file-${file.name}" m2:keys="s=${file.name}|i=${file.entries}|i=${file.fileSize}|i=${file.rawDataSize}|s=${file.buildDate}">
+			<td><a href="#">${file.name}</a></td>
+			<td style="text-align:right"><mrs:number f='#,##0' n='${file.entries}'/></td>
+			<td style="text-align:right"><mrs:number f='#,##0B' n='${file.fileSize}'/></td>
+			<td style="text-align:right; white-space: nowrap;"><mrs:number f='#,##0B' n='${file.rawDataSize}'/></td>
+			<td style="text-align:right; width:20%">${file.buildDate}</td>
+			<td style="width:20%">
+				<span id='update-status' />
+				<canvas id='update-progress' width="100" height="10" style="display:none;" />
+			</td>
+		</tr>
+		</mrs:iterate>
+		</table>
+		
+		<table id="update" class="list status" cellspacing="0" cellpadding="0" style="width:100%; display: none;"
+			xmlns:m2="http://mrs.cmbi.ru.nl/mrs-web/nl/my-ns">
+		<caption>Update status</caption>
+		<tr>
+			<th width="10%">
+				<a href="#" onclick="Status.sortTable('update', 0);">Name</a>
+			</th>
+			<th colspan="2" width="45%" style="text-align:right;">
+				<a href="#" onclick="Status.sortTable('update', 1);">Last Fetch</a>
+			</th>
+			<th colspan="2" width="45%" style="text-align:right;">
+				<a href="#" onclick="Status.sortTable('update', 2);">Last Build</a>
+			</th>
+		</tr>
+
+		<mrs:iterate collection="updates" var="update">
+		<tr id="update-${update.name}" class="${update.failed ? 'error' : (update.building or update.fetching ? 'active' : '')}"
+			m2:keys="s=${update.name}|s=${update.fetchDate}|s=${update.buildDate}">
+			<td>${update.name}</td>
+			<td style="text-align:right;" class="${update.fetching ? 'active' : ''}">${update.fetchDate}</td>
+			<td class="${update.fetching ? 'active' : ''}"><a href="log?kind=fetch&amp;update=${update.name}">log</a></td>
+			<td style="text-align:right;" class="${update.building ? 'active' : ''}">${update.buildDate}</td>
+			<td class="${update.building ? 'active' : ''}"><a href="log?kind=build&amp;update=${update.name}">log</a></td>
+		</tr>
+		</mrs:iterate>
+		</table>
+		
+	</div>
+</body>
+</html>

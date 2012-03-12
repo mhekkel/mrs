@@ -12,20 +12,27 @@ namespace el = zeep::http::el;
 class M6Iterator;
 class M6Databank;
 
+struct M6AuthInfo;
+typedef std::vector<M6AuthInfo*> M6AuthInfoList;
+
 class M6Server : public zh::webapp
 {
   public:
 					M6Server(zx::element* inConfig);
 
 	virtual void	handle_request(const zh::request& req, zh::reply& rep);
+	virtual void	create_unauth_reply(bool stale, zh::reply& rep);
 
   private:
 	virtual void	init_scope(el::scope& scope);
+
+	void			ValidateAuthentication(const zh::request& request);
 
 	void			handle_entry(const zh::request& request, const el::scope& scope, zh::reply& reply);
 	void			handle_file(const zh::request& request, const el::scope& scope, zh::reply& reply);
 	void			handle_search(const zh::request& request, const el::scope& scope, zh::reply& reply);
 	void			handle_welcome(const zh::request& request, const el::scope& scope, zh::reply& reply);
+	void			handle_admin(const zh::request& request, const el::scope& scope, zh::reply& reply);
 
 	void			process_mrs_entry(zx::element* node, const el::scope& scope, boost::filesystem::path dir);
 	void			process_mrs_link(zx::element* node, const el::scope& scope, boost::filesystem::path dir);
@@ -51,4 +58,6 @@ class M6Server : public zh::webapp
 
 	zx::element*	mConfig;
 	M6DbList		mLoadedDatabanks;
+	M6AuthInfoList	mAuthInfo;
+	boost::mutex	mAuthMutex;
 };

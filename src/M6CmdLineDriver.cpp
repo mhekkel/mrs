@@ -103,7 +103,7 @@ void Query(int argc, char* argv[])
 	
 	M6Config::SetConfigFile(configFile);
 
-	zeep::xml::element* config = M6Config::Instance().LoadConfig(databank);
+	zeep::xml::element* config = M6Config::Instance().LoadDatabank(databank);
 	if (not config)
 		THROW(("Configuration for %s is missing", databank.c_str()));
 
@@ -179,7 +179,7 @@ void Info(int argc, char* argv[])
 	
 	M6Config::SetConfigFile(configFile);
 
-	zeep::xml::element* config = M6Config::Instance().LoadConfig(databank);
+	zeep::xml::element* config = M6Config::Instance().LoadDatabank(databank);
 	if (not config)
 		THROW(("Configuration for %s is missing", databank.c_str()));
 
@@ -286,7 +286,7 @@ void Dump(int argc, char* argv[])
 	
 	M6Config::SetConfigFile(configFile);
 
-	zeep::xml::element* config = M6Config::Instance().LoadConfig(databank);
+	zeep::xml::element* config = M6Config::Instance().LoadDatabank(databank);
 	if (not config)
 		THROW(("Configuration for %s is missing", databank.c_str()));
 
@@ -341,7 +341,7 @@ void Vacuum(int argc, char* argv[])
 	
 	M6Config::SetConfigFile(configFile);
 
-	zeep::xml::element* config = M6Config::Instance().LoadConfig(databank);
+	zeep::xml::element* config = M6Config::Instance().LoadDatabank(databank);
 	if (not config)
 		THROW(("Configuration for %s is missing", databank.c_str()));
 
@@ -391,7 +391,7 @@ void Validate(int argc, char* argv[])
 	
 	M6Config::SetConfigFile(configFile);
 
-	zeep::xml::element* config = M6Config::Instance().LoadConfig(databank);
+	zeep::xml::element* config = M6Config::Instance().LoadDatabank(databank);
 	if (not config)
 		THROW(("Configuration for %s is missing", databank.c_str()));
 

@@ -41,7 +41,7 @@ M6Config::~M6Config()
 	delete mConfig;
 }
 
-zx::element* M6Config::LoadConfig(const std::string& inDatabank)
+zx::element* M6Config::LoadDatabank(const std::string& inDatabank)
 {
 	string dbConfigPath = (boost::format("/m6-config/databank[@id='%1%']") % inDatabank).str();
 	auto dbConfig = mConfig->find(dbConfigPath);
@@ -65,6 +65,11 @@ zx::element* M6Config::LoadParser(const std::string& inParser)
 		THROW(("parser %s specified multiple times in config file", inParser.c_str()));
 	
 	return dbConfig.front();
+}
+
+zeep::xml::element_set M6Config::LoadDatabanks()
+{
+	return mConfig->find("/m6-config/databank");
 }
 
 zeep::xml::element_set M6Config::LoadServers()

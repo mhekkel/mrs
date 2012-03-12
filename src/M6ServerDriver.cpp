@@ -11,7 +11,6 @@
 #include "M6Config.h"
 #include "M6Error.h"
 #include "M6Server.h"
-#include "M6AdminServer.h"
 
 using namespace std;
 namespace po = boost::program_options;
@@ -37,15 +36,8 @@ void RunMainLoop()
 		if (VERBOSE)
 			cout << "listening at " << addr << ':' << port << endl;
 		
-		unique_ptr<zeep::http::server> server;
-		
-		if (config->get_attribute("type") == "www")
-			server.reset(new M6Server(config));
-		else if (config->get_attribute("type") == "admin")
-			server.reset(new M6AdminServer(config));
-		else  
-			THROW(("Invalid server type %s", config->get_attribute("type").c_str()));
-		
+		unique_ptr<zeep::http::server> server(new M6Server(config));
+
 		uint32 nrOfThreads = boost::thread::hardware_concurrency();
 
 		server->bind(addr, boost::lexical_cast<uint16>(port));

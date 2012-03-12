@@ -15,15 +15,11 @@
 			<db>sprot</db>
 			<db>trembl</db>
 		</dbs>
-	</server>
-
-	<server type="admin" addr="0.0.0.0" port="18091">
-		<docroot>./docroot/</docroot>
 		<realm name="M6 Administrator">
 			<user name="scott">b92ff7d60b994c8a0d2941ad9349e841</user>
 		</realm>
 	</server>
-	
+
 	<parser id="pdbfinder">
 		<match regex="^\s?(\w+)\s+:\s(.+)\n">
 			<switch test="1">
@@ -262,7 +258,7 @@
 	<databank id="pdbfinder" parser="pdbfinder">
 		<name>PDBFINDER</name>
 <!--		<file>C:\Users\maarten\projects\m6\test\pdbfinder.m6</file> -->
-		<file>pdbfinder.m6</file>
+		<file>/data/mrs/pdbfinder.m6</file>
 		<locale>en_US.UTF-8</locale>
 		
 		<!-- source type can be path, glob or regex -->
@@ -293,7 +289,7 @@
 	<databank id="omim" parser="omim">
 		<name>OMIM - Online Mendelian Inheritance in Man™</name>
 		<info>http://www.ncbi.nlm.nih.gov/entrez/query.fcgi?db=OMIM</info>
-		<file>omim.m6</file>
+		<file>/data/mrs/omim.m6</file>
 		<locale>en_US.UTF-8</locale>
 		<source>omim/omim.dat.gz</source>
 		<document-separator type="first-line-equals">*RECORD*</document-separator>
@@ -302,7 +298,7 @@
 	<databank id="sprot" parser="uniprot">
 		<name>SwissProt</name>
 		<info>http://www.uniprot.org/</info>
-		<file>sprot.m6</file>
+		<file>/data/mrs/sprot.m6</file>
 		<source>uniprot/uniprot_sprot.dat.gz</source>
 		<document-separator type="last-line-equals">//</document-separator>
 	</databank>
@@ -310,7 +306,7 @@
 	<databank id="sprotw" parser="uniprot">
 		<name>SwissProt - mini version</name>
 		<info>http://www.uniprot.org/</info>
-		<file>sprot.m6</file>
+		<file>/data/mrs/sprot.m6</file>
 		<source>test/sprot-mini.dat</source>
 		<document-separator type="last-line-equals">//</document-separator>
 	</databank>
@@ -318,14 +314,14 @@
 	<databank id="trembl" parser="uniprot">
 		<name>TrEMBL</name>
 		<info>http://www.uniprot.org/</info>
-		<file>trembl.m6</file>
+		<file>/data/mrs/trembl.m6</file>
 		<source>uniprot/uniprot_trembl.dat.gz</source>
 		<document-separator type="last-line-equals">//</document-separator>
 	</databank>
 	
 	<databank id="genbank" parser="genbank">
 		<name>Genbank</name>
-		<file>genbank.m6</file>
+		<file>/data/mrs//data/mrs/genbank.m6</file>
 		<source>genbank/*.seq.gz</source>
 		
 		<document-separator type="last-line-equals">//</document-separator>
@@ -333,7 +329,7 @@
 
 	<databank id="nlwiki" parser="mediawiki">
 		<name>Wikipedia - Nederlandstalig</name>
-		<file>nlwiki.m6</file>
+		<file>/data/mrs/nlwiki.m6</file>
 		<source>nlwiki/nlwiki-latest-pages-articles.xml.bz2</source>
 
 		<document-separator type="first-line-equals">  &lt;page&gt;</document-separator>

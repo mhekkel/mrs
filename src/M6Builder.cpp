@@ -35,6 +35,7 @@
 #include "M6Progress.h"
 #include "M6DataSource.h"
 #include "M6Queue.h"
+#include "M6Config.h"
 
 using namespace std;
 using namespace std::tr1;
@@ -864,7 +865,8 @@ M6Builder::~M6Builder()
 	delete mDatabank;
 }
 
-int64 M6Builder::Glob(zx::element* inSource, vector<fs::path>& outFiles)
+int64 M6Builder::Glob(boost::filesystem::path inRawDir,
+	zx::element* inSource, vector<fs::path>& outFiles)
 {
 	int64 result = 0;
 	
@@ -873,15 +875,34 @@ int64 M6Builder::Glob(zx::element* inSource, vector<fs::path>& outFiles)
 
 	string source = inSource->content();
 	ba::trim(source);
+	source = (inRawDir / source).make_preferred().string();
 	
-	if (inSource->get_attribute("type") == "path")
+	fs::path dir = fs::path(source).parent_path();
+	while (not dir.empty() and (ba::contains(dir.filename().string(), "?") or ba::contains(dir.filename().string(), "*")))
+		dir = dir.parent_path();
+
+	stack<fs::path> ds;
+	ds.push(dir);
+	while (not ds.empty())
 	{
-		fs::path path(source);
-		result += fs::file_size(path);
-		outFiles.push_back(path);
+		fs::path dir = ds.top();
+		ds.pop();
+		
+		if (not fs::is_directory(dir))
+			THROW(("run time error"));
+		
+		fs::directory_iterator end;
+		for (fs::directory_iterator i(dir); i != end; ++i)
+		{
+			if (fs::is_directory(*i))
+				ds.push(*i);
+			else if (M6FilePathNameMatches(*i, source))
+			{
+				result += fs::file_size(*i);
+				outFiles.push_back(*i);
+			}
+		}
 	}
-	else
-		THROW(("Unsupported source type"));
 	
 	return result;
 }
@@ -910,7 +931,8 @@ void M6Builder::Build()
 		mDatabank->StartBatchImport(mLexicon);
 		
 		vector<fs::path> files;
-		int64 rawBytes = Glob(mConfig->find_first("source"), files);
+		int64 rawBytes = Glob(M6Config::Instance().FindGlobal("/m6-config/rawdir"),
+			mConfig->find_first("source"), files);
 		M6Progress progress(rawBytes + 1, "parsing");
 	
 		M6Processor processor(*mDatabank, mLexicon, mConfig);
@@ -933,7 +955,7 @@ void M6Builder::Build()
 	}
 	catch (...)
 	{
-//		fs::remove_all(path);
+		fs::remove_all(path);
 		throw;
 	}
 }

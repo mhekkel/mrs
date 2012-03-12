@@ -19,21 +19,21 @@ typedef int64	M6Handle;
 
 namespace M6IO
 {
-
-M6Handle open(const std::string& inFile, MOpenMode inMode);
-M6Handle open_tempfile(const std::string& inFileNameTemplate); 
-void close(M6Handle inHandle);
-void truncate(M6Handle inHandle, int64 inSize);
-int64 file_size(M6Handle inHandle);
-
-void pwrite(M6Handle inHandle, const void* inBuffer, int64 inSize, int64 inOffset);
-void pread(M6Handle inHandle, void* inBuffer, int64 inSize, int64 inOffset);
-
+	M6Handle open(const std::string& inFile, MOpenMode inMode);
+	M6Handle open_tempfile(const std::string& inFileNameTemplate); 
+	void close(M6Handle inHandle);
+	void truncate(M6Handle inHandle, int64 inSize);
+	int64 file_size(M6Handle inHandle);
+	
+	void pwrite(M6Handle inHandle, const void* inBuffer, int64 inSize, int64 inOffset);
+	void pread(M6Handle inHandle, void* inBuffer, int64 inSize, int64 inOffset);
 }
 
 class M6FileReader;
 class M6FileWriter;
 struct M6FileSizeHelper;
+
+bool M6FilePathNameMatches(const boost::filesystem::path& inPath, const std::string inGlobPattern);
 
 class M6File
 {

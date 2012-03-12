@@ -11,6 +11,8 @@ class M6Config
 							const boost::filesystem::path& inConfigFile);
 	static M6Config&	Instance();
 
+	std::string			FindGlobal(const std::string& inXPath);
+
 	zeep::xml::element*	LoadConfig(const std::string& inDatabank);
 	zeep::xml::element*	LoadParser(const std::string& inParser);
 	zeep::xml::element_set

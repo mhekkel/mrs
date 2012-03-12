@@ -4,6 +4,10 @@
 #include <limits>
 
 #include <boost/thread.hpp>
+#include <boost/algorithm/string/split.hpp>
+#include <boost/algorithm/string/classification.hpp>
+#include <boost/foreach.hpp>
+#define foreach BOOST_FOREACH
 
 #include "M6File.h"
 #include "M6Error.h"
@@ -13,6 +17,8 @@
 #endif
 
 using namespace std;
+namespace fs = boost::filesystem;
+namespace ba = boost::algorithm;
 
 // --------------------------------------------------------------------
 
@@ -392,3 +398,73 @@ int64 M6File::Seek(int64 inOffset, int inMode)
 	
 	return mImpl->mOffset;
 }
+
+// --------------------------------------------------------------------
+
+namespace {
+
+bool Match(const char* inPattern, const char* inName)
+{
+	for (;;)
+	{
+		char op = *inPattern;
+
+		switch (op)
+		{
+			case 0:
+				return *inName == 0;
+			case '*':
+			{
+				if (inPattern[1] == 0)	// last '*' matches all 
+					return true;
+
+				const char* n = inName;
+				while (*n)
+				{
+					if (Match(inPattern + 1, n))
+						return true;
+					++n;
+				}
+				return false;
+			}
+			case '?':
+				if (*inName)
+					return Match(inPattern + 1, inName + 1);
+				else
+					return false;
+			default:
+				if (tolower(*inName) == tolower(op))
+				{
+					++inName;
+					++inPattern;
+				}
+				else
+					return false;
+				break;
+		}
+	}
+}
+
+}
+
+bool M6FilePathNameMatches(const fs::path& inPath, const string inGlobPattern)
+{
+	bool result = false;
+	
+	if (not inPath.empty())
+	{
+		vector<string> patterns;
+		ba::split(patterns, inGlobPattern, ba::is_any_of(";"));
+		foreach (string& pat, patterns)
+		{
+			if (Match(pat.c_str(), inPath.string().c_str()))
+			{
+				result = true;
+				break;
+			}
+		}
+	}
+	
+	return result;	
+}
+

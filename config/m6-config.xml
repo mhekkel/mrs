@@ -3,7 +3,9 @@
 <m6-config>
 	
 <!--	<srvdir>/srv/mrs</srvdir>-->
-	<srvdir>srv</srvdir>
+	<srvdir>/data/</srvdir>
+	<mrsdir>/data/mrs/</mrsdir>
+	<rawdir>/data/raw/</rawdir>
 
 	<server type="www" addr="0.0.0.0" port="18090">
 		<docroot>./docroot/</docroot>
@@ -203,7 +205,7 @@
 				</case>
 				
 				<case value='version'>
-					<match regex="(\S+) GI:(\d+)">
+					<match regex="(\S+)\s+GI:(\d+)">
 						<capture nr="1">
 							<index name="version" unique="true" type="string"/>
 						</capture>
@@ -260,14 +262,14 @@
 	<databank id="pdbfinder" parser="pdbfinder">
 		<name>PDBFINDER</name>
 <!--		<file>C:\Users\maarten\projects\m6\test\pdbfinder.m6</file> -->
-		<file>/data/mrs/pdbfinder.m6</file>
+		<file>pdbfinder.m6</file>
 		<locale>en_US.UTF-8</locale>
 		
 		<!-- source type can be path, glob or regex -->
-<!--		<source type="path">test/PDBFIND2.TXT.gz</source>-->
-<!--		<source type="path">C:\Users\maarten\projects\m6\test\PDBFIND2.TXT</source> -->
-<!--		<source type="path">C:\Users\maarten\projects\m6\test\pdbfind2-head-2.txt</source>-->
-		<source type="path">C:\Users\maarten\projects\m6\test\pdbfind2-head.txt</source> 
+<!--		<source>test/PDBFIND2.TXT.gz</source>-->
+<!--		<source>C:\Users\maarten\projects\m6\test\PDBFIND2.TXT</source> -->
+<!--		<source>C:\Users\maarten\projects\m6\test\pdbfind2-head-2.txt</source>-->
+		<source>C:\Users\maarten\projects\m6\test\pdbfind2-head.txt</source> 
 		
 		<!-- if no header-line or document-separator element is specified, the
 			 entire file is considered to be one document. -->
@@ -291,48 +293,48 @@
 	<databank id="omim" parser="omim">
 		<name>OMIM - Online Mendelian Inheritance in Man™</name>
 		<info>http://www.ncbi.nlm.nih.gov/entrez/query.fcgi?db=OMIM</info>
-		<file>/data/mrs/omim.m6</file>
+		<file>omim.m6</file>
 		<locale>en_US.UTF-8</locale>
-		<source type="path">/data/raw/omim/omim.dat.gz</source>
+		<source>omim/omim.dat.gz</source>
 		<document-separator type="first-line-equals">*RECORD*</document-separator>
 	</databank>
 	
 	<databank id="sprot" parser="uniprot">
 		<name>SwissProt</name>
 		<info>http://www.uniprot.org/</info>
-		<file>/data/mrs/sprot.m6</file>
-		<source type="path">/data/raw/uniprot/uniprot_sprot.dat.gz</source>
+		<file>sprot.m6</file>
+		<source>uniprot/uniprot_sprot.dat.gz</source>
 		<document-separator type="last-line-equals">//</document-separator>
 	</databank>
 
 	<databank id="sprotw" parser="uniprot">
 		<name>SwissProt - mini version</name>
 		<info>http://www.uniprot.org/</info>
-		<file>/data/mrs/sprot.m6</file>
-		<source type="path">test/sprot-mini.dat</source>
+		<file>sprot.m6</file>
+		<source>test/sprot-mini.dat</source>
 		<document-separator type="last-line-equals">//</document-separator>
 	</databank>
 	
 	<databank id="trembl" parser="uniprot">
 		<name>TrEMBL</name>
 		<info>http://www.uniprot.org/</info>
-		<file>/data/mrs/trembl.m6</file>
-		<source type="path">/data/raw/uniprot/uniprot_trembl.dat.gz</source>
+		<file>trembl.m6</file>
+		<source>uniprot/uniprot_trembl.dat.gz</source>
 		<document-separator type="last-line-equals">//</document-separator>
 	</databank>
 	
 	<databank id="genbank" parser="genbank">
 		<name>Genbank</name>
-		<file>/data/mrs/genbank.m6</file>
-		<source type="path">/data/raw/genbank/genbank-test.seq.gz</source>
+		<file>genbank.m6</file>
+		<source>genbank/*.seq.gz</source>
 		
 		<document-separator type="last-line-equals">//</document-separator>
 	</databank>
 
 	<databank id="nlwiki" parser="mediawiki">
 		<name>Wikipedia - Nederlandstalig</name>
-		<file>/data/mrs/nlwiki.m6</file>
-		<source type="path">/data/raw/nlwiki/nlwiki-latest-pages-articles.xml.bz2</source>
+		<file>nlwiki.m6</file>
+		<source>nlwiki/nlwiki-latest-pages-articles.xml.bz2</source>
 
 		<document-separator type="first-line-equals">  &lt;page&gt;</document-separator>
 		<document-separator type="last-line-equals">  &lt;/page&gt;</document-separator>

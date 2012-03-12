@@ -71,3 +71,12 @@ zeep::xml::element_set M6Config::LoadServers()
 {
 	return mConfig->find("/m6-config/server");
 }
+
+string M6Config::FindGlobal(const std::string& inXPath)
+{
+	zeep::xml::element* e = mConfig->find_first(inXPath);
+	string result;
+	if (e != nullptr)
+		result = e->content();
+	return result;
+}

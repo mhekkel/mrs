@@ -88,42 +88,43 @@ void M6InputDocument::SetAttribute(const string& inName, const char* inText, siz
 	mAttributes[inName] = attribute;
 }
 
-void M6InputDocument::Store()
+void M6InputDocument::Compress()
 {
 	M6DocStore& store(mDatabank.GetDocStore());
 
-	vector<char> buffer;
-	buffer.reserve(mText.length() + mText.length() / 20);
+	mBuffer.reserve(mText.length() + mText.length() / 20);
 
+	// set-up the compression machine
+	io::zlib_params params(io::zlib::best_speed);
+	params.noheader = true;
+	params.calculate_crc = true;
+
+	io::zlib_compressor z_stream(params);
+
+	io::filtering_stream<io::output> out;
+	out.push(z_stream);
+	out.push(io::back_inserter(mBuffer));
+
+	foreach (auto attr, mAttributes)
 	{
-		// set-up the compression machine
-		io::zlib_params params(io::zlib::best_speed);
-		params.noheader = true;
-		params.calculate_crc = true;
-	
-		io::zlib_compressor z_stream(params);
-
-		io::filtering_stream<io::output> out;
-		out.push(z_stream);
-		out.push(io::back_inserter(buffer));
-	
-		foreach (auto attr, mAttributes)
-		{
-			uint8 attrNr = store.RegisterAttribute(attr.first);
-			out.write(reinterpret_cast<char*>(&attrNr), 1);
-			
-			uint8 size = static_cast<uint8>(attr.second.length());
-			out.write(reinterpret_cast<char*>(&size), 1);
-			
-			out.write(attr.second.c_str(), size);
-		}
+		uint8 attrNr = store.RegisterAttribute(attr.first);
+		out.write(reinterpret_cast<char*>(&attrNr), 1);
 		
-		char mark = 0;
-		out.write(&mark, 1);
-		out.write(mText.c_str(), mText.length());
+		uint8 size = static_cast<uint8>(attr.second.length());
+		out.write(reinterpret_cast<char*>(&size), 1);
+		
+		out.write(attr.second.c_str(), size);
 	}
+	
+	char mark = 0;
+	out.write(&mark, 1);
+	out.write(mText.c_str(), mText.length());
+}
 
-	mDocNr = store.StoreDocument(&buffer[0], buffer.size(), mText.length());
+void M6InputDocument::Store()
+{
+	M6DocStore& store(mDatabank.GetDocStore());
+	mDocNr = store.StoreDocument(&mBuffer[0], mBuffer.size(), mText.length());
 }
 
 M6InputDocument::M6IndexTokenList::iterator M6InputDocument::GetIndexTokens(

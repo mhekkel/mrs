@@ -70,7 +70,6 @@
   <ItemGroup>
     <ClCompile Include="..\..\src\M6MD5.cpp" />
     <ClCompile Include="..\..\src\M6Server.cpp" />
-    <ClCompile Include="..\..\src\M6ServerDriver.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

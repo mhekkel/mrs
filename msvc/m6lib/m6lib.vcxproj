@@ -84,7 +84,6 @@
     <ClCompile Include="..\..\src\M6DocStore.cpp" />
     <ClCompile Include="..\..\src\M6Document.cpp" />
     <ClCompile Include="..\..\src\M6Error.cpp" />
-    <ClCompile Include="..\..\src\M6FastLZ.cpp" />
     <ClCompile Include="..\..\src\M6File.cpp" />
     <ClCompile Include="..\..\src\M6Index.cpp" />
     <ClCompile Include="..\..\src\M6Iterator.cpp" />

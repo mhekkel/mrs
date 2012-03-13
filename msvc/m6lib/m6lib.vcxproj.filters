@@ -30,9 +30,6 @@
     <ClCompile Include="..\..\src\M6Document.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\M6FastLZ.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\src\M6Lexicon.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

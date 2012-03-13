@@ -82,6 +82,7 @@ class M6InputDocument : public M6Document
 
 	virtual void		Tokenize(M6Lexicon& inLexicon, uint32 inLastStopWord);
 
+	void				Compress();
 	void				Store();
 	
 	uint32				GetDocNr() const					{ return mDocNr; }
@@ -96,6 +97,7 @@ class M6InputDocument : public M6Document
 							M6DataType inDataType);
 
 	std::string			mText;
+	std::vector<char>	mBuffer;
 	M6DocAttributes		mAttributes;
 	M6IndexTokenList	mTokens;
 	M6IndexValueList	mValues;

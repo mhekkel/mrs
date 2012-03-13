@@ -193,6 +193,8 @@
 				<case value='definition'>
 					<capture nr="2">
 						<replace what="\s\s+" with=" "/>
+						<replace what=";.+" with=""/>
+						<substr length="255"/>
 						<index name="title" />
 						<attr name="title"/>
 					</capture>

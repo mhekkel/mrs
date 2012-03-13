@@ -83,7 +83,15 @@ OBJECTS.m6-passwd = \
 
 all: m6 m6-server m6-passwd
 
-m6 m6-server m6-passwd: $(OBJECTS.$@)
+m6: $(OBJECTS.m6)
+	@ echo ">>" $@
+	@ $(CC) $(BOOST_INC_DIR:%=-I%) -o $@ -I. $^ $(LDFLAGS)
+
+m6-server: $(OBJECTS.m6-server)
+	@ echo ">>" $@
+	@ $(CC) $(BOOST_INC_DIR:%=-I%) -o $@ -I. $^ $(LDFLAGS)
+
+m6-passwd: $(OBJECTS.m6-passwd)
 	@ echo ">>" $@
 	@ $(CC) $(BOOST_INC_DIR:%=-I%) -o $@ -I. $^ $(LDFLAGS)
 

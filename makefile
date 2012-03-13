@@ -48,11 +48,9 @@ OBJECTS = \
 	$(OBJDIR)/M6Databank.o \
 	$(OBJDIR)/M6DataSource.o \
 	$(OBJDIR)/M6Dictionary.o \
-	$(OBJDIR)/M6DiskCache.o \
 	$(OBJDIR)/M6DocStore.o \
 	$(OBJDIR)/M6Document.o \
 	$(OBJDIR)/M6Error.o \
-	$(OBJDIR)/M6FastLZ.o \
 	$(OBJDIR)/M6File.o \
 	$(OBJDIR)/M6Index.o \
 	$(OBJDIR)/M6Iterator.o \

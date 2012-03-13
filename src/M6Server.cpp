@@ -289,7 +289,7 @@ void M6Server::handle_entry(const zh::request& request, const el::scope& scope, 
 		
 		try
 		{
-			M6Iterator* filter;
+			M6Iterator* filter = nullptr;
 			vector<string> terms;
 			ParseQuery(*mdb, q, false, terms, filter);
 			delete filter;
@@ -408,7 +408,7 @@ void M6Server::handle_search(const zh::request& request,
 			
 			unique_ptr<M6Iterator> rset;
 			
-			M6Iterator* filter;
+			M6Iterator* filter = nullptr;
 			try
 			{
 				ParseQuery(*db.mDatabank, q, true, queryTerms, filter);

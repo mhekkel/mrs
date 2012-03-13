@@ -79,7 +79,6 @@ class M6DatabankImpl
 	void			Validate();
 	void			DumpIndex(const string& inIndex, ostream& inStream);
 
-	void			CompressThread();
 	void			StoreThread();
 	void			IndexThread();
 
@@ -105,8 +104,8 @@ class M6DatabankImpl
 	M6IndexDescList			mIndices;
 	M6BasicIndexPtr			mAllTextIndex;
 	vector<float>			mDocWeights;
-	M6DocQueue				mCompressQueue, mStoreQueue, mIndexQueue;
-	boost::thread			mCompressThread, mStoreThread, mIndexThread;
+	M6DocQueue				mStoreQueue, mIndexQueue;
+	boost::thread			mStoreThread, mIndexThread;
 };
 
 // --------------------------------------------------------------------
@@ -1273,21 +1272,6 @@ M6BasicIndexPtr M6DatabankImpl::LoadIndex(const string& inName)
 	return result;
 }
 
-void M6DatabankImpl::CompressThread()
-{
-	for (;;)
-	{
-		M6InputDocument* doc = mCompressQueue.Get();
-		if (doc == nullptr)
-			break;
-		
-		doc->Compress();
-		mStoreQueue.Put(doc);
-	}
-	
-	mStoreQueue.Put(nullptr);
-}
-
 void M6DatabankImpl::StoreThread()
 {
 	for (;;)
@@ -1336,7 +1320,7 @@ void M6DatabankImpl::Store(M6Document* inDocument)
 		THROW(("storing documents is only supported in batch mode, for now"));
 
 	if (mBatch != nullptr)
-		mCompressQueue.Put(doc);
+		mStoreQueue.Put(doc);
 }
 
 M6Document* M6DatabankImpl::Fetch(uint32 inDocNr)
@@ -1567,15 +1551,13 @@ void M6DatabankImpl::StartBatchImport(M6Lexicon& inLexicon)
 {
 	mBatch = new M6BatchIndexProcessor(*this, inLexicon);
 	
-	mCompressThread = boost::thread(boost::bind(&M6DatabankImpl::CompressThread, this));
 	mStoreThread = boost::thread(boost::bind(&M6DatabankImpl::StoreThread, this));
 	mIndexThread = boost::thread(boost::bind(&M6DatabankImpl::IndexThread, this));
 }
 
 void M6DatabankImpl::CommitBatchImport()
 {
-	mCompressQueue.Put(nullptr);
-	mCompressThread.join();
+	mStoreQueue.Put(nullptr);
 	mStoreThread.join();
 	mIndexThread.join();
 	

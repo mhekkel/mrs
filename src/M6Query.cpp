@@ -114,12 +114,10 @@ M6Iterator* M6QueryParser::ParseTest()
 	switch (mLookahead)
 	{
 		case eM6TokenOpenParenthesis:
-		{
 			Match(eM6TokenOpenParenthesis);
 			result.reset(ParseQuery());
 			Match(eM6TokenCloseParenthesis);
 			break;
-		}
 		
 		case eM6TokenNOT:
 			mIsBooleanQuery = true;
@@ -147,6 +145,9 @@ M6Iterator* M6QueryParser::ParseTest()
 				mQueryTerms.push_back(s);
 			break;
 		}
+
+		default:// force an exception
+			Match(eM6TokenWord);
 	}
 	
 	return result.release();

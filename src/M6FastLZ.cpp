@@ -347,3 +347,98 @@ size_t FastLZDecompress(const void* input, size_t length,
 
 	return op - static_cast<uint8*>(output);
 }
+
+// --------------------------------------------------------------------
+
+namespace detail
+{
+
+bool M6FastLZDecompressFilterImpl::filter(const char*& begin_in, const char* end_in,
+				char*& begin_out, char* end_out, bool flush)
+{
+	
+}
+
+size_t FastLZDecompress(const void* input, size_t length,
+	void* output, uint32 maxout)
+{
+	const uint8* ip = static_cast<const uint8*>(input);
+	const uint8* ip_limit = ip + length;
+	uint8* op = static_cast<uint8*>(output);
+	uint8* op_limit = op + maxout;
+	uint32 ctrl = (*ip++) & 31;
+	bool loop = true;
+
+	while (loop)
+	{
+		const uint8* ref = op;
+		uint32 len = ctrl >> 5;
+		uint32 ofs = (ctrl & 31) << 8;
+
+		if (ctrl >= 32)
+		{
+			--len;
+			ref -= ofs;
+
+			if (len == 7 - 1)
+				len += *ip++;
+
+			ref -= *ip++;
+			
+			if (op + len + 3 > op_limit or ref - 1 < static_cast<uint8*>(output))
+				return 0;
+
+			if (ip < ip_limit)
+				ctrl = *ip++;
+			else
+				loop = false;
+
+			if (ref == op)
+			{
+				/* optimize copy for a run */
+				uint8 b = ref[-1];
+				
+				*op++ = b;
+				*op++ = b;
+				*op++ = b;
+				
+				for (; len > 0; --len)
+					*op++ = b;
+			}
+			else
+			{
+				/* copy from reference */
+				ref--;
+
+				*op++ = *ref++;
+				*op++ = *ref++;
+				*op++ = *ref++;
+				
+				for (; len > 0; --len)
+					*op++ = *ref++;
+			}
+		}
+		else
+		{
+			ctrl++;
+
+			if (op + ctrl > op_limit or ip + ctrl > ip_limit)
+				return 0;
+
+			*op++ = *ip++; 
+
+			for (--ctrl; ctrl; --ctrl)
+				*op++ = *ip++;
+
+			loop = ip < ip_limit;
+
+			if (loop)
+				ctrl = *ip++;
+		}
+	}
+
+	return op - static_cast<uint8*>(output);
+}
+
+
+}

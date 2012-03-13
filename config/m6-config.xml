@@ -289,7 +289,7 @@
 <!--		<source>test/PDBFIND2.TXT.gz</source>-->
 <!--		<source>C:\Users\maarten\projects\m6\test\PDBFIND2.TXT</source> -->
 <!--		<source>C:\Users\maarten\projects\m6\test\pdbfind2-head-2.txt</source>-->
-		<source>C:\Users\maarten\projects\m6\test\pdbfind2-head.txt</source> 
+		<source>pdbfinder/pdbfind2-head.txt</source> 
 		
 		<!-- if no header-line or document-separator element is specified, the
 			 entire file is considered to be one document. -->

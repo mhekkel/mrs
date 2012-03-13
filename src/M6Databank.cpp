@@ -167,7 +167,7 @@ class M6FullTextIx
 	// variables affecting indexing speed and memory consumption.
 	// The value chosen here seems to be a reasonable tradeoff.
 	enum {
-		kM6BufferEntryCount = 800000
+		kM6BufferEntryCount = 8000000
 //		kM6BufferEntryCount = 8000
 	};
 	

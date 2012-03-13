@@ -5,6 +5,9 @@
 
 #pragma once
 
+#include <boost/iostreams/filter/zlib.hpp>
+#include <boost/type_traits/is_same.hpp>
+
 // maxout should be length + length / 20 or length + 5 whichever is greater
 
 size_t FastLZCompress(const void* input, size_t length,

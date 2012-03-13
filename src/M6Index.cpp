@@ -1923,8 +1923,7 @@ void M6IndexImpl::SetAutoCommit(bool inAutoCommit)
 	if (mAutoCommit == true)
 	{
 		Commit();
-		if (mDirty)
-			mFile.PWrite(mHeader, 0);
+		mFile.PWrite(mHeader, 0);
 	}
 }
 

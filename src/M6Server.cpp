@@ -89,6 +89,7 @@ bool M6AuthInfo::Validate(const string& inMethod, const string& inURI,
 			ha2).Finalise();
 		
 		valid = inInfo["response"] == response;
+		mLastNC = nc;
 	}
 	return valid;
 }
@@ -933,7 +934,7 @@ void M6Server::ValidateAuthentication(const zh::request& request)
 	}
 
 	if (authorization.empty())
-		throw zh::not_authorized(false);
+		throw zh::unauthorized_exception(false);
 
 	// That was easy, now check the response
 	
@@ -973,7 +974,7 @@ void M6Server::ValidateAuthentication(const zh::request& request)
 	}
 	
 	if (stale or not authorized)
-		throw zh::not_authorized(stale);
+		throw zh::unauthorized_exception(stale);
 }
 
 

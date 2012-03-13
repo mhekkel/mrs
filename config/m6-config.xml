@@ -180,6 +180,10 @@
 						<index name="id" unique="true" type="string"/>
 						<attr name="id"/>
 					</capture>
+					<capture nr="2">
+						<substr start="52" length="3" />
+						<index name="division" type="string"/>
+					</capture>
 <!--					<capture nr="2">-->
 <!--						<substr start="56" length="12" />-->
 <!--						<index name="date" type="string"/>-->
@@ -187,9 +191,11 @@
 				</case>
 				
 				<case value='definition'>
-					<replace what="\s\s+" with=" "/>
-					<index name="title" />
-					<attr name="title"/>
+					<capture nr="2">
+						<replace what="\s\s+" with=" "/>
+						<index name="title" />
+						<attr name="title"/>
+					</capture>
 				</case>
 
 				<case value='accession'>
@@ -197,6 +203,12 @@
 						<split separator="\s+">
 							<index name="accession" unique="true" type="string"/>
 						</split>
+					</capture>
+				</case>
+
+				<case value='dblink'>
+					<capture nr="2">
+						<index name="dblink" type="string"/>
 					</capture>
 				</case>
 				
@@ -211,11 +223,21 @@
 					</match>
 				</case>
 				
+				<case value='keywords'>
+					<capture nr="2">
+						<replace what="\.$" />
+						<split separator=";\s*">
+							<index name="keywords" type="string"/>
+						</split>
+					</capture>
+				</case>
+
 				<case value='features'>
 					<match regex="^\s{5}\w+\s+((?:\S.+)(?:\n\s{20,}.+)*)" capture="1">
-						<match regex='/(\w+)="((?:\n|[^"])*?)"'>
+						<match regex='/(\w+)=(?|([^"].+)|"((?:[^"]++|"")*)")\n'>
 							<switch test="1">
 								<case value="translation"/>
+								<case value="db_xref"><capture nr="2"><index name="db_xref"/></capture></case>
 								<default>
 									<capture nr="2"><index name="feature"/></capture>
 								</default>
@@ -321,7 +343,7 @@
 	
 	<databank id="genbank" parser="genbank">
 		<name>Genbank</name>
-		<file>/data/mrs//data/mrs/genbank.m6</file>
+		<file>/data/mrs/genbank.m6</file>
 		<source>genbank/*.seq.gz</source>
 		
 		<document-separator type="last-line-equals">//</document-separator>

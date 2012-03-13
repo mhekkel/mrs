@@ -3,6 +3,7 @@
 #include <iostream>
 #include <memory>
 #include <list>
+#include <cctype>
 
 #define PCRE_STATIC
 #include <pcre.h>
@@ -534,10 +535,20 @@ struct M6IndexExpr : public M6Expr
 
 	virtual bool	Evaluate(M6InputDocument* inDocument, M6Argument& arg) const
 					{
-						if (VERBOSE)
-							cout << "index " << mName << " => " << string(arg.mText, arg.mLength) << endl;
+						// trim the text
+						const char* s = arg.mText;
+						uint32 l = arg.mLength;
 						
-						inDocument->Index(mName, mType, mUnique, arg.mText, arg.mLength);
+						while (l > 0 and isspace(*s))
+							++s, --l;
+						
+						while (l > 0 and isspace(s[l - 1]))
+							--l;
+						
+						if (VERBOSE)
+							cout << "index " << mName << " => '" << string(s, l) << "'" << endl;
+						
+						inDocument->Index(mName, mType, mUnique, s, l);
 						return true;
 					}
 	
@@ -551,10 +562,20 @@ struct M6AttrExpr : public M6Expr
 					M6AttrExpr(const string& inName) : mName(inName) {}
 	virtual bool	Evaluate(M6InputDocument* inDocument, M6Argument& arg) const
 					{
+						// trim the text
+						const char* s = arg.mText;
+						uint32 l = arg.mLength;
+						
+						while (l > 0 and isspace(*s))
+							++s, --l;
+						
+						while (l > 0 and isspace(s[l - 1]))
+							--l;
+						
 						if (VERBOSE)
-							cout << "attr " << mName << " => " << string(arg.mText, arg.mLength) << endl;
+							cout << "attr " << mName << " => " << string(s, l) << endl;
 
-						inDocument->SetAttribute(mName, arg.mText, arg.mLength);
+						inDocument->SetAttribute(mName, s, l);
 						return true;
 					}
 

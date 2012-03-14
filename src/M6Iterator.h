@@ -156,7 +156,7 @@ class M6VectorIterator : public M6Iterator
 
 					M6VectorIterator(M6Vector& inVector)
 					{
-						mVector.swap(inVector);
+						std::swap(mVector, inVector);
 						mPtr = mVector.begin();
 						mRanked = true;
 					}

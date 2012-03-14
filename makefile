@@ -28,6 +28,7 @@ LDFLAGS				+= $(BOOST_LIB_DIR:%=-L%) $(LIBS:%=-l%) -g $(BOOST_LIBS:%=$(BOOST_LIB
 CC					= icpc
 CFLAGS				+= $(BOOST_INC_DIR:%=-I%) -I. -pthread -std=c++0x -I../libzeep/
 CFLAGS				+= -I $(HOME)/projects/pcre/include -Wno-multichar
+CFLAGS				+= -Wno-deprecated
 LDFLAGS				+= -L $(HOME)/projects/pcre/lib
 CFLAGS				+= -I $(HOME)/projects/libarchive/include
 LDFLAGS				+= -L $(HOME)/projects/libarchive/lib

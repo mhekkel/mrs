@@ -1047,11 +1047,16 @@ void M6BatchIndexProcessor::IndexValue(const string& inIndexName,
 			default:			THROW(("Runtime error, unexpected index type"));
 		}
 
-		M6Lexicon::M6SharedLock lock(mLexicon);
-		uint32 t = mLexicon.Lookup(inValue);
+		uint32 t = 0;
+
+		{
+			M6Lexicon::M6SharedLock lock(mLexicon);
+			t = mLexicon.Lookup(inValue);
+		}
+		
 		if (t == 0)
 		{
-			M6Lexicon::M6UpgradeLock lock(mLexicon);
+			M6Lexicon::M6UniqueLock lock(mLexicon);
 			t = mLexicon.Store(inValue);
 		}
 		

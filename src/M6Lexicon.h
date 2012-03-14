@@ -30,11 +30,24 @@ class M6Lexicon
 	// shared lock mode and then stores those unknown
 	// in a unique lock mode.
 	
-	void			LockShared()				{ mMutex.lock_shared(); }
-	void			UnlockShared()				{ mMutex.unlock_shared(); }
+	class M6SharedLock : public boost::shared_lock<boost::shared_mutex>
+	{
+	  public:
+		typedef boost::shared_lock<boost::shared_mutex>	base_type;
+					M6SharedLock(M6Lexicon& inLexicon)
+						: base_type(inLexicon.mMutex) {}
+	};
 	
-	void			LockUnique()				{ mMutex.lock(); }
-	void			UnlockUnique()				{ mMutex.unlock(); }
+	class M6UpgradeLock : public boost::upgrade_lock<boost::shared_mutex>
+	{
+	  public:
+		typedef boost::upgrade_lock<boost::shared_mutex>	base_type;
+					M6UpgradeLock(M6Lexicon& inLexicon)
+						: base_type(inLexicon.mMutex) {}
+	};
+	
+	friend class M6SharedLock;
+	friend class M6UpgradeLock;
 	
 	uint32			Lookup(const std::string& inWord) const;
 	uint32			Lookup(const char* inWord, size_t inWordLength) const;

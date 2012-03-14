@@ -212,9 +212,8 @@ void M6InputDocument::Tokenize(M6Lexicon& inLexicon, uint32 inLastStopWord)
 	vector<uint32> tokenRemap(docTokenCount, kUndefinedTokenValue);
 	tokenRemap[0] = 0;
 	
-	try
 	{
-		inLexicon.LockShared();
+		M6Lexicon::M6SharedLock sharedLock(inLexicon);
 		
 		for (uint32 t = 1; t < docTokenCount; ++t)
 		{
@@ -223,23 +222,13 @@ void M6InputDocument::Tokenize(M6Lexicon& inLexicon, uint32 inLastStopWord)
 			
 			mDocLexicon.GetString(t, w, wl);
 			uint32 rt = inLexicon.Lookup(w, wl);
-
+	
 			if (rt != 0)
 				tokenRemap[t] = rt;
 		}
 		
-		inLexicon.UnlockShared();
-	}
-	catch (...)
-	{
-		inLexicon.UnlockShared();
-		throw;
-	}
+		M6Lexicon::M6UpgradeLock upgradeLock(inLexicon);
 	
-	try
-	{
-		inLexicon.LockUnique();
-		
 		for (uint32 t = 1; t < docTokenCount; ++t)
 		{
 			if (tokenRemap[t] == kUndefinedTokenValue)
@@ -251,13 +240,6 @@ void M6InputDocument::Tokenize(M6Lexicon& inLexicon, uint32 inLastStopWord)
 				tokenRemap[t] = inLexicon.Store(w, wl);
 			}
 		}
-		
-		inLexicon.UnlockUnique();
-	}
-	catch (...)
-	{
-		inLexicon.UnlockUnique();
-		throw;
 	}
 	
 	foreach (M6IndexTokens& tm, mTokens)

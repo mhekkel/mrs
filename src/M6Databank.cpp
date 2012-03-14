@@ -1047,9 +1047,13 @@ void M6BatchIndexProcessor::IndexValue(const string& inIndexName,
 			default:			THROW(("Runtime error, unexpected index type"));
 		}
 
-		mLexicon.LockUnique();
-		uint32 t = mLexicon.Store(inValue);
-		mLexicon.UnlockUnique();
+		M6Lexicon::M6SharedLock lock(mLexicon);
+		uint32 t = mLexicon.Lookup(inValue);
+		if (t == 0)
+		{
+			M6Lexicon::M6UpgradeLock lock(mLexicon);
+			t = mLexicon.Store(inValue);
+		}
 		
 		index->AddWord(t);
 	}
@@ -1304,7 +1308,7 @@ void M6DatabankImpl::Store(M6Document* inDocument)
 		THROW(("storing documents is only supported in batch mode, for now"));
 
 	if (mBatch != nullptr)
-		mStoreQueue.Put(doc);
+		mIndexQueue.Put(doc);
 }
 
 M6Document* M6DatabankImpl::Fetch(uint32 inDocNr)

@@ -802,7 +802,7 @@ void M6Processor::ProcessDocument(const string& inDoc)
 	M6Argument arg(inDoc.c_str(), inDoc.length());
 	mScript->Evaluate(doc, arg);
 	
-	doc->Tokenize(mLexicon, 0);
+//	doc->Tokenize(mLexicon, 0);
 	doc->Compress();
 	
 	mDatabank.Store(doc);
@@ -824,10 +824,10 @@ void M6Processor::ProcessDocument()
 void M6Processor::Process(vector<fs::path>& inFiles, M6Progress& inProgress)
 {
 	uint32 nrOfThreads = boost::thread::hardware_concurrency();
-//	if (nrOfThreads > 4)
-//		nrOfThreads -= 1;
-	if (nrOfThreads > 6)
-		nrOfThreads = 6;
+	if (nrOfThreads > 4)
+		nrOfThreads -= 1;
+//	if (nrOfThreads > 6)
+//		nrOfThreads = 6;
 	
 	boost::thread_group fileThreads, docThreads;
 	
@@ -913,7 +913,7 @@ int64 M6Builder::Glob(boost::filesystem::path inRawDir,
 		ds.pop();
 		
 		if (not fs::is_directory(dir))
-			THROW(("run time error"));
+			THROW(("'%s' is not a directory", dir.string().c_str()));
 		
 		fs::directory_iterator end;
 		for (fs::directory_iterator i(dir); i != end; ++i)

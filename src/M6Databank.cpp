@@ -685,7 +685,7 @@ void M6StringIx::FlushTerm(uint32 inTerm, uint32 inDocCount)
 	{
 		FlushedTerm* termData = new FlushedTerm;
 		termData->mTerm = mLexicon.GetString(inTerm);
-		termData->mDocs.swap(mDocs);
+		swap(termData->mDocs, mDocs);
 		mFlushQueue.Put(termData);
 	}
 }
@@ -932,6 +932,9 @@ class M6BatchIndexProcessor
 					const string& inValue, bool inUnique, uint32 inDocNr);
 	void		FlushDoc(uint32 inDocNr);
 	void		Finish(uint32 inDocCount);
+
+	void		IndexTokens(M6InputDocument* inDoc)
+					{ inDoc->Tokenize(mLexicon, 0); }
 
   private:
 
@@ -1294,6 +1297,8 @@ void M6DatabankImpl::IndexThread()
 		M6InputDocument* doc = mIndexQueue.Get();
 		if (doc == nullptr)
 			break;
+			
+		mBatch->IndexTokens(doc);
 		
 		uint32 docNr = doc->GetDocNr();
 		assert(docNr > 0);

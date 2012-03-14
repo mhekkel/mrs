@@ -72,7 +72,6 @@ OBJECTS.m6-test = \
 OBJECTS.m6-server = \
 	$(OBJECTS) \
 	$(OBJDIR)/M6Server.o \
-	$(OBJDIR)/M6ServerDriver.o \
 
 OBJECTS.m6-passwd = \
 	$(OBJECTS) \

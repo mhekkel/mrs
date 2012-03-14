@@ -17,7 +17,7 @@ class M6Builder
 						M6Builder(const std::string& inDatabank);
 						~M6Builder();
 	
-	void				Build();
+	void				Build(uint32 inNrOfThreads);
 
   private:
 

@@ -12,6 +12,19 @@
 
 using namespace std;
 
+#if defined(_MSC_VER)
+#include <Windows.h>
+
+#define AtomicExchange(v,n)			InterlockedExchange64(v, n)
+#define AtomicExchangeAndAdd(v,i)	InterlockedExchangeAdd64(v, i)
+
+#elif defined(__linux__) || defined(__linux)
+
+#define AtomicExchange(v,n)			atomic_exchange(v, n)
+#define AtomicExchangeAndAdd(v,i)	atomic_exchange_and_add(v, i)
+
+#endif
+
 struct M6ProgressImpl
 {
 					M6ProgressImpl(int64 inMax, const string& inAction)
@@ -114,19 +127,17 @@ M6Progress::~M6Progress()
 	
 void M6Progress::Consumed(int64 inConsumed)
 {
-	boost::mutex::scoped_lock lock(mImpl->mMutex);
-	mImpl->mConsumed += inConsumed;
+	int64 old = AtomicExchangeAndAdd(&mImpl->mConsumed, inConsumed);
 
-	if (mImpl->mConsumed == mImpl->mMax)
+	if (old + inConsumed >= mImpl->mMax)
 		mImpl->mThread.interrupt();
 }
 
 void M6Progress::Progress(int64 inProgress)
 {
-	boost::mutex::scoped_lock lock(mImpl->mMutex);
-	mImpl->mConsumed = inProgress;
+	int64 old = AtomicExchange(&mImpl->mConsumed, inProgress);
 
-	if (mImpl->mConsumed == mImpl->mMax)
+	if (inProgress >= mImpl->mMax)
 		mImpl->mThread.interrupt();
 }
 

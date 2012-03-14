@@ -76,7 +76,8 @@ class M6Processor
 						zx::element* inTemplate);
 	virtual			~M6Processor();
 	
-	void			Process(vector<fs::path>& inFiles, M6Progress& inProgress);
+	void			Process(vector<fs::path>& inFiles, M6Progress& inProgress,
+						uint32 inNrOfThreads);
 	
   private:
 	M6ExprPtr		ParseScript(zx::element* inScript);
@@ -802,7 +803,7 @@ void M6Processor::ProcessDocument(const string& inDoc)
 	M6Argument arg(inDoc.c_str(), inDoc.length());
 	mScript->Evaluate(doc, arg);
 	
-//	doc->Tokenize(mLexicon, 0);
+	doc->Tokenize(mLexicon, 0);
 	doc->Compress();
 	
 	mDatabank.Store(doc);
@@ -821,22 +822,17 @@ void M6Processor::ProcessDocument()
 	mDocQueue.Put(string());
 }
 
-void M6Processor::Process(vector<fs::path>& inFiles, M6Progress& inProgress)
+void M6Processor::Process(vector<fs::path>& inFiles, M6Progress& inProgress,
+	uint32 inNrOfThreads)
 {
-	uint32 nrOfThreads = boost::thread::hardware_concurrency();
-	if (nrOfThreads > 4)
-		nrOfThreads -= 1;
-//	if (nrOfThreads > 6)
-//		nrOfThreads = 6;
-	
 	boost::thread_group fileThreads, docThreads;
 	
-	if (inFiles.size() >= nrOfThreads)
+	if (inFiles.size() >= inNrOfThreads)
 		mUseDocQueue = false;
 	else
 	{
 		mUseDocQueue = true;
-		for (uint32 i = 0; i < nrOfThreads; ++i)
+		for (uint32 i = 0; i < inNrOfThreads; ++i)
 			docThreads.create_thread(boost::bind(&M6Processor::ProcessDocument, this));
 	}
 
@@ -848,10 +844,10 @@ void M6Processor::Process(vector<fs::path>& inFiles, M6Progress& inProgress)
 	}
 	else
 	{
-		if (nrOfThreads > inFiles.size())
-			nrOfThreads = inFiles.size();
+		if (inNrOfThreads > inFiles.size())
+			inNrOfThreads = inFiles.size();
 
-		for (uint32 i = 0; i < nrOfThreads; ++i)
+		for (uint32 i = 0; i < inNrOfThreads; ++i)
 			fileThreads.create_thread(boost::bind(&M6Processor::ProcessFile, this, boost::ref(inProgress)));
 
 		foreach (fs::path& file, inFiles)
@@ -931,7 +927,7 @@ int64 M6Builder::Glob(boost::filesystem::path inRawDir,
 	return result;
 }
 
-void M6Builder::Build()
+void M6Builder::Build(uint32 inNrOfThreads)
 {
 //	boost::timer::auto_cpu_timer t;
 
@@ -960,7 +956,7 @@ void M6Builder::Build()
 		M6Progress progress(rawBytes + 1, "parsing");
 	
 		M6Processor processor(*mDatabank, mLexicon, mConfig);
-		processor.Process(files, progress);
+		processor.Process(files, progress, inNrOfThreads);
 		progress.Consumed(1);
 	
 		mDatabank->CommitBatchImport();

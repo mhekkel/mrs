@@ -211,59 +211,53 @@ void M6InputDocument::Tokenize(M6Lexicon& inLexicon, uint32 inLastStopWord)
 	vector<uint32> tokenRemap(docTokenCount, kUndefinedTokenValue);
 	tokenRemap[0] = 0;
 	
-//	try
-//	{
-//		inLexicon.LockShared();
-//		
-//		for (uint32 t = 1; t < docTokenCount; ++t)
-//		{
-//			const char* w;
-//			size_t wl;
-//			
-//			mDocLexicon.GetString(t, w, wl);
-//			uint32 rt = inLexicon.Lookup(w, wl);
-//
-//			if (rt != 0)
-//				tokenRemap[t] = rt;
-//		}
-//		
-//		inLexicon.UnlockShared();
-//	}
-//	catch (...)
-//	{
-//		inLexicon.UnlockShared();
-//		throw;
-//	}
-//	
-//	try
-//	{
-//		inLexicon.LockUnique();
-//		
+	try
+	{
+		inLexicon.LockShared();
+		
 		for (uint32 t = 1; t < docTokenCount; ++t)
 		{
 			const char* w;
 			size_t wl;
 			
 			mDocLexicon.GetString(t, w, wl);
-			tokenRemap[t] = inLexicon.Store(w, wl);
+			uint32 rt = inLexicon.Lookup(w, wl);
 
-//			if (tokenRemap[t] == kUndefinedTokenValue)
-//			{
-//				const char* w;
-//				size_t wl;
-//				
-//				mDocLexicon.GetString(t, w, wl);
-//				tokenRemap[t] = inLexicon.Store(w, wl);
-//			}
+			if (rt != 0)
+				tokenRemap[t] = rt;
 		}
-//		
-//		inLexicon.UnlockUnique();
-//	}
-//	catch (...)
-//	{
-//		inLexicon.UnlockUnique();
-//		throw;
-//	}
+		
+		inLexicon.UnlockShared();
+	}
+	catch (...)
+	{
+		inLexicon.UnlockShared();
+		throw;
+	}
+	
+	try
+	{
+		inLexicon.LockUnique();
+		
+		for (uint32 t = 1; t < docTokenCount; ++t)
+		{
+			if (tokenRemap[t] == kUndefinedTokenValue)
+			{
+				const char* w;
+				size_t wl;
+				
+				mDocLexicon.GetString(t, w, wl);
+				tokenRemap[t] = inLexicon.Store(w, wl);
+			}
+		}
+		
+		inLexicon.UnlockUnique();
+	}
+	catch (...)
+	{
+		inLexicon.UnlockUnique();
+		throw;
+	}
 	
 	foreach (M6IndexTokens& tm, mTokens)
 	{

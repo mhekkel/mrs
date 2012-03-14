@@ -28,6 +28,7 @@ void Build(int argc, char* argv[])
 		("databank,d",	po::value<string>(),	"Databank to build")
 		("config-file,c", po::value<string>(),	"Configuration file")
 		("verbose,v",							"Be verbose")
+		("threads,a", po::value<uint32>(),		"Nr of threads/pipelines")
 		("help,h",								"Display help message")
 		;
 
@@ -58,8 +59,18 @@ void Build(int argc, char* argv[])
 	
 	M6Config::SetConfigFile(configFile);
 
+	uint32 nrOfThreads = boost::thread::hardware_concurrency();
+	if (nrOfThreads > 4)
+		nrOfThreads -= 1;
+	if (nrOfThreads > 6)
+		nrOfThreads = 6;
+	if (vm.count("threads"))
+		nrOfThreads = vm["threads"].as<uint32>();
+	if (nrOfThreads < 1)
+		nrOfThreads = 1;
+
 	M6Builder builder(databank);
-	builder.Build();
+	builder.Build(nrOfThreads);
 }
 
 void Query(int argc, char* argv[])

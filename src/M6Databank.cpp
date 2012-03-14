@@ -933,9 +933,6 @@ class M6BatchIndexProcessor
 	void		FlushDoc(uint32 inDocNr);
 	void		Finish(uint32 inDocCount);
 
-	void		IndexTokens(M6InputDocument* inDoc)
-					{ inDoc->Tokenize(mLexicon, 0); }
-
   private:
 
 	template<class T>
@@ -1298,8 +1295,6 @@ void M6DatabankImpl::IndexThread()
 		if (doc == nullptr)
 			break;
 			
-		mBatch->IndexTokens(doc);
-		
 		uint32 docNr = doc->GetDocNr();
 		assert(docNr > 0);
 		

@@ -83,7 +83,7 @@ class M6InputDocument : public M6Document
 	virtual void		Tokenize(M6Lexicon& inLexicon, uint32 inLastStopWord);
 
 	void				Compress();
-	void				Store();
+	uint32				Store();
 	
 	uint32				GetDocNr() const					{ return mDocNr; }
 	

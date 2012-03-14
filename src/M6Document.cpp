@@ -121,10 +121,11 @@ void M6InputDocument::Compress()
 	out.write(mText.c_str(), mText.length());
 }
 
-void M6InputDocument::Store()
+uint32 M6InputDocument::Store()
 {
 	M6DocStore& store(mDatabank.GetDocStore());
 	mDocNr = store.StoreDocument(&mBuffer[0], mBuffer.size(), mText.length());
+	return mDocNr;
 }
 
 M6InputDocument::M6IndexTokenList::iterator M6InputDocument::GetIndexTokens(

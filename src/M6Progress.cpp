@@ -8,22 +8,44 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/timer/timer.hpp>
 
+#if defined(__linux__) || defined(__INTEL_COMPILER_BUILD_DATE)
+#include <atomic>
+
+typedef std::atomic<int64>	M6Counter;
+
+inline int64 add(M6Counter& ioCounter, int64 inIncrement)
+{
+	return ioCounter += inIncrement;
+} 
+
+inline int64 set(M6Counter& ioCounter, int64 inValue)
+{
+	return ioCounter = inValue;
+}
+
+#else
+
+#include <Windows.h>
+
+typedef int64 M6Counter
+
+inline int64 add(M6Counter& ioCounter, int64 inIncrement)
+{
+	return ::InterlockedExchangeAdd64(&ioCounter, inIncrement);
+} 
+
+inline int64 set(M6Counter& ioCounter, int64 inValue)
+{
+	::InterlockedExchange64(&ioCounter, inValue);
+	return inValue;
+}
+
+
+#endif
+
 #include "M6Progress.h"
 
 using namespace std;
-
-#if defined(_MSC_VER)
-#include <Windows.h>
-
-#define AtomicExchange(v,n)			InterlockedExchange64(v, n)
-#define AtomicExchangeAndAdd(v,i)	InterlockedExchangeAdd64(v, i)
-
-#elif defined(__linux__) || defined(__linux)
-
-#define AtomicExchange(v,n)			atomic_exchange(v, n)
-#define AtomicExchangeAndAdd(v,i)	atomic_exchange_and_add(v, i)
-
-#endif
 
 struct M6ProgressImpl
 {
@@ -36,7 +58,8 @@ struct M6ProgressImpl
 	void			PrintProgress();
 	void			PrintDone();
 
-	int64			mMax, mConsumed;
+	int64			mMax;
+	M6Counter		mConsumed;
 	string			mAction, mMessage;
 	boost::mutex	mMutex;
 	boost::thread	mThread;
@@ -127,17 +150,13 @@ M6Progress::~M6Progress()
 	
 void M6Progress::Consumed(int64 inConsumed)
 {
-	int64 old = AtomicExchangeAndAdd(&mImpl->mConsumed, inConsumed);
-
-	if (old + inConsumed >= mImpl->mMax)
+	if (add(mImpl->mConsumed, inConsumed) >= mImpl->mMax)
 		mImpl->mThread.interrupt();
 }
 
 void M6Progress::Progress(int64 inProgress)
 {
-	int64 old = AtomicExchange(&mImpl->mConsumed, inProgress);
-
-	if (inProgress >= mImpl->mMax)
+	if (set(mImpl->mConsumed, inProgress) >= mImpl->mMax)
 		mImpl->mThread.interrupt();
 }
 

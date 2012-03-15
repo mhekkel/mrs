@@ -229,7 +229,7 @@ void M6InputDocument::Tokenize(M6Lexicon& inLexicon, uint32 inLastStopWord)
 	}
 	
 	{
-		M6Lexicon::M6UniqueLock upgradeLock(inLexicon);
+		M6Lexicon::M6UniqueLock uniqueLock(inLexicon);
 	
 		for (uint32 t = 1; t < docTokenCount; ++t)
 		{

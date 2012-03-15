@@ -483,7 +483,7 @@ class M6BasicIx
 	
 	struct FlushedTerm
 	{
-		string			mTerm;
+		uint32			mTerm;
 		vector<uint32>	mDocs;
 	};
 	typedef M6Queue<FlushedTerm*>	M6FlushQueue;
@@ -609,7 +609,7 @@ void M6BasicIx::FlushTerm(uint32 inTerm, uint32 inDocCount)
 		uint32 docNr = 0;
 
 		FlushedTerm* termData = new FlushedTerm;
-		termData->mTerm = mLexicon.GetString(inTerm);
+		termData->mTerm = inTerm;
 
 		for (uint32 d = 0; d < mDocCount; ++d)
 		{
@@ -668,7 +668,7 @@ M6StringIx::M6StringIx(M6FullTextIx& inFullTextIndex, M6Lexicon& inLexicon,
 {
 	assert(mIndex);
 	mIndex->SetAutoCommit(false);
-	mIndex->SetBatchMode(true);
+	mIndex->SetBatchMode(inLexicon);
 	mFullTextIndex.SetExcludeInFullText(mIndexNr);
 }
 	
@@ -683,7 +683,7 @@ void M6StringIx::FlushTerm(uint32 inTerm, uint32 inDocCount)
 	if (not mDocs.empty())
 	{
 		FlushedTerm* termData = new FlushedTerm;
-		termData->mTerm = mLexicon.GetString(inTerm);
+		termData->mTerm = inTerm;
 		swap(termData->mDocs, mDocs);
 		mFlushQueue.Put(termData);
 	}
@@ -732,7 +732,7 @@ M6TextIx::M6TextIx(M6FullTextIx& inFullTextIndex, M6Lexicon& inLexicon,
 {
 	assert(mIndex);
 	mIndex->SetAutoCommit(false);
-	mIndex->SetBatchMode(true);
+	mIndex->SetBatchMode(inLexicon);
 	mFullTextIndex.SetUsesInDocLocation(mIndexNr);
 	mIDLFile = new M6File(
 		mFullTextIndex.GetScratchDir().parent_path() / (inName + ".idl"), eReadWrite);
@@ -778,7 +778,7 @@ void M6TextIx::FlushTerm(uint32 inTerm, uint32 inDocCount)
 			mIDLBits->Sync();
 
 		FlushedIDLTerm* termData = new FlushedIDLTerm;
-		termData->mTerm = mLexicon.GetString(inTerm);
+		termData->mTerm = inTerm;
 		termData->mIDLOffset = mIDLOffset;
 		
 		M6IBitStream bits(mBits);
@@ -845,7 +845,7 @@ M6WeightedWordIx::M6WeightedWordIx(M6FullTextIx& inFullTextIndex, M6Lexicon& inL
 {
 	assert(mIndex);
 	mIndex->SetAutoCommit(false);
-	mIndex->SetBatchMode(true);
+	mIndex->SetBatchMode(inLexicon);
 }
 
 void M6WeightedWordIx::AddDocTerm(uint32 inDoc, uint8 inFrequency, M6OBitStream& inIDL)
@@ -886,7 +886,7 @@ void M6WeightedWordIx::FlushTerm(uint32 inTerm, uint32 inDocCount)
 		M6IBitStream bits(mBits);
 		
 		FlushedWeightedTerm* termData = new FlushedWeightedTerm;
-		termData->mTerm = mLexicon.GetString(inTerm);
+		termData->mTerm = inTerm;
 
 		uint32 docNr = 0;
 		for (uint32 d = 0; d < mDocCount; ++d)
@@ -1029,9 +1029,6 @@ void M6BatchIndexProcessor::IndexValue(const string& inIndexName,
 			default:			THROW(("Runtime error, unexpected index type"));
 		}
 		
-		index->SetAutoCommit(false);
-		index->SetBatchMode(true);
-	
 		index->Insert(inValue, inDocNr);
 	}
 	else if (inValue.length() <= kM6MaxKeyLength)
@@ -1554,17 +1551,25 @@ void M6DatabankImpl::CommitBatchImport()
 	mBatch->Finish(mStore->size());
 	delete mBatch;
 	mBatch = nullptr;
-
+	
+	int64 size = mAllTextIndex->size();
+	foreach (M6IndexDesc& desc, mIndices)
+		size += desc.mIndex->size();
+	
+	M6Progress progress(size + 1, "writing indices");
+	mAllTextIndex->FinishBatchMode(progress);
 	foreach (M6IndexDesc& desc, mIndices)
 	{
-		desc.mIndex->SetAutoCommit(true);
-		desc.mIndex->SetBatchMode(false);
+		if (desc.mIndex->IsInBatchMode())
+			desc.mIndex->FinishBatchMode(progress);
+		else
+			desc.mIndex->Vacuum(progress);
 	}
-	
+
 	// And clean up
 	fs::remove_all(mDbDirectory / "tmp");
+	progress.Consumed(1);
 
-	Vacuum();
 	RecalculateDocumentWeights();
 	CreateDictionary();
 }

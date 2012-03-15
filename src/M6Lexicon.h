@@ -80,6 +80,9 @@ class M6Lexicon
 
 	int				Compare(uint32 inA, uint32 inB) const;
 
+	template<class Comparator>
+	int				Compare(uint32 inA, uint32 inB, Comparator inComp) const;
+
 	uint32			Count() const;
 	
   private:
@@ -110,4 +113,20 @@ inline std::string M6Lexicon::GetString(uint32 inNr) const
 	GetString(inNr, w, l);
 
 	return std::string(w, l);
+}
+
+template<class Comparator>
+inline int M6Lexicon::Compare(uint32 inA, uint32 inB, Comparator inComp) const
+{
+	const char* wA;
+	size_t lA;
+
+	GetString(inA, wA, lA);
+
+	const char* wB;
+	size_t lB;
+
+	GetString(inB, wB, lB);
+
+	return inComp(wA, lA, wB, lB);
 }

@@ -27,7 +27,7 @@ inline int64 set(M6Counter& ioCounter, int64 inValue)
 
 #include <Windows.h>
 
-typedef int64 M6Counter
+typedef int64 M6Counter;
 
 inline int64 add(M6Counter& ioCounter, int64 inIncrement)
 {
@@ -143,21 +143,33 @@ M6Progress::M6Progress(int64 inMax, const string& inAction)
 M6Progress::~M6Progress()
 {
 //	mImpl->mMutex.lock();
-	mImpl->mThread.interrupt();
-	mImpl->mThread.join();
+	if (mImpl->mThread.joinable())
+	{
+		mImpl->mThread.interrupt();
+		mImpl->mThread.join();
+	}
+
 	delete mImpl;
 }
 	
 void M6Progress::Consumed(int64 inConsumed)
 {
-	if (add(mImpl->mConsumed, inConsumed) >= mImpl->mMax)
+	if (add(mImpl->mConsumed, inConsumed) >= mImpl->mMax and
+		mImpl->mThread.joinable())
+	{
 		mImpl->mThread.interrupt();
+		mImpl->mThread.join();
+	}
 }
 
 void M6Progress::Progress(int64 inProgress)
 {
-	if (set(mImpl->mConsumed, inProgress) >= mImpl->mMax)
+	if (set(mImpl->mConsumed, inProgress) >= mImpl->mMax and
+		mImpl->mThread.joinable())
+	{
 		mImpl->mThread.interrupt();
+		mImpl->mThread.join();
+	}
 }
 
 void M6Progress::Message(const std::string& inMessage)

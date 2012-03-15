@@ -16,6 +16,7 @@
 #include <vector>
 #include <numeric>
 #include <iostream>
+#include <queue>
 
 #include <boost/static_assert.hpp>
 #include <boost/foreach.hpp>
@@ -28,6 +29,7 @@
 #include "M6BitStream.h"
 #include "M6Progress.h"
 #include "M6Iterator.h"
+#include "M6Lexicon.h"
 
 using namespace std;
 namespace fs = boost::filesystem;
@@ -74,7 +76,8 @@ const int64
 //	kM6MaxEntriesPerPage	= kM6KeySpace / 8;	// see above
 
 const uint32
-	kM6MaxKeyLength			= (kM6MinKeySpace / 2 > 255 ? 255 : kM6MinKeySpace / 2);
+	kM6MaxKeyLength			= (kM6MinKeySpace / 2 > 255 ? 255 : kM6MinKeySpace / 2),
+	kM6BatchSize			= 1024 * 1024;
 
 #else
 
@@ -86,7 +89,8 @@ const int64
 	kM6MaxEntriesPerPage	= kM6KeySpace / 8;	// see above
 
 const uint32
-	kM6MaxKeyLength			= (kM6MinKeySpace / 2 > 255 ? 255 : kM6MinKeySpace / 2);
+	kM6MaxKeyLength			= (kM6MinKeySpace / 2 > 255 ? 255 : kM6MinKeySpace / 2),
+	kM6BatchSize			= 1024 * 1024;
 
 #endif
 
@@ -632,6 +636,9 @@ struct M6IndexImpl
 					GetIterator(uint32 inPage, uint32 inKeyNr) = 0;
 	virtual uint32	GetCount(uint32 inPage, uint32 inKeyNr) = 0;
 
+	virtual void	Insert(uint32 inKey, const uint32& inValue)						{ THROW(("Incorrect use of index")); }
+	virtual void	Insert(uint32 inKey, const M6MultiData& inValue)				{ THROW(("Incorrect use of index")); }
+	virtual void	Insert(uint32 inKey, const M6MultiIDLData& inValue)				{ THROW(("Incorrect use of index")); }
 	virtual void	Insert(const string& inKey, const uint32& inValue)				{ THROW(("Incorrect use of index")); }
 	virtual void	Insert(const string& inKey, const M6MultiData& inValue)			{ THROW(("Incorrect use of index")); }
 	virtual void	Insert(const string& inKey, const M6MultiIDLData& inValue)		{ THROW(("Incorrect use of index")); }
@@ -664,7 +671,9 @@ struct M6IndexImpl
 	virtual void	Dump() = 0;
 
 	void			SetAutoCommit(bool inAutoCommit);
-	void			SetBatchMode(bool inBatchMode);
+	virtual void	SetBatchMode(M6Lexicon& inLexicon) = 0;
+	virtual void	FinishBatchMode(M6Progress& inProgress) = 0;
+	virtual bool	IsInBatchMode() = 0;
 
 	virtual void	Commit() = 0;
 	virtual void	Rollback() = 0;
@@ -691,7 +700,8 @@ struct M6IndexImpl
 	M6BasicIndex&	mIndex;
 	M6IxFileHeader	mHeader;
 	bool			mAutoCommit;
-	bool			mBatchMode;
+	M6File*			mBatchFile;
+	M6Lexicon*		mLexicon;
 	bool			mDirty;
 
 	// cache
@@ -739,6 +749,7 @@ class M6IndexImplT : public M6IndexImpl
 					GetIterator(uint32 inPage, uint32 inKeyNr);
 	virtual uint32	GetCount(uint32 inPage, uint32 inKeyNr);
 
+	virtual void	Insert(uint32 inKey, const M6DataType& inValue);
 	virtual void	Insert(const string& inKey, const M6DataType& inValue);
 	virtual bool	Erase(const string& inKey);
 	virtual bool	Find(const string& inKey, M6DataType& outValue);
@@ -752,6 +763,9 @@ class M6IndexImplT : public M6IndexImpl
 	virtual void	Rollback();
 	virtual void	Vacuum(M6Progress& inProgress);
 
+	virtual void	SetBatchMode(M6Lexicon& inLexicon);
+	virtual void	FinishBatchMode(M6Progress& inProgress);
+	virtual bool	IsInBatchMode() 				{ return mBatchFile != nullptr; }
 	void			CreateUpLevels(deque<pair<string,uint32>>& up);
 
 	virtual void	Validate();
@@ -760,9 +774,23 @@ class M6IndexImplT : public M6IndexImpl
 	virtual M6BasicPage*
 					GetFirstLeafPage();
 
+	// batch support
+	struct M6BatchEntry
+	{
+		uint32		key;
+		M6DataType	data;
+	};
+	
   protected:
 	virtual M6BasicPage*	CreateLeafPage(M6IndexPageData* inData, uint32 inPageNr);
 	virtual M6BasicPage*	CreateBranchPage(M6IndexPageData* inData, uint32 inPageNr);
+
+	BOOST_STATIC_ASSERT(sizeof(M6BatchEntry[2]) == (2 * sizeof(M6BatchEntry)));
+	
+	M6BatchEntry*	mBatch;
+	uint32			mBatchCount;
+	
+	void			FlushBatch();
 };
 
 // --------------------------------------------------------------------
@@ -1604,7 +1632,8 @@ M6IndexImpl::M6IndexImpl(M6BasicIndex& inIndex, const fs::path& inPath, M6IndexT
 	, mIndex(inIndex)
 	, mDirty(false)
 	, mAutoCommit(true)
-	, mBatchMode(false)
+	, mBatchFile(nullptr)
+	, mLexicon(nullptr)
 	, mCache(nullptr), mLRUHead(nullptr), mLRUTail(nullptr), mCacheCount(0)
 {
 	if (inMode == eReadWrite and mFile.Size() == 0)
@@ -1632,6 +1661,8 @@ M6IndexImpl::~M6IndexImpl()
 
 	if (mDirty)
 		mFile.PWrite(mHeader, 0);
+	
+	delete mBatchFile;
 }
 
 void M6IndexImpl::StoreBits(M6OBitStream& inBits, M6BitVector& outBitVector)
@@ -1871,7 +1902,7 @@ void M6IndexImpl::Release(Page*& ioPage)
 	
 	cp->mRefCount -= 1;
 	
-	if (cp->mRefCount == 0 and mBatchMode and ioPage->GetKind() == eM6IndexBitVectorPage)
+	if (cp->mRefCount == 0 and ioPage->GetKind() == eM6IndexBitVectorPage)
 	{
 		if (ioPage->IsDirty())
 			ioPage->Flush(mFile);
@@ -1935,17 +1966,14 @@ void M6IndexImpl::SetAutoCommit(bool inAutoCommit)
 	}
 }
 
-void M6IndexImpl::SetBatchMode(bool inBatchMode)
-{
-	mBatchMode = inBatchMode;
-}
-
 // --------------------------------------------------------------------
 
 template<class M6DataType>
 M6IndexImplT<M6DataType>::M6IndexImplT(M6BasicIndex& inIndex, const fs::path& inPath,
 		M6IndexType inType, MOpenMode inMode)
 	: M6IndexImpl(inIndex, inPath, inType, inMode)
+	, mBatch(nullptr)
+	, mBatchCount(0)
 {
 	InitCache(kM6CacheCount);
 }
@@ -1972,6 +2000,7 @@ void M6IndexImplT<M6MultiIDLData>::Remap(M6MultiIDLData& ioData, const vector<ui
 template<class M6DataType>
 M6IndexImplT<M6DataType>::~M6IndexImplT()
 {
+	delete [] mBatch;
 }
 
 template<class M6DataType>
@@ -2144,6 +2173,122 @@ for (uint32 ix = 0; ix < mCacheCount; ++ix)
 }
 
 template<class M6DataType>
+void M6IndexImplT<M6DataType>::Insert(uint32 inKey, const M6DataType& inValue)
+{
+	if (mBatchFile == nullptr)
+		THROW(("Insert called while not in batch mode"));
+	
+	++mHeader.mSize;
+	
+	mBatch[mBatchCount].key = inKey;
+	mBatch[mBatchCount].data = inValue;
+	
+	if (++mBatchCount >= kM6BatchSize)
+		FlushBatch();
+}
+
+template<class M6DataType>
+void M6IndexImplT<M6DataType>::FlushBatch()
+{
+	auto compareKeys = [this](const char* sa, size_t la, const char* sb, size_t lb) -> int
+		{ return this->mIndex.CompareKeys(sa, la, sb, lb); };
+	auto comparator = [=](const M6BatchEntry& a, const M6BatchEntry& b) -> bool
+		{ return this->mLexicon->Compare(a.key, b.key, compareKeys) < 0; };
+
+	sort(mBatch, mBatch + mBatchCount, comparator);
+
+	mBatchFile->Write(mBatch, sizeof(M6BatchEntry) * mBatchCount);
+	mBatchCount = 0;
+}
+
+template<class M6DataType, class Comparator>
+class M6BatchIterator
+{
+  public:
+	typedef typename M6IndexImplT<M6DataType>::M6BatchEntry M6BatchEntry;
+	struct M6BatchRunIterator;
+
+	struct M6CompareBatchRun
+	{
+					M6CompareBatchRun(M6Lexicon& inLexicon, Comparator inComparator)
+						: mLexicon(inLexicon), mCompare(inComparator) {}
+
+		bool operator()(const M6BatchRunIterator& a, const M6BatchRunIterator& b)
+			{ return mLexicon.Compare(a.mValue.key, b.mValue.key, mCompare); }
+
+		M6Lexicon&	mLexicon;
+		Comparator	mCompare;
+	};
+
+					M6BatchIterator(M6File& inFile, M6Lexicon& inLexicon, Comparator inComparator)
+						: mComparator(inLexicon, inComparator)
+					{
+						for (int64 offset = 0; offset < inFile.Size(); offset += kM6BatchSize * sizeof(M6BatchEntry))
+						{
+							M6BatchRunIterator r(&inFile, offset);
+							if (r.Next())
+								mQueue.push_back(r);
+						}
+						make_heap(mQueue.begin(), mQueue.end(), mComparator);
+					}
+	
+	bool			Next(string& outKey, M6DataType& outValue)
+					{
+						bool result = false;
+						if (not mQueue.empty())
+						{
+							pop_heap(mQueue.begin(), mQueue.end(), mComparator);
+							M6BatchRunIterator& r = mQueue.back();
+							
+							result = true;
+							outKey = mComparator.mLexicon.GetString(r.mValue.key);
+							outValue = r.mValue.data;
+							
+							if (r.Next())
+								push_heap(mQueue.begin(), mQueue.end(), mComparator);
+							else
+								mQueue.erase(mQueue.end() - 1);
+						}
+						return result;
+					}
+
+	struct M6BatchRunIterator
+	{
+					M6BatchRunIterator(M6File* inFile, int64 inOffset)
+						: mFile(inFile), mOffset(inOffset)
+					{
+						size_t n = (inFile->Size() - inOffset) / sizeof(M6BatchEntry);
+						if (n > kM6BatchSize)
+							n = kM6BatchSize;
+						mCount = static_cast<uint32>(n);
+					}
+		
+		bool		Next()
+					{
+						bool result = false;
+						if (mCount-- > 0)
+						{
+							mFile->PRead(mValue, mOffset);
+							mOffset += sizeof(mValue);
+							result = true;
+						}
+						return result;
+					}
+		
+		M6File*			mFile;
+		int64			mOffset;
+		M6BatchEntry	mValue;
+		uint32			mCount;
+	};
+
+  private:
+	
+	M6CompareBatchRun	mComparator;
+	vector<M6BatchRunIterator>
+						mQueue;
+};
+
+template<class M6DataType>
 bool M6IndexImplT<M6DataType>::Erase(const string& inKey)
 {
 	if (mHeader.mRoot == 0)
@@ -2267,6 +2412,8 @@ void M6IndexImplT<M6DataType>::Vacuum(M6Progress& inProgress)
 	//Get the address of the mapped region
 	uint32 n = 1;	// page counter
 
+	uint32 m = 0;
+
 	// start by reordering the bit pages
 	uint32 pageNr = mHeader.mFirstBitsPage;
 	while (pageNr != 0)
@@ -2354,15 +2501,101 @@ void M6IndexImplT<M6DataType>::Vacuum(M6Progress& inProgress)
 		else
 			page->SetLink(n);
 		
+		m += page->GetN();
 		inProgress.Consumed(page->GetN());
 		
 		Release(page);
 	}
+
+	assert(m == mHeader.mSize);
 	
 	FlushCache();
 	mFile.Truncate(n * kM6IndexPageSize);
 	CreateUpLevels(up);
 	Commit();
+}
+
+template<class M6DataType>
+void M6IndexImplT<M6DataType>::SetBatchMode(M6Lexicon& inLexicon)
+{
+	if (mBatchFile != nullptr)
+		THROW(("Already in batch mode!"));
+
+	if (mHeader.mRoot != 0)	// not an empty index?
+		THROW(("Batch mode request for a non-empty index is not supported yet... sorry"));
+
+	mBatchFile = new M6File(mPath.parent_path() / (mPath.filename().string() + ".bf"), eReadWrite);
+	mBatch = new M6BatchEntry[kM6BatchSize];
+	mLexicon = &inLexicon;
+}
+
+template<class M6DataType>
+void M6IndexImplT<M6DataType>::FinishBatchMode(M6Progress& inProgress)
+{
+	if (mBatchFile == nullptr)
+		THROW(("Not in batch mode"));
+	
+	// So we have to write out the batched entries
+	
+	if (mBatchCount > 0)
+		FlushBatch();
+	
+	auto comparator = [this](const char* sa, size_t la, const char* sb, size_t lb) -> int
+		{ return this->mIndex.CompareKeys(sa, la, sb, lb); };
+	
+	M6BatchIterator<M6DataType,decltype(comparator)> iter(*mBatchFile, *mLexicon, comparator);
+	
+	string key;
+	M6DataType v;
+	
+	if (not iter.Next(key, v))
+		return;	// empty index
+
+	uint32 n = 1;
+
+	// Now create the leaf pages
+	deque<pair<string,uint32>> up;
+	
+	// create a root
+	M6LeafPage* page(Allocate<M6LeafPage>());
+	mHeader.mRoot = mHeader.mFirstLeafPage = page->GetPageNr();
+	mHeader.mDepth = 1;
+
+	page->InsertKeyValue(key, v, page->GetN());
+	up.push_back(make_pair(key, page->GetPageNr()));
+
+	while (iter.Next(key, v))
+	{
+		++n;
+		
+		if (not page->CanStore(key))
+		{
+			M6LeafPage* next = Allocate<M6LeafPage>();
+			
+			page->SetLink(next->GetPageNr());
+			inProgress.Consumed(page->GetN());
+			Release(page);
+			page = next;
+			
+			up.push_back(make_pair(key, page->GetPageNr()));
+		}
+
+		page->InsertKeyValue(key, v, page->GetN());
+	}
+	
+	assert(n == mHeader.mSize);
+	
+	inProgress.Consumed(page->GetN());
+	Release(page);
+	
+	FlushCache();
+	CreateUpLevels(up);
+	Commit();
+	
+	delete mBatchFile;
+	mBatchFile = nullptr;
+	
+	fs::remove(mPath.parent_path() / (mPath.filename().string() + ".bf"));
 }
 
 template<class M6DataType>
@@ -2614,6 +2847,11 @@ void M6BasicIndex::Insert(const string& key, uint32 value)
 	mImpl->Insert(key, value);
 }
 
+void M6BasicIndex::Insert(uint32 key, uint32 value)
+{
+	mImpl->Insert(key, value);
+}
+
 void M6BasicIndex::Erase(const string& key)
 {
 	mImpl->Erase(key);
@@ -2659,9 +2897,19 @@ void M6BasicIndex::SetAutoCommit(bool inAutoCommit)
 	mImpl->SetAutoCommit(inAutoCommit);
 }
 
-void M6BasicIndex::SetBatchMode(bool inBatchMode)
+void M6BasicIndex::SetBatchMode(M6Lexicon& inLexicon)
 {
-	mImpl->SetBatchMode(inBatchMode);
+	mImpl->SetBatchMode(inLexicon);
+}
+
+void M6BasicIndex::FinishBatchMode(M6Progress& inProgress)
+{
+	mImpl->FinishBatchMode(inProgress);
+}
+
+bool M6BasicIndex::IsInBatchMode()
+{
+	return mImpl->IsInBatchMode();
 }
 
 // DEBUG code
@@ -2715,6 +2963,17 @@ void M6MultiBasicIndex::Insert(const string& inKey, const vector<uint32>& inDocu
 	mImpl->Insert(inKey, data);
 }
 
+void M6MultiBasicIndex::Insert(uint32 inKey, const vector<uint32>& inDocuments)
+{
+	M6MultiData data = { static_cast<uint32>(inDocuments.size()) };
+	
+	M6OBitStream bits;
+	CompressSimpleArraySelector(bits, inDocuments);
+	mImpl->StoreBits(bits, data.mBitVector);
+	
+	mImpl->Insert(inKey, data);
+}
+
 bool M6MultiBasicIndex::Find(const string& inKey, M6CompressedArray& outDocuments)
 {
 	bool result = false;
@@ -2736,7 +2995,7 @@ M6MultiIDLBasicIndex::M6MultiIDLBasicIndex(const fs::path& inPath, M6IndexType i
 {
 }
 
-void M6MultiIDLBasicIndex::Insert(const string& inKey, int64 inIDLOffset, const vector<uint32>& inDocuments)
+void M6MultiIDLBasicIndex::Insert(uint32 inKey, int64 inIDLOffset, const vector<uint32>& inDocuments)
 {
 	M6MultiIDLData data = { static_cast<uint32>(inDocuments.size()) };
 
@@ -2759,7 +3018,7 @@ M6WeightedBasicIndex::M6WeightedBasicIndex(const fs::path& inPath, M6IndexType i
 {
 }
 
-void M6WeightedBasicIndex::Insert(const string& inKey, vector<pair<uint32,uint8>>& inDocuments)
+void M6WeightedBasicIndex::Insert(uint32 inKey, vector<pair<uint32,uint8>>& inDocuments)
 {
 	M6MultiData data = { static_cast<uint32>(inDocuments.size()) };
 

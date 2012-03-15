@@ -16,6 +16,7 @@ class M6CompressedArray;
 union M6BitVector;
 class M6Progress;
 class M6Iterator;
+class M6Lexicon;
 
 extern const uint32 kM6MaxKeyLength;
 
@@ -33,7 +34,10 @@ class M6BasicIndex
 	void			Commit();
 	void			Rollback();
 	void			SetAutoCommit(bool inAutoCommit);
-	void			SetBatchMode(bool inBatchMode);
+
+	void			SetBatchMode(M6Lexicon& inLexicon);
+	void			FinishBatchMode(M6Progress& inProgress);
+	bool			IsInBatchMode();
 	
 	void			Vacuum(M6Progress& inProgress);
 	
@@ -91,6 +95,9 @@ class M6BasicIndex
 	void			Erase(const std::string& inKey);
 	bool			Find(const std::string& inKey, uint32& outValue);
 	
+	// for batch mode only:
+	void			Insert(uint32 inKey, uint32 inValue);
+
 	M6Iterator*		Find(const std::string& inKey);
 	M6Iterator*		FindString(const std::string& inString);
 
@@ -190,6 +197,9 @@ class M6MultiBasicIndex : public M6BasicIndex
 
 	void			Insert(const std::string& inKey, const std::vector<uint32>& inDocuments);
 	bool			Find(const std::string& inKey, M6CompressedArray& outDocuments);
+
+	// for batch mode only:
+	void			Insert(uint32 inKey, const std::vector<uint32>& inDocuments);
 };
 
 typedef M6Index<M6MultiBasicIndex, M6BasicComparator, eM6CharMultiIndex> M6SimpleMultiIndex;
@@ -204,6 +214,9 @@ class M6MultiIDLBasicIndex : public M6BasicIndex
 
 	void			Insert(const std::string& inKey, int64 inIDLOffset, const std::vector<uint32>& inDocuments);
 	bool			Find(const std::string& inKey, M6CompressedArray& outDocuments, int64& outIDLOffset);
+
+	// for batch mode only:
+	void			Insert(uint32 inKey, int64 inIDLOffset, const std::vector<uint32>& inDocuments);
 };
 
 typedef M6Index<M6MultiIDLBasicIndex, M6BasicComparator, eM6CharMultiIDLIndex> M6SimpleIDLMultiIndex;
@@ -239,6 +252,9 @@ class M6WeightedBasicIndex : public M6BasicIndex
 	bool			Find(const std::string& inKey, M6WeightedIterator& outIterator);
 	void			CalculateDocumentWeights(uint32 inDocCount, std::vector<float>& outWeights,
 						M6Progress& inProgress);
+
+	// for batch mode only:
+	void			Insert(uint32 inKey, std::vector<std::pair<uint32,uint8>>& inDocuments);
 };
 
 typedef M6Index<M6WeightedBasicIndex, M6BasicComparator, eM6CharWeightedIndex>	M6SimpleWeightedIndex;

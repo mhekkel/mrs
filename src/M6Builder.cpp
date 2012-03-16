@@ -821,14 +821,28 @@ void M6Processor::ProcessDocument()
 		if (text.empty() or docs.size() == 100)
 		{
 			// remap tokens
-
 			vector<uint32> remapped(tsLexicon->Count() + 1, 0);
 
 			{
-				M6Lexicon::M6UniqueLock lock(mLexicon);
+				M6Lexicon::M6SharedLock sharedLock(mLexicon);
 				
 				for (uint32 t = 1; t < tsLexicon->Count(); ++t)
 				{
+					const char* w;
+					size_t l;
+					tsLexicon->GetString(t, w, l);
+					remapped[t] = mLexicon.Lookup(w, l);
+				}
+			}
+			
+			{
+				M6Lexicon::M6UniqueLock uniqueLock(mLexicon);
+			
+				for (uint32 t = 1; t < tsLexicon->Count(); ++t)
+				{
+					if (remapped[t] != 0)
+						continue;
+					
 					const char* w;
 					size_t l;
 					tsLexicon->GetString(t, w, l);

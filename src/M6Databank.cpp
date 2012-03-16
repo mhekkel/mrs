@@ -1575,19 +1575,21 @@ void M6DatabankImpl::CommitBatchImport()
 	foreach (M6IndexDesc& desc, mIndices)
 		size += desc.mIndex->size();
 	
-	M6Progress progress(size + 1, "writing indices");
-	mAllTextIndex->FinishBatchMode(progress);
-	foreach (M6IndexDesc& desc, mIndices)
-	{
-		if (desc.mIndex->IsInBatchMode())
-			desc.mIndex->FinishBatchMode(progress);
-		else
-			desc.mIndex->Vacuum(progress);
+	{	// scope to force destruction of progress bar
+		M6Progress progress(size + 1, "writing indices");
+		mAllTextIndex->FinishBatchMode(progress);
+		foreach (M6IndexDesc& desc, mIndices)
+		{
+			if (desc.mIndex->IsInBatchMode())
+				desc.mIndex->FinishBatchMode(progress);
+			else
+				desc.mIndex->Vacuum(progress);
+		}
+	
+		// And clean up
+		fs::remove_all(mDbDirectory / "tmp");
+		progress.Consumed(1);
 	}
-
-	// And clean up
-	fs::remove_all(mDbDirectory / "tmp");
-	progress.Consumed(1);
 
 	RecalculateDocumentWeights();
 	CreateDictionary();

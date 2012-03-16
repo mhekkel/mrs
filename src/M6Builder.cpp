@@ -811,13 +811,56 @@ void M6Processor::ProcessDocument(const string& inDoc)
 
 void M6Processor::ProcessDocument()
 {
+	unique_ptr<M6Lexicon> tsLexicon(new M6Lexicon);
+	vector<M6InputDocument*> docs;
+	
 	for (;;)
 	{
 		string text = mDocQueue.Get();
+		
+		if (text.empty() or docs.size() == 100)
+		{
+			// remap tokens
+
+			vector<uint32> remapped(tsLexicon->Count() + 1, 0);
+
+			{
+				M6Lexicon::M6UniqueLock lock(mLexicon);
+				
+				for (uint32 t = 1; t < tsLexicon->Count(); ++t)
+				{
+					const char* w;
+					size_t l;
+					tsLexicon->GetString(t, w, l);
+					remapped[t] = mLexicon.Store(w, l);
+				}
+			}
+			
+			foreach (M6InputDocument* doc, docs)
+			{
+				doc->RemapTokens(&remapped[0]);
+				mDatabank.Store(doc);
+			}
+			
+			docs.clear();
+			tsLexicon.reset(new M6Lexicon);
+		}
+		
 		if (text.empty())
 			break;
-		ProcessDocument(text);
+
+		M6InputDocument* doc = new M6InputDocument(mDatabank, text);
+		
+		M6Argument arg(text.c_str(), text.length());
+		mScript->Evaluate(doc, arg);
+		
+		doc->Tokenize(*tsLexicon, 0);
+		doc->Compress();
+		docs.push_back(doc);
+//		ProcessDocument(text);
 	}
+	
+	assert(docs.empty());
 	
 	mDocQueue.Put(string());
 }

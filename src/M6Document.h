@@ -81,6 +81,7 @@ class M6InputDocument : public M6Document
 							const char* inText, size_t inSize);
 
 	virtual void		Tokenize(M6Lexicon& inLexicon, uint32 inLastStopWord);
+	virtual void		RemapTokens(const uint32 inTokenMap[]);
 
 	void				Compress();
 	uint32				Store();

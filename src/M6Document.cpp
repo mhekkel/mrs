@@ -224,7 +224,12 @@ void M6InputDocument::Tokenize(M6Lexicon& inLexicon, uint32 inLastStopWord)
 			uint32 rt = inLexicon.Lookup(w, wl);
 	
 			if (rt != 0)
-				tokenRemap[t] = rt;
+			{
+				if (rt <= inLastStopWord)
+					tokenRemap[t] = 0;
+				else
+					tokenRemap[t] = rt;
+			}
 		}
 	}
 	
@@ -244,17 +249,15 @@ void M6InputDocument::Tokenize(M6Lexicon& inLexicon, uint32 inLastStopWord)
 		}
 	}
 	
+	RemapTokens(&tokenRemap[0]);
+}
+
+void M6InputDocument::RemapTokens(const uint32 inTokenMap[])
+{
 	foreach (M6IndexTokens& tm, mTokens)
 	{
 		foreach (uint32& t, tm.mTokens)
-		{
-			if (tokenRemap[t] > inLastStopWord)
-				t = tokenRemap[t];
-			else
-				t = 0;
-
-			assert(t != kUndefinedTokenValue);
-		}
+			t = inTokenMap[t];
 	}
 }
 

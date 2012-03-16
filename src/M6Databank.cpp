@@ -79,6 +79,7 @@ class M6DatabankImpl
 	void			Validate();
 	void			DumpIndex(const string& inIndex, ostream& inStream);
 
+	void			StoreThread();
 	void			IndexThread();
 
   protected:
@@ -103,8 +104,8 @@ class M6DatabankImpl
 	M6IndexDescList			mIndices;
 	M6BasicIndexPtr			mAllTextIndex;
 	vector<float>			mDocWeights;
-	M6DocQueue				mIndexQueue;
-	boost::thread			mIndexThread;
+	M6DocQueue				mStoreQueue, mIndexQueue;
+	boost::thread			mStoreThread, mIndexThread;
 };
 
 // --------------------------------------------------------------------
@@ -1277,6 +1278,21 @@ M6BasicIndexPtr M6DatabankImpl::LoadIndex(const string& inName)
 	return result;
 }
 
+void M6DatabankImpl::StoreThread()
+{
+	for (;;)
+	{
+		M6InputDocument* doc = mStoreQueue.Get();
+		if (doc == nullptr)
+			break;
+		
+		doc->Store();
+		mIndexQueue.Put(doc);
+	}
+	
+	mIndexQueue.Put(nullptr);
+}
+
 void M6DatabankImpl::IndexThread()
 {
 	for (;;)
@@ -1284,8 +1300,8 @@ void M6DatabankImpl::IndexThread()
 		M6InputDocument* doc = mIndexQueue.Get();
 		if (doc == nullptr)
 			break;
-
-		uint32 docNr = doc->Store();
+			
+		uint32 docNr = doc->GetDocNr();
 		assert(docNr > 0);
 		
 		foreach (const M6InputDocument::M6IndexTokens& d, doc->GetIndexTokens())
@@ -1310,7 +1326,7 @@ void M6DatabankImpl::Store(M6Document* inDocument)
 		THROW(("storing documents is only supported in batch mode, for now"));
 
 	if (mBatch != nullptr)
-		mIndexQueue.Put(doc);
+		mStoreQueue.Put(doc);
 }
 
 M6Document* M6DatabankImpl::Fetch(uint32 inDocNr)
@@ -1540,12 +1556,15 @@ void M6DatabankImpl::SuggestSearchTerms(const string& inWord, vector<string>& ou
 void M6DatabankImpl::StartBatchImport(M6Lexicon& inLexicon)
 {
 	mBatch = new M6BatchIndexProcessor(*this, inLexicon);
+	
+	mStoreThread = boost::thread(boost::bind(&M6DatabankImpl::StoreThread, this));
 	mIndexThread = boost::thread(boost::bind(&M6DatabankImpl::IndexThread, this));
 }
 
 void M6DatabankImpl::CommitBatchImport()
 {
-	mIndexQueue.Put(nullptr);
+	mStoreQueue.Put(nullptr);
+	mStoreThread.join();
 	mIndexThread.join();
 	
 	mBatch->Finish(mStore->size());

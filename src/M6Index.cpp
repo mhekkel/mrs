@@ -2214,7 +2214,7 @@ class M6BatchIterator
 						: mLexicon(inLexicon), mCompare(inComparator) {}
 
 		bool operator()(const M6BatchRunIterator& a, const M6BatchRunIterator& b)
-			{ return mLexicon.Compare(a.mValue.key, b.mValue.key, mCompare); }
+			{ return mLexicon.Compare(a.mValue.key, b.mValue.key, mCompare) > 0; }
 
 		M6Lexicon&	mLexicon;
 		Comparator	mCompare;

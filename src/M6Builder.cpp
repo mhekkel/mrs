@@ -444,7 +444,7 @@ bool M6ReplaceExpr::Evaluate(M6InputDocument* inDocument, M6Argument& arg) const
 		string with = mWith;
 		for (int i = 0; i < 10; ++i)
 		{
-			char v[] = { '$', '0' + i, 0 };
+			char v[] = { '$', char('0' + i), 0 };
 			string m;
 			if (i < rc)
 				m.append(arg.mText + ovector[i * 2], ovector[i * 2 + 1] - ovector[i * 2]);

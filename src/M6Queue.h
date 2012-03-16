@@ -12,6 +12,7 @@ class M6Queue
 						~M6Queue();
 
 	void				Put(T inValue);
+//	void				Put(T inValue[], uint32 inCount);
 	T					Get();
 
 	// flags to help debug performance issues
@@ -57,6 +58,23 @@ void M6Queue<T,N>::Put(T inValue)
 
 	mEmptyCondition->notify_one();
 }
+
+//template<class T, uint32 N>
+//void M6Queue<T,N>::Put(T inValue[], uint32 inCount)
+//{
+//	boost::mutex::scoped_lock lock(mMutex);
+//
+//	mWasFull = false;
+//	while (mQueue.size() >= N)
+//	{
+//		mFullCondition->wait(lock);
+//		mWasFull = true;
+//	}
+//	
+//	mQueue.append(inValue, inValue + inCount);
+//
+//	mEmptyCondition->notify_one();
+//}
 
 template<class T, uint32 N>
 T M6Queue<T,N>::Get()

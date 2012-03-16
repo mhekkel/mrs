@@ -386,9 +386,9 @@ void M6Server::handle_search(const zh::request& request,
 		uint32 hits_per_page = params.get("count", 3).as<uint32>();
 		if (hits_per_page > 5)
 			hits_per_page = 5;
-		
+
 //		sub.put("linkeddbs", el::object(GetLinkedDbs(db)));
-		sub.put("show", el::object(hits_per_page));
+		sub.put("count", el::object(hits_per_page));
 	
 		string hitDb = db;
 		bool ranked = false;

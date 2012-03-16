@@ -65,6 +65,10 @@ OBJECTS.m6 = \
 	$(OBJECTS) \
 	$(OBJDIR)/M6CmdLineDriver.o
 
+OBJECTS.m6-make = \
+	$(OBJECTS) \
+	$(OBJDIR)/M6CmdLineBuild.o
+
 OBJECTS.m6-test = \
 	$(OBJECTS) \
 	$(OBJDIR)/M6TestMain.o \
@@ -81,6 +85,10 @@ OBJECTS.m6-passwd = \
 all: m6 m6-server m6-passwd
 
 m6: $(OBJECTS.m6)
+	@ echo ">>" $@
+	@ $(CC) $(BOOST_INC_DIR:%=-I%) -o $@ -I. $^ $(LDFLAGS)
+
+m6-make: $(OBJECTS.m6-make)
 	@ echo ">>" $@
 	@ $(CC) $(BOOST_INC_DIR:%=-I%) -o $@ -I. $^ $(LDFLAGS)
 

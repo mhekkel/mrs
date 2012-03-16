@@ -424,7 +424,7 @@ void M6Server::handle_search(const zh::request& request,
 				continue;
 			}
 
-			if (not rset)
+			if (not rset or rset->GetCount() == 0)
 				continue;
 			
 			if (firstDb.empty())
@@ -557,7 +557,8 @@ void M6Server::handle_search(const zh::request& request,
 			
 			uint32 count = rset->GetCount();
 			
-			sub.put("hits", el::object(hits));
+			if (not hits.empty())
+				sub.put("hits", el::object(hits));
 			sub.put("hitCount", el::object(count));
 			sub.put("lastPage", el::object(((count - 1) / hits_per_page) + 1));
 			sub.put("last", el::object(nr - 1));
@@ -653,7 +654,9 @@ void M6Server::process_mrs_entry(zx::element* node, const el::scope& scope, fs::
 	if (mdb == nullptr)
 		THROW(("databank not loaded"));
 	unique_ptr<M6Document> doc(mdb->Fetch(boost::lexical_cast<uint32>(nr)));
-	
+	if (not doc)
+		THROW(("Document %s not found", nr.c_str()));
+
 	zx::node* replacement = nullptr;
 	
 	if (format == "title")

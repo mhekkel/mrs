@@ -1577,16 +1577,19 @@ void M6DatabankImpl::CommitBatchImport()
 	
 	{	// scope to force destruction of progress bar
 		M6Progress progress(size + 1, "writing indices");
-		mAllTextIndex->FinishBatchMode(progress);
+
+		boost::thread_group g;
+		g.create_thread([&]() { mAllTextIndex->FinishBatchMode(progress); });
 		foreach (M6IndexDesc& desc, mIndices)
 		{
 			if (desc.mIndex->IsInBatchMode())
-				desc.mIndex->FinishBatchMode(progress);
+				g.create_thread([&]() { desc.mIndex->FinishBatchMode(progress); });
 			else
-				desc.mIndex->Vacuum(progress);
+				g.create_thread([&]() { desc.mIndex->Vacuum(progress); });
 		}
-	
-		// And clean up
+
+		g.join_all();
+
 		fs::remove_all(mDbDirectory / "tmp");
 		progress.Consumed(1);
 	}

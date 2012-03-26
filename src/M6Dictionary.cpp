@@ -535,6 +535,9 @@ void M6Dictionary::Create(M6BasicIndex& inIndex, uint32 inDocCount,
 
 	for (M6BasicIndex::iterator iter = inIndex.begin(); iter != inIndex.end(); ++iter)
 	{
+		if (++nr % 10000 == 0)
+			inProgress.Progress(nr);
+
 		uint32 dfI = iter.GetCount();
 		if (dfI < kM6MinWordOccurrence)
 			continue;
@@ -577,9 +580,6 @@ void M6Dictionary::Create(M6BasicIndex& inIndex, uint32 inDocCount,
 		s0[q] = 0;
 		is_terminal[q] = 1;
 		df[q] = static_cast<uint16>(dfI);
-
-		if (++nr % 10000 == 0)
-			inProgress.Progress(nr);
 	}
 	
 	while (i > 0)

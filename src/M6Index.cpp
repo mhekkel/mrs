@@ -727,8 +727,8 @@ struct M6IndexImpl
 	
 	uint32			mCacheCount;
 	const static uint32	
-					kM6CacheCount = 8;
-					//kM6CacheCount = 16;
+					kM6CacheCount = 16;
+	boost::mutex	mCacheMutex;
 };
 
 template<class M6DataType>
@@ -1656,6 +1656,8 @@ M6IndexImpl::M6IndexImpl(M6BasicIndex& inIndex, const fs::path& inPath, M6IndexT
 
 M6IndexImpl::~M6IndexImpl()
 {
+	boost::mutex::scoped_lock lock(mCacheMutex);
+	
 	FlushCache();
 	delete [] mCache;
 
@@ -1825,6 +1827,8 @@ M6IndexImpl::M6CachedPagePtr M6IndexImpl::GetCachePage()
 template<class Page>
 Page* M6IndexImpl::Allocate()
 {
+	boost::mutex::scoped_lock lock(mCacheMutex);
+
 	int64 fileSize = mFile.Size();
 	uint32 pageNr = static_cast<uint32>((fileSize - 1) / kM6IndexPageSize + 1);
 	int64 offset = pageNr * kM6IndexPageSize;
@@ -1851,6 +1855,8 @@ Page* M6IndexImpl::Load(uint32 inPageNr)
 {
 	if (inPageNr == 0)
 		THROW(("Invalid page number"));
+
+	boost::mutex::scoped_lock lock(mCacheMutex);
 		
 	M6CachedPagePtr cp = mLRUHead;
 
@@ -1891,6 +1897,8 @@ Page* M6IndexImpl::Load(uint32 inPageNr)
 template<class Page>
 void M6IndexImpl::Release(Page*& ioPage)
 {
+	boost::mutex::scoped_lock lock(mCacheMutex);
+
 	assert(ioPage != nullptr);
 	
 	M6CachedPagePtr cp = mLRUHead;
@@ -1918,6 +1926,8 @@ void M6IndexImpl::Release(Page*& ioPage)
 template<class Page>
 void M6IndexImpl::Reference(Page* inPage)
 {
+	boost::mutex::scoped_lock lock(mCacheMutex);
+
 	assert(inPage != nullptr);
 	
 	M6CachedPagePtr cp = mLRUHead;

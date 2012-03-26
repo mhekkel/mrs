@@ -9,6 +9,7 @@
 #include <iostream>
 
 #include <boost/iostreams/categories.hpp>
+#include <boost/thread/mutex.hpp>
 
 #include "M6DocStore.h"
 #include "M6Error.h"
@@ -273,6 +274,12 @@ class M6DocStoreImpl
 	void			Validate();
 	void			Dump();
 
+	friend struct Lock;
+	struct Lock : public boost::mutex::scoped_lock
+	{
+					Lock(M6DocStoreImpl* inImpl) : boost::mutex::scoped_lock(inImpl->mMutex) {} 
+	};
+
   private:
 
 	struct M6CachedPage;
@@ -288,6 +295,7 @@ class M6DocStoreImpl
 	};
 
 	M6File					mFile;
+	boost::mutex			mMutex;
 	M6DocStoreHdr			mHeader;
 	M6DocStoreIndexPagePtr	mRoot;
 	bool					mDirty;
@@ -731,7 +739,7 @@ struct M6DocSource : public io::source
 
 	streamsize		read(char* s, streamsize n);
 
-	M6DocStoreImpl&	mStore;
+	M6DocStoreImpl*	mStore;
 	uint32			mDocNr, mPageNr, mDocSize;
 	char			mBuffer[kM6DataPageTextSize];
 	char*			mBufferStart;
@@ -740,7 +748,7 @@ struct M6DocSource : public io::source
 
 M6DocSource::M6DocSource(M6DocStoreImpl& inStore, 
 	uint32 inDocNr, uint32 inPageNr, uint32 inDocSize)
-	: mStore(inStore)
+	: mStore(&inStore)
 	, mDocNr(inDocNr)
 	, mPageNr(inPageNr)
 	, mDocSize(inDocSize)
@@ -792,7 +800,8 @@ streamsize M6DocSource::read(char* s, streamsize n)
 			if (mDocSize == 0)
 				break;
 			
-			M6DocStoreDataPagePtr page(mStore.Load<M6DocStoreDataPage>(mPageNr));
+			M6DocStoreImpl::Lock lock(mStore);
+			M6DocStoreDataPagePtr page(mStore->Load<M6DocStoreDataPage>(mPageNr));
 			
 			uint32 n = page->Load(mDocNr, reinterpret_cast<uint8*>(mBuffer), sizeof(mBuffer));
 			mPageNr = page->GetLink();
@@ -1294,11 +1303,13 @@ M6DocStore::M6DocStore(const fs::path& inPath, MOpenMode inMode)
 
 M6DocStore::~M6DocStore()
 {
+	M6DocStoreImpl::Lock lock(mImpl);
 	delete mImpl;
 }
 
 void M6DocStore::GetInfo(uint32& outDocCount, int64& outFileSize, int64& outRawSize)
 {
+	M6DocStoreImpl::Lock lock(mImpl);
 	outDocCount = mImpl->Size();
 	outFileSize = mImpl->GetFileSize();
 	outRawSize = mImpl->GetRawSize();
@@ -1306,58 +1317,69 @@ void M6DocStore::GetInfo(uint32& outDocCount, int64& outFileSize, int64& outRawS
 
 uint8 M6DocStore::RegisterAttribute(const string& inName)
 {
+	M6DocStoreImpl::Lock lock(mImpl);
 	return mImpl->RegisterAttribute(inName);
 }
 
 string M6DocStore::GetAttributeName(uint8 inAttrNr) const
 {
+	M6DocStoreImpl::Lock lock(mImpl);
 	return mImpl->GetAttributeName(inAttrNr);
 }
 
 uint32 M6DocStore::StoreDocument(const char* inData, size_t inSize, size_t inRawSize)
 {
+	M6DocStoreImpl::Lock lock(mImpl);
 	return mImpl->StoreDocument(inData, inSize, inRawSize);
 }
 
 void M6DocStore::EraseDocument(uint32 inDocNr)
 {
+	M6DocStoreImpl::Lock lock(mImpl);
 	mImpl->EraseDocument(inDocNr);
 }
 
 bool M6DocStore::FetchDocument(uint32 inDocNr, uint32& outPageNr, uint32& outDocSize)
 {
+	M6DocStoreImpl::Lock lock(mImpl);
 	return mImpl->FetchDocument(inDocNr, outPageNr, outDocSize);
 }
 
 void M6DocStore::OpenDataStream(uint32 inDocNr, uint32 inPageNr, uint32 inDocSize,
 	io::filtering_stream<io::input>& ioStream)
 {
+	M6DocStoreImpl::Lock lock(mImpl);
 	mImpl->OpenDataStream(inDocNr, inPageNr, inDocSize, ioStream);
 }
 
 uint32 M6DocStore::size() const
 {
+	M6DocStoreImpl::Lock lock(mImpl);
 	return mImpl->Size();
 }
 
 void M6DocStore::Commit()
 {
 //	mImpl->Validate();
+	M6DocStoreImpl::Lock lock(mImpl);
 	mImpl->Commit();
 }
 
 uint32 M6DocStore::NextDocumentNumber() const
 {
+	M6DocStoreImpl::Lock lock(mImpl);
 	return mImpl->NextDocumentNumber();
 }
 
 void M6DocStore::Validate()
 {
+	M6DocStoreImpl::Lock lock(mImpl);
 	mImpl->Validate();
 }
 
 void M6DocStore::Dump()
 {
+	M6DocStoreImpl::Lock lock(mImpl);
 	mImpl->Dump();
 }
 

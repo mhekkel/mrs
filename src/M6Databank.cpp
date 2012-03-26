@@ -8,6 +8,7 @@
 #define foreach BOOST_FOREACH
 #include <boost/algorithm/string.hpp>
 #include <boost/format.hpp>
+#include <boost/thread/mutex.hpp>
 
 #include "M6Databank.h"
 #include "M6Document.h"
@@ -33,6 +34,38 @@ const uint32
 	kMaxIndexNr = 30;
 
 class M6BatchIndexProcessor;
+
+// --------------------------------------------------------------------
+
+#if defined(_MSC_VER)
+#include <Windows.h>
+
+void lock_memory(void* ptr, size_t size)
+{
+	::VirtualLock(ptr, size);
+}
+
+void unlock_memory(void* ptr, size_t size)
+{
+	::VirtualUnlock(ptr, size);
+}
+
+#elif defined(linux) || defined(__linux__)
+#include <sys/mman.h>
+
+void lock_memory(void* ptr, size_t size)
+{
+	::mlock(ptr, size);
+}
+
+void unlock_memory(void* ptr, size_t size)
+{
+	::munlock(ptr, size);
+}
+
+#else
+#	error "Implement mlock for this OS"
+#endif
 
 // --------------------------------------------------------------------
 
@@ -106,6 +139,7 @@ class M6DatabankImpl
 	vector<float>			mDocWeights;
 	M6DocQueue				mStoreQueue, mIndexQueue;
 	boost::thread			mStoreThread, mIndexThread;
+	boost::mutex			mMutex;
 };
 
 // --------------------------------------------------------------------
@@ -1164,7 +1198,10 @@ M6DatabankImpl::M6DatabankImpl(M6Databank& inDatabank, const fs::path& inPath, M
 				
 				M6File file(mDbDirectory / "full-text.weights", eReadOnly);
 				if (file.Size() == sizeof(float) * maxDocNr)
+				{
 					file.Read(&mDocWeights[0], sizeof(float) * maxDocNr);
+					lock_memory(&mDocWeights[0], sizeof(float) * maxDocNr);
+				}
 				else
 					mDocWeights.clear();
 			}
@@ -1176,11 +1213,21 @@ M6DatabankImpl::M6DatabankImpl(M6Databank& inDatabank, const fs::path& inPath, M
 		
 		if (mDocWeights.empty())
 			RecalculateDocumentWeights();
+
+		fs::path dict(mDbDirectory / "full-text.dict");
+		if (not fs::exists(dict))
+			CreateDictionary();
+		mDictionary = new M6Dictionary(dict);
 	}
 }
 
 M6DatabankImpl::~M6DatabankImpl()
 {
+	boost::mutex::scoped_lock lock(mMutex);
+	
+	if (not mDocWeights.empty())
+		unlock_memory(&mDocWeights[0], mDocWeights.size() * sizeof(float));
+	
 	mStore->Commit();
 	delete mStore;
 }
@@ -1255,6 +1302,7 @@ M6BasicIndexPtr M6DatabankImpl::CreateIndex(const string& inName, M6IndexType in
 
 M6BasicIndexPtr M6DatabankImpl::LoadIndex(const string& inName)
 {
+	boost::mutex::scoped_lock lock(mMutex);
 	M6BasicIndexPtr result;
 	
 	foreach (M6IndexDesc& desc, mIndices)
@@ -1531,26 +1579,14 @@ M6Iterator* M6DatabankImpl::FindString(const string& inIndex,
 
 void M6DatabankImpl::SuggestCorrection(const string& inWord, vector<string>& outCorrections)
 {
-	if (mDictionary == nullptr)
-	{
-		fs::path dict(mDbDirectory / "full-text.dict");
-		if (not fs::exists(dict))
-			CreateDictionary();
-		mDictionary = new M6Dictionary(dict);
-	}
-	mDictionary->SuggestCorrection(inWord, outCorrections);
+	if (mDictionary != nullptr)
+		mDictionary->SuggestCorrection(inWord, outCorrections);
 }
 
 void M6DatabankImpl::SuggestSearchTerms(const string& inWord, vector<string>& outSearchTerms)
 {
-	if (mDictionary == nullptr)
-	{
-		fs::path dict(mDbDirectory / "full-text.dict");
-		if (not fs::exists(dict))
-			CreateDictionary();
-		mDictionary = new M6Dictionary(dict);
-	}
-	mDictionary->SuggestSearchTerms(inWord, outSearchTerms);
+	if (mDictionary != nullptr)
+		mDictionary->SuggestSearchTerms(inWord, outSearchTerms);
 }
 
 void M6DatabankImpl::StartBatchImport(M6Lexicon& inLexicon)

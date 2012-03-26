@@ -392,89 +392,41 @@ void M6Server::handle_search(const zh::request& request,
 	
 		string hitDb = db;
 		bool ranked = false;
-
+		
+		boost::thread_group thr;
+		boost::mutex m;
 		vector<el::object> databanks;
 		
 		foreach (M6LoadedDatabank& db, mLoadedDatabanks)
 		{
-//			if (mIgnoreInAll.count(dbi.GetID()))
-//				continue;
-
-			int32 maxresultcount = hits_per_page;
-
-			el::object databank;
-			databank["id"] = db.mID;
-			databank["name"] = db.mName;
-			
-			unique_ptr<M6Iterator> rset;
-			
-			M6Iterator* filter = nullptr;
-			try
-			{
-				ParseQuery(*db.mDatabank, q, true, queryTerms, filter);
-				if (queryTerms.empty())
-					rset.reset(filter);
-				else
-					rset.reset(db.mDatabank->Find(queryTerms, filter, true, maxresultcount));
-			}
-			catch (...)	// silently ignore errors in find all
-			{
-				if (filter)
-					delete filter;
-				continue;
-			}
-
-			if (not rset or rset->GetCount() == 0)
-				continue;
-			
-			if (firstDb.empty())
-				firstDb = db.mID;
-
-			ranked = rset->IsRanked();
-	
-			uint32 docNr, nr = 1;
-			
-			vector<el::object> hits;
-			sub.put("first", el::object(nr));
-			
-			float score = 0;
-			while (maxresultcount-- > 0 and rset->Next(docNr, score))
-			{
-				if (firstDocNr == 0)
-					firstDocNr = docNr;
-
-				unique_ptr<M6Document> doc(db.mDatabank->Fetch(docNr));
-				
-				el::object hit;
-				hit["nr"] = nr;
-				hit["docNr"] = docNr;
-				hit["id"] = doc->GetAttribute("id");
-				hit["title"] = doc->GetAttribute("title");
-				hit["score"] = static_cast<uint16>(score * 100);
-				
-//				vector<string> linked;
-//				GetLinkedDbs(db, id, linked);
-//				if (not linked.empty())
-//				{
-//					vector<el::object> links;
-//					foreach (string& l, linked)
-//						links.push_back(el::object(l));
-//					hit["links"] = links;
-//				}
-				
-				hits.push_back(hit);
-				++nr;
-			}
-			
-			if (not hits.empty())
-			{
-				databank["hits"] = hits;
-				databank["hitCount"] = rset->GetCount();
-				databanks.push_back(databank);
-				
-				hitCount += rset->GetCount();
-			}
+			thr.create_thread(
+				[&]() {
+					try
+					{
+						vector<el::object> hits;
+						uint32 c;
+						bool r;
+						
+						Find(db.mDatabank, q, true, 0, 5, hits, c, r);
+						
+						boost::mutex::scoped_lock lock(m);
+						hitCount += c;
+						ranked = ranked or r;
+						
+						if (not hits.empty())
+						{
+							el::object databank;
+							databank["id"] = db.mID;
+							databank["name"] = db.mName;
+							databank["hits"] = hits;
+							databank["hitCount"] = c;
+							databanks.push_back(databank);
+						}
+					}
+					catch (...) { }
+				});
 		}
+		thr.join_all();
 
 		if (not databanks.empty())
 		{
@@ -500,72 +452,23 @@ void M6Server::handle_search(const zh::request& request,
 			resultoffset = (page - 1) * maxresultcount;
 		
 		M6Databank* mdb = Load(db);
-
-		M6Iterator* filter;
-		ParseQuery(*mdb, q, true, queryTerms, filter);
-
-		unique_ptr<M6Iterator> rset;
-		if (queryTerms.empty())
-			rset.reset(filter);
-		else
-			rset.reset(mdb->Find(queryTerms, filter, true, maxresultcount));
-
-//		unique_ptr<M6Iterator> rset(mdb->Find(q, true, page * maxresultcount));
-		if (not rset)
+		vector<el::object> hits;
+		bool ranked;
+		
+		Find(mdb, q, true, resultoffset, maxresultcount, hits, hitCount, ranked);
+		if (hitCount == 0)
 		{
-			rset.reset(mdb->Find(q, false, page * maxresultcount));
 			sub.put("relaxed", el::object(true));
+			Find(mdb, q, false, resultoffset, maxresultcount, hits, hitCount, ranked);
 		}
-
-		if (rset)
-		{
-			uint32 docNr, nr = 1;
-			float score;
-			while (resultoffset-- > 0 and rset->Next(docNr, score))
-				++nr;
-			
-			vector<el::object> hits;
-			sub.put("first", el::object(nr));
-			
-			while (maxresultcount-- > 0 and rset->Next(docNr, score))
-			{
-				if (firstDocNr == 0)
-					firstDocNr = docNr;
-				unique_ptr<M6Document> doc(mdb->Fetch(docNr));
-
-				el::object hit;
-				hit["nr"] = nr;
-				hit["docNr"] = docNr;
-				hit["id"] = id = doc->GetAttribute("id");
-				hit["title"] = doc->GetAttribute("title");
-				hit["score"] = tr1::trunc(score * 100);
-
-//				vector<string> linked;
-//				GetLinkedDbs(db, id, linked);
-//				if (not linked.empty())
-//				{
-//					vector<el::object> links;
-//					foreach (string& l, linked)
-//						links.push_back(el::object(l));
-//					hit["links"] = links;
-//				}
-				
-				hits.push_back(hit);
-	
-				++nr;
-			}
-			
-			uint32 count = rset->GetCount();
-			
-			if (not hits.empty())
-				sub.put("hits", el::object(hits));
-			sub.put("hitCount", el::object(count));
-			sub.put("lastPage", el::object(((count - 1) / hits_per_page) + 1));
-			sub.put("last", el::object(nr - 1));
-			sub.put("ranked", rset->IsRanked());
-
-			hitCount += count;
-		}
+		
+		if (not hits.empty())
+			sub.put("hits", el::object(hits));
+		sub.put("first", el::object(resultoffset + 1));
+		sub.put("last", el::object(resultoffset + hits.size()));
+		sub.put("hitCount", el::object(hitCount));
+		sub.put("lastPage", el::object(((hitCount - 1) / hits_per_page) + 1));
+		sub.put("ranked", ranked);
 	}
 
 	// OK, now if we only have one hit, we might as well show it directly of course...
@@ -917,6 +820,62 @@ M6Databank* M6Server::Load(const std::string& inDatabank)
 	}
 	
 	return result;
+}
+
+void M6Server::Find(M6Databank* inDatabank, const string& inQuery, bool inAllTermsRequired,
+	uint32 inResultOffset, uint32 inMaxResultCount,
+	vector<el::object>& outHits, uint32& outHitCount, bool& outRanked)
+{
+	unique_ptr<M6Iterator> rset;
+	M6Iterator* filter;
+	
+	vector<string> queryTerms;
+
+	ParseQuery(*inDatabank, inQuery, true, queryTerms, filter);
+	if (queryTerms.empty())
+		rset.reset(filter);
+	else
+		rset.reset(inDatabank->Find(queryTerms, filter, true, inResultOffset + inMaxResultCount));
+
+	if (not rset or rset->GetCount() == 0)
+		outHitCount = 0;
+	else
+	{
+		outHitCount = rset->GetCount();
+		outRanked = rset->IsRanked();
+	
+		uint32 docNr, nr = 1;
+		
+		float score = 0;
+
+		while (inResultOffset-- > 0 and rset->Next(docNr, score))
+			;
+
+		while (inMaxResultCount-- > 0 and rset->Next(docNr, score))
+		{
+			unique_ptr<M6Document> doc(inDatabank->Fetch(docNr));
+			
+			el::object hit;
+			hit["nr"] = nr;
+			hit["docNr"] = docNr;
+			hit["id"] = doc->GetAttribute("id");
+			hit["title"] = doc->GetAttribute("title");
+			hit["score"] = static_cast<uint16>(score * 100);
+			
+	//				vector<string> linked;
+	//				GetLinkedDbs(db, id, linked);
+	//				if (not linked.empty())
+	//				{
+	//					vector<el::object> links;
+	//					foreach (string& l, linked)
+	//						links.push_back(el::object(l));
+	//					hit["links"] = links;
+	//				}
+			
+			outHits.push_back(hit);
+			++nr;
+		}
+	}		
 }
 
 void M6Server::SpellCheck(const string& inDatabank, const string& inTerm,

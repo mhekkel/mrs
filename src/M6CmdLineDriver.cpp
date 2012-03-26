@@ -61,9 +61,7 @@ void Build(int argc, char* argv[])
 
 	uint32 nrOfThreads = boost::thread::hardware_concurrency();
 	if (nrOfThreads > 4)
-		nrOfThreads -= 1;
-	if (nrOfThreads > 6)
-		nrOfThreads = 6;
+		nrOfThreads = 4;
 	if (vm.count("threads"))
 		nrOfThreads = vm["threads"].as<uint32>();
 	if (nrOfThreads < 1)

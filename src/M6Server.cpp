@@ -841,11 +841,11 @@ void M6Server::Find(M6Databank* inDatabank, const string& inQuery, bool inAllTer
 	M6Iterator* filter;
 	vector<string> queryTerms;
 	
-	ParseQuery(*inDatabank, inQuery, true, queryTerms, filter);
+	ParseQuery(*inDatabank, inQuery, inAllTermsRequired, queryTerms, filter);
 	if (queryTerms.empty())
 		rset.reset(filter);
 	else
-		rset.reset(inDatabank->Find(queryTerms, filter, true, inResultOffset + inMaxResultCount));
+		rset.reset(inDatabank->Find(queryTerms, filter, inAllTermsRequired, inResultOffset + inMaxResultCount));
 
 	if (not rset or rset->GetCount() == 0)
 		outHitCount = 0;

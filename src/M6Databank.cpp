@@ -1317,10 +1317,11 @@ M6BasicIndexPtr M6DatabankImpl::LoadIndex(const string& inName)
 	if (result == nullptr)
 	{
 		fs::path path = mDbDirectory / (inName + ".index");
-		
-		result.reset(M6BasicIndex::Load(path));
-
-		mIndices.push_back(M6IndexDesc(inName, result->GetIndexType(), result));
+		if (fs::exists(path))
+		{
+			result.reset(M6BasicIndex::Load(path));
+			mIndices.push_back(M6IndexDesc(inName, result->GetIndexType(), result));
+		}
 	}
 
 	return result;
@@ -1566,15 +1567,20 @@ M6Iterator* M6DatabankImpl::Find(const vector<string>& inQueryTerms,
 M6Iterator* M6DatabankImpl::Find(
 	const string& inIndex, const string& inTerm, bool inTermIsPattern)
 {
+	M6Iterator* result = nullptr;
 	M6BasicIndexPtr index = LoadIndex(inIndex);
-	return index->Find(inTerm);
+	if (index != nullptr)
+		result = index->Find(inTerm);
+	return result;
 }
 
-M6Iterator* M6DatabankImpl::FindString(const string& inIndex,
-	const string& inString)
+M6Iterator* M6DatabankImpl::FindString(const string& inIndex, const string& inString)
 {
+	M6Iterator* result = nullptr;
 	M6BasicIndexPtr index = LoadIndex(inIndex);
-	return index->FindString(inString);
+	if (index != nullptr)
+		result = index->FindString(inString);
+	return result;
 }
 
 void M6DatabankImpl::SuggestCorrection(const string& inWord, vector<string>& outCorrections)

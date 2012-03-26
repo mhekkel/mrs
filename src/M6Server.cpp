@@ -410,11 +410,18 @@ void M6Server::handle_search(const zh::request& request,
 						Find(db.mDatabank, q, true, 0, 5, hits, c, r);
 						
 						boost::mutex::scoped_lock lock(m);
+						
 						hitCount += c;
 						ranked = ranked or r;
 						
 						if (not hits.empty())
 						{
+							if (hitCount == c)
+							{
+								firstDb = db.mID;
+								firstDocNr = hits.front()["docNr"].as<uint32>();
+							}
+						
 							el::object databank;
 							databank["id"] = db.mID;
 							databank["name"] = db.mName;
@@ -463,7 +470,14 @@ void M6Server::handle_search(const zh::request& request,
 		}
 		
 		if (not hits.empty())
+		{
 			sub.put("hits", el::object(hits));
+			if (hitCount == 1)
+			{
+				firstDb = db;
+				firstDocNr = hits.front()["docNr"].as<uint32>();
+			}
+		}
 		sub.put("first", el::object(resultoffset + 1));
 		sub.put("last", el::object(resultoffset + hits.size()));
 		sub.put("hitCount", el::object(hitCount));

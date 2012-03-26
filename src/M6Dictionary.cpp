@@ -74,7 +74,7 @@ class M6Automaton
 			M6Automaton(M6File& inFile);
 			~M6Automaton();
 
-	void	SuggestCorrection(const string& inWord, vector<string>& outCorrections) const;
+	void	SuggestCorrection(const string& inWord, vector<pair<string,uint16>>& outCorrections) const;
 	void	SuggestSearchTerms(const string& inWord, M6Suggestions& outSearchTerms) const;
 
   private:
@@ -215,17 +215,17 @@ struct M6ScoreTableImp
 						uint32 inAutomatonLength, const string& inWord);
 
 	void			Test(uint32 inState, int16 inScore, uint32 inEdits,
-						string inMatch, const char* inWoord);
+						string inMatch, const char* inWord, uint32 inWordLength);
 	bool			Match(uint32 inState, int16 inScore, uint32 inEdits,
-						string inMatch, const char* inWoord);
+						string inMatch, const char* inWord, uint32 inWordLength);
 	void			Delete(uint32 inState, int16 inScore, uint32 inEdits,
-						string inMatch, const char* inWoord);
+						string inMatch, const char* inWord, uint32 inWordLength);
 	void			Insert(uint32 inState, int16 inScore, uint32 inEdits,
-						string inMatch, const char* inWoord);
+						string inMatch, const char* inWord, uint32 inWordLength);
 	void			Transpose(uint32 inState, int16 inScore, uint32 inEdits,
-						string inMatch, const char* inWoord);
+						string inMatch, const char* inWord, uint32 inWordLength);
 	void			Substitute(uint32 inState, int16 inScore, uint32 inEdits,
-						string inMatch, const char* inWoord);
+						string inMatch, const char* inWord, uint32 inWordLength);
 
 	void			Add(string inTerm, int16 inScore, uint16 inDF);
 	void			Finish();
@@ -243,25 +243,25 @@ M6ScoreTableImp::M6ScoreTableImp(const M6Transition* inAutomaton,
 	: mAutomaton(inAutomaton), mAutomatonLength(inAutomatonLength), n(0)
 {
 	string match;
-	Test(mAutomaton[mAutomatonLength - 1].b.dest, 0, 0, match, inWord.c_str());
+	Test(mAutomaton[mAutomatonLength - 1].b.dest, 0, 0, match, inWord.c_str(), inWord.length());
 
 	Finish();
 }
 
-void M6ScoreTableImp::Test(uint32 inState, int16 inScore, uint32 inEdits, string inMatch, const char* inWord)
+void M6ScoreTableImp::Test(uint32 inState, int16 inScore, uint32 inEdits, string inMatch, const char* inWord, uint32 inWordLength)
 {
-	Match(inState, inScore, inEdits, inMatch, inWord);
+	Match(inState, inScore, inEdits, inMatch, inWord, inWordLength);
 
 	if (inScore >= max(MinScore() - 3, 0) and inEdits < 3)
 	{
-		Delete(inState, inScore, inEdits, inMatch, inWord);
-		Insert(inState, inScore, inEdits, inMatch, inWord);
-		Transpose(inState, inScore, inEdits, inMatch, inWord);
-		Substitute(inState, inScore, inEdits, inMatch, inWord);
+		Delete(inState, inScore, inEdits, inMatch, inWord, inWordLength);
+		Insert(inState, inScore, inEdits, inMatch, inWord, inWordLength);
+		Transpose(inState, inScore, inEdits, inMatch, inWord, inWordLength);
+		Substitute(inState, inScore, inEdits, inMatch, inWord, inWordLength);
 	}
 }
 
-bool M6ScoreTableImp::Match(uint32 inState, int16 inScore, uint32 inEdits, string inMatch, const char* inWord)
+bool M6ScoreTableImp::Match(uint32 inState, int16 inScore, uint32 inEdits, string inMatch, const char* inWord, uint32 inWordLength)
 {
 	bool match = false;
 	
@@ -285,17 +285,17 @@ bool M6ScoreTableImp::Match(uint32 inState, int16 inScore, uint32 inEdits, strin
 			inScore += kMatchReward;
 			inMatch += inWord[0];
 			
-			if (mAutomaton[inState].b.term and inEdits < kMaxEdits)
-				Add(inMatch, inScore, mAutomaton[inState].b.df);
+			if (mAutomaton[inState].b.term and inEdits + inWordLength <= kMaxEdits)
+				Add(inMatch, inScore + (inWordLength - 1) * kDeletePenalty, mAutomaton[inState].b.df);
 			
-			Test(mAutomaton[inState].b.dest, inScore, inEdits, inMatch, inWord + 1);
+			Test(mAutomaton[inState].b.dest, inScore, inEdits, inMatch, inWord + 1, inWordLength - 1);
 		}
 	}
 	
 	return match;
 }
 
-void M6ScoreTableImp::Delete(uint32 inState, int16 inScore, uint32 inEdits, string inMatch, const char* inWord)
+void M6ScoreTableImp::Delete(uint32 inState, int16 inScore, uint32 inEdits, string inMatch, const char* inWord, uint32 inWordLength)
 {
 	uint32 state = inState;
 
@@ -303,10 +303,10 @@ void M6ScoreTableImp::Delete(uint32 inState, int16 inScore, uint32 inEdits, stri
 	{
 		char ch = mAutomaton[state].b.attr;
 
-		if (mAutomaton[state].b.term and inEdits < kMaxEdits)
-			Add(inMatch + ch, inScore + kDeletePenalty, mAutomaton[state].b.df);
+		if (mAutomaton[state].b.term and inEdits + inWordLength <= kMaxEdits)
+			Add(inMatch + ch, inScore + inWordLength * kDeletePenalty, mAutomaton[state].b.df);
 
-		Test(mAutomaton[state].b.dest, inScore + kDeletePenalty, inEdits + 1, inMatch + ch, inWord);
+		Test(mAutomaton[state].b.dest, inScore + kDeletePenalty, inEdits + 1, inMatch + ch, inWord, inWordLength);
 
 		if (mAutomaton[state].b.last)
 			break;
@@ -315,13 +315,13 @@ void M6ScoreTableImp::Delete(uint32 inState, int16 inScore, uint32 inEdits, stri
 	}
 }
 
-void M6ScoreTableImp::Insert(uint32 inState, int16 inScore, uint32 inEdits, string inMatch, const char* inWord)
+void M6ScoreTableImp::Insert(uint32 inState, int16 inScore, uint32 inEdits, string inMatch, const char* inWord, uint32 inWordLength)
 {
 	if (*inWord != 0)
-		Test(inState, inScore + kInsertPenalty, inEdits + 1, inMatch, inWord + 1);
+		Test(inState, inScore + kInsertPenalty, inEdits + 1, inMatch, inWord + 1, inWordLength - 1);
 }
 
-void M6ScoreTableImp::Transpose(uint32 inState, int16 inScore, uint32 inEdits, string inMatch, const char* inWord)
+void M6ScoreTableImp::Transpose(uint32 inState, int16 inScore, uint32 inEdits, string inMatch, const char* inWord, uint32 inWordLength)
 {
 	if (inWord[0] != 0 and inWord[1] != 0)
 	{
@@ -329,11 +329,11 @@ void M6ScoreTableImp::Transpose(uint32 inState, int16 inScore, uint32 inEdits, s
 		woord = inWord[1];
 		woord += inWord[0];
 		woord += inWord + 2;
-		Test(inState, inScore + kTransposePenalty, inEdits + 1, inMatch, woord.c_str());
+		Test(inState, inScore + kTransposePenalty, inEdits + 1, inMatch, woord.c_str(), woord.length());
 	}
 }
 
-void M6ScoreTableImp::Substitute(uint32 inState, int16 inScore, uint32 inEdits, string inMatch, const char* inWord)
+void M6ScoreTableImp::Substitute(uint32 inState, int16 inScore, uint32 inEdits, string inMatch, const char* inWord, uint32 inWordLength)
 {
 	if (inWord[0] != 0)
 	{
@@ -343,10 +343,10 @@ void M6ScoreTableImp::Substitute(uint32 inState, int16 inScore, uint32 inEdits, 
 		{
 			char ch = mAutomaton[state].b.attr;
 
-			if (mAutomaton[state].b.term and inEdits < kMaxEdits)
-				Add(inMatch + ch, inScore + kSubstitutePenalty, mAutomaton[state].b.df);
+			if (mAutomaton[state].b.term and inEdits + inWordLength <= kMaxEdits)
+				Add(inMatch + ch, inScore + kSubstitutePenalty + (inWordLength - 1) * kDeletePenalty, mAutomaton[state].b.df);
 
-			Test(mAutomaton[state].b.dest, inScore + kSubstitutePenalty, inEdits + 1, inMatch + ch, inWord + 1);
+			Test(mAutomaton[state].b.dest, inScore + kSubstitutePenalty, inEdits + 1, inMatch + ch, inWord + 1, inWordLength - 1);
 			
 			if (mAutomaton[state].b.last)
 				break;
@@ -438,13 +438,17 @@ M6Automaton::~M6Automaton()
 	delete[] mAutomaton;
 }
 
-void M6Automaton::SuggestCorrection(const string& inWord, vector<string>& outCorrections) const
+void M6Automaton::SuggestCorrection(const string& inWord, vector<pair<string,uint16>>& outCorrections) const
 {
 	M6ScoreTableImp scores(mAutomaton, mAutomatonLength, inWord);
 
 	uint16 minDF = 0;
+	int16 maxScore = 0;
 	if (scores.n > 0)
+	{
 		minDF = scores.scores[0].df;
+		maxScore = scores.scores[0].score;
+	}
 
 	//for (uint32 i = 0; i < scores.n; ++i)
 	//{
@@ -462,7 +466,15 @@ void M6Automaton::SuggestCorrection(const string& inWord, vector<string>& outCor
 
 		if (scores.scores[i].df >= minDF)
 		{
-			outCorrections.push_back(term);
+			int16 distance = abs(scores.scores[i].score - maxScore);
+
+			if (distance > 12)
+				break;
+
+			uint32 v = scores.scores[i].df;
+			v >>= 2 * distance;
+			
+			outCorrections.push_back(make_pair(term, v));
 			unique.insert(term);
 		}
 	}
@@ -608,7 +620,7 @@ void M6Dictionary::Create(M6BasicIndex& inIndex, uint32 inDocCount,
 	inFile.Write(&automaton[0], automaton.size() * sizeof(M6Transition));
 }
 
-void M6Dictionary::SuggestCorrection(const string& inWord, vector<string>& outCorrections)
+void M6Dictionary::SuggestCorrection(const string& inWord, vector<pair<string,uint16>>& outCorrections)
 {
 	mAutomaton->SuggestCorrection(inWord, outCorrections);
 }

@@ -2,8 +2,10 @@
 
 #include <vector>
 #include <algorithm>
+#include <boost/filesystem/path.hpp>
 
 #include "M6BitStream.h"
+#include "M6File.h"
 
 // --------------------------------------------------------------------
 // M6Iterator is a base class to iterate over query results
@@ -147,6 +149,37 @@ class M6IntersectionIterator : public M6Iterator
   private:
 
 	M6IteratorParts	mIterators;
+};
+
+class M6PhraseIterator : public M6Iterator
+{
+  public:
+
+					M6PhraseIterator(boost::filesystem::path& inIDLFile,
+						std::vector<std::pair<M6Iterator*,int64>>& inIterators);
+					~M6PhraseIterator();
+	
+	virtual bool	Next(uint32& outDoc, float& outRank);
+
+  private:
+
+	struct M6PhraseIteratorPart
+	{
+		M6Iterator*			mIter;
+		M6IBitStream		mBits;
+		uint32				mDoc;
+		std::vector<uint32>	mIDL;
+	
+		bool				operator>(const M6IteratorPart& inPart) const
+								{ return mDoc > inPart.mDoc; }
+		bool				operator<(const M6IteratorPart& inPart) const
+								{ return mDoc < inPart.mDoc; }
+	};
+	
+	typedef std::vector<M6PhraseIteratorPart> M6PhraseIteratorParts;
+
+	M6PhraseIteratorParts	mIterators;
+	M6File					mIDLFile;
 };
 
 class M6VectorIterator : public M6Iterator

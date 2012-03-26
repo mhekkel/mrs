@@ -47,7 +47,7 @@ class M6Server : public zh::webapp
 	M6Databank*		Load(const std::string& inDatabank);
 	
 	void			SpellCheck(const std::string& inDatabank, const std::string& inTerm,
-						std::vector<std::string>& outSuggestions);
+						std::vector<std::pair<std::string,uint16>>& outCorrections);
 
 	struct M6LoadedDatabank
 	{
@@ -60,6 +60,8 @@ class M6Server : public zh::webapp
 						const std::string& inQuery, bool inAllTermsRequired,
 						uint32 inResultOffset, uint32 inMaxResultCount,
 						std::vector<el::object>& outHits, uint32& outHitCount, bool& outRanked);
+
+	uint32			Count(const std::string& inDatabank, const std::string& inQuery);
 
 	zx::element*	mConfig;
 	M6DbList		mLoadedDatabanks;

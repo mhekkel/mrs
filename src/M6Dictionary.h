@@ -16,7 +16,7 @@ class M6Dictionary
 			~M6Dictionary();
 
 	void	SuggestCorrection(const std::string& inWord,
-				std::vector<std::string>& outCorrections);
+				std::vector<std::pair<std::string,uint16>>& outCorrections);
 
 	void	SuggestSearchTerms(const std::string& inWord,
 				std::vector<std::string>& outSearchTerms);

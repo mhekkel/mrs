@@ -18,7 +18,7 @@ namespace ba = boost::algorithm;
 class M6QueryParser
 {
   public:
-					M6QueryParser(M6Databank& inDatabank, const string& inQuery,
+					M6QueryParser(M6Databank* inDatabank, const string& inQuery,
 						bool inAllTermsRequired);
 	
 	void			Parse(vector<string>& outTerms, M6Iterator*& outFilter);
@@ -33,7 +33,7 @@ class M6QueryParser
 	M6Token			GetNextToken();
 	void			Match(M6Token inToken);
 	
-	M6Databank&		mDatabank;
+	M6Databank*		mDatabank;
 	M6Tokenizer		mTokenizer;
 	bool			mImplicitIntersection;
 	bool			mIsBooleanQuery;
@@ -41,8 +41,7 @@ class M6QueryParser
 	M6Token			mLookahead;
 };
 
-M6QueryParser::M6QueryParser(M6Databank& inDatabank,
-	const string& inQuery, bool inAllTermsRequired)
+M6QueryParser::M6QueryParser(M6Databank* inDatabank, const string& inQuery, bool inAllTermsRequired)
 	: mDatabank(inDatabank), mTokenizer(inQuery), mImplicitIntersection(inAllTermsRequired), mIsBooleanQuery(false)
 {
 }
@@ -121,7 +120,8 @@ M6Iterator* M6QueryParser::ParseTest()
 		
 		case eM6TokenNOT:
 			mIsBooleanQuery = true;
-			result.reset(new M6NotIterator(ParseQuery(), mDatabank.GetMaxDocNr()));
+			if (mDatabank != nullptr)
+				result.reset(new M6NotIterator(ParseQuery(), mDatabank->GetMaxDocNr()));
 			break;
 		
 		case eM6TokenDocNr:
@@ -130,7 +130,8 @@ M6Iterator* M6QueryParser::ParseTest()
 			break;
 
 		case eM6TokenString:
-			result.reset(mDatabank.FindString("*", mTokenizer.GetTokenString()));
+			if (mDatabank != nullptr)
+				result.reset(mDatabank->FindString("*", mTokenizer.GetTokenString()));
 			Match(eM6TokenString);
 			break;
 
@@ -185,17 +186,20 @@ M6Iterator* M6QueryParser::ParseTerm(const string& inIndex)
 	switch (mLookahead)
 	{
 		case eM6TokenString:
-			result.reset(mDatabank.FindString(inIndex, mTokenizer.GetTokenString()));
+			if (mDatabank != nullptr)
+				result.reset(mDatabank->FindString(inIndex, mTokenizer.GetTokenString()));
 			Match(eM6TokenString);
 			break;
 		
 		case eM6TokenPattern:
-			result.reset(mDatabank.Find(inIndex, mTokenizer.GetTokenString(), true));
+			if (mDatabank != nullptr)
+				result.reset(mDatabank->Find(inIndex, mTokenizer.GetTokenString(), true));
 			Match(eM6TokenPattern);
 			break;
 		
 		default:
-			result.reset(mDatabank.Find(inIndex, mTokenizer.GetTokenString(), false));
+			if (mDatabank != nullptr)
+				result.reset(mDatabank->Find(inIndex, mTokenizer.GetTokenString(), false));
 			Match(eM6TokenWord);
 			break;
 	}
@@ -205,10 +209,19 @@ M6Iterator* M6QueryParser::ParseTerm(const string& inIndex)
 
 // --------------------------------------------------------------------
 
+void AnalyseQuery(const string& inQuery, vector<string>& outTerms)
+{
+	M6QueryParser parser(nullptr, inQuery, true);
+	
+	M6Iterator* filter = nullptr;
+	parser.Parse(outTerms, filter);
+	delete filter;
+}
+
 void ParseQuery(M6Databank& inDatabank, const string& inQuery,
 	bool inAllTermsRequired, vector<string>& outTerms, M6Iterator*& outFilter)
 {
-	M6QueryParser parser(inDatabank, inQuery, inAllTermsRequired);
+	M6QueryParser parser(&inDatabank, inQuery, inAllTermsRequired);
 	parser.Parse(outTerms, outFilter);
 }
 

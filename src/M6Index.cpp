@@ -30,6 +30,7 @@
 #include "M6Progress.h"
 #include "M6Iterator.h"
 #include "M6Lexicon.h"
+#include "M6Tokenizer.h"
 
 using namespace std;
 namespace fs = boost::filesystem;
@@ -756,6 +757,8 @@ class M6IndexImplT : public M6IndexImpl
 
 	virtual M6Iterator*
 					Find(const string& inKey);
+	virtual M6Iterator*
+					FindString(const string& inString);
 
 	void			Remap(M6DataType& ioData, const vector<uint32>& inRemappedBitPageNrs);
 
@@ -2404,6 +2407,58 @@ M6Iterator* M6IndexImplT<M6MultiIDLData>::Find(const string& inKey)
 			result = new M6MultiDocIterator(bits, data.mCount);
 		}
 		Release(root);
+	}
+	return result;
+}
+
+template<class M6DataType>
+M6Iterator* M6IndexImplT<M6DataType>::FindString(const string& inString)
+{
+	return nullptr;
+}
+
+template<>
+M6Iterator* M6IndexImplT<M6MultiIDLData>::FindString(const string& inString)
+{
+	M6Iterator* result = nullptr;
+	if (mHeader.mRoot != 0)
+	{
+		M6IndexPage* root(Load<M6IndexPage>(mHeader.mRoot));
+		M6MultiIDLData data;
+		vector<pair<M6Iterator*,int64>> iterators;
+		bool ok = true;
+		
+		M6Tokenizer tokenizer(inString);
+		for (;;)
+		{
+			M6Token token = tokenizer.GetNextWord();
+			if (token == eM6TokenEOF)
+				break;
+			
+			if (token == eM6TokenWord or token == eM6TokenNumber)
+			{
+				if (not root->Find(tokenizer.GetTokenString(), data))
+				{
+					ok = false;
+					break;
+				}
+
+				M6IBitStream bits(new M6IBitVectorImpl(*this, data.mBitVector));
+				iterators.push_back(make_pair(new M6MultiDocIterator(bits, data.mCount), data.mIDLOffset));
+			}
+		}
+		
+		Release(root);
+		
+		if (not ok)
+		{
+			foreach (auto i, iterators)
+				delete i.first;
+			iterators.clear();
+		}
+		
+		fs::path idlFile = mPath.parent_path() / (mPath.stem().string() + ".idl");
+		result = new M6PhraseIterator(idlFile, iterators);
 	}
 	return result;
 }

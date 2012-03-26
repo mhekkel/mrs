@@ -8,6 +8,7 @@
 #include "M6Iterator.h"
 
 using namespace std;
+namespace fs = boost::filesystem;
 
 void M6Iterator::Intersect(vector<uint32>& ioDocs, M6Iterator* inIterator)
 {
@@ -261,4 +262,47 @@ M6Iterator* M6IntersectionIterator::Create(M6Iterator* inA, M6Iterator* inB)
 	}
 
 	return result;
+}
+
+// --------------------------------------------------------------------
+
+M6PhraseIterator::M6PhraseIterator(fs::path& inIDLFile,
+	vector<pair<M6Iterator*,int64>>& inIterators)
+	: mIDLFile(inIDLFile, eReadOnly)
+{
+	bool ok = true;
+	
+	foreach (auto i, inIterators)
+	{
+		M6PhraseIteratorPart p = { i.first, M6IBitStream(mIDLFile, i.second) };
+	
+		float r;
+		if (not i.first->Next(p.mDoc, r))
+		{
+			ok = false;
+			break;
+		}
+		
+		mIterators.push_back(p);
+		ReadArray(p.mBits, mIterators.back().mIDL);
+	}
+	
+	if (not ok)
+	{
+		foreach (auto& part, mIterators)
+			delete part.mIter;
+		mIterators.clear();
+	}
+}
+
+M6PhraseIterator::~M6PhraseIterator()
+{
+	foreach (auto& part, mIterators)
+		delete part.mIter;
+	mIterators.clear();
+}
+
+bool M6PhraseIterator::Next(uint32& outDoc, float& outRank)
+{
+	return false;
 }

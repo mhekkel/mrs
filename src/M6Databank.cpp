@@ -93,14 +93,14 @@ class M6DatabankImpl
 						bool inTermIsPattern);
 	M6Iterator*		FindString(const string& inIndex, const string& inString);
 
-	void			SuggestCorrection(const string& inWord, vector<string>& outCorrections);
+	void			SuggestCorrection(const string& inWord, vector<pair<string,uint16>>& outCorrections);
 	void			SuggestSearchTerms(const string& inWord, vector<string>& outSearchTerms);
 	
 	M6DocStore&		GetDocStore()						{ return *mStore; }
 	
 	M6BasicIndexPtr	GetIndex(const string& inName, M6IndexType inType);
 	M6BasicIndexPtr	CreateIndex(const string& inName, M6IndexType inType);
-	M6BasicIndexPtr	LoadIndex(const string& inName);
+//	M6BasicIndexPtr	LoadIndex(const string& inName);
 	M6BasicIndexPtr	GetAllTextIndex()					{ return mAllTextIndex; }
 	
 	fs::path		GetScratchDir() const				{ return mDbDirectory / "tmp"; }
@@ -1210,6 +1210,17 @@ M6DatabankImpl::M6DatabankImpl(M6Databank& inDatabank, const fs::path& inPath, M
 				mDocWeights.clear();
 			}
 		}
+
+		fs::directory_iterator end;
+		for (fs::directory_iterator ix(mDbDirectory); ix != end; ++ix)
+		{
+			if (ix->path().extension().string() != ".index")
+				continue;
+
+			string name = ix->path().stem().string();
+			M6BasicIndexPtr index(M6BasicIndex::Load(ix->path()));
+			mIndices.push_back(M6IndexDesc(name, index->GetIndexType(), index));
+		}
 		
 		if (mDocWeights.empty())
 			RecalculateDocumentWeights();
@@ -1236,22 +1247,12 @@ void M6DatabankImpl::GetInfo(M6DatabankInfo& outInfo)
 {
 	mStore->GetInfo(outInfo.mDocCount, outInfo.mDataStoreSize, outInfo.mRawTextSize);
 	
-	map<string,int64> sizes;
-
-	fs::directory_iterator end;
-	for (fs::directory_iterator ix(mDbDirectory); ix != end; ++ix)
-	{
-		if (ix->path().extension().string() != ".index")
-			continue;
-
-		string name = ix->path().stem().string();
-		sizes[name] = fs::file_size(ix->path());
-		LoadIndex(name);
-	}
-	
 	foreach (const M6IndexDesc& desc, mIndices)
 	{
-		M6IndexInfo info = { desc.mName, desc.mType, desc.mIndex->size(), sizes[desc.mName] };
+		fs::path path(mDbDirectory / (desc.mName + ".index"));
+		assert(fs::exists(path));
+		
+		M6IndexInfo info = { desc.mName, desc.mType, desc.mIndex->size(), fs::file_size(path) };
 		outInfo.mIndexInfo.push_back(info);
 	}
 }
@@ -1300,32 +1301,32 @@ M6BasicIndexPtr M6DatabankImpl::CreateIndex(const string& inName, M6IndexType in
 	return result;
 }
 
-M6BasicIndexPtr M6DatabankImpl::LoadIndex(const string& inName)
-{
-	boost::mutex::scoped_lock lock(mMutex);
-	M6BasicIndexPtr result;
-	
-	foreach (M6IndexDesc& desc, mIndices)
-	{
-		if (desc.mName == inName)
-		{
-			result = desc.mIndex;
-			break;
-		}
-	}
-
-	if (result == nullptr)
-	{
-		fs::path path = mDbDirectory / (inName + ".index");
-		if (fs::exists(path))
-		{
-			result.reset(M6BasicIndex::Load(path));
-			mIndices.push_back(M6IndexDesc(inName, result->GetIndexType(), result));
-		}
-	}
-
-	return result;
-}
+//M6BasicIndexPtr M6DatabankImpl::LoadIndex(const string& inName)
+//{
+//	boost::mutex::scoped_lock lock(mMutex);
+//	M6BasicIndexPtr result;
+//	
+//	foreach (M6IndexDesc& desc, mIndices)
+//	{
+//		if (desc.mName == inName)
+//		{
+//			result = desc.mIndex;
+//			break;
+//		}
+//	}
+//
+//	if (result == nullptr)
+//	{
+//		fs::path path = mDbDirectory / (inName + ".index");
+//		if (fs::exists(path))
+//		{
+//			result.reset(M6BasicIndex::Load(path));
+//			mIndices.push_back(M6IndexDesc(inName, result->GetIndexType(), result));
+//		}
+//	}
+//
+//	return result;
+//}
 
 void M6DatabankImpl::StoreThread()
 {
@@ -1567,23 +1568,39 @@ M6Iterator* M6DatabankImpl::Find(const vector<string>& inQueryTerms,
 M6Iterator* M6DatabankImpl::Find(
 	const string& inIndex, const string& inTerm, bool inTermIsPattern)
 {
-	M6Iterator* result = nullptr;
-	M6BasicIndexPtr index = LoadIndex(inIndex);
-	if (index != nullptr)
-		result = index->Find(inTerm);
-	return result;
+	unique_ptr<M6UnionIterator> result(new M6UnionIterator);
+	
+	foreach (const M6IndexDesc& desc, mIndices)
+	{
+		if (inIndex != "*" and not ba::iequals(inIndex, desc.mName))
+			continue;
+		
+		M6Iterator* iter = desc.mIndex->Find(inTerm);
+		if (iter != nullptr)
+			result->AddIterator(iter);
+	}
+	
+	return result.release();
 }
 
 M6Iterator* M6DatabankImpl::FindString(const string& inIndex, const string& inString)
 {
-	M6Iterator* result = nullptr;
-	M6BasicIndexPtr index = LoadIndex(inIndex);
-	if (index != nullptr)
-		result = index->FindString(inString);
-	return result;
+	unique_ptr<M6UnionIterator> result(new M6UnionIterator);
+	
+	foreach (const M6IndexDesc& desc, mIndices)
+	{
+		if (inIndex != "*" and not ba::iequals(inIndex, desc.mName))
+			continue;
+		
+		M6Iterator* iter = desc.mIndex->FindString(inString);
+		if (iter != nullptr)
+			result->AddIterator(iter);
+	}
+	
+	return result.release();
 }
 
-void M6DatabankImpl::SuggestCorrection(const string& inWord, vector<string>& outCorrections)
+void M6DatabankImpl::SuggestCorrection(const string& inWord, vector<pair<string,uint16>>& outCorrections)
 {
 	if (mDictionary != nullptr)
 		mDictionary->SuggestCorrection(inWord, outCorrections);
@@ -1692,10 +1709,10 @@ void M6DatabankImpl::Validate()
 
 void M6DatabankImpl::DumpIndex(const string& inIndex, ostream& inStream)
 {
-	M6BasicIndexPtr index = LoadIndex(inIndex);
-	
-	foreach (const string& key, *index)
-		inStream << key << endl;
+//	M6BasicIndexPtr index = LoadIndex(inIndex);
+//	
+//	foreach (const string& key, *index)
+//		inStream << key << endl;
 }
 
 // --------------------------------------------------------------------
@@ -1775,7 +1792,7 @@ M6Iterator* M6Databank::FindString(const string& inIndex,
 	return mImpl->FindString(inIndex, inString);
 }
 
-void M6Databank::SuggestCorrection(const string& inWord, vector<string>& outCorrections)
+void M6Databank::SuggestCorrection(const string& inWord, vector<pair<string,uint16>>& outCorrections)
 {
 	mImpl->SuggestCorrection(inWord, outCorrections);
 }

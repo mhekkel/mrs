@@ -255,7 +255,6 @@ void M6Server::handle_entry(const zh::request& request, const el::scope& scope, 
 //		sub.put("links", el::object(links));
 //	}
 
-	M6Databank* mdb = Load(db);
 	zx::element* dbConfig = M6Config::Instance().LoadDatabank(db);
 //	unique_ptr<M6Document> document(mdb->Fetch(docNr));
 
@@ -289,11 +288,8 @@ void M6Server::handle_entry(const zh::request& request, const el::scope& scope, 
 		
 		try
 		{
-			M6Iterator* filter = nullptr;
 			vector<string> terms;
-			ParseQuery(*mdb, q, false, terms, filter);
-			delete filter;
-			
+			AnalyseQuery(q, terms);
 			if (not terms.empty())
 			{
 				string pattern = ba::join(terms, "|");
@@ -376,9 +372,6 @@ void M6Server::handle_search(const zh::request& request,
 	sub.put("db", el::object(db));
 	sub.put("q", el::object(q));
 
-	// store the query terms
-	vector<string> queryTerms;
-
 	if (db.empty() or q.empty() or (db == "all" and q == "*"))
 		handle_welcome(request, scope, reply);
 	else if (db == "all")
@@ -399,39 +392,38 @@ void M6Server::handle_search(const zh::request& request,
 		
 		foreach (M6LoadedDatabank& db, mLoadedDatabanks)
 		{
-			thr.create_thread(
-				[&]() {
-					try
+			thr.create_thread([&]() {
+				try
+				{
+					vector<el::object> hits;
+					uint32 c;
+					bool r;
+					
+					Find(db.mDatabank, q, true, 0, 5, hits, c, r);
+					
+					boost::mutex::scoped_lock lock(m);
+					
+					hitCount += c;
+					ranked = ranked or r;
+					
+					if (not hits.empty())
 					{
-						vector<el::object> hits;
-						uint32 c;
-						bool r;
-						
-						Find(db.mDatabank, q, true, 0, 5, hits, c, r);
-						
-						boost::mutex::scoped_lock lock(m);
-						
-						hitCount += c;
-						ranked = ranked or r;
-						
-						if (not hits.empty())
+						if (hitCount == c)
 						{
-							if (hitCount == c)
-							{
-								firstDb = db.mID;
-								firstDocNr = hits.front()["docNr"].as<uint32>();
-							}
-						
-							el::object databank;
-							databank["id"] = db.mID;
-							databank["name"] = db.mName;
-							databank["hits"] = hits;
-							databank["hitCount"] = c;
-							databanks.push_back(databank);
+							firstDb = db.mID;
+							firstDocNr = hits.front()["docNr"].as<uint32>();
 						}
+					
+						el::object databank;
+						databank["id"] = db.mID;
+						databank["name"] = db.mName;
+						databank["hits"] = hits;
+						databank["hitCount"] = c;
+						databanks.push_back(databank);
 					}
-					catch (...) { }
-				});
+				}
+				catch (...) { }
+			});
 		}
 		thr.join_all();
 
@@ -485,62 +477,67 @@ void M6Server::handle_search(const zh::request& request,
 		sub.put("ranked", ranked);
 	}
 
+	vector<string> terms;
+	AnalyseQuery(q, terms);
+	if (not terms.empty())
+	{
+		// add some spelling suggestions
+		sort(terms.begin(), terms.end());
+		terms.erase(unique(terms.begin(), terms.end()), terms.end());
+		
+		vector<el::object> suggestions;
+		foreach (string& term, terms)
+		{
+			try
+			{
+				boost::regex re(string("\\b") + term + "\\b");
+
+				vector<pair<string,uint16>> s;
+				SpellCheck(db, term, s);
+				if (s.empty())
+					continue;
+				
+				vector<el::object> alternatives;
+				foreach (auto c, s)
+				{
+					el::object alt;
+					alt["term"] = c.first;
+
+					// construct new query, with the term replaced by the alternative
+					ostringstream t;
+					ostream_iterator<char, char> oi(t);
+					boost::regex_replace(oi, q.begin(), q.end(), re, c.first,
+						boost::match_default | boost::format_all);
+
+//					if (Count(db, t.str()) > 0)
+//					{
+						alt["q"] = t.str();
+						alternatives.push_back(alt);
+//					}
+				}
+				
+				if (alternatives.empty())
+					continue;
+
+				el::object so;
+				so["term"] = term;
+				so["alternatives"] = alternatives;
+				
+				suggestions.push_back(so);
+			}
+			catch (...) {}	// silently ignore errors
+		}
+			
+		if (not suggestions.empty())
+			sub.put("suggestions", el::object(suggestions));
+	}
+
 	// OK, now if we only have one hit, we might as well show it directly of course...
 	if (hitCount == 1)
 		create_redirect(firstDb, firstDocNr, q, true, request, reply);
 	else
-	{
-		// add some spelling suggestions
-		sort(queryTerms.begin(), queryTerms.end());
-		queryTerms.erase(unique(queryTerms.begin(), queryTerms.end()), queryTerms.end());
-		
-		if (not queryTerms.empty())
-		{
-			vector<el::object> suggestions;
-			
-			foreach (string& term, queryTerms)
-			{
-				try
-				{
-					boost::regex re(string("\\b") + term + "\\b");
-	
-					vector<string> s;
-					SpellCheck(db, term, s);
-					if (s.empty())
-						continue;
-					
-					vector<el::object> alternatives;
-					foreach (string& at, s)
-					{
-						el::object alt;
-						alt["term"] = at;
-	
-						// construct new query, with the term replaced by the alternative
-						ostringstream t;
-						ostream_iterator<char, char> oi(t);
-						boost::regex_replace(oi, q.begin(), q.end(), re, at,
-							boost::match_default | boost::format_all);
-	
-						alt["q"] = t.str();
-						alternatives.push_back(alt);
-					}
-					
-					el::object so;
-					so["term"] = term;
-					so["alternatives"] = alternatives;
-					
-					suggestions.push_back(so);
-				}
-				catch (...) {}	// silently ignore errors
-			}
-				
-			if (not suggestions.empty())
-				sub.put("suggestions", el::object(suggestions));
-		}
-
 		create_reply_from_template(db == "all" ? "results-for-all.html" : "results.html",
 			sub, reply);
-	}
 }
 
 void M6Server::handle_admin(const zh::request& request,
@@ -842,9 +839,8 @@ void M6Server::Find(M6Databank* inDatabank, const string& inQuery, bool inAllTer
 {
 	unique_ptr<M6Iterator> rset;
 	M6Iterator* filter;
-	
 	vector<string> queryTerms;
-
+	
 	ParseQuery(*inDatabank, inQuery, true, queryTerms, filter);
 	if (queryTerms.empty())
 		rset.reset(filter);
@@ -892,15 +888,67 @@ void M6Server::Find(M6Databank* inDatabank, const string& inQuery, bool inAllTer
 	}		
 }
 
+uint32 M6Server::Count(const string& inDatabank, const string& inQuery)
+{
+	uint32 result = 0;
+	
+	if (inDatabank == "all")		// same as count for all databanks
+	{
+		foreach (M6LoadedDatabank& db, mLoadedDatabanks)
+			result += Count(db.mID, inQuery);
+	}
+	else
+	{
+		unique_ptr<M6Iterator> rset;
+		M6Iterator* filter;
+		vector<string> queryTerms;
+		
+		M6Databank* db = Load(inDatabank);
+		
+		ParseQuery(*db, inQuery, true, queryTerms, filter);
+		if (queryTerms.empty())
+			rset.reset(filter);
+		else
+			rset.reset(db->Find(queryTerms, filter, true, 1));
+		
+		if (rset)
+			result = rset->GetCount();
+	}
+	
+	return result;
+}
+
 void M6Server::SpellCheck(const string& inDatabank, const string& inTerm,
-	vector<string>& outSuggestions)
+	vector<pair<string,uint16>>& outCorrections)
 {
 	if (inDatabank == "all")
-		;
+	{
+		vector<pair<string,uint16>> corrections;
+
+		foreach (M6LoadedDatabank& db, mLoadedDatabanks)
+		{
+			vector<pair<string,uint16>> s;
+			SpellCheck(db.mID, inTerm, s);
+			if (not s.empty())
+				corrections.insert(corrections.end(), s.begin(), s.end());
+		}
+
+		sort(corrections.begin(), corrections.end(),
+			[](pair<string,uint16>& a, pair<string,uint16>& b) -> bool { return a.second > b.second; });
+		
+		set<string> words;
+		foreach (auto c, corrections)
+		{
+			if (words.count(c.first))
+				continue;
+			outCorrections.push_back(c);
+			words.insert(c.first);	
+		}
+	}
 	else
 	{
 		M6Databank* db = Load(inDatabank);
-		db->SuggestCorrection(inTerm, outSuggestions);
+		db->SuggestCorrection(inTerm, outCorrections);
 	}
 }
 

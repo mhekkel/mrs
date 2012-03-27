@@ -3,6 +3,7 @@
 #include <vector>
 #include <algorithm>
 #include <boost/filesystem/path.hpp>
+#include <boost/tr1/tuple.hpp>
 
 #include "M6BitStream.h"
 #include "M6File.h"
@@ -156,7 +157,7 @@ class M6PhraseIterator : public M6Iterator
   public:
 
 					M6PhraseIterator(boost::filesystem::path& inIDLFile,
-						std::vector<std::pair<M6Iterator*,int64>>& inIterators);
+						std::vector<std::tr1::tuple<M6Iterator*,int64,uint32>>& inIterators);
 					~M6PhraseIterator();
 	
 	virtual bool	Next(uint32& outDoc, float& outRank);
@@ -167,19 +168,23 @@ class M6PhraseIterator : public M6Iterator
 	{
 		M6Iterator*			mIter;
 		M6IBitStream		mBits;
+		uint32				mIndex;
 		uint32				mDoc;
 		std::vector<uint32>	mIDL;
 	
-		bool				operator>(const M6IteratorPart& inPart) const
+		bool				operator>(const M6PhraseIteratorPart& inPart) const
 								{ return mDoc > inPart.mDoc; }
-		bool				operator<(const M6IteratorPart& inPart) const
+		bool				operator<(const M6PhraseIteratorPart& inPart) const
 								{ return mDoc < inPart.mDoc; }
+
+		void				ReadArray();
 	};
 	
 	typedef std::vector<M6PhraseIteratorPart> M6PhraseIteratorParts;
 
 	M6PhraseIteratorParts	mIterators;
 	M6File					mIDLFile;
+	std::vector<uint32>		mIDLCache1, mIDLCache2;
 };
 
 class M6VectorIterator : public M6Iterator

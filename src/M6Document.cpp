@@ -124,6 +124,7 @@ void M6InputDocument::Compress()
 uint32 M6InputDocument::Store()
 {
 	M6DocStore& store(mDatabank.GetDocStore());
+	assert(not mBuffer.empty());
 	mDocNr = store.StoreDocument(&mBuffer[0], mBuffer.size(), mText.length());
 	return mDocNr;
 }

@@ -127,7 +127,7 @@ bool M6UnionIterator::Next(uint32& outDoc, float& outRank)
 		
 		while (not mIterators.empty() and mIterators.front().mDoc <= outDoc)
 		{
-			pop_heap(mIterators.begin(), mIterators.end());
+			pop_heap(mIterators.begin(), mIterators.end(), greater<M6IteratorPart>());
 			
 			if (mIterators.back().mIter->Next(mIterators.back().mDoc, r))
 				push_heap(mIterators.begin(), mIterators.end(), greater<M6IteratorPart>());
@@ -215,6 +215,19 @@ bool M6IntersectionIterator::Next(uint32& outDoc, float& outRank)
 		sort(mIterators.begin(), mIterators.end());
 
 		outDoc = mIterators.back().mDoc;
+
+		foreach (M6IteratorPart& part, mIterators)
+		{
+			while (part.mDoc < outDoc)
+			{
+				if (not part.mIter->Next(part.mDoc, r))
+				{
+					done = true;
+					break;
+				}
+			}
+		}
+
 		if (mIterators.front().mDoc == outDoc)
 		{
 			result = true;
@@ -222,21 +235,9 @@ bool M6IntersectionIterator::Next(uint32& outDoc, float& outRank)
 				done = done or part.mIter->Next(part.mDoc, r) == false;
 			break;
 		}
-		
-		foreach (M6IteratorPart& part, mIterators)
-		{
-			for (;;)
-			{
-				if (not part.mIter->Next(part.mDoc, r))
-				{
-					done = true;
-					break;
-				}
-				
-				if (part.mDoc >= outDoc)
-					break;
-			}
-		}
+
+		if (not mIterators.back().mIter->Next(mIterators.back().mDoc, r))
+			done = true;
 	}
 
 	if (done)
@@ -266,31 +267,38 @@ M6Iterator* M6IntersectionIterator::Create(M6Iterator* inA, M6Iterator* inB)
 
 // --------------------------------------------------------------------
 
+void M6PhraseIterator::M6PhraseIteratorPart::ReadArray()
+{
+	::ReadArray(mBits, mIDL);
+	transform(mIDL.begin(), mIDL.end(), mIDL.begin(), [=](uint32 ioOffset) -> uint32 { return ioOffset - mIndex; });
+}
+
 M6PhraseIterator::M6PhraseIterator(fs::path& inIDLFile,
-	vector<pair<M6Iterator*,int64>>& inIterators)
+	vector<std::tr1::tuple<M6Iterator*,int64,uint32>>& inIterators)
 	: mIDLFile(inIDLFile, eReadOnly)
 {
 	bool ok = true;
 	
 	foreach (auto i, inIterators)
 	{
-		M6PhraseIteratorPart p = { i.first, M6IBitStream(mIDLFile, i.second) };
+		M6PhraseIteratorPart p = {
+			tr1::get<0>(i), M6IBitStream(mIDLFile, tr1::get<1>(i)), tr1::get<2>(i) };
 	
 		float r;
-		if (not i.first->Next(p.mDoc, r))
+		if (not p.mIter->Next(p.mDoc, r))
 		{
 			ok = false;
 			break;
 		}
 		
 		mIterators.push_back(p);
-		ReadArray(p.mBits, mIterators.back().mIDL);
+		mIterators.back().ReadArray();
 	}
 	
 	if (not ok)
 	{
-		foreach (auto& part, mIterators)
-			delete part.mIter;
+		foreach (auto& iter, inIterators)
+			delete tr1::get<0>(iter);
 		mIterators.clear();
 	}
 }
@@ -304,5 +312,79 @@ M6PhraseIterator::~M6PhraseIterator()
 
 bool M6PhraseIterator::Next(uint32& outDoc, float& outRank)
 {
-	return false;
+	bool result = false, done = false;
+	float r;
+	
+	for (;;)
+	{
+		if (mIterators.empty())
+			break;
+
+		sort(mIterators.begin(), mIterators.end());
+
+		outDoc = mIterators.back().mDoc;
+
+		foreach (M6PhraseIteratorPart& part, mIterators)
+		{
+			while (part.mDoc < outDoc)
+			{
+				if (part.mIter->Next(part.mDoc, r))
+					part.ReadArray();
+				else
+				{
+					done = true;
+					break;
+				}
+			}
+		}
+
+		if (mIterators.front().mDoc == outDoc)
+		{
+			result = true;
+			outRank = 1;
+
+			// now check the IDL vectors
+			mIDLCache1 = mIterators.front().mIDL;
+			
+			for (auto i = mIterators.begin() + 1; i != mIterators.end(); ++i)
+			{
+				mIDLCache2.clear();
+
+				std::set_intersection(mIDLCache1.begin(), mIDLCache1.end(),
+					i->mIDL.begin(), i->mIDL.end(), std::back_inserter(mIDLCache2));
+				
+				if (mIDLCache2.empty())	// no adjacent words found
+				{
+					result = false;
+					break;
+				}
+				
+				swap(mIDLCache1, mIDLCache2);
+			}
+
+			foreach (M6PhraseIteratorPart& part, mIterators)
+			{
+				if (part.mIter->Next(part.mDoc, r))
+					part.ReadArray();
+				else
+					done = true;
+			}
+
+			break;
+		}
+
+		if (mIterators.back().mIter->Next(mIterators.back().mDoc, r))
+			mIterators.back().ReadArray();
+		else
+			done = true;
+	}
+
+	if (done)
+	{
+		foreach (M6PhraseIteratorPart& part, mIterators)
+			delete part.mIter;
+		mIterators.clear();
+	}
+
+	return result;
 }

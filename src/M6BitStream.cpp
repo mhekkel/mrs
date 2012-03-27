@@ -252,9 +252,7 @@ inline void M6OBitStream::Add(uint8 byte)
 
 size_t M6OBitStream::Size() const
 {
-	size_t result = mByteOffset;
-	if (mBitOffset < 7)
-		result += 1;
+	size_t result = mByteOffset + 1;
 
 	if (mImpl != nullptr)
 		result += mImpl->Size();
@@ -417,38 +415,38 @@ M6IBitStream::~M6IBitStream()
 	delete mImpl;
 }
 
-//void M6IBitStream::Sync()
-//{
-//	// replay the sync from an obit stream's sync
-//	
-//	int bit = operator()();
-//	assert(bit == 0);
-//	
-//	while (mBitOffset != 7)
-//		bit = operator()();
-//}
-//
-//// skip forward as fast as possible
-//void M6IBitStream::Skip(uint32 inBits)
-//{
-//	if (inBits == 0)
-//		return;
-//	
-//	if (inBits >= static_cast<uint32>(mBitOffset + 1))
-//	{
-//		inBits -= mBitOffset + 1;
-//		mImpl->Get(mByte);
-//		mBitOffset = 7;
-//	}
-//	
-//	while (inBits >= 8)
-//	{
-//		inBits -= 8;
-//		mImpl->Get(mByte);
-//	}
-//	
-//	mBitOffset -= inBits;
-//}
+void M6IBitStream::Sync()
+{
+	// replay the sync from an obit stream's sync
+	
+	int bit = operator()();
+	assert(bit == 0);
+	
+	while (mBitOffset != 7)
+		bit = operator()();
+}
+
+// skip forward as fast as possible
+void M6IBitStream::Skip(uint32 inBits)
+{
+	if (inBits == 0)
+		return;
+	
+	if (inBits >= static_cast<uint32>(mBitOffset + 1))
+	{
+		inBits -= mBitOffset + 1;
+		mImpl->Get(mByte);
+		mBitOffset = 7;
+	}
+	
+	while (inBits >= 8)
+	{
+		inBits -= 8;
+		mImpl->Get(mByte);
+	}
+	
+	mBitOffset -= inBits;
+}
 
 void M6IBitStream::NextByte(uint8& outByte)
 {
@@ -477,6 +475,12 @@ void ReadBits(M6IBitStream& inBits, M6OBitStream& outValue)
 	
 	while (length-- > 0)
 		outValue << inBits();
+
+	M6IBitStream test(outValue);
+	vector<uint32> t;
+	ReadArray(test, t);
+	copy(t.begin(), t.end(), ostream_iterator<uint32>(cout, ";"));
+	cout << endl;
 }
 
 void WriteBits(M6OBitStream& inBits, const M6OBitStream& inValue)

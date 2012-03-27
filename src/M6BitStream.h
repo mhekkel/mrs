@@ -51,7 +51,7 @@ class M6OBitStream
 	size_t				Size() const;
 	bool				Empty() const		{ return BitSize() == 0; }
 	void				Clear();
-	size_t				BitSize() const		{ return Size() * 8 + (7 - mBitOffset); }
+	size_t				BitSize() const		{ return Size() * 8 - mBitOffset - 1; }
 
 //	size_t				Copy(void* outBuffer, size_t inBufferSize) const;
 //	void				Write(M6File& inFile) const;
@@ -123,9 +123,9 @@ class M6IBitStream
 	// 
 	
 	int					operator()();
-//	void				Sync();
+	void				Sync();
 	void				Underflow();
-//	void				Skip(uint32 inBits);
+	void				Skip(uint32 inBits);
 	
 	friend void ReadBits(M6IBitStream& inBits, M6OBitStream& outValue);
 	friend void WriteBits(M6OBitStream& inBits, const M6OBitStream& inValue);

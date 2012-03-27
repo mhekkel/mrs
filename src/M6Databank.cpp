@@ -2,6 +2,7 @@
 
 #include <set>
 #include <iostream>
+#include <iterator>
 
 #include <boost/filesystem.hpp>
 #include <boost/foreach.hpp>
@@ -343,7 +344,15 @@ void M6FullTextIx::FlushDoc(uint32 inDoc)
 			e.weight = 1;
 		
 		if (UsesInDocLocation(w->index))
+		{
 			WriteArray(e.idl, w->loc);
+
+			vector<uint32> loc;
+			M6IBitStream bits(e.idl);
+			ReadArray(bits, loc);
+			if (loc != w->loc)
+				THROW(("Ouch!"));
+		}
 
 		PushEntry(e);
 	}
@@ -783,20 +792,26 @@ void M6TextIx::AddDocTerm(uint32 inDoc, uint8 inFrequency, M6OBitStream& inIDL)
 {
 	M6BasicIx::AddDocTerm(inDoc, inFrequency, inIDL);
 	
+	static ofstream log("log.txt");
+
 	if (mIDLBits == nullptr)
 	{
 		mIDLOffset = mIDLFile->Seek(0, SEEK_END);
 		mIDLBits = new M6OBitStream(*mIDLFile);
+		
+		if (mName == "text")
+			log << ">> " << mIDLOffset << endl;
 	}
 
-	// read binary is much faster than read gamma...
-	int64 idlBitSize = inIDL.BitSize();
-	if (idlBitSize <= 63)
-		WriteBinary(*mIDLBits, 6, idlBitSize);
-	else
+	if (mName == "text")
 	{
-		WriteBinary(*mIDLBits, 6, 0);
-		WriteGamma(*mIDLBits, idlBitSize);
+		log << inDoc << ": ";
+
+		vector<uint32> loc;
+		M6IBitStream bits(inIDL);
+		ReadArray(bits, loc);
+		copy(loc.begin(), loc.end(), ostream_iterator<uint32>(log, ";"));
+		log << endl;
 	}
 
 	CopyBits(*mIDLBits, inIDL);
@@ -832,6 +847,9 @@ void M6TextIx::FlushTerm(uint32 inTerm, uint32 inDocCount)
 	}
 
 	mBits.Clear();
+	
+	if (mIDLBits != nullptr)
+		mIDLBits->Sync();
 	
 	delete mIDLBits;
 	mIDLBits = nullptr;

@@ -2425,8 +2425,9 @@ M6Iterator* M6IndexImplT<M6MultiIDLData>::FindString(const string& inString)
 	{
 		M6IndexPage* root(Load<M6IndexPage>(mHeader.mRoot));
 		M6MultiIDLData data;
-		vector<pair<M6Iterator*,int64>> iterators;
+		vector<tr1::tuple<M6Iterator*,int64,uint32>> iterators;
 		bool ok = true;
+		uint32 index = 0;
 		
 		M6Tokenizer tokenizer(inString);
 		for (;;)
@@ -2444,8 +2445,11 @@ M6Iterator* M6IndexImplT<M6MultiIDLData>::FindString(const string& inString)
 				}
 
 				M6IBitStream bits(new M6IBitVectorImpl(*this, data.mBitVector));
-				iterators.push_back(make_pair(new M6MultiDocIterator(bits, data.mCount), data.mIDLOffset));
+				iterators.push_back(tr1::make_tuple(new M6MultiDocIterator(bits, data.mCount), data.mIDLOffset, index));
+				++index;
 			}
+			else if (token == eM6TokenPunctuation)
+				++index;
 		}
 		
 		Release(root);
@@ -2453,7 +2457,7 @@ M6Iterator* M6IndexImplT<M6MultiIDLData>::FindString(const string& inString)
 		if (not ok)
 		{
 			foreach (auto i, iterators)
-				delete i.first;
+				delete tr1::get<0>(i);
 			iterators.clear();
 		}
 		
@@ -3063,6 +3067,7 @@ M6MultiIDLBasicIndex::M6MultiIDLBasicIndex(const fs::path& inPath, M6IndexType i
 void M6MultiIDLBasicIndex::Insert(uint32 inKey, int64 inIDLOffset, const vector<uint32>& inDocuments)
 {
 	M6MultiIDLData data = { static_cast<uint32>(inDocuments.size()) };
+	data.mIDLOffset = inIDLOffset;
 
 	M6OBitStream bits;
 	CompressSimpleArraySelector(bits, inDocuments);

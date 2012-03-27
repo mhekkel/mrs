@@ -93,3 +93,138 @@ BOOST_AUTO_TEST_CASE(test_bit_stream_3)
 	ReadBinary(ibits, 32, t);
 	BOOST_CHECK_EQUAL(t, v);
 }
+
+BOOST_AUTO_TEST_CASE(test_bit_stream_4)
+{
+	cout << "testing bitstream 4" << endl;
+
+	M6OBitStream bits;
+	
+	uint32 a[] = { 3 };
+	uint32 b[] = { 1, 2, 5, 8, 9 };
+	uint32 c[] = { 1, 2, 4, 5, 8, 9 };
+
+	vector<uint32> va(a, a + sizeof(a) / sizeof(uint32));
+	vector<uint32> vb(b, b + sizeof(b) / sizeof(uint32));
+	vector<uint32> vc(c, c + sizeof(c) / sizeof(uint32));
+
+	WriteArray(bits, va);
+	WriteArray(bits, vb);
+	WriteArray(bits, vc);
+	bits.Sync();
+	
+	M6OBitStream b2;
+	CopyBits(b2, bits);
+	b2.Sync();
+	
+	M6IBitStream b3(b2);
+	vector<uint32> t;
+	
+	ReadArray(b3, t);	BOOST_CHECK(t == va);
+	ReadArray(b3, t);	BOOST_CHECK(t == vb);
+	ReadArray(b3, t);	BOOST_CHECK(t == vc);
+}
+
+BOOST_AUTO_TEST_CASE(test_bit_stream_5)
+{
+	cout << "testing bitstream 5" << endl;
+
+	M6OBitStream bits;
+	
+	uint32 a[] = { 3 };
+	uint32 b[] = { 1, 2, 5, 8, 9 };
+	uint32 c[] = { 1, 2, 4, 5, 8, 9 };
+
+	vector<uint32> va(a, a + sizeof(a) / sizeof(uint32));
+	vector<uint32> vb(b, b + sizeof(b) / sizeof(uint32));
+	vector<uint32> vc(c, c + sizeof(c) / sizeof(uint32));
+
+	M6OBitStream ob1;	WriteArray(ob1, va);	CopyBits(bits, ob1);
+	BOOST_CHECK_EQUAL(ob1.BitSize(), bits.BitSize());
+	M6OBitStream ob2;	WriteArray(ob2, vb);	CopyBits(bits, ob2);
+	BOOST_CHECK_EQUAL(ob1.BitSize() + ob2.BitSize(), bits.BitSize());
+	M6OBitStream ob3;	WriteArray(ob3, vc);	CopyBits(bits, ob3);
+	BOOST_CHECK_EQUAL(ob1.BitSize() + ob2.BitSize() + ob3.BitSize(), bits.BitSize());
+	bits.Sync();
+	
+	M6IBitStream b3(bits);
+	vector<uint32> t;
+	
+	ReadArray(b3, t);	BOOST_CHECK(t == va);
+	ReadArray(b3, t);	BOOST_CHECK(t == vb);
+	ReadArray(b3, t);	BOOST_CHECK(t == vc);
+}
+
+BOOST_AUTO_TEST_CASE(test_bit_stream_6)
+{
+	cout << "testing bitstream 6" << endl;
+
+	M6OBitStream bits;
+	
+	for (int i = 0; i < 10; ++i)
+	{
+		vector<uint32> v(100 + i * 13);
+		iota(v.begin(), v.end(), 100 + i * 13);
+
+		M6OBitStream ob;
+		WriteArray(ob, v);
+		CopyBits(bits, ob);
+	}
+
+	bits.Sync();
+	
+	M6IBitStream ib(bits);
+	
+	for (int i = 0; i < 10; ++i)
+	{
+		vector<uint32> v(100 + i * 13);
+		iota(v.begin(), v.end(), 100 + i * 13);
+
+		vector<uint32> t;
+		ReadArray(ib, t);
+		BOOST_CHECK(t == v);
+	}
+}
+
+BOOST_AUTO_TEST_CASE(test_bit_stream_7)
+{
+	cout << "testing bitstream 7" << endl;
+
+	M6OBitStream bits;
+	
+	uint32 a[] = {
+		3458, 3483, 3600, 5200, 5217, 5272, 5280, 5297,
+		5343, 5386, 5475, 5490, 5536, 5572, 5596, 5661,
+		5679, 5721, 5742, 6519, 6520, 6521, 6522
+	};
+	
+	vector<uint32> v(a, a + sizeof(a) / sizeof(uint32));
+	
+	WriteArray(bits, v);
+	
+	M6OBitStream b2;
+	WriteBits(b2, bits);
+	
+	{
+		M6IBitStream ib(bits);
+		vector<uint32> t;
+		ReadArray(ib, t);
+	
+		BOOST_CHECK(t == v);
+	}
+
+	{
+		M6IBitStream ib(b2);
+		M6OBitStream ob;
+
+		ReadBits(ib, ob);
+
+		M6IBitStream ib2(ob);
+
+		vector<uint32> t;
+		ReadArray(ib2, t);
+	
+		BOOST_CHECK(t == v);
+	}
+}
+

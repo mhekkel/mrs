@@ -101,7 +101,7 @@ string M6Config::LoadFormatScript(const string& inDatabank)
 		if (parser.empty())
 			break;
 		
-		string parserPath = (boost::format("/m6-config/format[@id='%1%']/script") % parser).str();
+		string parserPath = (boost::format("/m6-config/parser[@id='%1%']/format") % parser).str();
 		auto parserConfig = mConfig->find(parserPath);
 		if (parserConfig.empty() or parserConfig.size() > 1)
 			break;

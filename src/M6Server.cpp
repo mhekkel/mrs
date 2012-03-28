@@ -305,13 +305,17 @@ void M6Server::handle_entry(const zh::request& request, const el::scope& scope, 
 		}
 		catch (...) {}
 
-		zx::element* head = doc.find_first("//head");
-		if (head != nullptr)
+		string formatScript = M6Config::Instance().LoadFormatScript(db);
+		if (not formatScript.empty())
 		{
-			zx::element* script = new zx::element("script");
-			script->set_attribute("language", "JavaScript");
-			script->content(M6Config::Instance().LoadFormatScript(db));
-			head->append(script);
+			zx::element* head = doc.find_first("//head");
+			if (head != nullptr)
+			{
+				zx::element* script = new zx::element("script");
+				script->set_attribute("language", "JavaScript");
+				script->content(formatScript);
+				head->append(script);
+			}
 		}
 	
 		reply.set_content(doc);
@@ -479,6 +483,7 @@ void M6Server::handle_search(const zh::request& request,
 				firstDocNr = hits.front()["docNr"].as<uint32>();
 			}
 		}
+
 		sub.put("first", el::object(resultoffset + 1));
 		sub.put("last", el::object(resultoffset + hits.size()));
 		sub.put("hitCount", el::object(hitCount));

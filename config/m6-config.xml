@@ -371,6 +371,15 @@
 		<document-separator type="first-line-equals">*RECORD*</document-separator>
 	</databank>
 	
+	<databank id="mini-omim" parser="omim">
+		<name>OMIM - Online Mendelian Inheritance in Man™</name>
+		<info>http://www.ncbi.nlm.nih.gov/entrez/query.fcgi?db=OMIM</info>
+		<file>/data/mrs/omim.m6</file>
+		<locale>en_US.UTF-8</locale>
+		<source>omim/mini-omim.dat</source>
+		<document-separator type="first-line-equals">*RECORD*</document-separator>
+	</databank>
+	
 	<databank id="sprot" parser="uniprot">
 		<name>SwissProt</name>
 		<info>http://www.uniprot.org/</info>

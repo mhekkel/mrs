@@ -17,7 +17,10 @@
     <ClCompile Include="..\..\unit-tests\M6TestIterators.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\unit-tests\M6TestLex.cpp">
+    <ClCompile Include="..\..\unit-tests\M6TestDatabank.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\unit-tests\M6TestBitStream.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

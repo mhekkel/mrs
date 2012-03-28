@@ -131,7 +131,20 @@ M6Iterator* M6QueryParser::ParseTest()
 
 		case eM6TokenString:
 			if (mDatabank != nullptr)
+			{
+				M6Tokenizer tokenizer(mTokenizer.GetTokenValue(), mTokenizer.GetTokenLength());
+				for (;;)
+				{
+					M6Token token = tokenizer.GetNextWord();
+					if (token == eM6TokenEOF)
+						break;
+					
+					if (token == eM6TokenWord or token == eM6TokenNumber)
+						mQueryTerms.push_back(tokenizer.GetTokenString());
+				}
+
 				result.reset(mDatabank->FindString("*", mTokenizer.GetTokenString()));
+			}
 			Match(eM6TokenString);
 			break;
 
@@ -187,7 +200,19 @@ M6Iterator* M6QueryParser::ParseTerm(const string& inIndex)
 	{
 		case eM6TokenString:
 			if (mDatabank != nullptr)
+			{
+				M6Tokenizer tokenizer(mTokenizer.GetTokenValue(), mTokenizer.GetTokenLength());
+				for (;;)
+				{
+					M6Token token = tokenizer.GetNextWord();
+					if (token == eM6TokenEOF)
+						break;
+					
+					if (token == eM6TokenWord or token == eM6TokenNumber)
+						mQueryTerms.push_back(tokenizer.GetTokenString());
+				}
 				result.reset(mDatabank->FindString(inIndex, mTokenizer.GetTokenString()));
+			}
 			Match(eM6TokenString);
 			break;
 		

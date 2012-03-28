@@ -96,6 +96,8 @@ void M6UnionIterator::AddIterator(M6Iterator* inIter)
 		float r;
 		if (inIter->Next(p.mDoc, r))
 		{
+			mCount += p.mIter->GetCount();
+
 			mIterators.push_back(p);
 			push_heap(mIterators.begin(), mIterators.end(), greater<M6IteratorPart>());
 		}
@@ -199,7 +201,12 @@ void M6IntersectionIterator::AddIterator(M6Iterator* inIter)
 	
 		float r;
 		if (inIter->Next(p.mDoc, r))
+		{
 			mIterators.push_back(p);
+
+			if (mCount < p.mIter->GetCount())
+				mCount = p.mIter->GetCount();
+		}
 		else
 			delete inIter;
 	}
@@ -291,6 +298,9 @@ M6PhraseIterator::M6PhraseIterator(fs::path& inIDLFile,
 			break;
 		}
 		
+		if (mCount < p.mIter->GetCount())
+			mCount = p.mIter->GetCount();
+
 		mIterators.push_back(p);
 		mIterators.back().ReadArray();
 	}
@@ -315,7 +325,7 @@ bool M6PhraseIterator::Next(uint32& outDoc, float& outRank)
 	bool result = false, done = false;
 	float r;
 	
-	for (;;)
+	while (result == false and not done)
 	{
 		if (mIterators.empty())
 			break;
@@ -370,7 +380,7 @@ bool M6PhraseIterator::Next(uint32& outDoc, float& outRank)
 					done = true;
 			}
 
-			break;
+			continue;
 		}
 
 		if (mIterators.back().mIter->Next(mIterators.back().mDoc, r))

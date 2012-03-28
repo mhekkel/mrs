@@ -39,6 +39,8 @@ M6OBitStreamFileImpl::~M6OBitStreamFileImpl()
 
 void M6OBitStreamFileImpl::Write(const uint8* inData, size_t inSize)
 {
+	assert(mRefCount == 1);
+	
 	size_t free = kFileBufferSize - (mBufferPtr - mBuffer);
 	if (free >= inSize)
 	{
@@ -102,6 +104,8 @@ M6OBitStreamMemImpl::~M6OBitStreamMemImpl()
 
 void M6OBitStreamMemImpl::Write(const uint8* inData, size_t inSize)
 {
+	assert(mRefCount == 1);
+
 	size_t size = Size();
 	if (size + inSize > mBufferSize)
 	{
@@ -154,7 +158,8 @@ M6OBitStream::M6OBitStream(const M6OBitStream& inStream)
 
 M6OBitStream& M6OBitStream::operator=(const M6OBitStream& inStream)
 {
-	if (this != &inStream)
+	if (((mImpl != nullptr or inStream.mImpl != nullptr) and mImpl != inStream.mImpl) or
+		this != &inStream)
 	{
 		if (mImpl != nullptr)
 			mImpl->Release();
@@ -215,7 +220,15 @@ void M6OBitStream::Sync()
 void M6OBitStream::Clear()
 {
 	if (mImpl != nullptr)
-		mImpl->Truncate();
+	{
+		if (mImpl->RefCount() == 1)
+			mImpl->Truncate();
+		else
+		{
+			mImpl->Release();
+			mImpl = nullptr;
+		}
+	}
 	
 	mByteOffset = 0;
 	mBitOffset = 7;
@@ -475,12 +488,6 @@ void ReadBits(M6IBitStream& inBits, M6OBitStream& outValue)
 	
 	while (length-- > 0)
 		outValue << inBits();
-
-	M6IBitStream test(outValue);
-	vector<uint32> t;
-	ReadArray(test, t);
-	copy(t.begin(), t.end(), ostream_iterator<uint32>(cout, ";"));
-	cout << endl;
 }
 
 void WriteBits(M6OBitStream& inBits, const M6OBitStream& inValue)

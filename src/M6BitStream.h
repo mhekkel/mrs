@@ -19,6 +19,8 @@ struct M6OBitStreamImpl
 {
 					M6OBitStreamImpl() : mRefCount(1)	{ }
 	virtual 		~M6OBitStreamImpl()					{ assert(mRefCount == 0); }
+
+	uint32			RefCount() const					{ return mRefCount; }
 	void			Reference()							{ ++mRefCount; }
 	void			Release()							{ if (--mRefCount == 0) delete this; }
 
@@ -26,11 +28,12 @@ struct M6OBitStreamImpl
 	virtual void	Write(const uint8* inData, size_t inSize) = 0;
 	virtual void	Truncate() = 0;
 
+  protected:
+	uint32			mRefCount;
+
   private:
 					M6OBitStreamImpl(const M6OBitStreamImpl&);
 	M6OBitStreamImpl& operator=(const M6OBitStreamImpl&);
-
-	uint32			mRefCount;
 };
 
 class M6OBitStream

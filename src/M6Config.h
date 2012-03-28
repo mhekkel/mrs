@@ -22,6 +22,8 @@ class M6Config
 	zeep::xml::element_set
 						LoadServers();
 
+	std::string			LoadFormatScript(const std::string& inDatabank);
+
   private:
 						M6Config();
 						~M6Config();

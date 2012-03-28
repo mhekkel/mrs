@@ -792,27 +792,11 @@ void M6TextIx::AddDocTerm(uint32 inDoc, uint8 inFrequency, M6OBitStream& inIDL)
 {
 	M6BasicIx::AddDocTerm(inDoc, inFrequency, inIDL);
 	
-	static ofstream log("log.txt");
-
 	if (mIDLBits == nullptr)
 	{
 		mIDLOffset = mIDLFile->Seek(0, SEEK_END);
 		mIDLBits = new M6OBitStream(*mIDLFile);
-		
-		//if (mName == "text")
-		//	log << ">> " << mIDLOffset << endl;
 	}
-
-	//if (mName == "text")
-	//{
-	//	log << inDoc << ": ";
-
-	//	vector<uint32> loc;
-	//	M6IBitStream bits(inIDL);
-	//	ReadArray(bits, loc);
-	//	copy(loc.begin(), loc.end(), ostream_iterator<uint32>(log, ";"));
-	//	log << endl;
-	//}
 
 	CopyBits(*mIDLBits, inIDL);
 }

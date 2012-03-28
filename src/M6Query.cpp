@@ -130,23 +130,24 @@ M6Iterator* M6QueryParser::ParseTest()
 			break;
 
 		case eM6TokenString:
-			if (mDatabank != nullptr)
+		{
+			M6Tokenizer tokenizer(mTokenizer.GetTokenValue(), mTokenizer.GetTokenLength());
+			for (;;)
 			{
-				M6Tokenizer tokenizer(mTokenizer.GetTokenValue(), mTokenizer.GetTokenLength());
-				for (;;)
-				{
-					M6Token token = tokenizer.GetNextWord();
-					if (token == eM6TokenEOF)
-						break;
+				M6Token token = tokenizer.GetNextWord();
+				if (token == eM6TokenEOF)
+					break;
 					
-					if (token == eM6TokenWord or token == eM6TokenNumber)
-						mQueryTerms.push_back(tokenizer.GetTokenString());
-				}
-
-				result.reset(mDatabank->FindString("*", mTokenizer.GetTokenString()));
+				if (token == eM6TokenWord or token == eM6TokenNumber)
+					mQueryTerms.push_back(tokenizer.GetTokenString());
 			}
+
+			if (mDatabank != nullptr)
+				result.reset(mDatabank->FindString("*", mTokenizer.GetTokenString()));
+
 			Match(eM6TokenString);
 			break;
+		}
 
 		case eM6TokenWord:
 		{
@@ -199,23 +200,25 @@ M6Iterator* M6QueryParser::ParseTerm(const string& inIndex)
 	switch (mLookahead)
 	{
 		case eM6TokenString:
-			if (mDatabank != nullptr)
+		{
+			M6Tokenizer tokenizer(mTokenizer.GetTokenValue(), mTokenizer.GetTokenLength());
+			for (;;)
 			{
-				M6Tokenizer tokenizer(mTokenizer.GetTokenValue(), mTokenizer.GetTokenLength());
-				for (;;)
-				{
-					M6Token token = tokenizer.GetNextWord();
-					if (token == eM6TokenEOF)
-						break;
+				M6Token token = tokenizer.GetNextWord();
+				if (token == eM6TokenEOF)
+					break;
 					
-					if (token == eM6TokenWord or token == eM6TokenNumber)
-						mQueryTerms.push_back(tokenizer.GetTokenString());
-				}
-				result.reset(mDatabank->FindString(inIndex, mTokenizer.GetTokenString()));
+				if (token == eM6TokenWord or token == eM6TokenNumber)
+					mQueryTerms.push_back(tokenizer.GetTokenString());
 			}
+
+			if (mDatabank != nullptr)
+				result.reset(mDatabank->FindString(inIndex, mTokenizer.GetTokenString()));
+
 			Match(eM6TokenString);
 			break;
-		
+		}
+
 		case eM6TokenPattern:
 			if (mDatabank != nullptr)
 				result.reset(mDatabank->Find(inIndex, mTokenizer.GetTokenString(), true));

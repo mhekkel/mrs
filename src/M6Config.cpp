@@ -85,3 +85,31 @@ string M6Config::FindGlobal(const std::string& inXPath)
 		result = e->content();
 	return result;
 }
+
+string M6Config::LoadFormatScript(const string& inDatabank)
+{
+	string result;
+	
+	for (;;)
+	{
+		string dbConfigPath = (boost::format("/m6-config/databank[@id='%1%']") % inDatabank).str();
+		auto dbConfig = mConfig->find(dbConfigPath);
+		if (dbConfig.empty() or dbConfig.size() > 1)
+			break;
+		
+		string parser = dbConfig.front()->get_attribute("parser");
+		if (parser.empty())
+			break;
+		
+		string parserPath = (boost::format("/m6-config/format[@id='%1%']/script") % parser).str();
+		auto parserConfig = mConfig->find(parserPath);
+		if (parserConfig.empty() or parserConfig.size() > 1)
+			break;
+	
+		result = parserConfig.front()->content();
+	
+		break;	
+	}
+	
+	return result;
+}

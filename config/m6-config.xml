@@ -87,6 +87,55 @@
 	</parser>
 	
 	<format id="omim">
+		<script>
+// <![CDATA[
+
+jQuery(function() {
+	var re1 = /\*FIELD\* (..)\n(((\n|[^*\n].*\n)+|\*(?!FIELD).*\n)+)/g;
+	var re2 = /\((\d{6})(\.(\d{4}))?\)/g;
+
+	var label = new Array();
+	label['AV'] = 'Allelic variation';
+	label['CD'] = 'Creation date';
+	label['CN'] = 'Contributor name';
+	label['CS'] = 'Clinical Synopsis';
+	label['ED'] = 'Edit history';
+	label['MN'] = 'Mini-Mim';
+	label['NO'] = 'Number';
+	label['RF'] = 'References';
+	label['SA'] = 'See Also';
+	label['TI'] = 'Title';
+	label['TX'] = 'Text';
+
+	var txt = $("#entrytext").html()
+		.replace( /\*RECORD\*\n/, '')
+		.replace( re1 , function(s, n, t) {
+			if (n == 'CS')
+				t = '<div style="white-space:pre">' + t + '</div>';
+			else if (n == 'CN' || n == 'ED')
+				t = '<p>' + t.replace(/\n/g, '<br/>') + '</p>';
+			else
+			{
+				t = '<p>' + t.split('\n\n').join("</p>\n<p>") + '</p>';
+	
+				t = t.replace(re2, function(s, id, dummy, anchor) {
+					if (anchor != undefined)
+						return '(<a href="/link?db=omim&id=' + id + '#' + anchor + '">' + id + '.' + anchor + '</a>)';
+					else
+						return '(<a href="/link?db=omim&id=' + id + '">' + id + '</a>)';
+				});
+				t = '<p>' + t + '</p>';
+			}
+
+			return '<h3>' + label[n] + '</h3>\n' + t;
+		});
+	
+	$("#entrytext").replaceWith('<div id="entrytext">' + txt + '</div>');
+});
+
+// ]]>
+		</script>
+
 		<match regex="^\*FIELD\* (\w\w)\n((?:(?:\n|[^*\n].*\n)++|\*(?!FIELD).*\n)+)">
 			<switch test="1" capture="2">
 				<case value="CS">

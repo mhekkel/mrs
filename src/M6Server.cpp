@@ -279,7 +279,7 @@ void M6Server::handle_entry(const zh::request& request, const el::scope& scope, 
 	zx::document doc;
 	doc.set_preserve_cdata(true);
 	doc.read(data);
-
+	
 	zx::element* root = doc.child();
 
 	try
@@ -304,7 +304,16 @@ void M6Server::handle_entry(const zh::request& request, const el::scope& scope, 
 			}
 		}
 		catch (...) {}
-		
+
+		zx::element* head = doc.find_first("//head");
+		if (head != nullptr)
+		{
+			zx::element* script = new zx::element("script");
+			script->set_attribute("language", "JavaScript");
+			script->content(M6Config::Instance().LoadFormatScript(db));
+			head->append(script);
+		}
+	
 		reply.set_content(doc);
 	}
 	catch (M6Redirect& redirect)
@@ -578,6 +587,7 @@ void M6Server::process_mrs_entry(zx::element* node, const el::scope& scope, fs::
 	else // if (format == "plain")
 	{
 		zx::element* pre = new zx::element("pre");
+		pre->set_attribute("id", "entrytext");
 		pre->add_text(doc->GetText());
 		replacement = pre;
 	}

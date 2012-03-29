@@ -567,6 +567,9 @@ void M6Server::handle_search(const zh::request& request,
 			resultoffset = (page - 1) * maxresultcount;
 		
 		M6Databank* mdb = Load(db);
+		if (mdb == nullptr)
+			THROW(("Databank %s not loaded", db.c_str()));
+
 		vector<el::object> hits;
 		bool ranked;
 		

@@ -287,7 +287,13 @@ void M6Server::handle_entry(const zh::request& request, const el::scope& scope, 
 		zx::element* format = M6Config::Instance().LoadFormat(db);
 		
 		if (zx::element* script = format->find_first("script"))
-			sub["formatScript"] = script->content();
+		{
+			string src = script->get_attribute("src");
+			if (src.empty())
+				sub["formatScript"] = script->content();
+			else
+				sub["formatSrc"] = src;
+		}
 
 		process_xml(root, sub, "/");	
 		

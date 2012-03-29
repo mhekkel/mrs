@@ -21,6 +21,7 @@
 	<script src="scripts/mrs.js" type="text/javascript">
 	</script>
 	
+	<mrs:if test="${formatSrc}"><script type="text/javascript" src="${formatSrc}"></script></mrs:if>
 	<mrs:if test="${formatScript}"><script language="JavaScript">
 // <![CDATA[
 ${formatScript}
@@ -90,7 +91,7 @@ ${formatScript}
 			</ul>
 		</div>
 		
-		<div class="highlightwords">
+		<div class="highlightwords entry" id="entry">
 			<mrs:entry db="${db}" nr="${nr}" format="${format}" />
 		</div>
 	</div>

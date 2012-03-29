@@ -262,6 +262,10 @@
 		</match>
 	</parser>
 
+	<format id="uniprot">
+		<script src="scripts/uniprot.js" />
+	</format>
+
 	<parser id="genbank">
 		<match regex="^\s*(\w+)\s+((?:.+)(?:\n\s{5,}.+)*)">
 			<switch test="1">
@@ -427,7 +431,7 @@
 		<document-separator type="first-line-equals">*RECORD*</document-separator>
 	</databank>
 	
-	<databank id="sprot" parser="uniprot">
+	<databank id="sprot" parser="uniprot" format="uniprot">
 		<name>SwissProt</name>
 		<info>http://www.uniprot.org/</info>
 		<file>/data/mrs/sprot.m6</file>
@@ -435,7 +439,7 @@
 		<document-separator type="last-line-equals">//</document-separator>
 	</databank>
 
-	<databank id="sprotw" parser="uniprot">
+	<databank id="sprotw" parser="uniprot" format="uniprot">
 		<name>SwissProt - mini version</name>
 		<info>http://www.uniprot.org/</info>
 		<file>/data/mrs/sprot.m6</file>
@@ -443,7 +447,7 @@
 		<document-separator type="last-line-equals">//</document-separator>
 	</databank>
 	
-	<databank id="trembl" parser="uniprot">
+	<databank id="trembl" parser="uniprot" format="uniprot">
 		<name>TrEMBL</name>
 		<info>http://www.uniprot.org/</info>
 		<file>/data/mrs/trembl.m6</file>

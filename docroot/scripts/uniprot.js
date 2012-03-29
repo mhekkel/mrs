@@ -3,9 +3,19 @@ UniProt = {
 	comments: null,
 	cross: null,
 
-	cell: function(name, value) {
-		return  "<td width='20%'>" + name + "</td>" +
+	cell: function(name, value, rowspan) {
+		if (rowspan == null)
+			rowspan = '';
+		else
+			rowspan = ' rowspan=' + rowspan;
+	
+		return  "<td width='20%'" + rowspan + ">" + name + "</td>" +
 				"<td>" + value + "</td>";
+	},
+
+	cell2: function(name, value) {
+		return  "<td width='20%'>" + name + "</td>" +
+				"<td class='sub_entry'>" + value + "</td>";
 	},
 
 	init: function() {
@@ -14,9 +24,6 @@ UniProt = {
 	
 		var entry = $("#entry");
 		var text = $("#entrytext").html();
-		
-		var table = $("<table cellspacing='0' cellpadding='0' width='100%'/>");
-		table.append($("<tr/>").append("<th colspan='2'>Entry information</th>"));
 		
 		var re = /^(([A-Z]{2})   ).+\n(\2.+\n)*/gm;
 		
@@ -27,20 +34,65 @@ UniProt = {
 					m[0].replace(/ID\s+(\S+)\s+(.+)/, "<strong>$1</strong> $2</td>")));
 			}
 			else if (m[2] == 'AC') {
-				var a = m[0].replace(/^AC\s+/gm, '').split(/;\s*/);
+				var a = m[0].replace(/;\s*$/, '').replace(/^AC\s+/gm, '').split(/;\s*/);
 				info.push(UniProt.cell("Primary accession", "<strong>" + a.shift() + "</strong>"));
-				info.push(UniProt.cell("Secondary accession", a.join(" ")));
+				if (a.length > 0)
+					info.push(UniProt.cell("Secondary accession", a.join(" ")));
 			}
 			else if (m[2] == 'DT') {
-				var dates = m[0].replace(/\.$/gm, '').split("\n");
+				var dates = m[0].replace(/\s+$/, '').replace(/\.$/gm, '').split("\n");
 				for (i in dates) {
-					info.push(UniProt.cell(dates[i].substr(18), dates[i].substr(5, 11)));
+					var d = new Date(dates[i].substr(12, 4),
+						{"JAN":0, "FEB":1, "MAR":2, "APR":3, "MAY":4, "JUN":5, 
+						"JUL":6, "AUG":7, "SEP":8, "OCT":9, "NOV":10, "DEC":11}[dates[i].substr(8, 3)],
+						dates[i].substr(5, 2));
+					info.push(UniProt.cell(dates[i].substr(18), d.toDateString()));
 				}
+			}
+			else if (m[2] == "DE") {
+				var a = m[0].replace(/^DE   /gm, '').replace(/;\s*$/, '')
+					.replace(/(RecName|AltName): /gm, '')
+					.replace(/(Full|Short)=/gm, '')
+					.split(/;\s*/);
+				name.push(UniProt.cell("Protein names", a.shift(), a.length + 1));
+				$(a).each(function(index,value) {
+					name.push("<td>" + value + "</td>");
+				});
+			}
+			else if (m[2] == "OS") {
+				name.push(UniProt.cell("From", m[0].replace(/^OS   /, '')));
+			}
+			else if (m[2] == "GN") {
+				var a = m[0].replace(/^GN   /gm, '').replace(/;\s*$/, '').split(/;\s*/);
+				
+				var subtable = $(document.createElement("table")).attr("cellpadding", 0)
+					.attr("cellspacing", 0);
+				$.each(a, function(index, value) {
+					value = "<td><em>" + value.replace(/=/, "</em></td><td>") + "</td>";
+					$("<tr/>").append(value).appendTo(subtable);
+				});
+				
+				name.push(UniProt.cell2("Gene names", $("<table/>").append(subtable).html()));
+			}
+			else if (m[2] == 'KW') {
+				var a = m[0].replace(/^KW   /gm, '').replace(/;\s*$/, '').replace(/\.\n/, '').split(/;\s*/);
+				a = $.map(a, function(value) {
+					return "<a href='search?db=sprot&amp;q=kw:\"" + value + "\"'>" + value + "</a>";
+				});
+				name.push(UniProt.cell("Keywords", a.join(", ")));
 			}
 		}
 		
-		$(info).each(function(index) {
-			table.append($("<tr/>").append(info[index]));
+		var table = $("<table cellspacing='0' cellpadding='0' width='100%'/>");
+
+		$("<tr/>").append("<th colspan='2'>Entry information</th>").appendTo(table);
+		$(info).each(function(index, value) {
+			$("<tr/>").append(value).appendTo(table);
+		});
+
+		$("<tr/>").append("<th colspan='2'>Name and origin of the protein</th>").appendTo(table);
+		$(name).each(function(index, value) {
+			$("<tr/>").append(value).appendTo(table);
 		});
 		
 		entry.prepend(table);

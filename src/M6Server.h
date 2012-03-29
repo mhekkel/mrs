@@ -41,7 +41,10 @@ class M6Server : public zh::webapp
 	void			create_redirect(const std::string& databank, uint32 inDocNr,
 						const std::string& q, bool redirectForQuery,
 						const zh::request& req, zh::reply& rep);
+
 	void			highlight_query_terms(zx::element* node, boost::regex& expr);
+	void			create_link_tags(zx::element* node, boost::regex& expr, const std::string& inDatabank,
+						const std::string& inID, const std::string& inAnchor, const std::string& inText);
 
 	void			LoadAllDatabanks();
 	M6Databank*		Load(const std::string& inDatabank);

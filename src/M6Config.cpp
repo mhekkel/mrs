@@ -97,16 +97,16 @@ string M6Config::LoadFormatScript(const string& inDatabank)
 		if (dbConfig.empty() or dbConfig.size() > 1)
 			break;
 		
-		string parser = dbConfig.front()->get_attribute("parser");
-		if (parser.empty())
+		string format = dbConfig.front()->get_attribute("format");
+		if (format.empty())
 			break;
 		
-		string parserPath = (boost::format("/m6-config/parser[@id='%1%']/format") % parser).str();
-		auto parserConfig = mConfig->find(parserPath);
-		if (parserConfig.empty() or parserConfig.size() > 1)
+		string formatPath = (boost::format("/m6-config/format[@id='%1%']/script") % format).str();
+		auto formatConfig = mConfig->find(formatPath);
+		if (formatConfig.empty() or formatConfig.size() > 1)
 			break;
 	
-		result = parserConfig.front()->content();
+		result = formatConfig.front()->content();
 	
 		break;	
 	}

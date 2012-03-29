@@ -284,6 +284,8 @@ void M6Server::handle_entry(const zh::request& request, const el::scope& scope, 
 
 	try
 	{
+		sub["formatScript"] = M6Config::Instance().LoadFormatScript(db);
+
 		process_xml(root, sub, "/");	
 		
 		try
@@ -304,19 +306,6 @@ void M6Server::handle_entry(const zh::request& request, const el::scope& scope, 
 			}
 		}
 		catch (...) {}
-
-		string formatScript = M6Config::Instance().LoadFormatScript(db);
-		if (not formatScript.empty())
-		{
-			zx::element* head = doc.find_first("//head");
-			if (head != nullptr)
-			{
-				zx::element* script = new zx::element("script");
-				script->set_attribute("language", "JavaScript");
-				script->content(formatScript);
-				head->append(script);
-			}
-		}
 	
 		reply.set_content(doc);
 	}

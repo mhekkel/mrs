@@ -87,12 +87,8 @@
 	</parser>
 	
 	<format id="omim">
-		<script>
-// <![CDATA[
-
-jQuery(function() {
+		<script><![CDATA[jQuery(function() {
 	var re1 = /\*FIELD\* (..)\n(((\n|[^*\n].*\n)+|\*(?!FIELD).*\n)+)/g;
-	var re2 = /\((\d{6})(\.(\d{4}))?\)/g;
 
 	var label = new Array();
 	label['AV'] = 'Allelic variation';
@@ -110,31 +106,26 @@ jQuery(function() {
 	var txt = $("#entrytext").html()
 		.replace( /\*RECORD\*\n/, '')
 		.replace( re1 , function(s, n, t) {
-			if (n == 'CS')
-				t = '<div style="white-space:pre">' + t + '</div>';
-			else if (n == 'CN' || n == 'ED')
-				t = '<p>' + t.replace(/\n/g, '<br/>') + '</p>';
-			else
-			{
-				t = '<p>' + t.split('\n\n').join("</p>\n<p>") + '</p>';
+			var ot = t;
+			try {
+				if (n == 'CS')
+					t = '<div style="white-space:pre">' + t + '</div>';
+				else if (n == 'CN' || n == 'ED')
+					t = '<p>' + t.replace(/\n/g, '<br/>') + '</p>';
+				else
+					t = '<p>' + t.split('\n\n').join("</p>\n<p>") + '</p>';
 	
-				t = t.replace(re2, function(s, id, dummy, anchor) {
-					if (anchor != undefined)
-						return '(<a href="/link?db=omim&id=' + id + '#' + anchor + '">' + id + '.' + anchor + '</a>)';
-					else
-						return '(<a href="/link?db=omim&id=' + id + '">' + id + '</a>)';
-				});
-				t = '<p>' + t + '</p>';
+				return '<h3>' + label[n] + '</h3>\n' + t;
 			}
-
-			return '<h3>' + label[n] + '</h3>\n' + t;
+			catch (e) {
+				return ot;
+			}
 		});
 	
 	$("#entrytext").replaceWith('<div id="entrytext">' + txt + '</div>');
-});
+});]]></script>
 
-// ]]>
-		</script>
+		<link regex="(?<=()((\d{6}))(?:\.(\d{4})))?(?=))" db="omim" id="2" anchor="3" />
 
 		<match regex="^\*FIELD\* (\w\w)\n((?:(?:\n|[^*\n].*\n)++|\*(?!FIELD).*\n)+)">
 			<switch test="1" capture="2">
@@ -411,7 +402,7 @@ jQuery(function() {
 	</databank>
 	
 	<!-- omim -->
-	<databank id="omim" parser="omim">
+	<databank id="omim" parser="omim" format="omim">
 		<name>OMIM - Online Mendelian Inheritance in Man™</name>
 		<info>http://www.ncbi.nlm.nih.gov/entrez/query.fcgi?db=OMIM</info>
 		<file>/data/mrs/omim.m6</file>
@@ -420,7 +411,7 @@ jQuery(function() {
 		<document-separator type="first-line-equals">*RECORD*</document-separator>
 	</databank>
 	
-	<databank id="mini-omim" parser="omim">
+	<databank id="mini-omim" parser="omim" format="omim">
 		<name>OMIM - Online Mendelian Inheritance in Man™</name>
 		<info>http://www.ncbi.nlm.nih.gov/entrez/query.fcgi?db=OMIM</info>
 		<file>/data/mrs/omim.m6</file>

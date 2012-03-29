@@ -284,28 +284,50 @@ void M6Server::handle_entry(const zh::request& request, const el::scope& scope, 
 
 	try
 	{
-		sub["formatScript"] = M6Config::Instance().LoadFormatScript(db);
+		zx::element* format = M6Config::Instance().LoadFormat(db);
+		
+		if (zx::element* script = format->find_first("script"))
+			sub["formatScript"] = script->content();
 
 		process_xml(root, sub, "/");	
 		
-		try
+		if (not q.empty())
 		{
-			vector<string> terms;
-			AnalyseQuery(q, terms);
-			if (not terms.empty())
+			try
 			{
-				string pattern = ba::join(terms, "|");
-				
-				if (uc::contains_han(pattern))
-					pattern = string("(") + pattern + ")";
-				else
-					pattern = string("\\b(") + pattern + ")\\b";
-				
-				boost::regex re(pattern, boost::regex_constants::icase);
-				highlight_query_terms(root, re);
+				vector<string> terms;
+				AnalyseQuery(q, terms);
+				if (not terms.empty())
+				{
+					string pattern = ba::join(terms, "|");
+					
+					if (uc::contains_han(pattern))
+						pattern = string("(") + pattern + ")";
+					else
+						pattern = string("\\b(") + pattern + ")\\b";
+					
+					boost::regex re(pattern, boost::regex_constants::icase);
+					highlight_query_terms(root, re);
+				}
 			}
+			catch (...) {}
 		}
-		catch (...) {}
+
+		foreach (zx::element* link, format->find("link"))
+		{
+			try
+			{
+				string db = link->get_attribute("db");
+				string id = link->get_attribute("id");
+				string ix = link->get_attribute("ix");
+				string anchor = link->get_attribute("anchor");
+				if (db.empty() or id.empty())
+					continue;
+				boost::regex re(link->get_attribute("regex"));
+				create_link_tags(root, re, db, ix, id, anchor);
+			}
+			catch (...) {}
+		}
 	
 		reply.set_content(doc);
 	}
@@ -348,6 +370,92 @@ void M6Server::highlight_query_terms(zx::element* node, boost::regex& expr)
 			span->set_attribute("class", "highlight");
 			node->insert(text, span);
 			
+			text->str(m.suffix());
+		}
+	}
+}
+
+void M6Server::create_link_tags(zx::element* node, boost::regex& expr,
+	const string& inDatabank, const string& inIndex, const string& inID, const string& inAnchor)
+{
+	foreach (zx::element* e, *node)
+		create_link_tags(e, expr, inDatabank, inIndex, inID, inAnchor);
+
+	foreach (zx::node* n, node->nodes())
+	{
+		zx::text* text = dynamic_cast<zx::text*>(n);
+		
+		if (text == nullptr)
+			continue;
+
+		for (;;)
+		{
+			boost::smatch m;
+
+			string s = text->str();
+			// somehow boost::regex_search works incorrectly with a const std::string...
+			if (not boost::regex_search(s, m, expr) or not m[0].matched or m[0].length() == 0)
+				break;
+
+			string db = inDatabank; if (db[0] == '$') db = m[atoi(db.c_str() + 1)];
+			string id = inID;		if (id[0] == '$') id = m[atoi(id.c_str() + 1)];
+			string ix = inIndex;	if (ix[0] == '$') ix = m[atoi(ix.c_str() + 1)];
+//			string ix = node->get_attribute("index");			process_el(scope, ix);
+			string an = inAnchor;	if (an[0] == '$') an = m[atoi(an.c_str() + 1)];
+//			string title = node->get_attribute("title");		process_el(scope, title);
+			string title;
+			string q;
+//			string q = node->get_attribute("q");				process_el(scope, q);
+		
+			bool exists = false;
+			uint32 docNr = 0;
+			
+			zx::node* replacement = new zx::text(m[0]);
+			
+			try
+			{
+				M6Databank* mdb = Load(db);
+				if (mdb != nullptr)
+				{
+					tr1::tie(exists, docNr) = mdb->Exists(ix, id);
+	
+					unique_ptr<zx::element> a(new zeep::xml::element("a"));
+					
+					if (docNr != 0)
+						a->set_attribute("href",
+							(boost::format("entry?db=%1%&nr=%2%%3%%4%")
+								% zeep::http::encode_url(db)
+								% docNr
+								% (q.empty() ? "" : ("&q=" + zeep::http::encode_url(q)).c_str())
+								% (an.empty() ? "" : (string("#") + zeep::http::encode_url(an)).c_str())
+							).str());
+					else
+					{
+						a->set_attribute("href",
+							(boost::format("link?db=%1%&ix=%2%&id=%3%%4%%5%")
+								% zeep::http::encode_url(db)
+								% zeep::http::encode_url(ix)
+								% zeep::http::encode_url(id)
+								% (q.empty() ? "" : ("&q=" + zeep::http::encode_url(q)).c_str())
+								% (an.empty() ? "" : (string("#") + zeep::http::encode_url(an)).c_str())
+							).str());
+					
+						if (not exists)
+							a->set_attribute("class", "not-found");
+					}
+				
+					if (not title.empty())
+						a->set_attribute("title", title);
+					
+					a->append(replacement);
+					replacement = a.release();
+				}
+			}
+			catch (...) {}
+			
+			// split the text
+			node->insert(text, new zx::text(m.prefix()));
+			node->insert(text, replacement);
 			text->str(m.suffix());
 		}
 	}

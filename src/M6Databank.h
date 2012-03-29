@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vector>
+#include <boost/tr1/tuple.hpp>
 
 #include "M6File.h"
 
@@ -61,6 +62,10 @@ class M6Databank
 	M6Iterator*		Find(const std::string& inIndex, const std::string& inTerm,
 						bool inTermIsPattern);
 	M6Iterator*		FindString(const std::string& inIndex, const std::string& inString);
+
+	// Exist returns <documents exist,docnr for a unique match>
+	std::tr1::tuple<bool,uint32>
+					Exists(const std::string& inIndex, const std::string& inValue);
 	
 	// dictionary interface
 	void			SuggestCorrection(const std::string& inWord,

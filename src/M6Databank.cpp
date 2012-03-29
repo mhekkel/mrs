@@ -93,6 +93,8 @@ class M6DatabankImpl
 	M6Iterator*		Find(const string& inIndex, const string& inTerm,
 						bool inTermIsPattern);
 	M6Iterator*		FindString(const string& inIndex, const string& inString);
+	tr1::tuple<bool,uint32>
+					Exists(const string& inIndex, const string& inValue);
 
 	void			SuggestCorrection(const string& inWord, vector<pair<string,uint16>>& outCorrections);
 	void			SuggestSearchTerms(const string& inWord, vector<string>& outSearchTerms);
@@ -1602,6 +1604,36 @@ M6Iterator* M6DatabankImpl::FindString(const string& inIndex, const string& inSt
 	return result.release();
 }
 
+tr1::tuple<bool,uint32> M6DatabankImpl::Exists(const string& inIndex, const string& inValue)
+{
+	unique_ptr<M6UnionIterator> iter(new M6UnionIterator);
+	
+	foreach (const M6IndexDesc& desc, mIndices)
+	{
+		if (inIndex != "*" and not ba::iequals(inIndex, desc.mName))
+			continue;
+		
+		M6Iterator* sub = desc.mIndex->Find(inValue);
+		if (sub != nullptr)
+			iter->AddIterator(sub);
+	}
+	
+	tr1::tuple<bool,uint32> result = make_tuple(false, 0);
+	
+	uint32 docNr, dummy;
+	float r;
+	
+	if (iter->Next(docNr, r))
+	{
+		if (iter->Next(dummy, r))
+			result = make_tuple(true, 0);
+		else
+			result = make_tuple(true, docNr);
+	}
+	
+	return result;
+}
+
 void M6DatabankImpl::SuggestCorrection(const string& inWord, vector<pair<string,uint16>>& outCorrections)
 {
 	if (mDictionary != nullptr)
@@ -1786,6 +1818,11 @@ M6Iterator* M6Databank::Find(const vector<string>& inQueryTerms, M6Iterator* inF
 M6Iterator* M6Databank::Find(const string& inIndex, const string& inQuery, bool inTermIsPattern)
 {
 	return mImpl->Find(inIndex, inQuery, inTermIsPattern);
+}
+
+tr1::tuple<bool,uint32> M6Databank::Exists(const string& inIndex, const string& inValue)
+{
+	return mImpl->Exists(inIndex, inValue);
 }
 
 M6Iterator* M6Databank::FindString(const string& inIndex,

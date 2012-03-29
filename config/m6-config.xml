@@ -102,9 +102,14 @@
 	label['SA'] = 'See Also';
 	label['TI'] = 'Title';
 	label['TX'] = 'Text';
+	
+	var entry = $("#entrytext");
 
-	var txt = $("#entrytext").html()
-		.replace( /\*RECORD\*\n/, '')
+	var txt = entry.html()
+		.replace( /\*RECORD\*/, '')
+		.replace( /\n\.(\d{4})\n/g, function(s, a) {
+			return '\n<a name="' + a + '"/>\n';
+		})
 		.replace( re1 , function(s, n, t) {
 			var ot = t;
 			try {
@@ -122,10 +127,11 @@
 			}
 		});
 	
-	$("#entrytext").replaceWith('<div id="entrytext">' + txt + '</div>');
+	entry.replaceWith('<div id="entrytext">' + txt + '</div>');
 });]]></script>
 
-		<link regex="(?<=()((\d{6}))(?:\.(\d{4})))?(?=))" db="omim" id="2" anchor="3" />
+		<link regex="(?&lt;=\()(?:[^();]+?; )?(\d{6})(?:\.(\d{4}))?(?=\))"
+			db="omim" ix="id" id="$1" anchor="$2" />
 
 		<match regex="^\*FIELD\* (\w\w)\n((?:(?:\n|[^*\n].*\n)++|\*(?!FIELD).*\n)+)">
 			<switch test="1" capture="2">

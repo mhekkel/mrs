@@ -225,9 +225,14 @@ M6Iterator* M6QueryParser::ParseTerm(const string& inIndex)
 			Match(eM6TokenPattern);
 			break;
 		
-		default:
+		case eM6TokenWord:
+		case eM6TokenNumber:
 			if (mDatabank != nullptr)
 				result.reset(mDatabank->Find(inIndex, mTokenizer.GetTokenString(), false));
+			Match(mLookahead);
+			break;
+
+		default:
 			Match(eM6TokenWord);
 			break;
 	}

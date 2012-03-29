@@ -86,6 +86,33 @@ string M6Config::FindGlobal(const std::string& inXPath)
 	return result;
 }
 
+zeep::xml::element* M6Config::LoadFormat(const string& inDatabank)
+{
+	zeep::xml::element* result = nullptr;
+	
+	for (;;)
+	{
+		string dbConfigPath = (boost::format("/m6-config/databank[@id='%1%']") % inDatabank).str();
+		auto dbConfig = mConfig->find(dbConfigPath);
+		if (dbConfig.empty() or dbConfig.size() > 1)
+			break;
+
+		string format = dbConfig.front()->get_attribute("format");
+		if (format.empty())
+			break;
+		
+		string formatPath = (boost::format("/m6-config/format[@id='%1%']") % format).str();
+		auto formatConfig = mConfig->find(formatPath);
+		if (formatConfig.empty() or formatConfig.size() > 1)
+			break;
+	
+		result = formatConfig.front();
+		break;
+	}
+	
+	return result;
+}
+
 string M6Config::LoadFormatScript(const string& inDatabank)
 {
 	string result;

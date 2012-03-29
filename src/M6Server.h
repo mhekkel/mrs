@@ -44,7 +44,7 @@ class M6Server : public zh::webapp
 
 	void			highlight_query_terms(zx::element* node, boost::regex& expr);
 	void			create_link_tags(zx::element* node, boost::regex& expr, const std::string& inDatabank,
-						const std::string& inID, const std::string& inAnchor, const std::string& inText);
+						const std::string& inIndex, const std::string& inID, const std::string& inAnchor);
 
 	void			LoadAllDatabanks();
 	M6Databank*		Load(const std::string& inDatabank);

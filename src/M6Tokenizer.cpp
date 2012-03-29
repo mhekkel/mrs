@@ -825,7 +825,7 @@ void M6Tokenizer::CaseFold(string& ioString)
 	
 	const char* ptr = ioString.c_str();
 	const char* end = ptr + ioString.length();
-	bool hasCombiningMarks = false;
+	bool hasCombiningMarks = false, hasUpperCase = false;
 	
 	while (ptr < end)
 	{
@@ -833,12 +833,15 @@ void M6Tokenizer::CaseFold(string& ioString)
 		tie(ptr, ch) = ReadUTF8(ptr);
 		if (::ToLower(ch, s))
 			hasCombiningMarks = true;
+		if (s.size() > 1 or (s.size() == 1 and s[0] != ch))
+			hasUpperCase = true;
 	}
 	
 	if (hasCombiningMarks)
-	{
 		Reorder(&s[0], s.size());
-		
+
+	if (hasCombiningMarks or hasUpperCase)
+	{
 		ioString.clear();
 		foreach (uint32 ch, s)
 			::WriteUTF8(ch, back_inserter(ioString));

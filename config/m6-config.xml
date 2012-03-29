@@ -15,6 +15,7 @@
 			<db>sprot</db>
 			<db>trembl</db>
 			<db>genbank</db>
+			<db>refseq</db>
 		</dbs>
 		<realm name="M6 Administrator">
 			<user name="scott">b92ff7d60b994c8a0d2941ad9349e841</user>
@@ -454,7 +455,13 @@
 		<name>Genbank</name>
 		<file>/data/mrs/genbank.m6</file>
 		<source>genbank/*.seq.gz</source>
-		
+		<document-separator type="last-line-equals">//</document-separator>
+	</databank>
+
+	<databank id="refseq" parser="genbank">
+		<name>Refseq</name>
+		<file>/data/mrs/refseq.m6</file>
+		<source>refseq_release/*gpff.gz;refseq_release/*gbff.gz</source>
 		<document-separator type="last-line-equals">//</document-separator>
 	</databank>
 

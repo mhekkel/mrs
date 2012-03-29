@@ -1046,7 +1046,7 @@ void M6Server::SpellCheck(const string& inDatabank, const string& inTerm,
 		}
 
 		sort(corrections.begin(), corrections.end(),
-			[](pair<string,uint16>& a, pair<string,uint16>& b) -> bool { return a.second > b.second; });
+			[](const pair<string,uint16>& a, const pair<string,uint16>& b) -> bool { return a.second > b.second; });
 		
 		set<string> words;
 		foreach (auto c, corrections)

@@ -248,13 +248,13 @@ void Info(int argc, char* argv[])
 		 << "Data store size     : " << formatNr(info.mDataStoreSize, 16) << endl
 		 << endl
 		 << "Index Name           |                    | Nr of keys   | File size" << endl
-		 << "-----------------------------------------------------------------------" << endl;
+		 << "-------------------------------------------------------------------------" << endl;
 	
 	foreach (M6IndexInfo& ix, info.mIndexInfo)
 		cout << ix.mName << string(20 - ix.mName.length(), ' ') << " | "
 			 << descIxType(ix.mType) << " | "
 			 << formatNr(ix.mCount, 12) << " | "
-			 << formatNr(ix.mFileSize, 12) << endl;
+			 << formatNr(ix.mFileSize, 14) << endl;
 }
 
 void Dump(int argc, char* argv[])

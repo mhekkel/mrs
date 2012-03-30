@@ -11,6 +11,7 @@
 		<docroot>./docroot/</docroot>
 		<dbs>
 			<db>embl</db>
+			<db>enzyme</db>
 			<db>omim</db>
 			<db>pdbfinder</db>
 			<db>sprot</db>
@@ -328,6 +329,38 @@
 		<script src="scripts/uniprot.js" />
 	</format>
 
+	<parser id="enzyme">
+		<match regex="^(?:([A-Z]{2})   ).+\n(?:\1.+\n)*">
+			<switch test="1">
+				<case value="ID">
+					<match regex="(\d+\.\d+\.\d+\.\d+)" capture="1">
+						<index name="id" unique="true" type="string"/>
+						<attr name="id"/>
+					</match>
+				</case>
+				<case value="DE">
+					<replace what="^DE   (.+)\n?" with="$1 "/>
+					<index name="de"/>
+					<substr length="255"/>
+					<attr name="title"/>
+				</case>
+				<case value="PR">
+					<replace what="^PR   PROSITE; (.+)\n?" with="$1 "/>
+					<index name="pr"/>
+				</case>
+				<default>
+					<replace what="^.{5}(.+)\n" with="$1\n"/>
+					<index name="text"/>
+				</default>
+			</switch>
+		</match>
+	</parser>
+
+	<format id="enzyme">
+		<link regex="([A-Z]+[A-Z0-9]+)(?=, [A-Z]+_[A-Z0-9]+\s+;)"
+			db="sprot" ix="ac" id="$1" />
+	</format>
+
 	<parser id="genbank">
 		<match regex="^\s*(\w+)\s+((?:.+)(?:\n\s{5,}.+)*)">
 			<switch test="1">
@@ -506,6 +539,14 @@
 		<info>http://www.ebi.ac.uk/embl/index.html</info>
 		<file>/data/mrs/embl.m6</file>
 		<source>embl/*.dat.gz</source>
+		<document-separator type="last-line-equals">//</document-separator>
+	</databank>
+
+	<databank id="enzyme" parser="enzyme" format="enzyme">
+		<name>Enzyme</name>
+		<info>http://ca.expasy.org/enzyme/</info>
+		<file>/data/mrs/enzyme.m6</file>
+		<source>enzyme/enzyme.dat</source>
 		<document-separator type="last-line-equals">//</document-separator>
 	</databank>
 

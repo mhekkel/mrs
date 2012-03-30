@@ -264,6 +264,10 @@
 		</match>
 	</parser>
 
+	<format id="uniprot">
+		<script src="scripts/uniprot.js" />
+	</format>
+
 	<parser id="embl">
 		<match regex="^(?:([A-Z]{2})   ).+\n(?:\1.+\n)*">
 			<switch test="1">
@@ -324,10 +328,6 @@
 			</switch>
 		</match>
 	</parser>
-
-	<format id="uniprot">
-		<script src="scripts/uniprot.js" />
-	</format>
 
 	<parser id="enzyme">
 		<match regex="^(?:([A-Z]{2})   ).+\n(?:\1.+\n)*">
@@ -539,6 +539,86 @@
 		<info>http://www.ebi.ac.uk/embl/index.html</info>
 		<file>/data/mrs/embl.m6</file>
 		<source>embl/*.dat.gz</source>
+		<document-separator type="last-line-equals">//</document-separator>
+	</databank>
+
+	<databank id="embl-con" parser="embl">
+		<name>EMBL Constructed</name>
+		<info>http://www.ebi.ac.uk/embl/index.html</info>
+		<file>/data/mrs/embl.m6</file>
+		<source>embl/rel_con_*.dat.gz</source>
+		<document-separator type="last-line-equals">//</document-separator>
+	</databank>
+
+	<databank id="embl-est" parser="embl">
+		<name>EMBL Expressed Sequence Tag</name>
+		<info>http://www.ebi.ac.uk/embl/index.html</info>
+		<file>/data/mrs/embl.m6</file>
+		<source>embl/rel_est_*.dat.gz</source>
+		<document-separator type="last-line-equals">//</document-separator>
+	</databank>
+
+	<databank id="embl-gss" parser="embl">
+		<name>EMBL Genome Sequence Scan</name>
+		<info>http://www.ebi.ac.uk/embl/index.html</info>
+		<file>/data/mrs/embl.m6</file>
+		<source>embl/rel_gss_*.dat.gz</source>
+		<document-separator type="last-line-equals">//</document-separator>
+	</databank>
+
+	<databank id="embl-htc" parser="embl">
+		<name>EMBL High Throughput CDNA sequencing</name>
+		<info>http://www.ebi.ac.uk/embl/index.html</info>
+		<file>/data/mrs/embl.m6</file>
+		<source>embl/rel_htc_*.dat.gz</source>
+		<document-separator type="last-line-equals">//</document-separator>
+	</databank>
+
+	<databank id="embl-htg" parser="embl">
+		<name>EMBL High Throughput Genome sequencing</name>
+		<info>http://www.ebi.ac.uk/embl/index.html</info>
+		<file>/data/mrs/embl.m6</file>
+		<source>embl/rel_htg_*.dat.gz</source>
+		<document-separator type="last-line-equals">//</document-separator>
+	</databank>
+
+	<databank id="embl-pat" parser="embl">
+		<name>EMBL Patents</name>
+		<info>http://www.ebi.ac.uk/embl/index.html</info>
+		<file>/data/mrs/embl.m6</file>
+		<source>embl/rel_pat_*.dat.gz</source>
+		<document-separator type="last-line-equals">//</document-separator>
+	</databank>
+
+	<databank id="embl-std" parser="embl">
+		<name>EMBL Standard</name>
+		<info>http://www.ebi.ac.uk/embl/index.html</info>
+		<file>/data/mrs/embl.m6</file>
+		<source>embl/rel_std_*.dat.gz</source>
+		<document-separator type="last-line-equals">//</document-separator>
+	</databank>
+
+	<databank id="embl-sts" parser="embl">
+		<name>EMBL Sequence Tagged Site</name>
+		<info>http://www.ebi.ac.uk/embl/index.html</info>
+		<file>/data/mrs/embl.m6</file>
+		<source>embl/rel_sts_*.dat.gz</source>
+		<document-separator type="last-line-equals">//</document-separator>
+	</databank>
+
+	<databank id="embl-tsa" parser="embl">
+		<name>EMBL Transcriptome Shotgun Assembly</name>
+		<info>http://www.ebi.ac.uk/embl/index.html</info>
+		<file>/data/mrs/embl.m6</file>
+		<source>embl/rel_tsa_*.dat.gz</source>
+		<document-separator type="last-line-equals">//</document-separator>
+	</databank>
+
+	<databank id="embl-wgs" parser="embl">
+		<name>EMBL Whole Genome Shotgun</name>
+		<info>http://www.ebi.ac.uk/embl/index.html</info>
+		<file>/data/mrs/embl.m6</file>
+		<source>embl/rel_wgs_*.dat.gz</source>
 		<document-separator type="last-line-equals">//</document-separator>
 	</databank>
 

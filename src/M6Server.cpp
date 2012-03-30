@@ -323,7 +323,8 @@ void M6Server::handle_entry(const zh::request& request, const el::scope& scope, 
 		{
 			try
 			{
-				string db = link->get_attribute("db");
+				if (link->get_attribute("db").empty() == false)
+					db = link->get_attribute("db");
 				string id = link->get_attribute("id");
 				string ix = link->get_attribute("ix");
 				string anchor = link->get_attribute("anchor");
@@ -403,11 +404,11 @@ void M6Server::create_link_tags(zx::element* node, boost::regex& expr,
 			if (not boost::regex_search(s, m, expr) or not m[0].matched or m[0].length() == 0)
 				break;
 
-			string db = inDatabank; if (db[0] == '$') db = m[atoi(db.c_str() + 1)];
-			string id = inID;		if (id[0] == '$') id = m[atoi(id.c_str() + 1)];
-			string ix = inIndex;	if (ix[0] == '$') ix = m[atoi(ix.c_str() + 1)];
+			string db = inDatabank; if (ba::starts_with(db, "$")) db = m[atoi(db.c_str() + 1)];
+			string id = inID;		if (ba::starts_with(id, "$")) id = m[atoi(id.c_str() + 1)];
+			string ix = inIndex;	if (ba::starts_with(ix, "$")) ix = m[atoi(ix.c_str() + 1)];
 //			string ix = node->get_attribute("index");			process_el(scope, ix);
-			string an = inAnchor;	if (an[0] == '$') an = m[atoi(an.c_str() + 1)];
+			string an = inAnchor;	if (ba::starts_with(an, "$")) an = m[atoi(an.c_str() + 1)];
 //			string title = node->get_attribute("title");		process_el(scope, title);
 			string title;
 			string q;
@@ -1069,7 +1070,8 @@ void M6Server::SpellCheck(const string& inDatabank, const string& inTerm,
 	else
 	{
 		M6Databank* db = Load(inDatabank);
-		db->SuggestCorrection(inTerm, outCorrections);
+		if (db != nullptr)
+			db->SuggestCorrection(inTerm, outCorrections);
 	}
 }
 

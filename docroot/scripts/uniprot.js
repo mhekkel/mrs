@@ -62,13 +62,25 @@ UniProt = {
 			else if (m[2] == "OS") {
 				name.push(UniProt.cell("From", m[0].replace(/^OS   /, '')));
 			}
+			else if (m[2] == "OX") {
+				name.push(UniProt.cell("NCBI Taxonomy ID", m[0].replace(/^OX   NCBI_TaxID=(\d+);/, function(s,v) {
+					return "<a href='entry?db=taxonomy&amp;id=" + v + "'>" + v + "</a>";
+				})));
+			}
+			else if (m[2] == "OC") {
+				var a = m[0].replace(/^OC   /gm, '').replace(/;\s*$/, '').split(/;\s*/);
+				var b = $.map(a, function(v) {
+					return "<a href='search?q=kw:\"" + v + "\"'>" + v + "</a>";
+				});
+				name.push(UniProt.cell("Lineage", b.join(", ")));
+			}
 			else if (m[2] == "GN") {
 				var a = m[0].replace(/^GN   /gm, '').replace(/;\s*$/, '').split(/;\s*/);
 				
 				var subtable = $(document.createElement("table")).attr("cellpadding", 0)
-					.attr("cellspacing", 0);
+					.attr("cellspacing", 0).attr("width", '100%');
 				$.each(a, function(index, value) {
-					value = "<td><em>" + value.replace(/=/, "</em></td><td>") + "</td>";
+					value = "<td width='20%'><em>" + value.replace(/=/, "</em></td><td>") + "</td>";
 					$("<tr/>").append(value).appendTo(subtable);
 				});
 				

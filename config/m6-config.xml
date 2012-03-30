@@ -10,6 +10,7 @@
 	<server type="www" addr="0.0.0.0" port="18090">
 		<docroot>./docroot/</docroot>
 		<dbs>
+			<db>embl</db>
 			<db>omim</db>
 			<db>pdbfinder</db>
 			<db>sprot</db>
@@ -262,6 +263,67 @@
 		</match>
 	</parser>
 
+	<parser id="embl">
+		<match regex="^(?:([A-Z]{2})   ).+\n(?:\1.+\n)*">
+			<switch test="1">
+				<case value="ID">
+					<match regex="^ID   (\w+);" capture="1">
+						<index name="id" unique="true" type="string"/>
+						<attr name="id"/>
+					</match>
+				</case>
+				<case value="AC">
+					<replace what="^AC   (.+)\n" with="$1 "/>
+					<split separator=";\s*">
+						<index name="ac" unique="true" type="string"/>
+					</split>
+				</case>
+				<case value="DE">
+					<replace what="^DE   (.+)\n" with="$1 "/>
+					<index name="title"/>
+					<split separator=";">
+						<if iteration="1">
+							<substr length="255" />
+							<attr name="title"/>
+						</if>
+					</split>
+				</case>
+				<case value="DR">
+					<match regex="^DR   (([^;]+); ([^;]+));.*" capture="1">
+						<replace what="([^-/;]+)(?:[-/][^;]+)?; (.+)" with="$1:$2" />
+						<index name="dr" type="string" />
+					</match>
+				</case>
+				<case value='FT'>
+					<replace what="^FT   " with=""/>
+					<match regex="^\w+\s+((?:\S.+)(?:\n\s{15,}.+)*)" capture="1">
+						<match regex='/(\w+)=(?|([^"].+)|"((?:[^"]++|"")*)")\n?'>
+							<switch test="1">
+								<case value="translation"/>
+								<case value="db_xref"><capture nr="2"><index name="db_xref"/></capture></case>
+								<default>
+									<capture nr="2"><index name="feature"/></capture>
+								</default>
+							</switch>
+						</match>
+					</match>
+				</case>
+				<case value="XX"/>
+				<case value="DT"/>
+				<case value="RN"/>
+				<case value="RP"/>
+				<case value="FH"/>
+				<case value="SQ">
+					<stop/>
+				</case>
+				<default>
+					<replace what="^.{5}(.+)\n" with="$1\n"/>
+					<index name="text"/>
+				</default>
+			</switch>
+		</match>
+	</parser>
+
 	<format id="uniprot">
 		<script src="scripts/uniprot.js" />
 	</format>
@@ -331,7 +393,7 @@
 
 				<case value='features'>
 					<match regex="^\s{5}\w+\s+((?:\S.+)(?:\n\s{20,}.+)*)" capture="1">
-						<match regex='/(\w+)=(?|([^"].+)|"((?:[^"]++|"")*)")\n'>
+						<match regex='/(\w+)=(?|([^"].+)|"((?:[^"]++|"")*)")\n?'>
 							<switch test="1">
 								<case value="translation"/>
 								<case value="db_xref"><capture nr="2"><index name="db_xref"/></capture></case>
@@ -431,6 +493,22 @@
 		<document-separator type="first-line-equals">*RECORD*</document-separator>
 	</databank>
 	
+	<databank id="test-embl" parser="embl">
+		<name>EMBL</name>
+		<info>http://www.ebi.ac.uk/embl/index.html</info>
+		<file>/data/mrs/embl.m6</file>
+		<source>embl/test.dat</source>
+		<document-separator type="last-line-equals">//</document-separator>
+	</databank>
+
+	<databank id="embl" parser="embl">
+		<name>EMBL</name>
+		<info>http://www.ebi.ac.uk/embl/index.html</info>
+		<file>/data/mrs/embl.m6</file>
+		<source>embl/*.dat.gz</source>
+		<document-separator type="last-line-equals">//</document-separator>
+	</databank>
+
 	<databank id="sprot" parser="uniprot" format="uniprot">
 		<name>SwissProt</name>
 		<info>http://www.uniprot.org/</info>

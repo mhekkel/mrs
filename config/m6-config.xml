@@ -266,6 +266,8 @@
 
 	<format id="uniprot">
 		<script src="scripts/uniprot.js" />
+		<link regex="(?&lt;=DR   EMBL; )(\S+)(?=;)" db="embl" ix="id" id="$1" />
+		<link regex="(?&lt;=DR   PDB; )(\S+)(?=;)" db="pdb" ix="id" id="$1" />
 	</format>
 
 	<parser id="embl">
@@ -538,7 +540,7 @@
 		<name>EMBL</name>
 		<info>http://www.ebi.ac.uk/embl/index.html</info>
 		<file>/data/mrs/embl.m6</file>
-		<source>embl/*.dat.gz</source>
+		<source>embl_release/*.dat.gz</source>
 		<document-separator type="last-line-equals">//</document-separator>
 	</databank>
 

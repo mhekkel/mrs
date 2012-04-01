@@ -296,7 +296,23 @@ void M6Server::handle_entry(const zh::request& request, const el::scope& scope, 
 		}
 
 		process_xml(root, sub, "/");	
-		
+
+		foreach (zx::element* link, format->find("link"))
+		{
+			try
+			{
+				string db = link->get_attribute("db");
+				string id = link->get_attribute("id");
+				string ix = link->get_attribute("ix");
+				string anchor = link->get_attribute("anchor");
+				if (db.empty() or id.empty())
+					continue;
+				boost::regex re(link->get_attribute("regex"));
+				create_link_tags(root, re, db, ix, id, anchor);
+			}
+			catch (...) {}
+		}
+	
 		if (not q.empty())
 		{
 			try
@@ -319,23 +335,6 @@ void M6Server::handle_entry(const zh::request& request, const el::scope& scope, 
 			catch (...) {}
 		}
 
-		foreach (zx::element* link, format->find("link"))
-		{
-			try
-			{
-				if (link->get_attribute("db").empty() == false)
-					db = link->get_attribute("db");
-				string id = link->get_attribute("id");
-				string ix = link->get_attribute("ix");
-				string anchor = link->get_attribute("anchor");
-				if (db.empty() or id.empty())
-					continue;
-				boost::regex re(link->get_attribute("regex"));
-				create_link_tags(root, re, db, ix, id, anchor);
-			}
-			catch (...) {}
-		}
-	
 		reply.set_content(doc);
 	}
 	catch (M6Redirect& redirect)
@@ -424,8 +423,10 @@ void M6Server::create_link_tags(zx::element* node, boost::regex& expr,
 				M6Databank* mdb = Load(db);
 				if (mdb != nullptr)
 				{
+					M6Tokenizer::CaseFold(id);
+					
 					tr1::tie(exists, docNr) = mdb->Exists(ix, id);
-	
+					
 					unique_ptr<zx::element> a(new zeep::xml::element("a"));
 					
 					if (docNr != 0)

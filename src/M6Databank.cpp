@@ -101,9 +101,9 @@ class M6DatabankImpl
 	
 	M6DocStore&		GetDocStore()						{ return *mStore; }
 	
+	M6BasicIndexPtr	GetIndex(const string& inName);
 	M6BasicIndexPtr	GetIndex(const string& inName, M6IndexType inType);
 	M6BasicIndexPtr	CreateIndex(const string& inName, M6IndexType inType);
-//	M6BasicIndexPtr	LoadIndex(const string& inName);
 	M6BasicIndexPtr	GetAllTextIndex()					{ return mAllTextIndex; }
 	
 	fs::path		GetScratchDir() const				{ return mDbDirectory / "tmp"; }
@@ -1261,6 +1261,23 @@ void M6DatabankImpl::GetInfo(M6DatabankInfo& outInfo)
 	}
 }
 
+M6BasicIndexPtr M6DatabankImpl::GetIndex(const string& inName)
+{
+	boost::mutex::scoped_lock lock(mMutex);
+	M6BasicIndexPtr result;
+	
+	foreach (M6IndexDesc& desc, mIndices)
+	{
+		if (desc.mName == inName)
+		{
+			result = desc.mIndex;
+			break;
+		}
+	}
+
+	return result;
+}
+
 M6BasicIndexPtr M6DatabankImpl::GetIndex(const string& inName, M6IndexType inType)
 {
 	M6BasicIndexPtr result;
@@ -1304,33 +1321,6 @@ M6BasicIndexPtr M6DatabankImpl::CreateIndex(const string& inName, M6IndexType in
 	}
 	return result;
 }
-
-//M6BasicIndexPtr M6DatabankImpl::LoadIndex(const string& inName)
-//{
-//	boost::mutex::scoped_lock lock(mMutex);
-//	M6BasicIndexPtr result;
-//	
-//	foreach (M6IndexDesc& desc, mIndices)
-//	{
-//		if (desc.mName == inName)
-//		{
-//			result = desc.mIndex;
-//			break;
-//		}
-//	}
-//
-//	if (result == nullptr)
-//	{
-//		fs::path path = mDbDirectory / (inName + ".index");
-//		if (fs::exists(path))
-//		{
-//			result.reset(M6BasicIndex::Load(path));
-//			mIndices.push_back(M6IndexDesc(inName, result->GetIndexType(), result));
-//		}
-//	}
-//
-//	return result;
-//}
 
 void M6DatabankImpl::StoreThread()
 {
@@ -1433,6 +1423,9 @@ class M6Accumulator
 						if (item->mCount >= inTermCount)
 							outDocs.push_back(static_cast<uint32>(item - mItems));
 					}
+					
+					if (mHitCount > outDocs.size())
+						mHitCount = outDocs.size();
 				}
 	
 	uint32		GetHitCount() const					{ return mHitCount; }
@@ -1618,7 +1611,7 @@ tr1::tuple<bool,uint32> M6DatabankImpl::Exists(const string& inIndex, const stri
 			iter->AddIterator(sub);
 	}
 	
-	tr1::tuple<bool,uint32> result = make_tuple(false, 0);
+	tr1::tuple<bool,uint32> result = tr1::make_tuple(false, 0);
 	
 	uint32 docNr, dummy;
 	float r;
@@ -1626,9 +1619,9 @@ tr1::tuple<bool,uint32> M6DatabankImpl::Exists(const string& inIndex, const stri
 	if (iter->Next(docNr, r))
 	{
 		if (iter->Next(dummy, r))
-			result = make_tuple(true, 0);
+			result = tr1::make_tuple(true, 0);
 		else
-			result = make_tuple(true, docNr);
+			result = tr1::make_tuple(true, docNr);
 	}
 	
 	return result;
@@ -1743,10 +1736,12 @@ void M6DatabankImpl::Validate()
 
 void M6DatabankImpl::DumpIndex(const string& inIndex, ostream& inStream)
 {
-//	M6BasicIndexPtr index = LoadIndex(inIndex);
-//	
-//	foreach (const string& key, *index)
-//		inStream << key << endl;
+	M6BasicIndexPtr index = GetIndex(inIndex);
+	if (index == nullptr)
+		THROW(("Index %s not found", inIndex.c_str()));
+	
+	foreach (const string& key, *index)
+		inStream << key << endl;
 }
 
 // --------------------------------------------------------------------

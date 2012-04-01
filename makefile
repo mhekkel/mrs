@@ -9,8 +9,8 @@
 # makefile to match your current installation.
 
 #BOOST_LIB_SUFFIX	= 				# e.g. '-mt'
-BOOST_LIB_DIR		= $(HOME)/projects/boost/lib
-BOOST_INC_DIR		= $(HOME)/projects/boost/include
+BOOST_LIB_DIR		= $(HOME)/projects/boost-intel/lib
+BOOST_INC_DIR		= $(HOME)/projects/boost-intel/include
 
 PREFIX				?= /usr/local
 LIBDIR				?= $(PREFIX)/lib

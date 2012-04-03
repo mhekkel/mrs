@@ -28,11 +28,13 @@ class M6Server : public zh::webapp
 
 	void			ValidateAuthentication(const zh::request& request);
 
+	void			handle_admin(const zh::request& request, const el::scope& scope, zh::reply& reply);
+	void			handle_download(const zh::request& request, const el::scope& scope, zh::reply& reply);
 	void			handle_entry(const zh::request& request, const el::scope& scope, zh::reply& reply);
 	void			handle_file(const zh::request& request, const el::scope& scope, zh::reply& reply);
 	void			handle_search(const zh::request& request, const el::scope& scope, zh::reply& reply);
+	void			handle_similar(const zh::request& request, const el::scope& scope, zh::reply& reply);
 	void			handle_welcome(const zh::request& request, const el::scope& scope, zh::reply& reply);
-	void			handle_admin(const zh::request& request, const el::scope& scope, zh::reply& reply);
 
 	void			process_mrs_entry(zx::element* node, const el::scope& scope, boost::filesystem::path dir);
 	void			process_mrs_link(zx::element* node, const el::scope& scope, boost::filesystem::path dir);
@@ -48,7 +50,7 @@ class M6Server : public zh::webapp
 
 	void			LoadAllDatabanks();
 	M6Databank*		Load(const std::string& inDatabank);
-	
+
 	void			SpellCheck(const std::string& inDatabank, const std::string& inTerm,
 						std::vector<std::pair<std::string,uint16>>& outCorrections);
 
@@ -59,6 +61,10 @@ class M6Server : public zh::webapp
 	};
 	typedef std::vector<M6LoadedDatabank> M6DbList;
 
+	std::string		GetEntry(M6Databank* inDatabank, const std::string& inFormat, uint32 inDocNr);
+	std::string		GetEntry(M6Databank* inDatabank, const std::string& inFormat,
+						const std::string& inIndex, const std::string& inValue);
+	
 	void			Find(M6Databank* inDatabank,
 						const std::string& inQuery, bool inAllTermsRequired,
 						uint32 inResultOffset, uint32 inMaxResultCount,

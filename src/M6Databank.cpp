@@ -1469,42 +1469,82 @@ M6Iterator* M6DatabankImpl::Find(const vector<string>& inQueryTerms,
 	uint32 maxDocNr = mStore->NextDocumentNumber();
 	float maxD = static_cast<float>(maxDocNr);
 
-	float queryWeight = 0, Smax = 0;
-	M6Accumulator A(maxDocNr);
+	typedef shared_ptr<M6WeightedBasicIndex::M6WeightedIterator> iter_ptr;
+	typedef tr1::tuple<string,iter_ptr,uint32,float> term_type;
+	typedef vector<term_type> term_list;
+	term_list terms;
+	bool foundAllTerms = true;
 	
+	// collect search terms, their iterator, and sort them based on IDF
 	foreach (const string& term, inQueryTerms)
 	{
-		M6WeightedBasicIndex::M6WeightedIterator iter;
-		if (static_cast<M6WeightedBasicIndex*>(mAllTextIndex.get())->Find(term, iter))
-		{
-			uint8 termWeight = 1;	// ?
+		term_list::iterator i = find_if(terms.begin(), terms.end(), [=](const term_type& t) -> bool {
+			return get<0>(t) == term;
+		});
 		
-			const float c_add = 0.007f;
-			const float c_ins = 0.12f;
+		if (i != terms.end())
+		{
+			tr1::get<2>(*i) += 1;
+			continue;
+		}
+
+		iter_ptr iter(new M6WeightedBasicIndex::M6WeightedIterator);
+		if (static_cast<M6WeightedBasicIndex*>(mAllTextIndex.get())->Find(term, *iter))
+		{
+			float idf = log(1.f + maxD / iter->Size());
+			terms.push_back(make_tuple(term, iter, 1, idf));
+		}
+		else
+			foundAllTerms = false;
+	}
 	
-			float s_add = c_add * Smax;
-			float s_ins = c_ins * Smax;
-			
-			float idf = log(1.f + maxD / iter.Size());
-			float wq = idf * termWeight;
-			queryWeight += wq * wq;
-			
-			uint8 f_add = static_cast<uint8>(s_add / (idf * wq * wq));
-			uint8 f_ins = static_cast<uint8>(s_ins / (idf * wq * wq));
-			
-			uint32 docNr;
-			uint8 weight;
-			while (iter.Next(docNr, weight) and weight >= f_add)
+	// short cut
+	if (terms.empty() or (inAllTermsRequired and not foundAllTerms))
+		return nullptr;
+
+	for_each(terms.begin(), terms.end(), [](term_type& t) {
+		tr1::get<3>(t) *= tr1::get<2>(t);
+	});
+
+	sort(terms.begin(), terms.end(), [](const term_type& a, const term_type& b) -> bool {
+		return get<3>(a) > get<3>(b);
+	});
+
+	float queryWeight = 0, Smax = 0, firstWq = tr1::get<3>(terms.front());
+	M6Accumulator A(maxDocNr);
+	
+	foreach (term_type term, terms)
+	{
+		float wq = tr1::get<3>(term);
+		if (100 * wq < firstWq)
+			break;
+
+		iter_ptr iter = tr1::get<1>(term);
+		
+		const float c_add = 0.007f;
+		const float c_ins = 0.12f;
+
+		float s_add = c_add * Smax;
+		float s_ins = c_ins * Smax;
+		
+		//float wq = idf; // * termWeight;
+		queryWeight += wq * wq;
+		
+		uint8 f_add = static_cast<uint8>(s_add / (wq * wq));
+		uint8 f_ins = static_cast<uint8>(s_ins / (wq * wq));
+		
+		uint32 docNr;
+		uint8 weight;
+		while (iter->Next(docNr, weight) and weight >= f_add)
+		{
+			if (weight >= f_ins or A[docNr] != 0)
 			{
-				if (weight >= f_ins or A[docNr] != 0)
-				{
-					float wd = weight;
-					float sd = idf * wd * wq;
-					
-					float S = A.Add(docNr, sd);
-					if (Smax < S)
-						Smax = S;
-				}
+				float wd = weight;
+				float sd = wd * wq;
+				
+				float S = A.Add(docNr, sd);
+				if (Smax < S)
+					Smax = S;
 			}
 		}
 	}
@@ -1589,7 +1629,10 @@ M6Iterator* M6DatabankImpl::FindString(const string& inIndex, const string& inSt
 		if (inIndex != "*" and not ba::iequals(inIndex, desc.mName))
 			continue;
 		
-		M6Iterator* iter = desc.mIndex->FindString(inString);
+		M6Iterator* iter = desc.mIndex->Find(inString);
+		if (iter == nullptr)
+			iter = desc.mIndex->FindString(inString);
+
 		if (iter != nullptr)
 			result->AddIterator(iter);
 	}

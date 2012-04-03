@@ -3265,7 +3265,8 @@ void M6WeightedBasicIndex::CalculateDocumentWeights(uint32 inDocCount,
 		page = next;
 	}
 	
-	for_each(outWeights.begin(), outWeights.end(), [](float& w) { w = sqrt(w); });
+	transform(outWeights.begin(), outWeights.end(), outWeights.begin(),
+		[](float w) -> float { return sqrt(w); });
 }
 
 // --------------------------------------------------------------------

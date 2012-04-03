@@ -79,6 +79,9 @@ class M6Processor
 	void			Process(vector<fs::path>& inFiles, M6Progress& inProgress,
 						uint32 inNrOfThreads);
 	
+	M6InputDocument*
+					IndexDocument(const string& inText);
+	
   private:
 	M6ExprPtr		ParseScript(zx::element* inScript);
 	void			ProcessFile(const string& inFileName, istream& inFileStream);
@@ -809,6 +812,17 @@ void M6Processor::ProcessDocument(const string& inDoc)
 	mDatabank.Store(doc);
 }
 
+M6InputDocument* M6Processor::IndexDocument(const string& inDoc)
+{
+	M6InputDocument* doc = new M6InputDocument(mDatabank, inDoc);
+	
+	M6Argument arg(inDoc.c_str(), inDoc.length());
+	mScript->Evaluate(doc, arg);
+	
+	doc->Tokenize(mLexicon, 0);
+	return doc;
+}
+
 void M6Processor::ProcessDocument()
 {
 	unique_ptr<M6Lexicon> tsLexicon(new M6Lexicon);
@@ -1037,3 +1051,14 @@ void M6Builder::Build(uint32 inNrOfThreads)
 	}
 }
 
+void M6Builder::IndexDocument(const string& inText, vector<string>& outTerms)
+{
+	M6Processor processor(*mDatabank, mLexicon, mConfig);
+	unique_ptr<M6InputDocument> doc(processor.IndexDocument(inText));
+	
+	foreach (auto& list, doc->GetIndexTokens())
+	{
+		foreach (auto& token, list.mTokens)
+			outTerms.push_back(mLexicon.GetString(token));
+	}
+}

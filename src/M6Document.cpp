@@ -178,6 +178,7 @@ void M6InputDocument::Index(const string& inIndex, M6DataType inDataType,
 				break;
 			
 			size_t l = tokenizer.GetTokenLength();
+#if DEBUG
 			if (l == 0)
 			{
 				cerr << endl
@@ -186,7 +187,7 @@ void M6InputDocument::Index(const string& inIndex, M6DataType inDataType,
 					 << " token = " << token << endl;
 
 			}
-
+#endif
 			assert(l > 0);
 			
 			if ((token == eM6TokenNumber and not inIndexNumbers) or

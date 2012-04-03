@@ -20,6 +20,7 @@
 #include "M6Config.h"
 #include "M6Query.h"
 #include "M6Tokenizer.h"
+#include "M6Builder.h"
 #include "M6MD5.h"
 
 using namespace std;
@@ -119,12 +120,14 @@ M6Server::M6Server(zx::element* inConfig)
 	set_docroot(docroot);
 	
 	mount("",				boost::bind(&M6Server::handle_welcome, this, _1, _2, _3));
+	mount("download",		boost::bind(&M6Server::handle_download, this, _1, _2, _3));
 	mount("entry",			boost::bind(&M6Server::handle_entry, this, _1, _2, _3));
 	mount("search",			boost::bind(&M6Server::handle_search, this, _1, _2, _3));
+	mount("similar",		boost::bind(&M6Server::handle_similar, this, _1, _2, _3));
 	mount("admin",			boost::bind(&M6Server::handle_admin, this, _1, _2, _3));
 	mount("scripts",		boost::bind(&M6Server::handle_file, this, _1, _2, _3));
 	mount("css",			boost::bind(&M6Server::handle_file, this, _1, _2, _3));
-	mount("man",			boost::bind(&M6Server::handle_file, this, _1, _2, _3));
+//	mount("man",			boost::bind(&M6Server::handle_file, this, _1, _2, _3));
 	mount("images",			boost::bind(&M6Server::handle_file, this, _1, _2, _3));
 	mount("favicon.ico",	boost::bind(&M6Server::handle_file, this, _1, _2, _3));
 
@@ -206,6 +209,46 @@ void M6Server::handle_file(const zh::request& request,
 	
 	if (file.extension() == ".html")
 		reply.set_content_type("application/xhtml+xml");
+}
+
+void M6Server::handle_download(const zh::request& request, const el::scope& scope, zh::reply& reply)
+{
+	zh::parameter_map params;
+	get_parameters(scope, params);
+
+	string format = params.get("format", "entry").as<string>();
+
+	string db = params.get("db", "").as<string>();
+
+	M6Databank* mdb = Load(db);
+	if (mdb == nullptr)
+		THROW(("Databank %s not loaded", db.c_str()));
+	
+	string id;
+	stringstream ss;
+	uint32 n = 0;
+	
+	typedef pair<string,zeep::http::parameter_value> iter;
+	foreach (const iter& i, params.equal_range("id"))
+	{
+		id = i.second.as<string>();
+		ss << GetEntry(mdb, format, "id", id);
+		++n;
+	}
+
+	foreach (const iter& i, params.equal_range("nr"))
+	{
+		ss << GetEntry(mdb, format, boost::lexical_cast<uint32>(i.second.as<string>()));
+		++n;
+	}
+	
+	reply.set_content(ss.str(), "text/plain");
+	
+	if (n != 1 or id.empty())
+		id = "mrs-data";
+
+	reply.set_header("Content-disposition",
+		(boost::format("attachement; filename=%1%.txt") % id).str());
 }
 
 void M6Server::handle_entry(const zh::request& request, const el::scope& scope, zh::reply& reply)
@@ -662,6 +705,95 @@ void M6Server::handle_search(const zh::request& request,
 			sub, reply);
 }
 
+void M6Server::handle_similar(const zh::request& request, const el::scope& scope, zh::reply& reply)
+{
+	string db, id, nr;
+	uint32 page, hits_per_page = 15;
+
+	zeep::http::parameter_map params;
+	get_parameters(scope, params);
+
+	db = params.get("db", "").as<string>();
+	nr = params.get("nr", "").as<string>();
+	page = params.get("page", 1).as<uint32>();
+	
+	int32 maxresultcount = hits_per_page, resultoffset = 0;
+	
+	if (page > 1)
+		resultoffset = (page - 1) * maxresultcount;
+
+	el::scope sub(scope);
+	sub.put("page", el::object(page));
+	sub.put("db", el::object(db));
+//	sub.put("linkeddbs", el::object(GetLinkedDbs(db)));
+	sub.put("similar", el::object(nr));
+
+	M6Databank* mdb = Load(db);
+	if (mdb == nullptr) THROW(("Databank %s not loaded", db.c_str()));
+
+	vector<string> queryTerms;
+	M6Builder builder(db);
+	builder.IndexDocument(GetEntry(mdb, "entry", boost::lexical_cast<uint32>(nr)), queryTerms);
+
+	M6Iterator* filter = nullptr;
+	unique_ptr<M6Iterator> results(mdb->Find(queryTerms, filter, false, resultoffset + maxresultcount));
+	delete filter;
+
+	if (results)
+	{
+		uint32 docNr, nr = 1, count = results->GetCount();
+		float score;
+		
+		while (resultoffset-- > 0 and results->Next(docNr, score))
+			++nr;
+		
+		vector<el::object> hits;
+		sub.put("first", el::object(nr));
+		
+		while (maxresultcount-- > 0 and results->Next(docNr, score))
+		{
+			el::object hit;
+			
+			unique_ptr<M6Document> doc(mdb->Fetch(docNr));
+
+			score *= 100;
+			if (score > 100)
+				score = 100;
+			
+			hit["nr"] = nr;
+			hit["docNr"] = docNr;
+			hit["id"] = doc->GetAttribute("id");
+			hit["title"] = doc->GetAttribute("title");;
+			hit["score"] = tr1::trunc(score);
+			
+//			vector<string> linked;
+//			GetLinkedDbs(db, id, linked);
+//			if (not linked.empty())
+//			{
+//				vector<el::object> links;
+//				foreach (string& l, linked)
+//					links.push_back(el::object(l));
+//				hit["links"] = links;
+//			}
+			
+			hits.push_back(hit);
+
+			++nr;
+		}
+		
+		if (maxresultcount > 0 and count + 1 > nr)
+			count = nr - 1;
+		
+		sub.put("hits", el::object(hits));
+		sub.put("hitCount", el::object(count));
+		sub.put("lastPage", el::object(((count - 1) / hits_per_page) + 1));
+		sub.put("last", el::object(nr - 1));
+		sub.put("ranked", el::object(true));
+	}
+	
+	create_reply_from_template("results.html", sub, reply);
+}
+
 void M6Server::handle_admin(const zh::request& request,
 	const el::scope& scope, zh::reply& reply)
 {
@@ -956,10 +1088,39 @@ M6Databank* M6Server::Load(const std::string& inDatabank)
 	return result;
 }
 
+string M6Server::GetEntry(M6Databank* inDatabank, const string& inFormat, uint32 inDocNr)
+{
+	unique_ptr<M6Document> doc(inDatabank->Fetch(inDocNr));
+	if (not doc)
+		THROW(("Unable to fetch document"));
+	
+	string result = doc->GetText();
+	
+	// TODO: format?
+	
+	return result;
+}
+
+string M6Server::GetEntry(M6Databank* inDatabank,
+	const string& inFormat, const string& inIndex, const string& inValue)
+{
+	unique_ptr<M6Iterator> iter(inDatabank->Find(inIndex, inValue));
+	uint32 docNr;
+	float rank;
+
+	if (not (iter and iter->Next(docNr, rank)))
+		THROW(("Entry %s not found", inValue.c_str()));
+
+	return GetEntry(inDatabank, inFormat, docNr);
+}
+
 void M6Server::Find(M6Databank* inDatabank, const string& inQuery, bool inAllTermsRequired,
 	uint32 inResultOffset, uint32 inMaxResultCount,
 	vector<el::object>& outHits, uint32& outHitCount, bool& outRanked)
 {
+	if (inDatabank == nullptr)
+		THROW(("Invalid databank"));
+	
 	unique_ptr<M6Iterator> rset;
 	M6Iterator* filter;
 	vector<string> queryTerms;

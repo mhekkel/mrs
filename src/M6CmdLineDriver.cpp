@@ -243,9 +243,9 @@ void Info(int argc, char* argv[])
 	
 	cout << "Statistics for databank " << path << endl
 		 << endl
-		 << "Number of documents : " << formatNr(info.mDocCount, 16) << endl
-		 << "Raw text in bytes   : " << formatNr(info.mRawTextSize, 16) << endl
-		 << "Data store size     : " << formatNr(info.mDataStoreSize, 16) << endl
+		 << "Number of documents : " << formatNr(info.mDocCount, 18) << endl
+		 << "Raw text in bytes   : " << formatNr(info.mRawTextSize, 18) << endl
+		 << "Data store size     : " << formatNr(info.mDataStoreSize, 18) << endl
 		 << endl
 		 << "Index Name           |                    | Nr of keys   | File size" << endl
 		 << "-------------------------------------------------------------------------" << endl;

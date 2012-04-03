@@ -60,7 +60,7 @@ class M6Databank
 	M6Iterator*		Find(const std::vector<std::string>& inQueryTerms,
 						M6Iterator* inFilter, bool inAllTermsRequired, uint32 inReportLimit);
 	M6Iterator*		Find(const std::string& inIndex, const std::string& inTerm,
-						bool inTermIsPattern);
+						bool inTermIsPattern = false);
 	M6Iterator*		FindString(const std::string& inIndex, const std::string& inString);
 
 	// Exist returns <documents exist,docnr for a unique match>

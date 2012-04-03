@@ -19,6 +19,9 @@ class M6Builder
 	
 	void				Build(uint32 inNrOfThreads);
 
+	void				IndexDocument(const std::string& inText,
+							std::vector<std::string>& outTerms);
+
   private:
 
 	int64				Glob(boost::filesystem::path inRawDir,

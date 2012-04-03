@@ -228,20 +228,21 @@ void M6Server::handle_download(const zh::request& request, const el::scope& scop
 	stringstream ss;
 	uint32 n = 0;
 	
-	typedef pair<string,zeep::http::parameter_value> iter;
-	foreach (const iter& i, params.equal_range("id"))
+	foreach (auto& p, params)
 	{
-		id = i.second.as<string>();
-		ss << GetEntry(mdb, format, "id", id);
-		++n;
+		if (p.first == "id")
+		{
+			id = p.second.as<string>();
+			ss << GetEntry(mdb, format, "id", id);
+			++n;
+		}
+		else if (p.first == "nr")
+		{
+			ss << GetEntry(mdb, format, boost::lexical_cast<uint32>(p.second.as<string>()));
+			++n;
+		}
 	}
 
-	foreach (const iter& i, params.equal_range("nr"))
-	{
-		ss << GetEntry(mdb, format, boost::lexical_cast<uint32>(i.second.as<string>()));
-		++n;
-	}
-	
 	reply.set_content(ss.str(), "text/plain");
 	
 	if (n != 1 or id.empty())

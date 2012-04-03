@@ -1492,7 +1492,7 @@ M6Iterator* M6DatabankImpl::Find(const vector<string>& inQueryTerms,
 		if (static_cast<M6WeightedBasicIndex*>(mAllTextIndex.get())->Find(term, *iter))
 		{
 			float idf = log(1.f + maxD / iter->Size());
-			terms.push_back(make_tuple(term, iter, 1, idf));
+			terms.push_back(tr1::make_tuple(term, iter, 1, idf));
 		}
 		else
 			foundAllTerms = false;

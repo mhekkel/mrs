@@ -233,9 +233,9 @@ UniProt = {
 	
 	createReference: function(ref) {
 		var s = '';
-		if (ref.ra != null)	s += ref.ra;
-		if (ref.rt != null) s += " <strong>" + ref.rt + "</strong>";
-		if (ref.rl != null) s += ' ' + ref.rl;
+		if (ref.ra != null && ref.ra.length > 0) s += ref.ra;
+		if (ref.rt != null && ref.rt.length > 0) s += " <strong>" + ref.rt + "</strong>";
+		if (ref.rl != null && ref.rl.length > 0) s += ' ' + ref.rl;
 		if (s.length > 0) s += "<br/>";
 	
 		var rx = $(ref.rx.split(/;\s*/)).map(function(index,value) {
@@ -248,24 +248,37 @@ UniProt = {
 					e = "<a href='http://www.ncbi.nlm.nih.gov/entrez/query.fcgi?db=pubmed&amp;cmd=search&amp;term=" + a[1] + "'>" + a[1] + "</a>";
 				else if (a[0] == 'DOI')
 					e = "<a href='http://dx.doi.org/" + a[1] + "'>" + a[1] + "</a>";
-				return "<td class='label' style='width: 20%'>" + a[0] + "</td><td>" + e + "</td>";
+				return "<td class='label'>" + a[0] + "</td><td>" + e + "</td>";
 			}
 			if (value.length > 0)
 				return "<td colspan='2'>" + a[0] + "</td>";
 			return "";
 		});
 
+		var rows = new Array();
+
 		if (rx.length > 0) {
-			var table = $(document.createElement("table")).attr("cellpadding", 0)
-				.attr("cellspacing", 0).attr("width", '100%');
 			$.each(rx, function(index, value) {
 				if (value.length > 0)
-					$("<tr/>").append(value).appendTo(table);
+					rows.push(value);
 			});
-			
+		}
+		
+		if (ref.rp != null && ref.rp.length > 0) rows.push("<td class='label'>Reference Position</td><td>" + ref.rp.toLowerCase() + "</td>");
+		$(ref.rc.split(/;\s*/)).each(function(index, value) {
+			if (value.length > 0)
+				rows.push("<td class='label'>Reference Comment</td><td>" + value.toLowerCase() + "</td>");
+		});
+		if (ref.rg != null && ref.rg.length > 0) rows.push("<td class='label'>Reference Group</td><td>" + ref.rg + "</td>");
+	
+		if (rows.length > 0)
+		{
+			var table = $(document.createElement("table")).attr("cellpadding", 0)
+				.attr("cellspacing", 0).attr("width", '100%');
+			$(rows).each(function(index,value) { $("<tr/>").append(value).appendTo(table); });
 			s += $("<table/>").append(table).html();
 		}
-	
+
 		return "<td>" + ref.nr + "</td><td class='sub_entry'>" + s + "</td>";
 	},
 
@@ -273,6 +286,9 @@ UniProt = {
 		var info = new Array();
 		var name = new Array();
 		var refs = new Array();
+		var cmnt = new Array();
+		var xref = new Array();
+		var copyright;
 	
 		var entry = $("#entry");
 		var text = $("#entrytext").html();
@@ -300,6 +316,9 @@ UniProt = {
 						dates[i].substr(5, 2));
 					info.push(UniProt.cell(dates[i].substr(18), d.toDateString()));
 				}
+			}
+			else if (m[2] == 'PE') {
+				info.push(UniProt.cell("Protein existence", m[0].substr(5)));
 			}
 			else if (m[2] == "DE") {
 				var parser = new DEParser();
@@ -367,6 +386,84 @@ UniProt = {
 			else if (m[2] == 'RA') { refs[refs.length - 1].ra += m[0].replace(/^RA   (.+)\n?$/gm, "$1"); }
 			else if (m[2] == 'RT') { refs[refs.length - 1].rt += m[0].replace(/^RT   (.+)\n?$/gm, "$1"); }
 			else if (m[2] == 'RL') { refs[refs.length - 1].rl += m[0].replace(/^RL   (.+)\n?$/gm, "$1"); }
+			else if (m[2] == 'CC') {
+				var s = m[0].replace(/^CC   /gm, '');
+				
+				var rx = /^\-\!\- ([A-Z ]+):(.*\n(    .+\n)*)/gm;
+				var mx;
+				while ((mx = rx.exec(s)) != null) {
+					if (mx[1] == 'ALTERNATIVE PRODUCTS') {
+						var event, comment, isoforms = new Array();
+					
+						var rx2 = /^    (\w+)=([^;]+);\s*(.*\n(      .+\n)*)/gm;
+						var mx2;
+						while ((mx2 = rx2.exec(mx[2])) != null) {
+							if (mx2[1] == 'Event') {
+								event = mx2[2];
+								if ((mx2 = (/Comment=(.+(\n.+)*)/m).exec(mx2[3])) != null) {
+									comment = mx2[1];
+								}
+							}
+							else if (mx2[1] == 'Name') {
+								var rx3 = /(\w+)=([^;]+);\s*/gm;
+								var mx3;
+								var isoform = { name: mx2[2], note: '' };
+								
+								while ((mx3 = rx3.exec(mx2[3])) != null) {
+									     if (mx3[1] == 'Synonyms') { isoform.synonym = mx3[2]; }
+									else if (mx3[1] == 'IsoId') { isoform.isoid = mx3[2]; }
+									else if (mx3[1] == 'Sequence') { isoform.seq = mx3[2]; }
+									else if (mx3[1] == 'Note') { isoform.note += ' ' + mx3[2]; }
+								}
+								
+								isoforms.push(isoform);
+							}
+						}
+						
+						if (isoforms.length > 0 && event != null)
+						{
+							if (comment != null) event += ' ' + comment;
+							
+							var table = $(document.createElement("table")).attr("cellpadding", 0)
+								.attr("cellspacing", 0).attr("width", '100%');
+							$("<tr/>").append(
+								$("<th/>").append('Name'),
+								$("<th/>").append('Synonyms'),
+								$("<th/>").append('IsoId'),
+								$("<th/>").append('Sequence'),
+								$("<th/>").append('Note')
+							).appendTo(table);
+
+							$(isoforms).each(function(index,value) {
+								$("<tr/>").append(
+									$("<td/>").append(value.name),
+									$("<td/>").append(value.synonym),
+									$("<td/>").append(value.isoid),
+									$("<td/>").append(value.seq),
+									$("<td/>").append(value.note)
+								).appendTo(table);
+							});
+							event += $("<table/>").append(table).html();
+						
+							cmnt.push(UniProt.cell2('alternative products', event));
+						}
+					}
+					else {
+						cmnt.push("<td>" + mx[1].toLowerCase() + "</td><td>" + mx[2] + "</td>");
+					}
+				}
+				
+				if ((mx = (/^(--+\n)(([^-]+.+\n)+)\1/m).exec(s)) != null) {
+					copyright = mx[2];
+				}
+			}
+			else if (m[2] == 'DR') {
+				var rx = /^DR   ([^;]+);\s*(.+)/gm;
+				var mx;
+				while ((mx = rx.exec(m[0])) != null) {
+					xref.push("<td>" + mx[1] + "</td><td>" + mx[2] + "</td>");
+				}
+			}
 		}
 		
 		var table = $("<table cellspacing='0' cellpadding='0' width='100%'/>");
@@ -385,8 +482,24 @@ UniProt = {
 		$(refs).each(function(index, value) {
 			$("<tr/>").append(UniProt.createReference(value)).appendTo(table);
 		});
+
+		$("<tr/>").append("<th colspan='2'>Comments</th>").appendTo(table);
+		$(cmnt).each(function(index, value) {
+			$("<tr/>").append(value).appendTo(table);
+		});
+		
+		if (copyright != null) {
+			$("<tr/>").append("<th colspan='2'>Copyright</th>").appendTo(table);
+			$("<tr/>").append("<td colspan='2'>" + copyright + "</td>").appendTo(table);
+		}
+		
+		$("<tr/>").append("<th colspan='2'>Cross-references</th>").appendTo(table);
+		$(xref).each(function(index, value) {
+			$("<tr/>").append(value).appendTo(table);
+		});
 		
 		entry.prepend(table);
+//		$("#entrytext").hide();
 	}
 }
 

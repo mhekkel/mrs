@@ -304,6 +304,11 @@ div.redirect {
 
 .entry td.sub_entry td.label {
 	font-style: italic;
+	width: 20%;
+}
+
+.entry table {
+	margin-top: 4px;
 }
 
 .scrolling-sequence {

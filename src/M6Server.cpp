@@ -1293,7 +1293,7 @@ void M6Server::ValidateAuthentication(const zh::request& request)
 
 // --------------------------------------------------------------------
 
-void RunMainLoop()
+void RunMainLoop(uint32 inNrOfThreads)
 {
 	cout << "Restarting services..."; cout.flush();
 	
@@ -1312,10 +1312,8 @@ void RunMainLoop()
 		
 		unique_ptr<zeep::http::server> server(new M6Server(config));
 
-		uint32 nrOfThreads = boost::thread::hardware_concurrency();
-
 		server->bind(addr, boost::lexical_cast<uint16>(port));
-		threads.create_thread(boost::bind(&zeep::http::server::run, server.get(), nrOfThreads));
+		threads.create_thread(boost::bind(&zeep::http::server::run, server.get(), inNrOfThreads));
 		servers.push_back(server.release());
 	}
 
@@ -1342,6 +1340,7 @@ int main(int argc, char* argv[])
 		desc.add_options()
 			("config-file,c", po::value<string>(),	"Configuration file")
 			("verbose,v",							"Be verbose")
+			("threads,a", po::value<uint32>(),		"Nr of threads")
 			("help,h",								"Display help message")
 			;
 	
@@ -1364,10 +1363,14 @@ int main(int argc, char* argv[])
 		
 		if (not fs::exists(configFile))
 			THROW(("Configuration file not found (\"%s\")", configFile.string().c_str()));
-		
+
+		uint32 nrOfThreads = boost::thread::hardware_concurrency();
+		if (vm.count("threads"))
+			nrOfThreads = vm["threads"].as<uint32>();
+
 		M6Config::SetConfigFile(configFile);
 		
-		RunMainLoop();
+		RunMainLoop(nrOfThreads);
 	}
 	catch (exception& e)
 	{

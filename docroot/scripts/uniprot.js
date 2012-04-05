@@ -230,11 +230,49 @@ UniProt = {
 				arr.push("<td>" + name.alt[i] + "</td>");
 		}
 	},
+	
+	createReference: function(ref) {
+		var s = '';
+		if (ref.ra != null)	s += ref.ra;
+		if (ref.rt != null) s += " <strong>" + ref.rt + "</strong>";
+		if (ref.rl != null) s += ' ' + ref.rl;
+		if (s.length > 0) s += "<br/>";
+	
+		var rx = $(ref.rx.split(/;\s*/)).map(function(index,value) {
+			var a = value.split(/=/);
+			if (a.length == 2) {
+				var e = a[1];
+				if (a[0] == 'MEDLINE')
+					e = "<a href='http://www.ncbi.nlm.nih.gov/entrez/query.fcgi?cmd=Retrieve&amp;db=PubMed&amp;list_uids=" + a[1] + "&amp;dopt=Abstract'>" + a[1] + "</a>";
+				else if (a[0] == 'PubMed')
+					e = "<a href='http://www.ncbi.nlm.nih.gov/entrez/query.fcgi?db=pubmed&amp;cmd=search&amp;term=" + a[1] + "'>" + a[1] + "</a>";
+				else if (a[0] == 'DOI')
+					e = "<a href='http://dx.doi.org/" + a[1] + "'>" + a[1] + "</a>";
+				return "<td class='label' style='width: 20%'>" + a[0] + "</td><td>" + e + "</td>";
+			}
+			if (value.length > 0)
+				return "<td colspan='2'>" + a[0] + "</td>";
+			return "";
+		});
+
+		if (rx.length > 0) {
+			var table = $(document.createElement("table")).attr("cellpadding", 0)
+				.attr("cellspacing", 0).attr("width", '100%');
+			$.each(rx, function(index, value) {
+				if (value.length > 0)
+					$("<tr/>").append(value).appendTo(table);
+			});
+			
+			s += $("<table/>").append(table).html();
+		}
+	
+		return "<td>" + ref.nr + "</td><td class='sub_entry'>" + s + "</td>";
+	},
 
 	init: function() {
 		var info = new Array();
 		var name = new Array();
-		var ref = new Array();
+		var refs = new Array();
 	
 		var entry = $("#entry");
 		var text = $("#entrytext").html();
@@ -318,9 +356,17 @@ UniProt = {
 				name.push(UniProt.cell("Keywords", a.join(", ")));
 			}
 			else if (m[2] == 'RN') {
-				var ref = { nr: m[0].replace(/^RN   \[(\d+)\].+/, "$1") };
+				var ref = { nr: m[0].replace(/^RN   \[(\d+)\].*/, "$1"),
+					rp: "", rx: "", rc: "", rg: "", ra: "", rt: "", rl: "" };
 				refs.push(ref);
 			}
+			else if (m[2] == 'RP') { refs[refs.length - 1].rp += m[0].replace(/^RP   (.+)\n?$/gm, "$1"); }
+			else if (m[2] == 'RX') { refs[refs.length - 1].rx += m[0].replace(/^RX   (.+)\n?$/gm, "$1"); }
+			else if (m[2] == 'RC') { refs[refs.length - 1].rc += m[0].replace(/^RC   (.+)\n?$/gm, "$1"); }
+			else if (m[2] == 'RG') { refs[refs.length - 1].rg += m[0].replace(/^RG   (.+)\n?$/gm, "$1"); }
+			else if (m[2] == 'RA') { refs[refs.length - 1].ra += m[0].replace(/^RA   (.+)\n?$/gm, "$1"); }
+			else if (m[2] == 'RT') { refs[refs.length - 1].rt += m[0].replace(/^RT   (.+)\n?$/gm, "$1"); }
+			else if (m[2] == 'RL') { refs[refs.length - 1].rl += m[0].replace(/^RL   (.+)\n?$/gm, "$1"); }
 		}
 		
 		var table = $("<table cellspacing='0' cellpadding='0' width='100%'/>");
@@ -333,6 +379,11 @@ UniProt = {
 		$("<tr/>").append("<th colspan='2'>Name and origin of the protein</th>").appendTo(table);
 		$(name).each(function(index, value) {
 			$("<tr/>").append(value).appendTo(table);
+		});
+		
+		$("<tr/>").append("<th colspan='2'>References</th>").appendTo(table);
+		$(refs).each(function(index, value) {
+			$("<tr/>").append(UniProt.createReference(value)).appendTo(table);
 		});
 		
 		entry.prepend(table);

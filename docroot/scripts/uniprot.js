@@ -21,7 +21,10 @@ DEParser.prototype.parse = function(de) {
 	this.lookahead = this.getNextToken();
 	try {
 		if (this.lookahead == this.RECNAME)
+		{
+			this.matchToken(this.RECNAME);
 			this.name = this.parseNextName();
+		}
 		
 		for (;;)
 		{
@@ -64,12 +67,11 @@ DEParser.prototype.parse = function(de) {
 
 DEParser.prototype.parseNextName = function() {
 	var result = {};
+	
+	if (this.lookahead == this.RECNAME || this.lookahead == this.SUBNAME)
+		this.matchToken(this.lookahead);
 
-	if (this.lookahead == this.RECNAME)
-	{
-		this.matchToken(this.RECNAME);
-		result.name = this.parseName();
-	}
+	result.name = this.parseName();
 	
 	while (this.lookahead == this.ALTNAME)
 	{
@@ -232,6 +234,7 @@ UniProt = {
 	init: function() {
 		var info = new Array();
 		var name = new Array();
+		var ref = new Array();
 	
 		var entry = $("#entry");
 		var text = $("#entrytext").html();
@@ -268,7 +271,7 @@ UniProt = {
 					UniProt.addName("Protein Name", parser.name, name);
 				
 				for (i in parser.sub)
-					name.push(info.cell("Submitted Name", parser.sub[i]));
+					UniProt.addName("Submitted Name", parser.sub[i], name);
 				
 				for (i in parser.contains)
 					UniProt.addName("Contains", parser.contains[i], name);
@@ -313,6 +316,10 @@ UniProt = {
 					return "<a href='search?db=sprot&amp;q=kw:\"" + v2 + "\"'>" + value + "</a>";
 				});
 				name.push(UniProt.cell("Keywords", a.join(", ")));
+			}
+			else if (m[2] == 'RN') {
+				var ref = { nr: m[0].replace(/^RN   \[(\d+)\].+/, "$1") };
+				refs.push(ref);
 			}
 		}
 		

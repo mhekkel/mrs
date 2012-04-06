@@ -482,7 +482,7 @@ UniProt = {
 				
 				var s = m[0].replace(/^FT   /gm, '');
 				
-				var rx = /^([^ ].{7}) (.{6}) (.{6}) (.+(\n {29}.+)*\n?)/gm;
+				var rx = /^([^ ].{7}) (.{6}) (.{6})( (.+(\n {29}.+)*\n?))?/gm;
 				while ((m = rx.exec(s)) != null) {
 					
 					var len = 0;
@@ -499,7 +499,7 @@ UniProt = {
 						$("<td class='right'/>").append(m[2]),
 						$("<td class='right'/>").append(m[3]),
 						$("<td class='right'/>").append(len ? len : ''),
-						$("<td/>").append(m[4].replace(/\n *(?=\/)/gm, '<br/>'))
+						$("<td/>").append(m[4] ? m[4].replace(/\n *(?=\/)/gm, '<br/>') : '')
 					).attr('id', featureId).addClass('feature')
 					.click(function() { UniProt.selectFeature(this.id); })
 					.mouseover(function(){
@@ -614,7 +614,8 @@ UniProt = {
 			}
 			result.append($("<span class='segment'/>").attr("id", "segment-" + j).append(s));
 			$.each(UniProt.segments[j].features.split(';'), function(index, value) {
-				UniProt.features[value].push(j);
+				if (value != null && value.length > 0)
+					UniProt.features[value].push(j);
 			});
 		}
 	

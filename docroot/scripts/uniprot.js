@@ -200,9 +200,8 @@ DEParser.prototype.getNextToken = function() {
 }
 
 UniProt = {
-	ref: null,
-	comments: null,
-	cross: null,
+	segments: new Array(),
+	features: new Array(),
 	
 	cell: function(name, value, rowspan) {
 		if (rowspan == null)
@@ -234,7 +233,7 @@ UniProt = {
 	createReference: function(ref) {
 		var s = '';
 		if (ref.ra != null && ref.ra.length > 0) s += ref.ra;
-		if (ref.rt != null && ref.rt.length > 0) s += " <strong>" + ref.rt + "</strong>";
+		if (ref.rt != null && ref.rt.length > 0) s += "<strong>" + ref.rt + "</strong>";
 		if (ref.rl != null && ref.rl.length > 0) s += ' ' + ref.rl;
 		if (s.length > 0) s += "<br/>";
 	
@@ -288,6 +287,8 @@ UniProt = {
 		var refs = new Array();
 		var cmnt = new Array();
 		var xref = new Array();
+		var seqr = new Array();
+		var ftbl, floc;
 		var copyright;
 	
 		var entry = $("#entry");
@@ -299,7 +300,7 @@ UniProt = {
 		while ((m = re.exec(text)) != null) {
 			if (m[2] == 'ID') {
 				info.push(UniProt.cell("Entry name",
-					m[0].replace(/ID\s+(\S+)\s+(.+)/, "<strong>$1</strong> $2")));
+					m[0].replace(/ID\s+((<[^<>]+>|[^ <])+)\s+(.+)/, "<strong>$1</strong> $3")));
 			}
 			else if (m[2] == 'AC') {
 				var a = m[0].replace(/;\s*$/, '').replace(/^AC\s+/gm, '').split(/;\s*/);
@@ -464,6 +465,73 @@ UniProt = {
 					xref.push("<td>" + mx[1] + "</td><td>" + mx[2] + "</td>");
 				}
 			}
+			else if (m[2] == 'FT') {
+				// the feature table...
+				
+				ftbl = $("<table class='list' cellspacing='0' cellpadding='0' width='100%'/>");
+				var featureNr = 1;
+				floc = new Array();
+				
+				$("<tr/>").append(
+					$("<th width='10%'/>").append('Key'),
+					$("<th width='5%'/>").append('From'),
+					$("<th width='5%'/>").append('To'),
+					$("<th width='5%'/>").append('Length'),
+					$("<th width='75%'/>").append('Description')
+				).appendTo(ftbl);
+				
+				var s = m[0].replace(/^FT   /gm, '');
+				
+				var rx = /^([^ ].{7}) (.{6}) (.{6}) (.+(\n {29}.+)*\n?)/gm;
+				while ((m = rx.exec(s)) != null) {
+					
+					var len = 0;
+					try { len = m[3] - m[2] + 1; } catch (e) {}
+					var loc = { from: m[2], to: m[3], length: len };
+
+					floc.push(loc);
+					UniProt.features.push(new Array());
+					
+					var featureId = "feature-" + featureNr++;
+					
+					$("<tr/>").append(
+						$("<td/>").append(m[1].toLowerCase()),
+						$("<td class='right'/>").append(m[2]),
+						$("<td class='right'/>").append(m[3]),
+						$("<td class='right'/>").append(len ? len : ''),
+						$("<td/>").append(m[4].replace(/\n *(?=\/)/gm, '<br/>'))
+					).attr('id', featureId).addClass('feature')
+					.click(function() { UniProt.selectFeature(this.id); })
+					.mouseover(function(){
+						UniProt.enterFeature(this.id);
+					})
+					.mouseleave(function(){
+						UniProt.leaveFeature(this.id);
+					})
+					.appendTo(ftbl);
+				}
+			}
+			else if (m[2] == 'SQ') {
+				var aa = 0, mw = 0, crc = 0;
+				var rx = /^SQ   SEQUENCE\s*(\d+)\s*AA;\s*(\d+)\s*MW;\s*(.+)\s*CRC64;/;
+				
+				if ((m = rx.exec(m[0])) != null) {
+					aa = m[1];
+					mw = m[2];
+					crc = m[3];
+				}
+				
+				seqr.push($("<td colspan='2'/>").append(
+					"Length: <strong>" + aa + "</strong>, molecular weight <strong>" + mw + "</strong>, " +
+					  "CRC64 checksum <strong>" + crc + "</strong>")
+				);
+				
+				rx = /^SQ   .*\n((     .+\n)+)/m;
+				if ((m = rx.exec(text)) != null) {
+					seqr.push($("<td colspan='2'/>").addClass('sequence')
+						.append(UniProt.createSequence(m[1], floc)));
+				}
+			}
 		}
 		
 		var table = $("<table cellspacing='0' cellpadding='0' width='100%'/>");
@@ -498,8 +566,86 @@ UniProt = {
 			$("<tr/>").append(value).appendTo(table);
 		});
 		
+		if (ftbl != null) {
+			$("<tr/>").append($("<th colspan='2'/>").append("Cross-references")).appendTo(table);
+			$("<tr/>").append(
+				$("<td colspan='2' class='sub_entry'/>")
+					.append($("<div/>").addClass('feature_table').append(ftbl))).appendTo(table);
+		}
+
+		$("<tr/>").append("<th colspan='2'>Sequence information</th>").appendTo(table);
+		$(seqr).each(function(index, value) {
+			$("<tr/>").append(value).appendTo(table);
+		});
+		
 		entry.prepend(table);
-//		$("#entrytext").hide();
+		$("#entrytext").hide();
+	},
+
+	createSequence: function(seq, floc) {
+		seq = seq.replace(/\s+/gm, '');
+		
+		var aaf = new Array();
+		for (i in seq) aaf[i] = "";
+		
+		for (i in floc) {
+			if (floc[i].length == 0) continue;
+			for (var j = floc[i].from - 1; j < floc[i].to; ++j)
+				if (aaf[j].length == 0) aaf[j] = i; else aaf[j] += ';' + i;
+		}
+		
+		for (var i = 0; i < aaf.length; ++i) {
+			var j = i + 1;
+			while (j < aaf.length && aaf[j] == aaf[i]) ++j;
+			
+			var segment = { from: i, to: j - 1, features: aaf[i] };
+			UniProt.segments.push(segment);
+			i = j - 1;
+		}
+		
+		var result = $("<pre/>"), i = 0;
+		for (j in UniProt.segments) {
+			var s = '';
+			for (var k = UniProt.segments[j].from; k <= UniProt.segments[j].to; ++k) {
+				s += seq[i];
+				++i;
+				if (i % 60 == 0) s += '\n'
+				else if (i % 10 == 0) s += ' ';
+			}
+			result.append($("<span class='segment'/>").attr("id", "segment-" + j).append(s));
+			$.each(UniProt.segments[j].features.split(';'), function(index, value) {
+				UniProt.features[value].push(j);
+			});
+		}
+	
+		return result;
+	},
+	
+	enterFeature: function(id)
+	{
+		var nr = id.substr("feature-".length) - 1;
+		$.each(UniProt.features[nr], function(index, value) {
+			$("#segment-" + value).addClass('hover-feature');
+		});
+	},
+	
+	leaveFeature: function(id)
+	{
+		var nr = id.substr("feature-".length) - 1;
+		$.each(UniProt.features[nr], function(index, value) {
+			$("#segment-" + value).removeClass('hover-feature');
+		});
+	},
+	
+	selectFeature: function(id)
+	{
+		$('.feature').removeClass('highlighted');
+		$('#' + id).addClass('highlighted');
+		$('.segment').removeClass('highlighted');
+		var nr = id.substr("feature-".length) - 1;
+		$.each(UniProt.features[nr], function(index, value) {
+			$("#segment-" + value).addClass('highlighted');
+		});
 	}
 }
 

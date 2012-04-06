@@ -232,22 +232,22 @@ table.list {
 	display: block;
 }
 
+td.right {
+	text-align: right;
+}
+
 .list td.nr {
 	font-weight: bold;
 	text-align: right;
 }
 
-.list tr.clickable:hover {
+.list tr.feature:hover {
 	background-color: #eaeff4;
 	cursor: pointer;
 }
 
 .list tr.selected {
 	background-color: #c6d4e1;
-}
-
-.list tr.selected:hover {
-	background-color: #eaeff4;
 }
 
 .list td.delete img {
@@ -311,6 +311,10 @@ div.redirect {
 	margin-top: 4px;
 }
 
+.entry div.feature_table table {
+	margin-top: 0px;
+}
+
 .scrolling-sequence {
 	width: 320px;
 	height: 66px;
@@ -326,13 +330,8 @@ div.redirect {
 	overflow: auto;
 }
 
-.entry .feature_table .clickable {
-	background-color: #ebe7e0;
-	cursor: pointer;
-}
-
 .entry .feature_table .highlighted {
-	background-color: #bdb8ad;
+	background-color: #ebe7e0;
 }
 
 .entry .sequence .hover-feature {

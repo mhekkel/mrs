@@ -18,6 +18,7 @@
 			<db>trembl</db>
 			<db>genbank</db>
 			<db>refseq</db>
+			<db>taxonomy</db>
 		</dbs>
 		<realm name="M6 Administrator">
 			<user name="scott">b92ff7d60b994c8a0d2941ad9349e841</user>
@@ -451,6 +452,30 @@
 		</match>
 	</parser>
 	
+	<parser id="taxonomy">
+		<match regex="^([A-Z]([^:]| )+?) +: (.+)\n">
+			<switch test="1">
+				<case value='ID'>
+					<capture nr="3">
+						<index name="id"/>
+						<attr name="id"/>
+					</capture>
+				</case>
+				<case value='SCIENTIFIC NAME'>
+					<capture nr="3">
+						<index name='sn'/>
+						<attr name='title'/>
+					</capture>
+				</case>
+				<default>
+					<capture nr="3">
+						<index name="text"/>
+					</capture>
+				</default>
+			</switch>
+		</match>
+	</parser>
+	
 <!--	<parser id="mediawiki" type="sax" docxpath="/mediawiki/page">-->
 <!--		<match xpath="title">-->
 <!--			<index name="title" />-->
@@ -667,6 +692,13 @@
 		<name>Refseq</name>
 		<file>/data/mrs/refseq.m6</file>
 		<source>refseq_release/*gpff.gz;refseq_release/*gbff.gz</source>
+		<document-separator type="last-line-equals">//</document-separator>
+	</databank>
+
+	<databank id="taxonomy" parser="taxonomy">
+		<name>Taxonomy</name>
+		<file>/data/mrs/taxonomy.m6</file>
+		<source>taxonomy/taxonomy.dat</source>
 		<document-separator type="last-line-equals">//</document-separator>
 	</databank>
 

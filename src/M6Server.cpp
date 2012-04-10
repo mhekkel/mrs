@@ -122,6 +122,7 @@ M6Server::M6Server(zx::element* inConfig)
 	mount("",				boost::bind(&M6Server::handle_welcome, this, _1, _2, _3));
 	mount("download",		boost::bind(&M6Server::handle_download, this, _1, _2, _3));
 	mount("entry",			boost::bind(&M6Server::handle_entry, this, _1, _2, _3));
+	mount("link",			boost::bind(&M6Server::handle_link, this, _1, _2, _3));
 	mount("search",			boost::bind(&M6Server::handle_search, this, _1, _2, _3));
 	mount("similar",		boost::bind(&M6Server::handle_similar, this, _1, _2, _3));
 	mount("admin",			boost::bind(&M6Server::handle_admin, this, _1, _2, _3));
@@ -254,22 +255,38 @@ void M6Server::handle_download(const zh::request& request, const el::scope& scop
 
 void M6Server::handle_entry(const zh::request& request, const el::scope& scope, zh::reply& reply)
 {
-	string db, nr;
+	string db, nr, id;
 
 	zh::parameter_map params;
 	get_parameters(scope, params);
 
 	db = params.get("db", "").as<string>();
 	nr = params.get("nr", "").as<string>();
+	id = params.get("id", "").as<string>();
 
-	if (db.empty() or nr.empty())		// shortcut
+	if (db.empty() or (nr.empty() and id.empty()))		// shortcut
 	{
 		handle_welcome(request, scope, reply);
 		return;
 	}
-	
-	uint32 docNr = boost::lexical_cast<uint32>(nr);
 
+	uint32 docNr = 0;
+	if (nr.empty())
+	{
+		M6Databank* mdb = Load(db);
+		if (mdb == nullptr)
+			THROW(("Databank %s not loaded", db.c_str()));
+		bool exists;
+		tr1::tie(exists, docNr) = mdb->Exists("id", id);
+		if (not exists)
+			THROW(("Entry %s does not exist in databank %s", id.c_str(), db.c_str()));
+		if (docNr == 0)
+			THROW(("Multiple entries with ID %s in databank %s", id.c_str(), db.c_str()));
+
+	}
+	else
+		docNr = boost::lexical_cast<uint32>(nr);
+	
 	string q, rq, format;
 	q = params.get("q", "").as<string>();
 	rq = params.get("rq", "").as<string>();
@@ -277,8 +294,8 @@ void M6Server::handle_entry(const zh::request& request, const el::scope& scope, 
 	
 	el::scope sub(scope);
 	sub.put("db", el::object(db));
+	sub.put("nr", el::object(docNr));
 //	sub.put("linkeddbs", el::object(GetLinkedDbs(db)));
-	sub.put("nr", el::object(nr));
 	if (not q.empty())
 		sub.put("q", el::object(q));
 	else if (not rq.empty())
@@ -345,14 +362,16 @@ void M6Server::handle_entry(const zh::request& request, const el::scope& scope, 
 		{
 			try
 			{
-				string db = link->get_attribute("db");
+				string ldb = link->get_attribute("db");
 				string id = link->get_attribute("id");
 				string ix = link->get_attribute("ix");
 				string anchor = link->get_attribute("anchor");
-				if (db.empty() or id.empty())
+				if (ldb.empty())
+					ldb = db;
+				if (id.empty())
 					continue;
 				boost::regex re(link->get_attribute("regex"));
-				create_link_tags(root, re, db, ix, id, anchor);
+				create_link_tags(root, re, ldb, ix, id, anchor);
 			}
 			catch (...) {}
 		}
@@ -706,6 +725,23 @@ void M6Server::handle_search(const zh::request& request,
 			sub, reply);
 }
 
+void M6Server::handle_link(const zh::request& request, const el::scope& scope, zh::reply& reply)
+{
+	string id, db, ix, q;
+
+	zeep::http::parameter_map params;
+	get_parameters(scope, params);
+
+	id = params.get("id", "").as<string>();
+	db = params.get("db", "").as<string>();
+	ix = params.get("ix", "").as<string>();
+	q = params.get("q", "").as<string>();
+
+	M6Tokenizer::CaseFold(id);
+
+	create_redirect(db, ix, id, q, false, request, reply);
+}
+
 void M6Server::handle_similar(const zh::request& request, const el::scope& scope, zh::reply& reply)
 {
 	string db, id, nr;
@@ -974,6 +1010,72 @@ void M6Server::process_mrs_redirect(zx::element* node, const el::scope& scope, f
 
 // --------------------------------------------------------------------
 
+void M6Server::create_redirect(const string& databank, const string& inIndex, const string& inValue,
+	const string& q, bool redirectForQuery, const zh::request& request, zh::reply& reply)
+{
+	string host = request.local_address;
+	foreach (const zh::header& h, request.headers)
+	{
+		if (ba::iequals(h.name, "Host"))
+		{
+			host = h.value;
+			break;
+		}
+	}
+
+	// for some weird reason, local_port is sometimes 0 (bug in asio?)
+	if (request.local_port != 80 and request.local_port != 0 and host.find(':') == string::npos)
+	{
+		host += ':';
+		host += boost::lexical_cast<string>(request.local_port);
+	}
+
+	bool exists = false;
+	M6Databank* mdb = Load(databank);
+
+	if (mdb != nullptr)
+	{
+		uint32 docNr;
+		tr1::tie(exists, docNr) = mdb->Exists(inIndex, inValue);
+		if (exists)
+		{
+			string location;
+			if (docNr != 0)
+			{
+				location =
+					(boost::format("http://%1%/entry?db=%2%&nr=%3%&%4%=%5%")
+						% host
+						% zh::encode_url(databank)
+						% docNr
+						% (redirectForQuery ? "rq" : "q")
+						% zh::encode_url(q)
+					).str();
+			}
+			else
+			{
+				location =
+					(boost::format("http://%1%/search?db=%2%&q=%3%:%4%")
+						% host
+						% zh::encode_url(databank)
+						% inIndex
+						% zh::encode_url(inValue)
+					).str();
+			}
+	
+			reply = zh::reply::redirect(location);
+		}
+	}
+
+	if (not exists)
+	{
+		// ouch, nothing found... fall back to a lame page that says so
+		// (this is an error, actually)
+		
+		el::scope scope(request);
+		create_reply_from_template("results.html", scope, reply);
+	}
+}
+
 void M6Server::create_redirect(const string& databank, uint32 inDocNr,
 	const string& q, bool redirectForQuery, const zh::request& request, zh::reply& reply)
 {
@@ -1073,7 +1175,7 @@ void M6Server::LoadAllDatabanks()
 	}
 }
 
-M6Databank* M6Server::Load(const std::string& inDatabank)
+M6Databank* M6Server::Load(const string& inDatabank)
 {
 	M6Databank* result = nullptr;
 

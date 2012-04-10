@@ -453,22 +453,23 @@
 	</parser>
 	
 	<parser id="taxonomy">
-		<match regex="^([A-Z]([^:]| )+?) +: (.+)\n">
+		<match regex="^([A-Z][^:]+?) +: (.+)\n">
 			<switch test="1">
 				<case value='ID'>
-					<capture nr="3">
+					<capture nr="2">
 						<index name="id"/>
 						<attr name="id"/>
 					</capture>
 				</case>
 				<case value='SCIENTIFIC NAME'>
-					<capture nr="3">
-						<index name='sn'/>
+					<capture nr="2">
+						<index name='sn' type='string'/>
+						<index name='text'/>
 						<attr name='title'/>
 					</capture>
 				</case>
 				<default>
-					<capture nr="3">
+					<capture nr="2">
 						<index name="text"/>
 					</capture>
 				</default>
@@ -476,6 +477,10 @@
 		</match>
 	</parser>
 	
+	<format id="taxonomy">
+		<link regex="(?&lt;=^PARENT ID                 : )(\d+)" ix="id" id="$1" />
+	</format>
+
 <!--	<parser id="mediawiki" type="sax" docxpath="/mediawiki/page">-->
 <!--		<match xpath="title">-->
 <!--			<index name="title" />-->
@@ -695,7 +700,7 @@
 		<document-separator type="last-line-equals">//</document-separator>
 	</databank>
 
-	<databank id="taxonomy" parser="taxonomy">
+	<databank id="taxonomy" parser="taxonomy" format="taxonomy">
 		<name>Taxonomy</name>
 		<file>/data/mrs/taxonomy.m6</file>
 		<source>taxonomy/taxonomy.dat</source>

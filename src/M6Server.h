@@ -32,6 +32,7 @@ class M6Server : public zh::webapp
 	void			handle_download(const zh::request& request, const el::scope& scope, zh::reply& reply);
 	void			handle_entry(const zh::request& request, const el::scope& scope, zh::reply& reply);
 	void			handle_file(const zh::request& request, const el::scope& scope, zh::reply& reply);
+	void			handle_link(const zh::request& request, const el::scope& scope, zh::reply& reply);
 	void			handle_search(const zh::request& request, const el::scope& scope, zh::reply& reply);
 	void			handle_similar(const zh::request& request, const el::scope& scope, zh::reply& reply);
 	void			handle_welcome(const zh::request& request, const el::scope& scope, zh::reply& reply);
@@ -39,6 +40,9 @@ class M6Server : public zh::webapp
 	void			process_mrs_entry(zx::element* node, const el::scope& scope, boost::filesystem::path dir);
 	void			process_mrs_link(zx::element* node, const el::scope& scope, boost::filesystem::path dir);
 	void			process_mrs_redirect(zx::element* node, const el::scope& scope, boost::filesystem::path dir);
+
+	void			create_redirect(const std::string& databank, const std::string& inIndex, const std::string& inValue,
+						const std::string& q, bool redirectForQuery, const zh::request& req, zh::reply& rep);
 
 	void			create_redirect(const std::string& databank, uint32 inDocNr,
 						const std::string& q, bool redirectForQuery,

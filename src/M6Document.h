@@ -80,6 +80,12 @@ class M6InputDocument : public M6Document
 							M6DataType inDataType, bool isUnique,
 							const char* inText, size_t inSize);
 
+	virtual void		Index(const std::string& inIndex,
+							const std::vector<std::pair<const char*,size_t>>& inWords);
+
+	virtual void		IndexSequence(const std::string& inIndex, uint32 inWordSize,
+							const char* inSequence, size_t inLength);
+
 	virtual void		Tokenize(M6Lexicon& inLexicon, uint32 inLastStopWord);
 	virtual void		RemapTokens(const uint32 inTokenMap[]);
 

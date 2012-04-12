@@ -715,5 +715,9 @@
 		<document-separator type="first-line-equals">  &lt;page&gt;</document-separator>
 		<document-separator type="last-line-equals">  &lt;/page&gt;</document-separator>
 	</databank>
+
+	<databank id="mini-sprot-fasta">
+		<file>/data/mrs/mini-sprot-fasta.m6</file>
+	</databank>
 	
 </m6-config>

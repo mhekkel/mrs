@@ -208,6 +208,30 @@ void M6InputDocument::Index(const string& inIndex, M6DataType inDataType,
 	}
 }
 
+void M6InputDocument::Index(const string& inIndex,
+		const vector<pair<const char*,size_t>>& inWords)
+{
+	auto ix = GetIndexTokens(inIndex, eM6StringData);
+
+	foreach (auto word, inWords)
+	{
+		uint32 t = mDocLexicon.Store(word.first, word.second);
+		ix->mTokens.push_back(t);
+	}
+}
+
+void M6InputDocument::IndexSequence(const string& inIndex, uint32 inWordSize,
+	const char* inSequence, size_t inLength)
+{
+	auto ix = GetIndexTokens(inIndex, eM6TextData);
+
+	for (uint32 i = 0; i + inWordSize <= inLength; ++i)
+	{
+		uint32 t = mDocLexicon.Store(inSequence++, inWordSize);
+		ix->mTokens.push_back(t);
+	}
+}
+
 void M6InputDocument::Tokenize(M6Lexicon& inLexicon, uint32 inLastStopWord)
 {
 	uint32 docTokenCount = mDocLexicon.Count();

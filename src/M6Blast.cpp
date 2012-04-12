@@ -9,6 +9,7 @@
 #include <boost/iostreams/filter/zlib.hpp>
 #include <boost/iostreams/filter/bzip2.hpp>
 #include <boost/iostreams/filter/gzip.hpp>
+#include <boost/iostreams/device/mapped_file.hpp>
 #include <boost/regex.hpp>
 #include <boost/algorithm/string.hpp>
 #include <boost/foreach.hpp>
@@ -30,12 +31,32 @@ namespace ba = boost::algorithm;
 
 namespace M6Blast {
 
+template<int n> inline uint32 powi(uint32 x) { return powi<n - 1>(x) * x; }
+template<> inline uint32 powi<1>(uint32 x) { return x; }
+
 const uint32
-	kM6ResTableCount = 23,
-	kM6WordSize = 3,
-	kM6MaxWordIndex = kM6ResTableCount * kM6ResTableCount * kM6ResTableCount,
+	kM6AACount = 22,
 	kM6Bits = 5,
-	kM6Threshold = 11;
+	kM6Threshold = 11,
+	kM6HitWindow = 40,
+	kM6UnusedDiagonal = 0xf3f3f3f3;
+
+// 22 real letters and 1 dummy
+const char kM6Residues[] = "ABCDEFGHIKLMNPQRSTVWYZX";
+
+inline int ResidueNr(char inAA)
+{
+	const static int8 kResidueNrTable[] = {
+	//	A   B   C   D   E   F   G   H   I       K   L   M   N   P   Q   R   S   T  U=X  V   W   X   Y   Z
+		0,  1,  2,  3,  4,  5,  6,  7,  8, -1,  9, 10, 11, 12, 13, 14, 15, 16, 17, 22, 18, 19, 22, 20, 21
+	};
+	
+	inAA &= ~(040);
+	int result = -1;
+	if (inAA >= 'A' and inAA <= 'Z')
+		result = kResidueNrTable[inAA - 'A'];
+	return result;
+}
 
 const int8 kM6Blosum62[] = {
 	  4,                                                                                                               // A
@@ -58,38 +79,23 @@ const int8 kM6Blosum62[] = {
 	  0,  -1,  -1,  -1,  -1,  -2,  -2,  -2,  -1,  -1,  -1,  -1,   0,  -1,  -1,  -1,   1,   5,                          // T
 	  0,  -3,  -1,  -3,  -2,  -1,  -3,  -3,   3,  -2,   1,   1,  -3,  -2,  -2,  -3,  -2,   0,   4,                     // V
 	 -3,  -4,  -2,  -4,  -3,   1,  -2,  -2,  -3,  -3,  -2,  -1,  -4,  -4,  -2,  -3,  -3,  -2,  -3,  11,                // W
-	  0,  -1,  -2,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -2,  -1,  -1,   0,   0,  -1,  -2,  -1,           // X
-	 -2,  -3,  -2,  -3,  -2,   3,  -3,   2,  -1,  -2,  -1,  -1,  -2,  -3,  -1,  -2,  -2,  -2,  -1,   2,  -1,   7,      // Y
-	 -1,   1,  -3,   1,   4,  -3,  -2,   0,  -3,   1,  -3,  -1,   0,  -1,   3,   0,   0,  -1,  -2,  -3,  -1,  -2,   4, // Z
+	 -2,  -3,  -2,  -3,  -2,   3,  -3,   2,  -1,  -2,  -1,  -1,  -2,  -3,  -1,  -2,  -2,  -2,  -1,   2,   7,           // Y
+	 -1,   1,  -3,   1,   4,  -3,  -2,   0,  -3,   1,  -3,  -1,   0,  -1,   3,   0,   0,  -1,  -2,  -3,  -2,   4,      // Z
+	  0,  -1,  -2,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -2,  -1,  -1,   0,   0,  -1,  -2,  -1,  -1,  -1, // X
 };
-
-const char kM6Residues[] = "ABCDEFGHIKLMNPQRSTVWXYZ";
-
-inline int ResidueNr(char inAA)
-{
-	const static int8 kResidueNrTable[] = {
-	//	A   B   C   D   E   F   G   H   I       K   L   M   N   P   Q   R   S   T  U=X  V   W   X   Y   Z
-		0,  1,  2,  3,  4,  5,  6,  7,  8, -1,  9, 10, 11, 12, 13, 14, 15, 16, 17, 20, 18, 19, 20, 21, 22
-	};
-	
-	inAA &= ~(040);
-	int result = -1;
-	if (inAA >= 'A' and inAA <= 'Z')
-		result = kResidueNrTable[inAA - 'A'];
-	return result;
-}
 
 class M6Matrix
 {
   public:
+					M6Matrix(const int8* inData) : mData(inData) {}
 
-	int				operator()(char inAA1, char inAA2) const;
+	int8			operator()(char inAA1, char inAA2) const;
 
   private:
-	
+	const int8*		mData;
 };
 
-inline int M6Matrix::operator()(char inAA1, char inAA2) const
+inline int8 M6Matrix::operator()(char inAA1, char inAA2) const
 {
 	int rn1 = ResidueNr(inAA1);
 	int rn2 = ResidueNr(inAA2);
@@ -107,64 +113,79 @@ inline int M6Matrix::operator()(char inAA1, char inAA2) const
 	return result;	
 }
 
+const M6Matrix	kM6Blosum62Matrix(kM6Blosum62);
+
 // --------------------------------------------------------------------
 
 template<int WORDSIZE>
-struct M6WordT
+struct M6Word
 {
+	static const uint32 kM6MaxWordIndex, kM6MaxIndex;
+
+					M6Word()
+					{
+						for (uint32 i = 0; i <= WORDSIZE; ++i)
+							aa[i] = 0;
+					}
+
+					M6Word(const char* inSequence)
+					{
+						for (uint32 i = 0; i < WORDSIZE; ++i)
+							aa[i] = inSequence[i];
+						aa[WORDSIZE] = 0;
+					}
+
 	uint8&			operator[](uint32 ix)	{ return aa[ix]; }
 	const char*		c_str() const			{ return reinterpret_cast<const char*>(aa); }
 	size_t			length() const			{ return WORDSIZE; }
 
+	class PermutationIterator
+	{
+	  public:
+						PermutationIterator(M6Word inWord, const M6Matrix& inMatrix, int32 inThreshold)
+							: mWord(inWord), mMatrix(inMatrix), mThreshold(inThreshold), mIndex(0) {}
+		
+		bool			Next(uint32& outIndex);
+	
+	  private:
+		M6Word			mWord;
+		uint32			mIndex;
+		const M6Matrix&	mMatrix;
+		int32			mThreshold;
+	};
+
 	uint8			aa[WORDSIZE + 1];
 };
 
-typedef M6WordT<kM6WordSize> M6Word;
+template<> const uint32 M6Word<3>::kM6MaxWordIndex = 0x07FFF;
+template<> const uint32 M6Word<3>::kM6MaxIndex = kM6AACount * kM6AACount * kM6AACount;
 
-class M6PermutationIterator
-{
-  public:
-					M6PermutationIterator(const char* inSequence, const M6Matrix& inMatrix, int32 inThreshold)
-						: mMatrix(inMatrix), mThreshold(inThreshold), mIndex(0)
-					{
-						for (uint32 i = 0; i < kM6WordSize; ++i)
-							mWord[i] = inSequence[i];
-					}
-	
-	bool			Next(M6Word& outWord, uint32& outIndex, int32& outScore);
-
-  private:
-	M6Word			mWord;
-	uint32			mIndex;
-	const M6Matrix&	mMatrix;
-	int32			mThreshold;
-};
-
-bool M6PermutationIterator::Next(M6Word& outWord, uint32& outIndex, int32& outScore)
+template<int WORDSIZE>
+bool M6Word<WORDSIZE>::PermutationIterator::Next(uint32& outIndex)
 {
 	bool result = false;
 	M6Word w;
-	w[kM6WordSize] = 0;
 
-	while (mIndex < kM6MaxWordIndex)
+	while (mIndex < kM6MaxIndex)
 	{
-		uint32 ix = outIndex = mIndex;
-		int32 score = 0;
-		
-		for (uint32 i = 0; i < kM6WordSize; ++i)
-		{
-			w[i] = kM6Residues[ix % kM6ResTableCount];
-			ix /= kM6ResTableCount;
-			score += mMatrix(mWord[i], w[i]);
-		}
-		
+		uint32 ix = mIndex;
 		++mIndex;
+
+		int32 score = 0;
+		outIndex = 0;
+		
+		for (uint32 i = 0; i < WORDSIZE; ++i)
+		{
+			uint32 resNr = ix % kM6AACount;
+			w[i] = kM6Residues[resNr];
+			ix /= kM6AACount;
+			score += mMatrix(mWord[i], w[i]);
+			outIndex = outIndex << kM6Bits | resNr;
+		}
 		
 		if (score >= mThreshold)
 		{
 			result = true;
-			outWord = w;
-			outScore = score;
 			break;
 		}
 	}
@@ -172,213 +193,274 @@ bool M6PermutationIterator::Next(M6Word& outWord, uint32& outIndex, int32& outSc
 	return result;
 }
 
-class M6Accumulator
+template<int WORDSIZE>
+class M6WordHitIterator
 {
-  public:
-				M6Accumulator(uint32 inDocCount)
-					: mItems(reinterpret_cast<M6Item*>(calloc(sizeof(M6Item), inDocCount)))
-					, mFirst(nullptr), mDocCount(inDocCount), mHitCount(0) {}
-				
-				~M6Accumulator()
-				{
-					free(mItems);
-				}
-				
-	uint32		Add(uint32 inDocNr, uint32 inDelta)
-				{
-					if (mItems[inDocNr].mCount++ == 0)
-					{
-						mItems[inDocNr].mNext = mFirst;
-						mFirst = &mItems[inDocNr];
-						++mHitCount;
-					}
-					
-					return mItems[inDocNr].mValue += inDelta;
-				}
+	enum { kInlineCount = 2 };
 
-	uint32		operator[](uint32 inIndex) const	{ return mItems[inIndex].mValue; }
+	static const uint32 kMask;
 	
-	void		Collect(vector<uint32>& outDocs)
-				{
-					outDocs.reserve(mHitCount);
-					for (M6Item* item = mFirst; item != nullptr; item = item->mNext)
-						outDocs.push_back(static_cast<uint32>(item - mItems));
-					
-					//if (mHitCount > outDocs.size())
-					//	mHitCount = outDocs.size();
-				}
+	struct Entry
+	{
+		uint16					mCount;
+		uint16					mDataOffset;
+		uint16					mInline[kInlineCount];
+	};
+
+  public:
+
+	typedef M6Word<WORDSIZE>					Word;
+	typedef typename Word::PermutationIterator	WordPermutationIterator;
+
+	struct WordHitIteratorStaticData
+	{
+		vector<Entry>			mLookup;
+		vector<uint32>			mOffsets;
+	};
+								M6WordHitIterator(WordHitIteratorStaticData& inStaticData)
+									: mLookup(inStaticData.mLookup), mOffsets(inStaticData.mOffsets) {}
 	
-	uint32		GetHitCount() const					{ return mHitCount; }
+	static void					Init(const char* inQuery, size_t inQueryLength, const M6Matrix& inMatrix,
+									uint32 inThreshhold, WordHitIteratorStaticData& outStaticData);
+
+	void						Reset(const char* inSequenceBegin, const char* inSequenceEnd);
+	bool						Next(uint16& outQueryOffset, uint16& outTargetOffset);
+	uint32						Index() const		{ return mIndex; }
 
   private:
-	
-	struct M6Item
-	{
-		uint32	mValue;
-		uint32	mCount;
-		M6Item*	mNext;
-	};
-	
-	M6Item*		mItems;
-	M6Item*		mFirst;
-	uint32		mDocCount, mHitCount;
+
+	const char*		mSeqBegin;
+	const char*		mSeqCurrent;
+	const char*		mSeqEnd;
+	vector<Entry>&	mLookup;
+	vector<uint32>&	mOffsets;
+	uint32			mIndex;
+	Entry			mCurrent;
 };
 
-void QueryBlastDB(M6Databank& inDatabank, const string& inQuery)
+template<> const uint32 M6WordHitIterator<3>::kMask = 0x03FF;
+
+template<int WORDSIZE>
+void M6WordHitIterator<WORDSIZE>::Init(const char* inQuery, size_t inQueryLength, 
+	const M6Matrix& inMatrix, uint32 inThreshhold, WordHitIteratorStaticData& outStaticData)
 {
-	vector<pair<M6Word,int32>> test(kM6MaxWordIndex);
-	const M6Matrix M;
+	uint64 N = Word::kM6MaxWordIndex;
 	
-	for (uint32 i = 0; i + kM6WordSize <= inQuery.length(); ++i)
+	vector<vector<uint32> > test(N);
+	
+	for (uint32 i = 0; i < inQueryLength - WORDSIZE + 1; ++i)
 	{
-		M6PermutationIterator iter(inQuery.c_str() + i, M, kM6Threshold);
-		M6Word w;
-		uint32 index;
-		int32 score;
+		Word w(inQuery++);
 		
-		while (iter.Next(w, index, score))
+		WordPermutationIterator p(w, inMatrix, inThreshhold);
+		uint32 ix;
+
+		while (p.Next(ix))
+			test[ix].push_back(i);
+	}
+	
+	size_t M = 0;
+	for (uint32 i = 0; i < N; ++i)
+		M += test[i].size();
+	
+	outStaticData.mLookup = vector<Entry>(N);
+	outStaticData.mOffsets = vector<uint32>(M);
+
+	uint32* data = &outStaticData.mOffsets[0];
+
+	for (uint32 i = 0; i < N; ++i)
+	{
+		outStaticData.mLookup[i].mCount = static_cast<uint16>(test[i].size());
+		outStaticData.mLookup[i].mDataOffset = static_cast<uint16>(data - &outStaticData.mOffsets[0]);
+
+		for (uint32 j = 0; j < outStaticData.mLookup[i].mCount; ++j)
 		{
-			assert(index < test.size());
-			
-			test[index].first = w;
-			test[index].second += score;
+			if (j >= kInlineCount)
+				*data++ = test[i][j];
+			else
+				outStaticData.mLookup[i].mInline[j] = test[i][j];
 		}
 	}
 	
-	sort(test.begin(), test.end(), [](const pair<M6Word,int32>& a, const pair<M6Word,int32>& b) -> bool {
-		return a.second > b.second;
-	});
+	assert(data < &outStaticData.mOffsets[0] + M);
+}
+
+template<int WORDSIZE>
+void M6WordHitIterator<WORDSIZE>::Reset(const char* inSequenceBegin, const char* inSequenceEnd)
+{
+	mSeqBegin = mSeqCurrent = inSequenceBegin;
+	mSeqEnd = inSequenceEnd;
 	
-	M6Accumulator accu(inDatabank.GetMaxDocNr());
-	uint32 Smax = 0;
+	mIndex = 0;
+	mCurrent.mCount = 0;
+
+	for (uint32 i = 0; i < WORDSIZE - 1 and mSeqCurrent != mSeqEnd; ++i)
+		mIndex = mIndex << kM6Bits | ResidueNr(*mSeqCurrent++);
+}
+
+template<int WORDSIZE>
+bool M6WordHitIterator<WORDSIZE>::Next(uint16& outQueryOffset, uint16& outTargetOffset)
+{
+	bool result = false;
 	
-	foreach (auto word, test)
+	for (;;)
 	{
-		if (word.second * 100 < Smax)
+		if (mCurrent.mCount-- > 0)
+		{
+			if (mCurrent.mCount >= kInlineCount)
+				outQueryOffset = mOffsets[mCurrent.mDataOffset + mCurrent.mCount - kInlineCount];
+			else
+				outQueryOffset = mCurrent.mInline[mCurrent.mCount];
+			
+			assert(mSeqCurrent - mSeqBegin - WORDSIZE < numeric_limits<uint16>::max());
+			outTargetOffset = static_cast<uint16>(mSeqCurrent - mSeqBegin - WORDSIZE);
+			result = true;
 			break;
-
-		unique_ptr<M6Iterator> iter(inDatabank.Find("seq", word.first.c_str()));
-
-		uint32 docNr; float rank;
-		while (iter->Next(docNr, rank))
-		{
-			uint32 s = accu.Add(docNr, word.second);
-			if (Smax < s)
-				Smax = s;
 		}
-	}
-	
-	vector<uint32> docs;
-	accu.Collect(docs);
-	
-	sort(docs.begin(), docs.end(), [&](uint32 a, uint32 b) -> bool {
-		return accu[a] > accu[b];
-	});
+		
+		if (mSeqCurrent == mSeqEnd)
+			break;
+		
+		int8 r = ResidueNr(*mSeqCurrent++);
+		while (r < 0 or r >= kM6AACount and mSeqCurrent < mSeqEnd)
+			r = ResidueNr(*mSeqCurrent++);
 
-	for (uint32 i = 0; i < 100; ++i)
-	{
-		unique_ptr<M6Document> doc(inDatabank.Fetch(docs[i]));
-		if (doc)
-			cout << doc->GetAttribute("id") << "\t" << doc->GetAttribute("title") << endl
-				 << doc->GetText() << endl;
+		if (mSeqCurrent == mSeqEnd)
+			break;
+		
+		mIndex = ((mIndex & kMask) << kM6Bits) | *mSeqCurrent++;
+		assert(mIndex < mLookup.size());
+		mCurrent = mLookup[mIndex];
 	}
+
+	return result;
 }
 
 // --------------------------------------------------------------------
 
-void AddEntry(M6Databank& inDatabank, M6Lexicon& inLexicon, const string& inEntry)
+struct M6Diagonal
 {
-	static boost::regex re("^>(?:[a-z]+\\|)?(?:([A-Za-z0-9_]+)\\|)?([A-Za-z0-9_]+) (.*)\\n((?:[A-IK-Z]+\\n)+)$");
-	
-	boost::smatch m;
-	if (not boost::regex_match(inEntry, m, re, boost::match_not_dot_newline))
-		cerr << "no match for: " << inEntry << endl;
-	else
-	{
-		string id = m[2];
-		string acc = m[1];
-		string title = m[3];
-		string seq = m[4];
-		
-		ba::erase_all(seq, "\n");
-		
-		unique_ptr<M6InputDocument> doc(new M6InputDocument(inDatabank, inEntry));
-
-		doc->Index("id", eM6StringData, true, id.c_str(), id.length());
-		doc->SetAttribute("id", id.c_str(), id.length());
-
-		if (not acc.empty())
-		{
-			doc->Index("acc", eM6StringData, true, acc.c_str(), acc.length());
-			doc->SetAttribute("acc", acc.c_str(), acc.length());
-		}
-
-		if (not title.empty())
-		{
-			doc->Index("title", eM6TextData, true, title.c_str(), title.length());
-			doc->SetAttribute("title", acc.c_str(), acc.length());
-		}
-
-//		vector<pair<const char*,size_t>> words(seq.length() - kM6WordSize + 1);
-//		
-//		const char* s = seq.c_str();
-//		generate(words.begin(), words.end(), [&]() -> pair<const char*,size_t> {
-//			return make_pair(s++, kM6WordSize);
-//		});
-//		
-//		doc->Index("words", words);
-		doc->IndexSequence("seq", kM6WordSize, seq.c_str(), seq.length());
-		
-		doc->Tokenize(inLexicon, 0);
-		doc->Compress();
-
-		inDatabank.Store(doc.release());
-	}
-}
-
-// --------------------------------------------------------------------
-
-void BuildBlastDB()
-{
-	M6Lexicon lexicon;
-	unique_ptr<M6Databank> databank(M6Databank::CreateNew("C:/data/mrs/mini-sprot-fasta.m6"));
-	databank->StartBatchImport(lexicon);
-	
-	fs::path rawFile("C:/data/raw/uniprot/uniprot_sprot.fasta.gz");
-//	fs::path rawFile("C:/data/raw/uniprot/mini-sprot.fa");
-	
-	{
-		M6Progress progress(fs::file_size(rawFile), "parsing");
-		M6DataSource data(rawFile, progress);
-
-		for (M6DataSource::iterator i = data.begin(); i != data.end(); ++i)
-		{
-			string entry;
-			
-			for (;;)
+			M6Diagonal() : mQuery(0), mTarget(0) {}
+			M6Diagonal(int16 inQuery, int16 inTarget)
+				: mQuery(0), mTarget(0)
 			{
-				string line;
-				getline(i->mStream, line);
-				
-				if (line.empty() and i->mStream.eof())
-					break;
-				
-				if (ba::starts_with(line, ">"))
-				{
-					if (not entry.empty())
-						AddEntry(*databank, lexicon, entry);
-					entry.clear();
-				}
-		
-				entry += line + "\n";
+				if (inQuery > inTarget)
+					mQuery = inQuery - inTarget;
+				else
+					mTarget = -(inTarget - inQuery);
 			}
+			
+	bool	operator<(const M6Diagonal& rhs) const
+				{ return mQuery < rhs.mQuery or (mQuery == rhs.mQuery and mTarget < rhs.mTarget); }
+
+	int16	mQuery, mTarget;
+};
+
+struct M6DiagonalStartTable
+{
+			M6DiagonalStartTable() : mTable(nullptr) {}
+			~M6DiagonalStartTable() { delete[] mTable; }
+	
+	void	Reset(uint32 inQueryLength, uint32 inTargetLength)
+			{
+				mQueryLength = inQueryLength;
+				mTargetLength = inTargetLength;
+				
+				uint32 n = mQueryLength + mTargetLength + 1;
+				if (mTable == nullptr or n > mTableLength)
+				{
+					uint32 k = ((n / 10240) + 1) * 10240;
+					int32* t = new int32[k];
+					delete[] mTable;
+					mTable = t;
+					mTableLength = k;
+				}
+				
+				memset(mTable, 0xf3, n * sizeof(int32));
+			}
+
+	int32&	operator[](const M6Diagonal& inD)
+				{ return mTable[mTargetLength + inD.mTarget + inD.mQuery]; }
+
+	int32*	mTable;
+	int32	mTableLength, mTargetLength, mQueryLength;
+};
+
+// --------------------------------------------------------------------
+
+template<int WORDSIZE>
+void Search(const char* inFasta, size_t inLength, const string& inQuery)
+{
+	typedef M6WordHitIterator<WORDSIZE>	M6WordHitIterator;
+	typedef M6WordHitIterator::WordHitIteratorStaticData M6StaticData;
+	
+	M6StaticData data;
+	M6WordHitIterator::Init(inQuery.c_str(), inQuery.length(), kM6Blosum62, kM6Threshold, data);
+	
+	size_t offset = 0;
+	while (*inFasta != '>')		// skip over 'header'
+		++offset, ++inFasta, --inLength;
+	const char* end = inFasta + inLength;
+	uint32 queryLength = static_cast<uint32>(inQuery.length());
+	
+	M6WordHitIterator iter(data);
+	M6DiagonalStartTable diagonals;
+	
+	int64 hitsToDb = 0, extensions = 0;
+	
+	while (inFasta != end)
+	{
+		const char* entry = inFasta;
+		const char* seq = nullptr;
+		uint32 seqLength = 0;
+
+		while (inFasta != end and *++inFasta != '>')
+		{
+			if (seq == nullptr)
+			{
+				if (*inFasta == '\n')
+					seq = inFasta + 1;
+			}
+			else if (*inFasta != '\r' and *inFasta != '\n' and *inFasta != ' ' and *inFasta != '\t')
+				++seqLength;
+		}
 		
-			if (not entry.empty())
-				AddEntry(*databank, lexicon, entry);
+		iter.Reset(seq, inFasta);
+		diagonals.Reset(queryLength, seqLength);
+		
+		uint16 queryOffset, targetOffset;
+		while (iter.Next(queryOffset, targetOffset))
+		{
+			++hitsToDb;
+			
+			M6Diagonal d(queryOffset, targetOffset);
+			int32 m = diagonals[d];
+			
+			int32 distance = queryOffset - m;
+			if (m == kM6UnusedDiagonal or distance >= kM6HitWindow)
+				diagonals[d] = queryOffset;
+			else
+			{
+				++extensions;
+			}
 		}
 	}
+}
+
+
+// --------------------------------------------------------------------
+
+void QueryBlastDB(const fs::path& inFasta, const string& inQuery)
+{
+	io::mapped_file file(inFasta.string().c_str(), io::mapped_file::readonly);
+	if (not file.is_open())
+		throw M6Exception("FastA file %s not open", inFasta.string());
 	
-	databank->CommitBatchImport();
+	const char* data = file.const_data();
+	size_t length = file.size();
+	
+	Search<3>(data, length, inQuery);
+	
 }
 
 }
@@ -390,9 +472,8 @@ int main()
 	try
 	{
 //		BuildBlastDB();
-		M6Databank databank("C:/data/mrs/mini-sprot-fasta.m6", eReadOnly);
 		const char kQuery[] = "MSFCSFFGGEVFQNHFEPGVYVCAKCGYELFSSHSKYAHSSPWPAFTETIHADSVAKRPEHNRPGALKVSCGRCGNGLGHEFLNDGPKRGQSRFUIFSSSLKFIPKGQESSPSQGQ";
-		M6Blast::QueryBlastDB(databank, kQuery);
+		M6Blast::QueryBlastDB(fs::path("C:/data/fasta/uniprot_sprot.fasta"), kQuery);
 	}
 	catch (exception& e)
 	{

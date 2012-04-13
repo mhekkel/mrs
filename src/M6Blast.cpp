@@ -69,6 +69,8 @@ inline int ResidueNr(char inAA)
 	return result;
 }
 
+typedef basic_string<uint8>	sequence;
+
 const int8 kM6Blosum62[] = {
 	  4,                                                                                                               // A
 	 -2,   4,                                                                                                          // B
@@ -113,6 +115,7 @@ class M6Matrix
 					M6Matrix(const M6MatrixData& inData) : mData(inData) {}
 
 	int8			operator()(char inAA1, char inAA2) const;
+//	int8			operator()(uint8 inAA1, uint8 inAA2) const;
 
 	int32			OpenCost() const		{ return mData.mGapOpen; }
 	int32			ExtendCost() const		{ return mData.mGapExtend; }
@@ -133,22 +136,36 @@ class M6Matrix
 	const M6MatrixData&	mData;
 };
 
+//inline int8 M6Matrix::operator()(uint8 inAA1, uint8 inAA2) const
+//{
+////	int result = -4;
+////	
+////	if (inAA1 >= 0 and inAA2 >= 0)
+////	{
+////		if (inAA1 >= inAA2)
+////			result = kM6Blosum62[(inAA1 * (inAA1 + 1)) / 2 + inAA2];
+////		else
+////			result = kM6Blosum62[(inAA2 * (inAA2 + 1)) / 2 + inAA1];
+////	}
+////
+////	return result;	
+//}
+
 inline int8 M6Matrix::operator()(char inAA1, char inAA2) const
 {
+//	return operator()(ResidueNr(inAA1), ResidueNr(inAA2));
+	int result = -4;
+	
 	int rn1 = ResidueNr(inAA1);
 	int rn2 = ResidueNr(inAA2);
 	
-	int result = -4;
-	
 	if (rn1 >= 0 and rn2 >= 0)
 	{
-		if (rn1 > rn2)
-			result = kM6Blosum62[(rn2 * (rn2 + 1)) / 2 + rn1];
-		else
+		if (rn1 >= rn2)
 			result = kM6Blosum62[(rn1 * (rn1 + 1)) / 2 + rn2];
+		else
+			result = kM6Blosum62[(rn2 * (rn2 + 1)) / 2 + rn1];
 	}
-
-//cout << inAA1 << '(' << int(rn1) << ')' << "+" << inAA2 << '(' << int(rn2) << ')' << ": " << result << endl;
 
 	return result;	
 }
@@ -515,7 +532,7 @@ bool M6WordHitIterator<WORDSIZE>::Next(uint16& outQueryOffset, uint16& outTarget
 struct M6Diagonal
 {
 			M6Diagonal() : mQuery(0), mTarget(0) {}
-			M6Diagonal(int16 inQuery, int16 inTarget)
+			M6Diagonal(int32 inQuery, int32 inTarget)
 				: mQuery(0), mTarget(0)
 			{
 				if (inQuery > inTarget)
@@ -527,7 +544,7 @@ struct M6Diagonal
 	bool	operator<(const M6Diagonal& rhs) const
 				{ return mQuery < rhs.mQuery or (mQuery == rhs.mQuery and mTarget < rhs.mTarget); }
 
-	int16	mQuery, mTarget;
+	int32	mQuery, mTarget;
 };
 
 struct M6DiagonalStartTable
@@ -574,7 +591,7 @@ struct M6DiagonalStartTable
 
 struct Data
 {
-				Data(uint32 inDimX, uint32 inDimY) : mDimX(inDimX), mDimY(inDimY)
+				Data(size_t inDimX, size_t inDimY) : mDimX(inDimX), mDimY(inDimY)
 				{
 					mDataLength = (inDimX + 1) * (inDimY + 1);
 					mData = reinterpret_cast<int16*>(calloc(mDataLength, sizeof(int16)));
@@ -585,9 +602,9 @@ struct Data
 	int16&		operator()(uint32 inI, uint32 inJ)					{ return mData[inI * mDimY + inJ]; }
 	
 	int16*		mData;
-	uint32		mDataLength;
-	uint32		mDimX;
-	uint32		mDimY;
+	size_t		mDataLength;
+	size_t		mDimX;
+	size_t		mDimY;
 };
 
 struct RecordTraceBack
@@ -699,6 +716,9 @@ struct M6Hsp
 					return
 						mQueryEnd >= inOther.mQueryStart and mQueryStart <= inOther.mQueryEnd and
 						mTargetEnd >= inOther.mTargetStart and mTargetStart <= inOther.mTargetEnd;
+//					return
+//						mQueryEnd >= inOther.mQueryStart and mQueryStart <= inOther.mQueryEnd and
+//						mTargetEnd >= inOther.mTargetStart and mTargetStart <= inOther.mTargetEnd;
 				}
 
 	void		CalculateMidline(const string& inUnfilteredQuery, const M6Matrix& inMatrix, bool inFilter);
@@ -748,7 +768,7 @@ xml::node* M6Hsp::ToXML(uint32 inIndex, const M6Matrix& inMatrix, int64 inSearch
 	result->append(child = new xml::element("Hsp_score"));			child->content(boost::lexical_cast<string>(mScore));
 	result->append(child = new xml::element("Hsp_evalue"));			child->content(boost::lexical_cast<string>(mExpect));
 	result->append(child = new xml::element("Hsp_query-from"));		child->content(boost::lexical_cast<string>(mQueryStart + 1));
-	result->append(child = new xml::element("Hsp_query-to"));		child->content(boost::lexical_cast<string>(mQueryEnd + 1));
+	result->append(child = new xml::element("Hsp_query-to"));		child->content(boost::lexical_cast<string>(mQueryEnd));
 	
 	result->append(child = new xml::element("Hsp_qseq"));			child->content(mAlignedQuery);
 	result->append(child = new xml::element("Hsp_hseq"));			child->content(mAlignedTarget);
@@ -839,11 +859,16 @@ xml::node* M6Hit::ToXML(uint32 inIndex, const M6Matrix& inMatrix, int64 inSearch
 	xml::element* result = new xml::element("Hit");
 	xml::element* child;
 	
-	result->append(child = new xml::element("Hit_num"));			child->content(boost::lexical_cast<string>(inIndex));
+	result->append(child = new xml::element("Hit_num"));	child->content(boost::lexical_cast<string>(inIndex));
+
+	string def(mEntry, strchr(mEntry, '\n'));
+	result->append(child = new xml::element("Hit_def"));	child->content(def);
+	result->append(child = new xml::element("Hit_len"));	child->content(boost::lexical_cast<string>(mTargetLength));
+	result->append(child = new xml::element("Hit_hsps"));
 	
 	int nr = 1;
 	foreach (auto& hsp, mHsps)
-		result->append(hsp.ToXML(nr++, inMatrix, inSearchSpace));
+		child->append(hsp.ToXML(nr++, inMatrix, inSearchSpace));
 	
 	return result;
 }
@@ -953,7 +978,10 @@ xml::document* M6BlastQuery<WORDSIZE>::Search(const char* inFasta, size_t inLeng
 	});
 
 	if (mHits.size() > mReportLimit)
+	{
+		for_each(mHits.begin() + mReportLimit, mHits.end(), [](M6Hit* hit) { delete hit; });
 		mHits.erase(mHits.begin() + mReportLimit, mHits.end());
+	}
 
 	xml::document* doc = new xml::document;
 	xml::element* hits = new xml::element("Hits");
@@ -1424,9 +1452,7 @@ int32 M6BlastQuery<WORDSIZE>::AlignGappedWithTraceBack(M6Hsp& ioHsp)
 template<int WORDSIZE>
 void M6BlastQuery<WORDSIZE>::AddHit(M6Hit* inHit)
 {
-	sort(inHit->mHsps.begin(), inHit->mHsps.end(), [](const M6Hsp& a, const M6Hsp& b) -> bool {
-		return a.mScore > b.mScore;
-	});
+	sort(inHit->mHsps.begin(), inHit->mHsps.end(), greater<M6Hsp>());
 
 	mHits.push_back(inHit);
 	
@@ -1438,6 +1464,7 @@ void M6BlastQuery<WORDSIZE>::AddHit(M6Hit* inHit)
 	if (mHits.size() > mReportLimit * 2)
 	{
 		pop_heap(mHits.begin(), mHits.end(), cmp);
+		delete mHits.back();
 		mHits.erase(mHits.end() - 1);
 	}
 }
@@ -1478,7 +1505,8 @@ int main()
 		//	score += M6Blast::kM6Blosum62Matrix(kQuery[i], kQuery[i]);
 		//cout << "max score: " << score << endl;
 		
-		M6Blast::QueryBlastDB(fs::path("C:/data/fasta/sprot.fa"), kQuery);
+		//M6Blast::QueryBlastDB(fs::path("C:/data/fasta/sprot.fa"), kQuery);
+		M6Blast::QueryBlastDB(fs::path("C:/data/fasta/uniprot_sprot.fasta"), kQuery);
 	}
 	catch (exception& e)
 	{

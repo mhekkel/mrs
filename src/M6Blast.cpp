@@ -38,9 +38,6 @@ namespace ba = boost::algorithm;
 
 namespace M6Blast {
 
-template<int n> inline uint32 powi(uint32 x) { return powi<n - 1>(x) * x; }
-template<> inline uint32 powi<1>(uint32 x) { return x; }
-
 const uint32
 	kM6AACount				= 22,
 	kM6Bits					= 5,
@@ -61,8 +58,8 @@ const char kM6Residues[] = "ABCDEFGHIKLMNPQRSTVWYZX";
 inline int ResidueNr(char inAA)
 {
 	const static int8 kResidueNrTable[] = {
-	//	A   B   C   D   E   F   G   H   I       K   L   M   N   P   Q   R   S   T  U=X  V   W   X   Y   Z
-		0,  1,  2,  3,  4,  5,  6,  7,  8, -1,  9, 10, 11, 12, 13, 14, 15, 16, 17, 22, 18, 19, 22, 20, 21
+	//	A   B   C   D   E   F   G   H   I       K   L   M   N       P   Q   R   S   T  U=X  V   W   X   Y   Z
+		0,  1,  2,  3,  4,  5,  6,  7,  8, -1,  9, 10, 11, 12, -1, 13, 14, 15, 16, 17, 22, 18, 19, 22, 20, 21
 	};
 	
 	inAA &= ~(040);
@@ -150,6 +147,8 @@ inline int8 M6Matrix::operator()(char inAA1, char inAA2) const
 		else
 			result = kM6Blosum62[(rn1 * (rn1 + 1)) / 2 + rn2];
 	}
+
+//cout << inAA1 << '(' << int(rn1) << ')' << "+" << inAA2 << '(' << int(rn2) << ')' << ": " << result << endl;
 
 	return result;	
 }
@@ -679,6 +678,8 @@ struct M6Hsp
 	string		mAlignedTarget;
 	bool		mGapped;
 
+	double		mBitScore;
+	double		mExpect;
 	string		mMidline;
 	uint32		mGaps;
 	uint32		mIdentity;
@@ -686,6 +687,12 @@ struct M6Hsp
 	
 	bool		operator<(const M6Hsp& inHsp) const				{ return mScore < inHsp.mScore; }
 	bool		operator>(const M6Hsp& inHsp) const				{ return mScore > inHsp.mScore; }
+	
+	void		CalculateExpect(int64 inSearchSpace, double inLambda, double inLogKappa)
+				{
+					mBitScore = floor((inLambda * mScore - inLogKappa) / kLn2);
+					mExpect = inSearchSpace / pow(2., mBitScore);
+				}
 	
 	bool		Overlaps(const M6Hsp& inOther) const
 				{
@@ -733,17 +740,13 @@ void M6Hsp::CalculateMidline(const string& inUnfilteredQuery, const M6Matrix& in
 xml::node* M6Hsp::ToXML(uint32 inIndex, const M6Matrix& inMatrix, int64 inSearchSpace) const
 {
 //	CalculateMidline(mAlignedQuery, inMatrix, false);
-	
-	double bitScore = floor((inMatrix.GappedLambda() * mScore - log(inMatrix.GappedKappa())) / kLn2);
-	double expect = inSearchSpace / pow(2., bitScore);
-
 	xml::element* result = new xml::element("Hsp");
 	xml::element* child;
 	
 	result->append(child = new xml::element("Hsp_num"));			child->content(boost::lexical_cast<string>(inIndex));
-	result->append(child = new xml::element("Hsp_bit-score"));		child->content(boost::lexical_cast<string>(bitScore));
+	result->append(child = new xml::element("Hsp_bit-score"));		child->content(boost::lexical_cast<string>(mBitScore));
 	result->append(child = new xml::element("Hsp_score"));			child->content(boost::lexical_cast<string>(mScore));
-	result->append(child = new xml::element("Hsp_evalue"));			child->content(boost::lexical_cast<string>(expect));
+	result->append(child = new xml::element("Hsp_evalue"));			child->content(boost::lexical_cast<string>(mExpect));
 	result->append(child = new xml::element("Hsp_query-from"));		child->content(boost::lexical_cast<string>(mQueryStart + 1));
 	result->append(child = new xml::element("Hsp_query-to"));		child->content(boost::lexical_cast<string>(mQueryEnd + 1));
 	
@@ -778,7 +781,7 @@ struct M6Hit
 						mHsps.push_back(inHsp);
 				}
 	
-	void		Cleanup()
+	void		Cleanup(int64 inSearchSpace, double inLambda, double inLogKappa, double inExpect)
 				{
 					sort(mHsps.begin(), mHsps.end(), greater<M6Hsp>());
 					
@@ -795,6 +798,16 @@ struct M6Hit
 						}
 						++a;
 					}
+
+					for_each(mHsps.begin(), mHsps.end(), [=](M6Hsp& hsp) {
+						hsp.CalculateExpect(inSearchSpace, inLambda, inLogKappa);
+					});
+					
+					mHsps.erase(
+						remove_if(mHsps.begin(), mHsps.end(), [=](const M6Hsp& hsp) -> bool {
+							return hsp.mExpect > inExpect;
+						}),
+						mHsps.end());
 				}
 	
 	bool		operator<(const M6Hit& inHit) const
@@ -928,16 +941,16 @@ xml::document* M6BlastQuery<WORDSIZE>::Search(const char* inFasta, size_t inLeng
 			}
 		}
 		
-		hit->Cleanup();
+		hit->Cleanup(mSearchSpace, mMatrix.GappedLambda(), log(mMatrix.GappedKappa()), mExpect);
 	}
+
+	mHits.erase(
+		remove_if(mHits.begin(), mHits.end(), [](const M6Hit* hit) -> bool { return hit->mHsps.empty(); }),
+		mHits.end());
 
 	sort(mHits.begin(), mHits.end(), [](const M6Hit* a, const M6Hit* b) -> bool {
 		return a->mHsps.front().mScore > b->mHsps.front().mScore;
 	});
-
-	mHits.erase(remove_if(mHits.begin(), mHits.end(), [&](const M6Hit* hit) -> bool {
-		return hit->Expect(mSearchSpace, mMatrix.GappedLambda(), log(mMatrix.GappedKappa())) > mExpect;
-	}), mHits.end());
 
 	if (mHits.size() > mReportLimit)
 		mHits.erase(mHits.begin() + mReportLimit, mHits.end());
@@ -1411,7 +1424,10 @@ int32 M6BlastQuery<WORDSIZE>::AlignGappedWithTraceBack(M6Hsp& ioHsp)
 template<int WORDSIZE>
 void M6BlastQuery<WORDSIZE>::AddHit(M6Hit* inHit)
 {
-	inHit->Cleanup();
+	sort(inHit->mHsps.begin(), inHit->mHsps.end(), [](const M6Hsp& a, const M6Hsp& b) -> bool {
+		return a.mScore > b.mScore;
+	});
+
 	mHits.push_back(inHit);
 	
 	auto cmp = [](const M6Hit* a, const M6Hit* b) -> bool {
@@ -1456,6 +1472,12 @@ int main()
 	{
 //		BuildBlastDB();
 		const char kQuery[] = "GSQFGKGKGQLIGVGAGALLGAILGNQIGAGMDEQDRRLAELTSQRALETTPSGTSIEWRNPDNGNYGYVTPSKTYKNST";
+		
+		//int32 score = 0;
+		//for (int i = 0; i < sizeof(kQuery) - 1; ++i)
+		//	score += M6Blast::kM6Blosum62Matrix(kQuery[i], kQuery[i]);
+		//cout << "max score: " << score << endl;
+		
 		M6Blast::QueryBlastDB(fs::path("C:/data/fasta/sprot.fa"), kQuery);
 	}
 	catch (exception& e)

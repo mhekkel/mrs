@@ -228,3 +228,40 @@ BOOST_AUTO_TEST_CASE(test_bit_stream_7)
 	}
 }
 
+BOOST_AUTO_TEST_CASE(test_bit_stream_8)
+{
+	cout << "testing bitstream 8" << endl;
+
+	for (uint32 i = 1; i < 1000; ++i)
+	{
+		cerr << i << endl;
+
+		M6OBitStream bits;
+		
+		for (uint32 j = 0; j < i; ++j)
+			bits << 1;
+		
+		M6OBitStream b2;
+		//CopyBits(b2, bits);
+		swap(b2, bits);
+		
+		M6IBitStream ib1(b2);
+		for (uint32 j = 0; j < i; ++j)
+			BOOST_CHECK_EQUAL(ib1(), 1);
+		BOOST_CHECK_EQUAL(ib1(), 0);
+		
+		M6OBitStream b3;
+		WriteBits(b3, b2);
+		
+		M6IBitStream ib2(b3);
+		M6OBitStream b4;
+		ReadBits(ib2, b4);
+		
+		M6IBitStream ib3(b4);
+		for (uint32 j = 0; j < i; ++j)
+			BOOST_CHECK_EQUAL(ib3(), 1);
+		BOOST_CHECK_EQUAL(ib3(), 0);
+	}
+
+}
+

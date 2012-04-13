@@ -12,8 +12,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\unit-tests\M6TestBitStream.cpp" />
-    <ClCompile Include="..\..\unit-tests\M6TestDatabank.cpp" />
     <ClCompile Include="..\..\unit-tests\M6TestIterators.cpp" />
+    <ClCompile Include="..\..\unit-tests\M6TestLex.cpp" />
     <ClCompile Include="..\..\unit-tests\M6TestMain.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">

@@ -45,11 +45,13 @@ const uint32
 	kM6ResCount				= 23,	// includes X
 	kM6Bits					= 5,
 	kM6Threshold			= 11,
-	kM6HitWindow			= 40,
 	kM6UngappedDropOff		= 7,
 	kM6GappedDropOff		= 15,
 	kM6GappedDropOffFinal	= 25,
-	kM6GapTrigger			= 22,
+	kM6GapTrigger			= 22;
+
+const int32
+	kM6HitWindow			= 40,
 	kM6UnusedDiagonal		= 0xf3f3f3f3;
 
 const double
@@ -946,7 +948,7 @@ M6BlastQuery<WORDSIZE>::M6BlastQuery(const string& inQuery, double inExpect, boo
 	mXg =		static_cast<int32>((kLn2 * kM6GappedDropOff) / mMatrix.GappedLambda());
 	mXgFinal =	static_cast<int32>((kLn2 * kM6GappedDropOffFinal) / mMatrix.GappedLambda());
 	mS1 =		static_cast<int32>((kLn2 * kM6GapTrigger + log(mMatrix.UngappedKappa())) / mMatrix.UngappedLambda());
-	mS2 =		0;	// yeah, that sucks... perhaps
+	mS2 =		static_cast<int32>((kLn2 * kM6GapTrigger + log(mMatrix.GappedKappa())) / mMatrix.GappedLambda());;	// yeah, that sucks... perhaps
 
 	M6WordHitIterator::Init(mQuery, mMatrix, kM6Threshold, mWordHitData);
 }
@@ -1060,9 +1062,10 @@ void M6BlastQuery<WORDSIZE>::SearchPart(const char* inFasta, size_t inLength)
 			int32 m = diagonals[d];
 			
 			int32 distance = queryOffset - m;
+
 			if (m == kM6UnusedDiagonal or distance >= kM6HitWindow)
 				diagonals[d] = queryOffset;
-			else
+			else if (distance > 0)
 			{
 				int32 queryStart = m;
 				int32 targetStart = targetOffset - distance;
@@ -1071,6 +1074,8 @@ void M6BlastQuery<WORDSIZE>::SearchPart(const char* inFasta, size_t inLength)
 				if (targetStart < 0 or queryStart < 0)
 					continue;
 	
+				++extensions;
+				
 				int32 score = Extend(queryStart, target, targetStart, alignmentDistance);
 	
 				if (score >= mS1)
@@ -1081,21 +1086,21 @@ void M6BlastQuery<WORDSIZE>::SearchPart(const char* inFasta, size_t inLength)
 					int32 querySeed = queryStart + alignmentDistance / 2;
 					int32 targetSeed = targetStart + alignmentDistance / 2;
 	
-					if (mGapped and score < mS2)
-					{
-						++gappedAlignmentAttempts;
-	
-						int32 gappedScore = AlignGapped(querySeed, target, targetSeed, mXg);
-	
-						if (gappedScore > score)
-						{
-							++successfulGappedAlignments;
-							score = gappedScore;
-						}
-					}
-					
-					if (score >= mS2)
-					{
+//					if (mGapped and score < mS2)
+//					{
+//						++gappedAlignmentAttempts;
+//	
+//						int32 gappedScore = AlignGapped(querySeed, target, targetSeed, mXg);
+//	
+//						if (gappedScore > score)
+//						{
+//							++successfulGappedAlignments;
+//							score = gappedScore;
+//						}
+//					}
+//					
+//					if (score >= mS2)
+//					{
 						M6Hsp hsp;
 						hsp.mScore = score;
 						hsp.mTarget = target;
@@ -1112,7 +1117,7 @@ void M6BlastQuery<WORDSIZE>::SearchPart(const char* inFasta, size_t inLength)
 							hit.reset(new M6Hit(entry, target.length()));
 	
 						hit->AddHsp(hsp);
-					}
+//					}
 				}
 				
 				diagonals[d] = queryStart + alignmentDistance;
@@ -1122,6 +1127,16 @@ void M6BlastQuery<WORDSIZE>::SearchPart(const char* inFasta, size_t inLength)
 
 	if (hit)
 		AddHit(hit.release());
+
+	cout << "hits to db: " << hitsToDb << endl
+		 << "extensions: " << extensions << endl
+		 << "successful extensions: " << successfulExtensions << endl
+		 << "gapped: " << gappedAlignmentAttempts << endl
+		 << "X1: " << mXu << endl
+		 << "X2: " << mXg << endl
+		 << "X3: " << mXgFinal << endl
+		 << "S1: " << mS1 << endl
+		 << "S2: " << mS2 << endl;
 	
 	// LOCK
 	mDbCount += dbCount;

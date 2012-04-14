@@ -768,17 +768,16 @@ xml::node* M6Hsp::ToXML(uint32 inIndex, const M6Matrix& inMatrix, int64 inSearch
 //	CalculateMidline(mAlignedQuery, inMatrix, false);
 	xml::element* result = new xml::element("Hsp");
 	xml::element* child;
+	
+	auto fmt = [](uint8 rn) -> char {
+		return rn == '-' ? '-' : kM6Residues[rn];
+	};
 
 	string alignedQuery(mAlignedQuery.length(), 0);
-	transform(mAlignedQuery.begin(), mAlignedQuery.end(), alignedQuery.begin(), [](uint8 rn) -> char {
-		return kM6Residues[rn];
-	});
+	transform(mAlignedQuery.begin(), mAlignedQuery.end(), alignedQuery.begin(), fmt);
 
 	string alignedTarget(mAlignedTarget.length(), 0);
-	transform(mAlignedTarget.begin(), mAlignedTarget.end(), alignedTarget.begin(), [](uint8 rn) -> char {
-		return kM6Residues[rn];
-	});
-
+	transform(mAlignedTarget.begin(), mAlignedTarget.end(), alignedTarget.begin(), fmt);
 	
 	result->append(child = new xml::element("Hsp_num"));			child->content(boost::lexical_cast<string>(inIndex));
 	result->append(child = new xml::element("Hsp_bit-score"));		child->content(boost::lexical_cast<string>(mBitScore));
@@ -1112,6 +1111,8 @@ void M6BlastQuery<WORDSIZE>::SearchPart(const char* inFasta, size_t inLength)
 						hsp.mQueryEnd = queryStart + alignmentDistance;
 						hsp.mTargetStart = targetStart;
 						hsp.mTargetEnd = targetStart + alignmentDistance;
+						
+//						hsp.mScore = AlignGappedWithTraceBack(hsp);
 	
 						if (hit.get() == nullptr)
 							hit.reset(new M6Hit(entry, target.length()));
@@ -1513,7 +1514,7 @@ void QueryBlastDB(const fs::path& inFasta, const string& inQuery)
 {
 	io::mapped_file file(inFasta.string().c_str(), io::mapped_file::readonly);
 	if (not file.is_open())
-		throw M6Exception("FastA file %s not open", inFasta.string());
+		throw M6Exception("FastA file %s not open", inFasta.string().c_str());
 	
 	const char* data = file.const_data();
 	size_t length = file.size();
@@ -1536,7 +1537,7 @@ int main()
 	try
 	{
 //		BuildBlastDB();
-		const char kQuery[] = "GSQFGKGKGQLIGVGAGALLGAILGNQIGAGMDEQDRRLAELTSQRALETTPSGTSIEWRNPDNGNYGYVTPSKTYKNST";
+		const char kQuery[] = "MALLKVKFDQKKRVKLAQGLWLMNWLSVLAGIVIFSLGLFLKIELRKRSDVMNNSESHFVPNSLIVMGVLSCVFNSLAGKICYDALDPAKYAKWKPWLKPYLAVCVLFNIALFLVTLCCFLMRGSLESTLAHGLKNGMKYYRDTDTPGRCFMKKTIDMLQIEFRCCGNNGFRDWFEIQWISNRYLDFSSKEVKDRIKSNVDGRYLVDGVPFSCCNPSSPRPCIQYQLTNNSAHYSYDHQTEELNLWVNGCRAALLSYYSSLMNSMGAVTLLVWLFEVTITIGLRYLHTALEGVSNPEDPECESEGWLLEKSVSETWKAFLESLKKLGKSNQVEAEGADAGQAPEAG";
 		
 		//int32 score = 0;
 		//for (int i = 0; i < sizeof(kQuery) - 1; ++i)

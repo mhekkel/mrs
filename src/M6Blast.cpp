@@ -20,6 +20,7 @@
 #include <boost/foreach.hpp>
 #define foreach BOOST_FOREACH
 #include <boost/lexical_cast.hpp>
+#include <boost/timer/timer.hpp>
 
 #include "M6Error.h"
 #include "M6Document.h"
@@ -27,6 +28,7 @@
 #include "M6DataSource.h"
 #include "M6Progress.h"
 #include "M6Iterator.h"
+#include "M6SequenceFilter.h"
 
 using namespace std;
 using namespace zeep;
@@ -39,7 +41,8 @@ namespace ba = boost::algorithm;
 namespace M6Blast {
 
 const uint32
-	kM6AACount				= 22,
+	kM6AACount				= 22,	// 20 + B and Z
+	kM6ResCount				= 23,	// includes X
 	kM6Bits					= 5,
 	kM6Threshold			= 11,
 	kM6HitWindow			= 40,
@@ -55,17 +58,18 @@ const double
 // 22 real letters and 1 dummy
 const char kM6Residues[] = "ABCDEFGHIKLMNPQRSTVWYZX";
 
-inline int ResidueNr(char inAA)
+inline uint8 ResidueNr(char inAA)
 {
-	const static int8 kResidueNrTable[] = {
+	int result = -1;
+
+	const static uint8 kResidueNrTable[] = {
 	//	A   B   C   D   E   F   G   H   I       K   L   M   N       P   Q   R   S   T  U=X  V   W   X   Y   Z
-		0,  1,  2,  3,  4,  5,  6,  7,  8, -1,  9, 10, 11, 12, -1, 13, 14, 15, 16, 17, 22, 18, 19, 22, 20, 21
+		0,  1,  2,  3,  4,  5,  6,  7,  8, 23,  9, 10, 11, 12, 23, 13, 14, 15, 16, 17, 22, 18, 19, 22, 20, 21
 	};
 	
-	inAA &= ~(040);
-	int result = -1;
-	if (inAA >= 'A' and inAA <= 'Z')
-		result = kResidueNrTable[inAA - 'A'];
+	inAA |= 040;
+	if (inAA >= 'a' and inAA <= 'z')
+		result = kResidueNrTable[inAA - 'a'];
 	return result;
 }
 
@@ -115,7 +119,7 @@ class M6Matrix
 					M6Matrix(const M6MatrixData& inData) : mData(inData) {}
 
 	int8			operator()(char inAA1, char inAA2) const;
-//	int8			operator()(uint8 inAA1, uint8 inAA2) const;
+	int8			operator()(uint8 inAA1, uint8 inAA2) const;
 
 	int32			OpenCost() const		{ return mData.mGapOpen; }
 	int32			ExtendCost() const		{ return mData.mGapExtend; }
@@ -136,38 +140,38 @@ class M6Matrix
 	const M6MatrixData&	mData;
 };
 
-//inline int8 M6Matrix::operator()(uint8 inAA1, uint8 inAA2) const
-//{
-////	int result = -4;
-////	
-////	if (inAA1 >= 0 and inAA2 >= 0)
-////	{
-////		if (inAA1 >= inAA2)
-////			result = kM6Blosum62[(inAA1 * (inAA1 + 1)) / 2 + inAA2];
-////		else
-////			result = kM6Blosum62[(inAA2 * (inAA2 + 1)) / 2 + inAA1];
-////	}
-////
-////	return result;	
-//}
-
-inline int8 M6Matrix::operator()(char inAA1, char inAA2) const
+inline int8 M6Matrix::operator()(uint8 inAA1, uint8 inAA2) const
 {
-//	return operator()(ResidueNr(inAA1), ResidueNr(inAA2));
 	int result = -4;
 	
-	int rn1 = ResidueNr(inAA1);
-	int rn2 = ResidueNr(inAA2);
-	
-	if (rn1 >= 0 and rn2 >= 0)
+	if (inAA1 < kM6ResCount and inAA2 < kM6ResCount)
 	{
-		if (rn1 >= rn2)
-			result = kM6Blosum62[(rn1 * (rn1 + 1)) / 2 + rn2];
+		if (inAA1 >= inAA2)
+			result = kM6Blosum62[(inAA1 * (inAA1 + 1)) / 2 + inAA2];
 		else
-			result = kM6Blosum62[(rn2 * (rn2 + 1)) / 2 + rn1];
+			result = kM6Blosum62[(inAA2 * (inAA2 + 1)) / 2 + inAA1];
 	}
 
 	return result;	
+}
+
+inline int8 M6Matrix::operator()(char inAA1, char inAA2) const
+{
+	return operator()(ResidueNr(inAA1), ResidueNr(inAA2));
+//	int result = -4;
+//	
+//	int rn1 = ResidueNr(inAA1);
+//	int rn2 = ResidueNr(inAA2);
+//	
+//	if (rn1 >= 0 and rn2 >= 0)
+//	{
+//		if (rn1 >= rn2)
+//			result = kM6Blosum62[(rn1 * (rn1 + 1)) / 2 + rn2];
+//		else
+//			result = kM6Blosum62[(rn2 * (rn2 + 1)) / 2 + rn1];
+//	}
+//
+//	return result;	
 }
 
 const M6Matrix	kM6Blosum62Matrix(kM6MatrixData[0]);
@@ -323,7 +327,7 @@ struct M6Word
 							aa[i] = 0;
 					}
 
-					M6Word(const char* inSequence)
+					M6Word(const uint8* inSequence)
 					{
 						for (uint32 i = 0; i < WORDSIZE; ++i)
 							aa[i] = inSequence[i];
@@ -331,7 +335,7 @@ struct M6Word
 					}
 
 	uint8&			operator[](uint32 ix)	{ return aa[ix]; }
-	const char*		c_str() const			{ return reinterpret_cast<const char*>(aa); }
+	const uint8*	c_str() const			{ return aa; }
 	size_t			length() const			{ return WORDSIZE; }
 
 	class PermutationIterator
@@ -372,7 +376,7 @@ bool M6Word<WORDSIZE>::PermutationIterator::Next(uint32& outIndex)
 		for (uint32 i = 0; i < WORDSIZE; ++i)
 		{
 			uint32 resNr = ix % kM6AACount;
-			w[i] = kM6Residues[resNr];
+			w[i] = resNr;
 			ix /= kM6AACount;
 			score += mMatrix(mWord[i], w[i]);
 			outIndex = outIndex << kM6Bits | resNr;
@@ -415,18 +419,18 @@ class M6WordHitIterator
 								M6WordHitIterator(WordHitIteratorStaticData& inStaticData)
 									: mLookup(inStaticData.mLookup), mOffsets(inStaticData.mOffsets) {}
 	
-	static void					Init(const char* inQuery, size_t inQueryLength, const M6Matrix& inMatrix,
+	static void					Init(const sequence& inQuery, const M6Matrix& inMatrix,
 									uint32 inThreshhold, WordHitIteratorStaticData& outStaticData);
 
-	void						Reset(const string& inTarget);
+	void						Reset(const sequence& inTarget);
 	bool						Next(uint16& outQueryOffset, uint16& outTargetOffset);
 	uint32						Index() const		{ return mIndex; }
 
   private:
 
-	const char*		mTargetBegin;
-	const char*		mTargetCurrent;
-	const char*		mTargetEnd;
+	const uint8*	mTargetBegin;
+	const uint8*	mTargetCurrent;
+	const uint8*	mTargetEnd;
 	vector<Entry>&	mLookup;
 	vector<uint32>&	mOffsets;
 	uint32			mIndex;
@@ -436,16 +440,16 @@ class M6WordHitIterator
 template<> const uint32 M6WordHitIterator<3>::kMask = 0x03FF;
 
 template<int WORDSIZE>
-void M6WordHitIterator<WORDSIZE>::Init(const char* inQuery, size_t inQueryLength, 
+void M6WordHitIterator<WORDSIZE>::Init(const sequence& inQuery, 
 	const M6Matrix& inMatrix, uint32 inThreshhold, WordHitIteratorStaticData& outStaticData)
 {
 	uint64 N = Word::kM6MaxWordIndex;
 	
 	vector<vector<uint32> > test(N);
 	
-	for (uint32 i = 0; i < inQueryLength - WORDSIZE + 1; ++i)
+	for (uint32 i = 0; i < inQuery.length() - WORDSIZE + 1; ++i)
 	{
-		Word w(inQuery++);
+		Word w(inQuery.c_str() + i);
 		
 		WordPermutationIterator p(w, inMatrix, inThreshhold);
 		uint32 ix;
@@ -481,7 +485,7 @@ void M6WordHitIterator<WORDSIZE>::Init(const char* inQuery, size_t inQueryLength
 }
 
 template<int WORDSIZE>
-void M6WordHitIterator<WORDSIZE>::Reset(const string& inTarget)
+void M6WordHitIterator<WORDSIZE>::Reset(const sequence& inTarget)
 {
 	mTargetBegin = mTargetCurrent = inTarget.c_str();
 	mTargetEnd = mTargetBegin + inTarget.length();
@@ -490,7 +494,7 @@ void M6WordHitIterator<WORDSIZE>::Reset(const string& inTarget)
 	mCurrent.mCount = 0;
 
 	for (uint32 i = 0; i < WORDSIZE - 1 and mTargetCurrent != mTargetEnd; ++i)
-		mIndex = mIndex << kM6Bits | ResidueNr(*mTargetCurrent++);
+		mIndex = mIndex << kM6Bits | *mTargetCurrent++;
 }
 
 template<int WORDSIZE>
@@ -519,7 +523,7 @@ bool M6WordHitIterator<WORDSIZE>::Next(uint16& outQueryOffset, uint16& outTarget
 		if (mTargetCurrent == mTargetEnd)
 			break;
 		
-		mIndex = ((mIndex & kMask) << kM6Bits) | ResidueNr(*mTargetCurrent++);
+		mIndex = ((mIndex & kMask) << kM6Bits) | *mTargetCurrent++;
 		assert(mIndex < mLookup.size());
 		mCurrent = mLookup[mIndex];
 	}
@@ -648,7 +652,7 @@ struct DiscardTraceBack
 
 // --------------------------------------------------------------------
 
-inline void ReadEntry(const char*& inFasta, const char* inEnd, string& outTarget)
+inline void ReadEntry(const char*& inFasta, const char* inEnd, sequence& outTarget)
 {
 	assert(inFasta == inEnd or *inFasta == '>');
 	
@@ -671,8 +675,9 @@ inline void ReadEntry(const char*& inFasta, const char* inEnd, string& outTarget
 		}
 		else
 		{
-			if (ResidueNr(ch) >= 0)
-				outTarget += ch;
+			uint8 rn = ResidueNr(ch);
+			if (rn < kM6ResCount)
+				outTarget += rn;
 			nl = false;
 		}
 	}
@@ -684,15 +689,14 @@ struct M6Hsp
 {
 	uint32		mScore;
 	uint32		mQuerySeed;
-	string		mTarget;
+	sequence	mTarget;
 	uint32		mTargetSeed;
 	uint32		mQueryStart;
 	uint32		mQueryEnd;
 	uint32		mTargetStart;
 	uint32		mTargetEnd;
-	string		mAlignedQuery;
-	string		mAlignedQueryString;
-	string		mAlignedTarget;
+	sequence	mAlignedQuery;
+	sequence	mAlignedTarget;
 	bool		mGapped;
 
 	double		mBitScore;
@@ -729,20 +733,20 @@ struct M6Hsp
 void M6Hsp::CalculateMidline(const string& inUnfilteredQuery, const M6Matrix& inMatrix, bool inFilter)
 {
 	string::const_iterator q = inUnfilteredQuery.begin() + mQueryStart;
-	string::const_iterator t = mAlignedTarget.begin();
-	string::const_iterator e = mAlignedTarget.end();
+	sequence::const_iterator t = mAlignedTarget.begin();
+	sequence::const_iterator e = mAlignedTarget.end();
 	
 	mGaps = mIdentity = mPositive = 0;
 	
 	for (; t != e; ++q, ++t)
 	{
-		if (*q == *t)
+		if (*q == kM6Residues[*t])
 		{
 			++mIdentity;
 			++mPositive;
-			mMidline += *t;
+			mMidline += *q;
 		}
-		else if (inMatrix(*q, *t) > 0)
+		else if (inMatrix(ResidueNr(*q), *t) > 0)
 		{
 			++mPositive;
 			mMidline += '+';
@@ -762,6 +766,17 @@ xml::node* M6Hsp::ToXML(uint32 inIndex, const M6Matrix& inMatrix, int64 inSearch
 //	CalculateMidline(mAlignedQuery, inMatrix, false);
 	xml::element* result = new xml::element("Hsp");
 	xml::element* child;
+
+	string alignedQuery(mAlignedQuery.length(), 0);
+	transform(mAlignedQuery.begin(), mAlignedQuery.end(), alignedQuery.begin(), [](uint8 rn) -> char {
+		return kM6Residues[rn];
+	});
+
+	string alignedTarget(mAlignedTarget.length(), 0);
+	transform(mAlignedTarget.begin(), mAlignedTarget.end(), alignedTarget.begin(), [](uint8 rn) -> char {
+		return kM6Residues[rn];
+	});
+
 	
 	result->append(child = new xml::element("Hsp_num"));			child->content(boost::lexical_cast<string>(inIndex));
 	result->append(child = new xml::element("Hsp_bit-score"));		child->content(boost::lexical_cast<string>(mBitScore));
@@ -770,8 +785,8 @@ xml::node* M6Hsp::ToXML(uint32 inIndex, const M6Matrix& inMatrix, int64 inSearch
 	result->append(child = new xml::element("Hsp_query-from"));		child->content(boost::lexical_cast<string>(mQueryStart + 1));
 	result->append(child = new xml::element("Hsp_query-to"));		child->content(boost::lexical_cast<string>(mQueryEnd));
 	
-	result->append(child = new xml::element("Hsp_qseq"));			child->content(mAlignedQuery);
-	result->append(child = new xml::element("Hsp_hseq"));			child->content(mAlignedTarget);
+	result->append(child = new xml::element("Hsp_qseq"));			child->content(alignedQuery);
+	result->append(child = new xml::element("Hsp_hseq"));			child->content(alignedTarget);
 //	result->append(child = new xml::element("Hsp_midline"));		child->content(mMidline);
 	
 	return result;
@@ -887,8 +902,8 @@ class M6BlastQuery
 
 	void			SearchPart(const char* inFasta, size_t inLength);
 
-	int32			Extend(int32& ioQueryStart, const string& inTarget, int32& ioTargetStart, int32& ioDistance);
-	int32			AlignGapped(uint32 inQuerySeed, const string& inTarget, uint32 inTargetSeed, int32 inDropOff);
+	int32			Extend(int32& ioQueryStart, const sequence& inTarget, int32& ioTargetStart, int32& ioDistance);
+	int32			AlignGapped(uint32 inQuerySeed, const sequence& inTarget, uint32 inTargetSeed, int32 inDropOff);
 	template<class Iterator1, class Iterator2, class TraceBack>
 	int32			AlignGapped(Iterator1 inQueryBegin, Iterator1 inQueryEnd,
 						Iterator2 inTargetBegin, Iterator2 inTargetEnd,
@@ -900,7 +915,7 @@ class M6BlastQuery
 	typedef M6WordHitIterator<WORDSIZE>								M6WordHitIterator;
 	typedef typename M6WordHitIterator::WordHitIteratorStaticData	M6StaticData;
 
-	string			mQuery;
+	sequence		mQuery;
 	M6Matrix		mMatrix;
 	double			mExpect, mCutOff;
 	bool			mGapped;
@@ -917,11 +932,15 @@ class M6BlastQuery
 
 template<int WORDSIZE>
 M6BlastQuery<WORDSIZE>::M6BlastQuery(const string& inQuery, double inExpect, bool inGapped, uint32 inReportLimit)
-	: mQuery(inQuery), mMatrix(kM6Blosum62Matrix), mExpect(inExpect), mGapped(inGapped), mReportLimit(inReportLimit)
+	: mQuery(inQuery.length(), 0), mMatrix(kM6Blosum62Matrix), mExpect(inExpect), mGapped(inGapped), mReportLimit(inReportLimit)
 	, mDbCount(0), mDbLength(0), mSearchSpace(0)
 {
 	if (mQuery.length() >= numeric_limits<uint16>::max())
 		throw M6Exception("Query length exceeds maximum");
+	
+	transform(inQuery.begin(), inQuery.end(), mQuery.begin(), [](char aa) -> uint8 {
+		return ResidueNr(aa); 
+	});
 	
 	mXu =		static_cast<int32>(ceil((kLn2 * kM6UngappedDropOff) / mMatrix.UngappedLambda()));
 	mXg =		static_cast<int32>((kLn2 * kM6GappedDropOff) / mMatrix.GappedLambda());
@@ -929,12 +948,14 @@ M6BlastQuery<WORDSIZE>::M6BlastQuery(const string& inQuery, double inExpect, boo
 	mS1 =		static_cast<int32>((kLn2 * kM6GapTrigger + log(mMatrix.UngappedKappa())) / mMatrix.UngappedLambda());
 	mS2 =		0;	// yeah, that sucks... perhaps
 
-	M6WordHitIterator::Init(mQuery.c_str(), mQuery.length(), mMatrix, kM6Threshold, mWordHitData);
+	M6WordHitIterator::Init(mQuery, mMatrix, kM6Threshold, mWordHitData);
 }
 
 template<int WORDSIZE>
 xml::document* M6BlastQuery<WORDSIZE>::Search(const char* inFasta, size_t inLength)
 {
+	boost::timer::auto_cpu_timer t;
+
 	SearchPart(inFasta, inLength);
 	
 	int32 lengthAdjustment = ncbi::BlastComputeLengthAdjustment(mMatrix, static_cast<uint32>(mQuery.length()), mDbLength, mDbCount);
@@ -996,6 +1017,8 @@ xml::document* M6BlastQuery<WORDSIZE>::Search(const char* inFasta, size_t inLeng
 template<int WORDSIZE>
 void M6BlastQuery<WORDSIZE>::SearchPart(const char* inFasta, size_t inLength)
 {
+	boost::timer::auto_cpu_timer t;
+
 	size_t offset = 0;
 	while (*inFasta != '>')		// skip over 'header'
 		++offset, ++inFasta, --inLength;
@@ -1004,7 +1027,7 @@ void M6BlastQuery<WORDSIZE>::SearchPart(const char* inFasta, size_t inLength)
 	
 	M6WordHitIterator iter(mWordHitData);
 	M6DiagonalStartTable diagonals;
-	string target;
+	sequence target;
 	
 	int64 hitsToDb = 0, extensions = 0, successfulExtensions = 0, gappedAlignmentAttempts = 0, successfulGappedAlignments = 0,
 		dbLength = 0;
@@ -1106,18 +1129,18 @@ void M6BlastQuery<WORDSIZE>::SearchPart(const char* inFasta, size_t inLength)
 }
 
 template<int WORDSIZE>
-int32 M6BlastQuery<WORDSIZE>::Extend(int32& ioQueryStart, const string& inTarget, int32& ioTargetStart, int32& ioDistance)
+int32 M6BlastQuery<WORDSIZE>::Extend(int32& ioQueryStart, const sequence& inTarget, int32& ioTargetStart, int32& ioDistance)
 {
 	// use iterators
-	string::const_iterator ai = mQuery.begin() + ioQueryStart;
-	string::const_iterator bi = inTarget.begin() + ioTargetStart;
+	sequence::const_iterator ai = mQuery.begin() + ioQueryStart;
+	sequence::const_iterator bi = inTarget.begin() + ioTargetStart;
 	
 	int32 score = 0;
 	for (int i = 0; i < ioDistance; ++i, ++ai, ++bi)
 		score += mMatrix(*ai, *bi);
 	
 	// record start and stop positions for optimal score
-	string::const_iterator qe = ai;
+	sequence::const_iterator qe = ai;
 	
 	for (int32 test = score, n = static_cast<int32>(min(mQuery.end() - ai, inTarget.end() - bi));
 		 test >= score - mXu and n > 0;
@@ -1134,7 +1157,7 @@ int32 M6BlastQuery<WORDSIZE>::Extend(int32& ioQueryStart, const string& inTarget
 	
 	ai = mQuery.begin() + ioQueryStart;
 	bi = inTarget.begin() + ioTargetStart;
-	string::const_iterator qs = ai + 1;
+	sequence::const_iterator qs = ai + 1;
 
 	for (int32 test = score, n = min(ioQueryStart, ioTargetStart);
 		 test >= score - mXu and n > 0;
@@ -1158,7 +1181,7 @@ int32 M6BlastQuery<WORDSIZE>::Extend(int32& ioQueryStart, const string& inTarget
 }
 
 template<int WORDSIZE>
-int32 M6BlastQuery<WORDSIZE>::AlignGapped(uint32 inQuerySeed, const string& inTarget, uint32 inTargetSeed, int32 inDropOff)
+int32 M6BlastQuery<WORDSIZE>::AlignGapped(uint32 inQuerySeed, const sequence& inTarget, uint32 inTargetSeed, int32 inDropOff)
 {
 	int32 score;
 	
@@ -1340,8 +1363,8 @@ int32 M6BlastQuery<WORDSIZE>::AlignGappedWithTraceBack(M6Hsp& ioHsp)
 	
 	ioHsp.mGapped = false;
 
-	string alignedQuery;
-	string alignedTarget;
+	sequence alignedQuery;
+	sequence alignedTarget;
 
 	// start with the part before the seed
 	Data d1(ioHsp.mQuerySeed + 1, ioHsp.mTargetSeed + 1);
@@ -1354,8 +1377,8 @@ int32 M6BlastQuery<WORDSIZE>::AlignGappedWithTraceBack(M6Hsp& ioHsp)
 	ioHsp.mQueryStart = ioHsp.mQuerySeed - x;
 	ioHsp.mTargetStart = ioHsp.mTargetSeed - y;
 	
-	string::const_iterator qi = mQuery.begin() + ioHsp.mQuerySeed - x, qis = qi;
-	string::const_iterator si = ioHsp.mTarget.begin() + ioHsp.mTargetSeed - y, sis = si;
+	sequence::const_iterator qi = mQuery.begin() + ioHsp.mQuerySeed - x, qis = qi;
+	sequence::const_iterator si = ioHsp.mTarget.begin() + ioHsp.mTargetSeed - y, sis = si;
 	
 	uint32 qLen = 1;
 	uint32 sLen = 1;
@@ -1402,10 +1425,10 @@ int32 M6BlastQuery<WORDSIZE>::AlignGappedWithTraceBack(M6Hsp& ioHsp)
 		ioHsp.mTarget.begin() + ioHsp.mTargetSeed + 1, ioHsp.mTarget.end(),
 		tba, mXgFinal, x, y);
 
-	string::const_reverse_iterator qri = mQuery.rbegin() + (mQuery.length() - ioHsp.mQuerySeed) - 1 - x, qris = qri;
-	string::const_reverse_iterator sri = ioHsp.mTarget.rbegin() + (ioHsp.mTarget.length() - ioHsp.mTargetSeed) - 1 - y, sris = sri;
+	sequence::const_reverse_iterator qri = mQuery.rbegin() + (mQuery.length() - ioHsp.mQuerySeed) - 1 - x, qris = qri;
+	sequence::const_reverse_iterator sri = ioHsp.mTarget.rbegin() + (ioHsp.mTarget.length() - ioHsp.mTargetSeed) - 1 - y, sris = sri;
 	
-	string q, s;
+	sequence q, s;
 	
 	while (x >= 1 and y >= 1)
 	{
@@ -1441,8 +1464,8 @@ int32 M6BlastQuery<WORDSIZE>::AlignGappedWithTraceBack(M6Hsp& ioHsp)
 	qLen += static_cast<uint32>(qri - qris);
 	sLen += static_cast<uint32>(sri - sris);
 	
-	ioHsp.mAlignedQuery = string(alignedQuery.begin(), alignedQuery.end());
-	ioHsp.mAlignedTarget = string(alignedTarget.begin(), alignedTarget.end());
+	ioHsp.mAlignedQuery = sequence(alignedQuery.begin(), alignedQuery.end());
+	ioHsp.mAlignedTarget = sequence(alignedTarget.begin(), alignedTarget.end());
 	ioHsp.mQueryEnd = ioHsp.mQueryStart + qLen;
 	ioHsp.mTargetEnd = ioHsp.mTargetStart + sLen;
 	
@@ -1504,9 +1527,11 @@ int main()
 		//for (int i = 0; i < sizeof(kQuery) - 1; ++i)
 		//	score += M6Blast::kM6Blosum62Matrix(kQuery[i], kQuery[i]);
 		//cout << "max score: " << score << endl;
+
+		string query = SEG(kQuery);
 		
 		//M6Blast::QueryBlastDB(fs::path("C:/data/fasta/sprot.fa"), kQuery);
-		M6Blast::QueryBlastDB(fs::path("C:/data/fasta/uniprot_sprot.fasta"), kQuery);
+		M6Blast::QueryBlastDB(fs::path("C:/data/fasta/uniprot_sprot.fasta"), query);
 	}
 	catch (exception& e)
 	{

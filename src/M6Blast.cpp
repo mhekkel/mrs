@@ -8,12 +8,6 @@
 #include <boost/filesystem/fstream.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/fstream.hpp>
-#include <boost/iostreams/device/back_inserter.hpp>
-#include <boost/iostreams/filtering_stream.hpp>
-#include <boost/iostreams/copy.hpp>
-#include <boost/iostreams/filter/zlib.hpp>
-#include <boost/iostreams/filter/bzip2.hpp>
-#include <boost/iostreams/filter/gzip.hpp>
 #include <boost/iostreams/device/mapped_file.hpp>
 #include <boost/regex.hpp>
 #include <boost/algorithm/string.hpp>
@@ -22,12 +16,9 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/timer/timer.hpp>
 
+#include "M6Blast.h"
 #include "M6Error.h"
-#include "M6Document.h"
-#include "M6Databank.h"
-#include "M6DataSource.h"
 #include "M6Progress.h"
-#include "M6Iterator.h"
 #include "M6SequenceFilter.h"
 
 using namespace std;
@@ -38,7 +29,10 @@ namespace ba = boost::algorithm;
 
 // --------------------------------------------------------------------
 
-namespace M6Blast {
+namespace M6Blast
+{
+
+typedef basic_string<uint8> sequence;
 
 const uint32
 	kM6AACount				= 22,	// 20 + B and Z
@@ -75,8 +69,6 @@ inline uint8 ResidueNr(char inAA)
 	return result;
 }
 
-typedef basic_string<uint8>	sequence;
-
 const int8 kM6Blosum62[] = {
 	  4,                                                                                                               // A
 	 -2,   4,                                                                                                          // B
@@ -105,11 +97,12 @@ const int8 kM6Blosum62[] = {
 
 struct M6MatrixData
 {
-	const int8*	mMatrix;
+	const char*	mName;
 	int8		mGapOpen, mGapExtend;
+	const int8*	mMatrix;
 	double		mGappedStats[5], mUngappedStats[5];
 } kM6MatrixData[] = {
-	{ kM6Blosum62, 11, 1, { 0.267, 0.041, 0.14, 1.9, -30 }, { 0.3176, 0.134, 0.4012, 0.7916, -3.2 } }
+	{ "BLOSUM62", 11, 1, kM6Blosum62, { 0.267, 0.041, 0.14, 1.9, -30 }, { 0.3176, 0.134, 0.4012, 0.7916, -3.2 } }
 };
 
 const int16
@@ -118,7 +111,8 @@ const int16
 class M6Matrix
 {
   public:
-					M6Matrix(const M6MatrixData& inData) : mData(inData) {}
+//					M6Matrix(const M6MatrixData& inData) : mData(inData) {}
+					M6Matrix(const string& inName, int32 inGapOpen, int32 inGapExtend);
 
 	int8			operator()(char inAA1, char inAA2) const;
 	int8			operator()(uint8 inAA1, uint8 inAA2) const;
@@ -139,8 +133,26 @@ class M6Matrix
 	double			UngappedBeta() const	{ return mData.mUngappedStats[4]; }
 
   private:
-	const M6MatrixData&	mData;
+	M6MatrixData	mData;
 };
+
+M6Matrix::M6Matrix(const string& inName, int32 inGapOpen, int32 inGapExtend)
+{
+	mData.mName = nullptr;
+	for (int i = 0; i < sizeof(kM6MatrixData) / sizeof(M6MatrixData); ++i)
+	{
+		if (ba::iequals(inName, kM6MatrixData[i].mName) and
+			inGapOpen == kM6MatrixData[i].mGapOpen and
+			inGapExtend == kM6MatrixData[i].mGapExtend)
+		{
+			mData = kM6MatrixData[i];
+			break;
+		}
+	}
+	
+	if (mData.mName == nullptr)
+		throw M6Exception("Unsupported matrix/gap combination (%s/%d/%d)", inName.c_str(), inGapOpen, inGapExtend);
+}
 
 inline int8 M6Matrix::operator()(uint8 inAA1, uint8 inAA2) const
 {
@@ -161,8 +173,6 @@ inline int8 M6Matrix::operator()(char inAA1, char inAA2) const
 {
 	return operator()(ResidueNr(inAA1), ResidueNr(inAA2));
 }
-
-const M6Matrix	kM6Blosum62Matrix(kM6MatrixData[0]);
 
 // --------------------------------------------------------------------
 
@@ -393,19 +403,19 @@ class M6WordHitIterator
 
   public:
 
-	typedef M6Word<WORDSIZE>					Word;
-	typedef typename Word::PermutationIterator	WordPermutationIterator;
+	typedef M6Word<WORDSIZE>						M6Word;
+	typedef typename M6Word::PermutationIterator	M6WordPermutationIterator;
 
-	struct WordHitIteratorStaticData
+	struct M6WordHitIteratorStaticData
 	{
 		vector<Entry>			mLookup;
 		vector<uint16>			mOffsets;
 	};
-								M6WordHitIterator(WordHitIteratorStaticData& inStaticData)
+								M6WordHitIterator(M6WordHitIteratorStaticData& inStaticData)
 									: mLookup(inStaticData.mLookup), mOffsets(inStaticData.mOffsets) {}
 	
 	static void					Init(const sequence& inQuery, const M6Matrix& inMatrix,
-									uint32 inThreshhold, WordHitIteratorStaticData& outStaticData);
+									uint32 inThreshhold, M6WordHitIteratorStaticData& outStaticData);
 
 	void						Reset(const sequence& inTarget);
 	bool						Next(uint16& outQueryOffset, uint16& outTargetOffset);
@@ -426,18 +436,18 @@ template<> const uint32 M6WordHitIterator<3>::kMask = 0x03FF;
 
 template<int WORDSIZE>
 void M6WordHitIterator<WORDSIZE>::Init(const sequence& inQuery, 
-	const M6Matrix& inMatrix, uint32 inThreshhold, WordHitIteratorStaticData& outStaticData)
+	const M6Matrix& inMatrix, uint32 inThreshhold, M6WordHitIteratorStaticData& outStaticData)
 {
-	uint64 N = Word::kM6MaxWordIndex;
+	uint64 N = M6Word::kM6MaxWordIndex;
 	size_t M = 0;
 	
 	vector<vector<uint16>> test(N);
 	
 	for (uint16 i = 0; i < inQuery.length() - WORDSIZE + 1; ++i)
 	{
-		Word w(inQuery.c_str() + i);
+		M6Word w(inQuery.c_str() + i);
 		
-		WordPermutationIterator p(w, inMatrix, inThreshhold);
+		M6WordPermutationIterator p(w, inMatrix, inThreshhold);
 		uint32 ix;
 
 		while (p.Next(ix))
@@ -652,199 +662,139 @@ inline void ReadEntry(const char*& inFasta, const char* inEnd, sequence& outTarg
 struct M6Hsp
 {
 	uint32		mScore;
-	sequence	mTarget;
-	uint32		mQueryStart;
-	uint32		mQueryEnd;
-	uint32		mTargetStart;
-	uint32		mTargetEnd;
-	sequence	mAlignedQuery;
-	sequence	mAlignedTarget;
-	bool		mGapped;
-
+	uint32		mQueryStart, mQueryEnd, mTargetStart, mTargetEnd;
+	sequence	mAlignedQuery, mAlignedTarget;
 	double		mBitScore;
 	double		mExpect;
-	string		mMidline;
-	uint32		mGaps;
-	uint32		mIdentity;
-	uint32		mPositive;
-	
-	bool		operator<(const M6Hsp& inHsp) const				{ return mScore < inHsp.mScore; }
+	bool		mGapped;
+
 	bool		operator>(const M6Hsp& inHsp) const				{ return mScore > inHsp.mScore; }
-	
-	void		CalculateExpect(int64 inSearchSpace, double inLambda, double inLogKappa)
-				{
-					mBitScore = floor((inLambda * mScore - inLogKappa) / kLn2);
-					mExpect = inSearchSpace / pow(2., mBitScore);
-				}
-	
+	void		CalculateExpect(int64 inSearchSpace, double inLambda, double inLogKappa);
 	bool		Overlaps(const M6Hsp& inOther) const
 				{
 					return
 						mQueryEnd >= inOther.mQueryStart and mQueryStart <= inOther.mQueryEnd and
 						mTargetEnd >= inOther.mTargetStart and mTargetStart <= inOther.mTargetEnd;
 				}
-
-	void		CalculateMidline(const string& inUnfilteredQuery, const M6Matrix& inMatrix, bool inFilter);
-	
-	xml::node*	ToXML(uint32 inIndex, const M6Matrix& inMatrix, int64 inSearchSpace) const;
 };
 
-void M6Hsp::CalculateMidline(const string& inUnfilteredQuery, const M6Matrix& inMatrix, bool inFilter)
+void M6Hsp::CalculateExpect(int64 inSearchSpace, double inLambda, double inLogKappa)
 {
-	string::const_iterator q = inUnfilteredQuery.begin() + mQueryStart;
-	sequence::const_iterator t = mAlignedTarget.begin();
-	sequence::const_iterator e = mAlignedTarget.end();
-	
-	mGaps = mIdentity = mPositive = 0;
-	
-	for (; t != e; ++q, ++t)
-	{
-		if (*q == kM6Residues[*t])
-		{
-			++mIdentity;
-			++mPositive;
-			mMidline += *q;
-		}
-		else if (inMatrix(ResidueNr(*q), *t) > 0)
-		{
-			++mPositive;
-			mMidline += '+';
-		}
-		else
-		{
-			if (*q == '-' or *t == '-')
-				++mGaps;
-				
-			mMidline += ' ';
-		}
-	}
+	mBitScore = floor((inLambda * mScore - inLogKappa) / kLn2);
+	mExpect = inSearchSpace / pow(2., mBitScore);
 }
 
-xml::node* M6Hsp::ToXML(uint32 inIndex, const M6Matrix& inMatrix, int64 inSearchSpace) const
-{
-//	CalculateMidline(mAlignedQuery, inMatrix, false);
-	xml::element* result = new xml::element("Hsp");
-	xml::element* child;
-	
-	auto fmt = [](uint8 rn) -> char {
-		return rn == '-' ? '-' : kM6Residues[rn];
-	};
-
-	string alignedQuery(mAlignedQuery.length(), 0);
-	transform(mAlignedQuery.begin(), mAlignedQuery.end(), alignedQuery.begin(), fmt);
-
-	string alignedTarget(mAlignedTarget.length(), 0);
-	transform(mAlignedTarget.begin(), mAlignedTarget.end(), alignedTarget.begin(), fmt);
-	
-	result->append(child = new xml::element("Hsp_num"));			child->content(boost::lexical_cast<string>(inIndex));
-	result->append(child = new xml::element("Hsp_bit-score"));		child->content(boost::lexical_cast<string>(mBitScore));
-	result->append(child = new xml::element("Hsp_score"));			child->content(boost::lexical_cast<string>(mScore));
-	result->append(child = new xml::element("Hsp_evalue"));			child->content(boost::lexical_cast<string>(mExpect));
-	result->append(child = new xml::element("Hsp_query-from"));		child->content(boost::lexical_cast<string>(mQueryStart + 1));
-	result->append(child = new xml::element("Hsp_query-to"));		child->content(boost::lexical_cast<string>(mQueryEnd));
-	
-	result->append(child = new xml::element("Hsp_qseq"));			child->content(alignedQuery);
-	result->append(child = new xml::element("Hsp_hseq"));			child->content(alignedTarget);
-//	result->append(child = new xml::element("Hsp_midline"));		child->content(mMidline);
-	
-	return result;
-}
+//xml::node* M6Hsp::ToXML(uint32 inIndex, const M6Matrix& inMatrix, int64 inSearchSpace) const
+//{
+////	CalculateMidline(mAlignedQuery, inMatrix, false);
+//	xml::element* result = new xml::element("Hsp");
+//	xml::element* child;
+//	
+//	auto fmt = [](uint8 rn) -> char {
+//		return rn == '-' ? '-' : kM6Residues[rn];
+//	};
+//
+//	string alignedQuery(mAlignedQuery.length(), 0);
+//	transform(mAlignedQuery.begin(), mAlignedQuery.end(), alignedQuery.begin(), fmt);
+//
+//	string alignedTarget(mAlignedTarget.length(), 0);
+//	transform(mAlignedTarget.begin(), mAlignedTarget.end(), alignedTarget.begin(), fmt);
+//	
+//	result->append(child = new xml::element("Hsp_num"));			child->content(boost::lexical_cast<string>(inIndex));
+//	result->append(child = new xml::element("Hsp_bit-score"));		child->content(boost::lexical_cast<string>(mBitScore));
+//	result->append(child = new xml::element("Hsp_score"));			child->content(boost::lexical_cast<string>(mScore));
+//	result->append(child = new xml::element("Hsp_evalue"));			child->content(boost::lexical_cast<string>(mExpect));
+//	result->append(child = new xml::element("Hsp_query-from"));		child->content(boost::lexical_cast<string>(mQueryStart + 1));
+//	result->append(child = new xml::element("Hsp_query-to"));		child->content(boost::lexical_cast<string>(mQueryEnd));
+//	
+//	result->append(child = new xml::element("Hsp_qseq"));			child->content(alignedQuery);
+//	result->append(child = new xml::element("Hsp_hseq"));			child->content(alignedTarget);
+////	result->append(child = new xml::element("Hsp_midline"));		child->content(mMidline);
+//	
+//	return result;
+//}
 
 struct M6Hit
 {
-				M6Hit(const char* inEntry, size_t inTargetLength)
-					: mEntry(inEntry), mTargetLength(inTargetLength) {}
+					M6Hit(const char* inEntry, const sequence& inTarget)
+						: mEntry(inEntry), mTarget(inTarget) {}
 
-	void		AddHsp(const M6Hsp& inHsp)
-				{
-					bool found = false;
-			
-					foreach (auto& hsp, mHsps)
-					{
-						if (inHsp.Overlaps(hsp))
-						{
-							if (hsp.mScore < inHsp.mScore)
-								hsp = inHsp;
-							found = true;
-							break;
-						}
-					}
-			
-					if (not found)
-						mHsps.push_back(inHsp);
-				}
-	
-	void		Cleanup(int64 inSearchSpace, double inLambda, double inLogKappa, double inExpect)
-				{
-					sort(mHsps.begin(), mHsps.end(), greater<M6Hsp>());
-					
-					vector<M6Hsp>::iterator a = mHsps.begin();
-					while (a != mHsps.end() and a + 1 != mHsps.end())
-					{
-						vector<M6Hsp>::iterator b = a + 1;
-						while (b != mHsps.end())
-						{
-							if (a->Overlaps(*b))
-								b = mHsps.erase(b);
-							else
-								++b;
-						}
-						++a;
-					}
+	void			AddHsp(const M6Hsp& inHsp);
+	void			Cleanup(int64 inSearchSpace, double inLambda, double inLogKappa, double inExpect);
 
-					for_each(mHsps.begin(), mHsps.end(), [=](M6Hsp& hsp) {
-						hsp.CalculateExpect(inSearchSpace, inLambda, inLogKappa);
-					});
-					
-					mHsps.erase(
-						remove_if(mHsps.begin(), mHsps.end(), [=](const M6Hsp& hsp) -> bool {
-							return hsp.mExpect > inExpect;
-						}),
-						mHsps.end());
-				}
-	
-	bool		operator<(const M6Hit& inHit) const
-				{
-					return mEntry < inHit.mEntry or
-						(mEntry == inHit.mEntry and mHsps.front().mScore < inHit.mHsps.front().mScore);
-				}
-
-	double		Expect(int64 inSearchSpace, double inLambda, double inKappa) const
-				{
-					double result = numeric_limits<double>::max();
-					if (not mHsps.empty())
-					{
-						double bitScore = floor((inLambda * mHsps.front().mScore - inKappa) / kLn2);
-						result = inSearchSpace / pow(2., bitScore);
-					}
-					return result;
-				}
-
-	xml::node*	ToXML(uint32 inIndex, const M6Matrix& inMatrix, int64 inSearchSpace) const;
+//	xml::node*		ToXML(uint32 inIndex, const M6Matrix& inMatrix, int64 inSearchSpace) const;
 	
 	const char*		mEntry;
-	size_t			mTargetLength;
+	sequence		mTarget;
 	vector<M6Hsp>	mHsps;
 };
 
-xml::node* M6Hit::ToXML(uint32 inIndex, const M6Matrix& inMatrix, int64 inSearchSpace) const
+void M6Hit::AddHsp(const M6Hsp& inHsp)
 {
-	xml::element* result = new xml::element("Hit");
-	xml::element* child;
-	
-	result->append(child = new xml::element("Hit_num"));	child->content(boost::lexical_cast<string>(inIndex));
+	bool found = false;
 
-	string def(mEntry, strchr(mEntry, '\n'));
-	result->append(child = new xml::element("Hit_def"));	child->content(def);
-	result->append(child = new xml::element("Hit_len"));	child->content(boost::lexical_cast<string>(mTargetLength));
-	result->append(child = new xml::element("Hit_hsps"));
-	
-	int nr = 1;
 	foreach (auto& hsp, mHsps)
-		child->append(hsp.ToXML(nr++, inMatrix, inSearchSpace));
-	
-	return result;
+	{
+		if (inHsp.Overlaps(hsp))
+		{
+			if (hsp.mScore < inHsp.mScore)
+				hsp = inHsp;
+			found = true;
+			break;
+		}
+	}
+
+	if (not found)
+		mHsps.push_back(inHsp);
 }
+
+void M6Hit::Cleanup(int64 inSearchSpace, double inLambda, double inLogKappa, double inExpect)
+{
+	sort(mHsps.begin(), mHsps.end(), greater<M6Hsp>());
+	
+	vector<M6Hsp>::iterator a = mHsps.begin();
+	while (a != mHsps.end() and a + 1 != mHsps.end())
+	{
+		vector<M6Hsp>::iterator b = a + 1;
+		while (b != mHsps.end())
+		{
+			if (a->Overlaps(*b))
+				b = mHsps.erase(b);
+			else
+				++b;
+		}
+		++a;
+	}
+
+	for_each(mHsps.begin(), mHsps.end(), [=](M6Hsp& hsp) {
+		hsp.CalculateExpect(inSearchSpace, inLambda, inLogKappa);
+	});
+	
+	mHsps.erase(
+		remove_if(mHsps.begin(), mHsps.end(), [=](const M6Hsp& hsp) -> bool {
+			return hsp.mExpect > inExpect;
+		}),
+		mHsps.end());
+}
+
+//xml::node* M6Hit::ToXML(uint32 inIndex, const M6Matrix& inMatrix, int64 inSearchSpace) const
+//{
+//	xml::element* result = new xml::element("Hit");
+//	xml::element* child;
+//	
+//	result->append(child = new xml::element("Hit_num"));	child->content(boost::lexical_cast<string>(inIndex));
+//
+//	string def(mEntry, strchr(mEntry, '\n'));
+//	result->append(child = new xml::element("Hit_def"));	child->content(def);
+//	result->append(child = new xml::element("Hit_len"));	child->content(boost::lexical_cast<string>(mTargetLength));
+//	result->append(child = new xml::element("Hit_hsps"));
+//	
+//	int nr = 1;
+//	foreach (auto& hsp, mHsps)
+//		child->append(hsp.ToXML(nr++, inMatrix, inSearchSpace));
+//	
+//	return result;
+//}
 
 // --------------------------------------------------------------------
 
@@ -852,9 +802,11 @@ template<int WORDSIZE>
 class M6BlastQuery
 {
   public:
-					M6BlastQuery(const string& inQuery, double inExpect, bool inGapped, uint32 inReportLimit);
+					M6BlastQuery(const string& inQuery, bool inFilter, double inExpect,
+						bool inGapped, const M6Matrix& inMatrix, uint32 inReportLimit);
 
-	xml::document*	Search(const char* inFasta, size_t inLength);
+	void			Search(const char* inFasta, size_t inLength);
+	void			Report(Result& outResult);
 
   private:
 
@@ -865,15 +817,16 @@ class M6BlastQuery
 	int32			AlignGapped(Iterator1 inQueryBegin, Iterator1 inQueryEnd,
 						Iterator2 inTargetBegin, Iterator2 inTargetEnd,
 						TraceBack& inTraceBack, int32 inDropOff, uint32& outBestX, uint32& outBestY);
-	int32			AlignGapped(M6Hsp& ioHsp);
+	int32			AlignGapped(const sequence& inTarget, M6Hsp& ioHsp);
 
 	void			AddHit(M6Hit* inHit);
 
 	typedef M6WordHitIterator<WORDSIZE>								M6WordHitIterator;
-	typedef typename M6WordHitIterator::WordHitIteratorStaticData	M6StaticData;
+	typedef typename M6WordHitIterator::M6WordHitIteratorStaticData	M6StaticData;
 
+	string			mUnfiltered;
 	sequence		mQuery;
-	M6Matrix		mMatrix;
+	const M6Matrix&	mMatrix;
 	double			mExpect, mCutOff;
 	bool			mGapped;
 	int32			mS1, mS2, mXu, mXg, mXgFinal;
@@ -888,14 +841,19 @@ class M6BlastQuery
 };
 
 template<int WORDSIZE>
-M6BlastQuery<WORDSIZE>::M6BlastQuery(const string& inQuery, double inExpect, bool inGapped, uint32 inReportLimit)
-	: mQuery(inQuery.length(), 0), mMatrix(kM6Blosum62Matrix), mExpect(inExpect), mGapped(inGapped), mReportLimit(inReportLimit)
+M6BlastQuery<WORDSIZE>::M6BlastQuery(const string& inQuery, bool inFilter, double inExpect,
+		bool inGapped, const M6Matrix& inMatrix, uint32 inReportLimit)
+	: mUnfiltered(inQuery), mQuery(inQuery.length(), 0), mMatrix(inMatrix), mExpect(inExpect), mGapped(inGapped), mReportLimit(inReportLimit)
 	, mDbCount(0), mDbLength(0), mSearchSpace(0)
 {
 	if (mQuery.length() >= numeric_limits<uint16>::max())
 		throw M6Exception("Query length exceeds maximum");
 	
-	transform(inQuery.begin(), inQuery.end(), mQuery.begin(), [](char aa) -> uint8 {
+	string query(inQuery);
+	if (inFilter)
+		SEG(query);
+	
+	transform(query.begin(), query.end(), mQuery.begin(), [](char aa) -> uint8 {
 		return ResidueNr(aa); 
 	});
 	
@@ -911,7 +869,7 @@ M6BlastQuery<WORDSIZE>::M6BlastQuery(const string& inQuery, double inExpect, boo
 }
 
 template<int WORDSIZE>
-xml::document* M6BlastQuery<WORDSIZE>::Search(const char* inFasta, size_t inLength)
+void M6BlastQuery<WORDSIZE>::Search(const char* inFasta, size_t inLength)
 {
 	boost::timer::auto_cpu_timer t;
 
@@ -930,7 +888,7 @@ xml::document* M6BlastQuery<WORDSIZE>::Search(const char* inFasta, size_t inLeng
 		{
 			if (mGapped)
 			{
-				uint32 newScore = AlignGapped(hsp);
+				uint32 newScore = AlignGapped(hit->mTarget, hsp);
 				assert(hsp.mAlignedQuery.length() == hsp.mAlignedTarget.length());
 				
 				if (hsp.mScore < newScore)
@@ -939,11 +897,11 @@ xml::document* M6BlastQuery<WORDSIZE>::Search(const char* inFasta, size_t inLeng
 //				if (hsp.mGapped)
 //					++mGapCount;
 			}
-			else
-			{
-				hsp.mAlignedQuery = mQuery.substr(hsp.mQueryStart, hsp.mQueryEnd - hsp.mQueryStart);
-				hsp.mAlignedTarget = hsp.mTarget.substr(hsp.mTargetStart, hsp.mTargetEnd - hsp.mTargetStart);
-			}
+			//else
+			//{
+			//	hsp.mAlignedQuery = mQuery.substr(hsp.mQueryStart, hsp.mQueryEnd - hsp.mQueryStart);
+			//	hsp.mAlignedTarget = hsp.mTarget.substr(hsp.mTargetStart, hsp.mTargetEnd - hsp.mTargetStart);
+			//}
 		}
 		
 		hit->Cleanup(mSearchSpace, mMatrix.GappedLambda(), log(mMatrix.GappedKappa()), mExpect);
@@ -962,15 +920,73 @@ xml::document* M6BlastQuery<WORDSIZE>::Search(const char* inFasta, size_t inLeng
 		for_each(mHits.begin() + mReportLimit, mHits.end(), [](M6Hit* hit) { delete hit; });
 		mHits.erase(mHits.begin() + mReportLimit, mHits.end());
 	}
+}
 
-	xml::document* doc = new xml::document;
-	xml::element* hits = new xml::element("Hits");
-	doc->child(hits);
+template<int WORDSIZE>
+void M6BlastQuery<WORDSIZE>::Report(Result& outResult)
+{
+	outResult.mDbCount = mDbCount;
+	outResult.mDbLength = mDbLength;
+	outResult.mEffectiveSpace = mSearchSpace;
+	outResult.mKappa = mMatrix.GappedKappa();
+	outResult.mLambda = mMatrix.GappedLambda();
+	outResult.mEntropy = mMatrix.GappedEntropy();
+	
+	foreach (M6Hit* hit, mHits)
+	{
+		Hit h;
+		static const boost::regex re("^>(\\w+)((?:\\|([^|]*))?(?:\\|([^|]+))?(?:\\|([^|]+))?(?:\\|([^|]+))?) (.+)");
+		boost::smatch m;
+		h.mDefLine = string(hit->mEntry + 1, strchr(hit->mEntry + 1, '\n'));
 
-	uint32 nr = 1;
-	foreach (auto& hit, mHits)
-		hits->append(hit->ToXML(nr++, mMatrix, mSearchSpace));
-	return doc;
+		if (boost::regex_match(h.mDefLine, m, re, boost::match_not_dot_newline))
+		{
+			if (m[1] == "sp")
+			{
+				h.mAccession = m[3];
+				h.mID = m[4];
+			}
+			else
+				h.mID = m[2];
+
+			h.mDefLine = m[6];
+		}
+		else
+			h.mDefLine.erase(0, 1);
+		
+		foreach (M6Hsp& hsp, hit->mHsps)
+		{
+			Hsp p = { hsp.mQueryStart + 1, hsp.mQueryEnd, hsp.mTargetStart + 1, hsp.mTargetEnd,
+				hit->mTarget.length(), hsp.mScore, hsp.mBitScore, hsp.mExpect };
+			
+			string::const_iterator q = mUnfiltered.begin() + hsp.mQueryStart;
+			foreach (uint8 r, hsp.mAlignedTarget)
+			{
+				char qaa = *q++;
+				
+				if (qaa == kM6Residues[r])
+				{
+					++p.mIdentity;
+					++p.mPositive;
+					p.mMidLine += qaa;
+				}
+				else if (mMatrix(ResidueNr(qaa), r) > 0)
+				{
+					++p.mPositive;
+					p.mMidLine += '+';
+				}
+				else
+				{
+					if (qaa == '-' or r == '-')
+						++p.mGaps;
+					p.mMidLine += ' ';
+				}
+			}
+
+			h.mHsps.push_back(p);
+		}
+		outResult.mHits.push_back(h);
+	}
 }
 
 template<int WORDSIZE>
@@ -1041,7 +1057,6 @@ void M6BlastQuery<WORDSIZE>::SearchPart(const char* inFasta, size_t inLength)
 	
 					M6Hsp hsp;
 					hsp.mScore = score;
-					hsp.mTarget = target;
 
 					// extension results, to be updated later
 					hsp.mQueryStart = queryStart;
@@ -1050,7 +1065,7 @@ void M6BlastQuery<WORDSIZE>::SearchPart(const char* inFasta, size_t inLength)
 					hsp.mTargetEnd = targetStart + alignmentDistance;
 
 					if (hit.get() == nullptr)
-						hit.reset(new M6Hit(entry, target.length()));
+						hit.reset(new M6Hit(entry, target));
 
 					hit->AddHsp(hsp);
 				}
@@ -1282,7 +1297,7 @@ int32 M6BlastQuery<WORDSIZE>::AlignGapped(
 }
 
 template<int WORDSIZE>
-int32 M6BlastQuery<WORDSIZE>::AlignGapped(M6Hsp& ioHsp)
+int32 M6BlastQuery<WORDSIZE>::AlignGapped(const sequence& inTarget, M6Hsp& ioHsp)
 {
 	uint32 x, y;
 	int32 score = 0;
@@ -1301,13 +1316,13 @@ int32 M6BlastQuery<WORDSIZE>::AlignGapped(M6Hsp& ioHsp)
 
 	score = AlignGapped(
 		mQuery.rbegin() + (mQuery.length() - querySeed), mQuery.rend(),
-		ioHsp.mTarget.rbegin() + (ioHsp.mTarget.length() - targetSeed), ioHsp.mTarget.rend(),
+		inTarget.rbegin() + (inTarget.length() - targetSeed), inTarget.rend(),
 		tbb, mXgFinal, x, y);
 	ioHsp.mQueryStart = querySeed - x;
 	ioHsp.mTargetStart = targetSeed - y;
 	
 	sequence::const_iterator qi = mQuery.begin() + querySeed - x, qis = qi;
-	sequence::const_iterator si = ioHsp.mTarget.begin() + targetSeed - y, sis = si;
+	sequence::const_iterator si = inTarget.begin() + targetSeed - y, sis = si;
 	
 	uint32 qLen = 1;
 	uint32 sLen = 1;
@@ -1342,20 +1357,20 @@ int32 M6BlastQuery<WORDSIZE>::AlignGapped(M6Hsp& ioHsp)
 	
 	// the seed itself
 	alignedQuery += mQuery[querySeed];
-	alignedTarget += ioHsp.mTarget[targetSeed];
-	score += mMatrix(mQuery[querySeed], ioHsp.mTarget[targetSeed]);
+	alignedTarget += inTarget[targetSeed];
+	score += mMatrix(mQuery[querySeed], inTarget[targetSeed]);
 
 	// and the part after the seed
-	M6DPData d2(mQuery.length() - querySeed, ioHsp.mTarget.length() - targetSeed);
+	M6DPData d2(mQuery.length() - querySeed, inTarget.length() - targetSeed);
 	M6RecordTraceBack tba(d2);
 
 	score += AlignGapped(
 		mQuery.begin() + querySeed + 1, mQuery.end(),
-		ioHsp.mTarget.begin() + targetSeed + 1, ioHsp.mTarget.end(),
+		inTarget.begin() + targetSeed + 1, inTarget.end(),
 		tba, mXgFinal, x, y);
 
 	sequence::const_reverse_iterator qri = mQuery.rbegin() + (mQuery.length() - querySeed) - 1 - x, qris = qri;
-	sequence::const_reverse_iterator sri = ioHsp.mTarget.rbegin() + (ioHsp.mTarget.length() - targetSeed) - 1 - y, sris = sri;
+	sequence::const_reverse_iterator sri = inTarget.rbegin() + (inTarget.length() - targetSeed) - 1 - y, sris = sri;
 	
 	sequence q, s;
 	
@@ -1423,26 +1438,57 @@ void M6BlastQuery<WORDSIZE>::AddHit(M6Hit* inHit)
 
 // --------------------------------------------------------------------
 
-void QueryBlastDB(const fs::path& inFasta, const string& inQuery)
+Result* Search(const fs::path& inDatabank,
+	const string& inQuery, const string& inProgram,
+	const string& inMatrix, uint32 inWordSize, double inExpect,
+	bool inFilter, bool inGapped, uint32 inGapOpen, uint32 inGapExtend,
+	uint32 inReportLimit, uint32 inThreads)
 {
-	io::mapped_file file(inFasta.string().c_str(), io::mapped_file::readonly);
+	io::mapped_file file(inDatabank.string().c_str(), io::mapped_file::readonly);
 	if (not file.is_open())
-		throw M6Exception("FastA file %s not open", inFasta.string().c_str());
-	
+		throw M6Exception("FastA file %s not open", inDatabank.string().c_str());
+
 	const char* data = file.const_data();
 	size_t length = file.size();
 	
 	boost::timer::auto_cpu_timer t;
 
-	M6BlastQuery<3> query(inQuery, 10.0, true, 100);
-	xml::document* result = query.Search(data, length);
-	if (result != nullptr)
+	if (inProgram != "blastp")
+		throw M6Exception("Unsupported program %s", inProgram.c_str());
+	
+	if (inGapped)
 	{
-		cout << *result;
-		delete result;
+		if (inGapOpen == -1) inGapOpen = 11;
+		if (inGapExtend == -1) inGapExtend = 1;
 	}
+
+	M6Matrix matrix(inMatrix, inGapOpen, inGapExtend);
+
+	unique_ptr<Result> result(new Result);
+	switch (inWordSize)
+	{
+		case 3:
+		{
+			M6BlastQuery<3> query(inQuery, inFilter, inExpect, inGapped, matrix, inReportLimit);
+			query.Search(data, length);
+			query.Report(*result);
+			break;
+		}
+
+		default:
+			throw M6Exception("Unsupported word size %d", inWordSize);	
+	}
+	
+	return result.release();
 }
 
+}
+
+// --------------------------------------------------------------------
+
+ostream& operator<<(ostream& os, const M6Blast::Result& inResult)
+{
+	return os;
 }
 
 // --------------------------------------------------------------------
@@ -1451,18 +1497,17 @@ int main()
 {
 	try
 	{
-//		BuildBlastDB();
 		const char kQuery[] = "MALLKVKFDQKKRVKLAQGLWLMNWLSVLAGIVIFSLGLFLKIELRKRSDVMNNSESHFVPNSLIVMGVLSCVFNSLAGKICYDALDPAKYAKWKPWLKPYLAVCVLFNIALFLVTLCCFLMRGSLESTLAHGLKNGMKYYRDTDTPGRCFMKKTIDMLQIEFRCCGNNGFRDWFEIQWISNRYLDFSSKEVKDRIKSNVDGRYLVDGVPFSCCNPSSPRPCIQYQLTNNSAHYSYDHQTEELNLWVNGCRAALLSYYSSLMNSMGAVTLLVWLFEVTITIGLRYLHTALEGVSNPEDPECESEGWLLEKSVSETWKAFLESLKKLGKSNQVEAEGADAGQAPEAG";
 		
-		//int32 score = 0;
-		//for (int i = 0; i < sizeof(kQuery) - 1; ++i)
-		//	score += M6Blast::kM6Blosum62Matrix(kQuery[i], kQuery[i]);
-		//cout << "max score: " << score << endl;
-
-		string query = SEG(kQuery);
+		M6Blast::Result* r = M6Blast::Search(fs::path("C:/data/fasta/uniprot_sprot.fasta"),
+			kQuery, "blastp", "BLOSUM62", 3, 10.0, true, true, -1, -1, 250);
 		
-		//M6Blast::QueryBlastDB(fs::path("C:/data/fasta/sprot.fa"), kQuery);
-		M6Blast::QueryBlastDB(fs::path("C:/data/fasta/uniprot_sprot.fasta"), query);
+		if (r != nullptr)
+			cout << *r << endl;
+		else
+			cout << "no hits found" << endl;
+
+		delete r;
 	}
 	catch (exception& e)
 	{

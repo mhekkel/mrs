@@ -4,6 +4,7 @@
 
 #include <zeep/xml/node.hpp>
 #include <zeep/xml/document.hpp>
+#include <zeep/xml/writer.hpp>
 
 #include <boost/filesystem/fstream.hpp>
 #include <boost/filesystem/operations.hpp>
@@ -1488,6 +1489,16 @@ Result* Search(const fs::path& inDatabank,
 
 ostream& operator<<(ostream& os, const M6Blast::Result& inResult)
 {
+	xml::writer w(os);
+	w.xml_decl(true);
+	w.start_element("BlastOutput");
+//	w.element("BlastOutput_program", "blastp");
+	
+	w.start_element("BlastOutput_iterations");
+	
+	w.end_element();
+	
+	w.end_element();
 	return os;
 }
 

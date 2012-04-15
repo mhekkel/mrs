@@ -553,6 +553,12 @@ struct M6Diagonal
 	int32	mQuery, mTarget;
 };
 
+ostream& operator<<(ostream& os, const M6Diagonal& d)
+{
+	os << '[' << d.mQuery << ',' << d.mTarget << ']';
+	return os;
+}
+
 struct M6DiagonalStartTable
 {
 			M6DiagonalStartTable() : mTable(nullptr) {}
@@ -690,9 +696,7 @@ inline void ReadEntry(const char*& inFasta, const char* inEnd, sequence& outTarg
 struct M6Hsp
 {
 	uint32		mScore;
-	uint32		mQuerySeed;
 	sequence	mTarget;
-	uint32		mTargetSeed;
 	uint32		mQueryStart;
 	uint32		mQueryEnd;
 	uint32		mTargetStart;
@@ -904,12 +908,11 @@ class M6BlastQuery
 	void			SearchPart(const char* inFasta, size_t inLength);
 
 	int32			Extend(int32& ioQueryStart, const sequence& inTarget, int32& ioTargetStart, int32& ioDistance);
-	int32			AlignGapped(uint32 inQuerySeed, const sequence& inTarget, uint32 inTargetSeed, int32 inDropOff);
 	template<class Iterator1, class Iterator2, class TraceBack>
 	int32			AlignGapped(Iterator1 inQueryBegin, Iterator1 inQueryEnd,
 						Iterator2 inTargetBegin, Iterator2 inTargetEnd,
 						TraceBack& inTraceBack, int32 inDropOff, uint32& outBestX, uint32& outBestY);
-	int32			AlignGappedWithTraceBack(M6Hsp& ioHsp);
+	int32			AlignGapped(M6Hsp& ioHsp);
 
 	void			AddHit(M6Hit* inHit);
 
@@ -947,6 +950,8 @@ M6BlastQuery<WORDSIZE>::M6BlastQuery(const string& inQuery, double inExpect, boo
 	mXg =		static_cast<int32>((kLn2 * kM6GappedDropOff) / mMatrix.GappedLambda());
 	mXgFinal =	static_cast<int32>((kLn2 * kM6GappedDropOffFinal) / mMatrix.GappedLambda());
 	mS1 =		static_cast<int32>((kLn2 * kM6GapTrigger + log(mMatrix.UngappedKappa())) / mMatrix.UngappedLambda());
+	
+	// we're not using S2
 	mS2 =		static_cast<int32>((kLn2 * kM6GapTrigger + log(mMatrix.GappedKappa())) / mMatrix.GappedLambda());;	// yeah, that sucks... perhaps
 
 	M6WordHitIterator::Init(mQuery, mMatrix, kM6Threshold, mWordHitData);
@@ -972,7 +977,7 @@ xml::document* M6BlastQuery<WORDSIZE>::Search(const char* inFasta, size_t inLeng
 		{
 			if (mGapped)
 			{
-				uint32 newScore = AlignGappedWithTraceBack(hsp);
+				uint32 newScore = AlignGapped(hsp);
 				assert(hsp.mAlignedQuery.length() == hsp.mAlignedTarget.length());
 				
 				if (hsp.mScore < newScore)
@@ -1064,12 +1069,12 @@ void M6BlastQuery<WORDSIZE>::SearchPart(const char* inFasta, size_t inLength)
 
 			if (m == kM6UnusedDiagonal or distance >= kM6HitWindow)
 				diagonals[d] = queryOffset;
-			else if (distance > 0)
+			else if (distance > WORDSIZE)
 			{
 				int32 queryStart = m;
 				int32 targetStart = targetOffset - distance;
 				int32 alignmentDistance = distance + WORDSIZE;
-				
+
 				if (targetStart < 0 or queryStart < 0)
 					continue;
 	
@@ -1081,44 +1086,20 @@ void M6BlastQuery<WORDSIZE>::SearchPart(const char* inFasta, size_t inLength)
 				{
 					++successfulExtensions;
 	
-					// perform a gapped alignment
-					int32 querySeed = queryStart + alignmentDistance / 2;
-					int32 targetSeed = targetStart + alignmentDistance / 2;
-	
-//					if (mGapped and score < mS2)
-//					{
-//						++gappedAlignmentAttempts;
-//	
-//						int32 gappedScore = AlignGapped(querySeed, target, targetSeed, mXg);
-//	
-//						if (gappedScore > score)
-//						{
-//							++successfulGappedAlignments;
-//							score = gappedScore;
-//						}
-//					}
-//					
-//					if (score >= mS2)
-//					{
-						M6Hsp hsp;
-						hsp.mScore = score;
-						hsp.mTarget = target;
-						hsp.mTargetSeed = targetSeed;
-						hsp.mQuerySeed = querySeed;
-	
-						// this is of course not the exact data:
-						hsp.mQueryStart = queryStart;
-						hsp.mQueryEnd = queryStart + alignmentDistance;
-						hsp.mTargetStart = targetStart;
-						hsp.mTargetEnd = targetStart + alignmentDistance;
-						
-//						hsp.mScore = AlignGappedWithTraceBack(hsp);
-	
-						if (hit.get() == nullptr)
-							hit.reset(new M6Hit(entry, target.length()));
-	
-						hit->AddHsp(hsp);
-//					}
+					M6Hsp hsp;
+					hsp.mScore = score;
+					hsp.mTarget = target;
+
+					// extension results, to be updated later
+					hsp.mQueryStart = queryStart;
+					hsp.mQueryEnd = queryStart + alignmentDistance;
+					hsp.mTargetStart = targetStart;
+					hsp.mTargetEnd = targetStart + alignmentDistance;
+
+					if (hit.get() == nullptr)
+						hit.reset(new M6Hit(entry, target.length()));
+
+					hit->AddHsp(hsp);
 				}
 				
 				diagonals[d] = queryStart + alignmentDistance;
@@ -1129,15 +1110,15 @@ void M6BlastQuery<WORDSIZE>::SearchPart(const char* inFasta, size_t inLength)
 	if (hit)
 		AddHit(hit.release());
 
-	cout << "hits to db: " << hitsToDb << endl
-		 << "extensions: " << extensions << endl
-		 << "successful extensions: " << successfulExtensions << endl
-		 << "gapped: " << gappedAlignmentAttempts << endl
-		 << "X1: " << mXu << endl
-		 << "X2: " << mXg << endl
-		 << "X3: " << mXgFinal << endl
-		 << "S1: " << mS1 << endl
-		 << "S2: " << mS2 << endl;
+//	cout << "hits to db: " << hitsToDb << endl
+//		 << "extensions: " << extensions << endl
+//		 << "successful extensions: " << successfulExtensions << endl
+//		 << "gapped: " << gappedAlignmentAttempts << endl
+//		 << "X1: " << mXu << endl
+//		 << "X2: " << mXg << endl
+//		 << "X3: " << mXgFinal << endl
+//		 << "S1: " << mS1 << endl
+//		 << "S2: " << mS2 << endl;
 	
 	// LOCK
 	mDbCount += dbCount;
@@ -1192,30 +1173,6 @@ int32 M6BlastQuery<WORDSIZE>::Extend(int32& ioQueryStart, const sequence& inTarg
 	ioQueryStart -= delta;
 	ioTargetStart -= delta;
 	ioDistance = static_cast<int32>(qe - qs);
-	
-	return score;
-}
-
-template<int WORDSIZE>
-int32 M6BlastQuery<WORDSIZE>::AlignGapped(uint32 inQuerySeed, const sequence& inTarget, uint32 inTargetSeed, int32 inDropOff)
-{
-	int32 score;
-	
-	uint32 x, y;
-	
-	DiscardTraceBack tb;
-	
-	score = AlignGapped(
-		mQuery.begin() + inQuerySeed + 1, mQuery.end(),
-		inTarget.begin() + inTargetSeed + 1, inTarget.end(),
-		tb, inDropOff, x, y);
-	
-	score += AlignGapped(
-		mQuery.rbegin() + (mQuery.length() - inQuerySeed), mQuery.rend(),
-		inTarget.rbegin() + (inTarget.length() - inTargetSeed), inTarget.rend(),
-		tb, inDropOff, x, y);
-	
-	score += mMatrix(mQuery[inQuerySeed], inTarget[inTargetSeed]);
 	
 	return score;
 }
@@ -1372,7 +1329,7 @@ int32 M6BlastQuery<WORDSIZE>::AlignGapped(
 }
 
 template<int WORDSIZE>
-int32 M6BlastQuery<WORDSIZE>::AlignGappedWithTraceBack(M6Hsp& ioHsp)
+int32 M6BlastQuery<WORDSIZE>::AlignGapped(M6Hsp& ioHsp)
 {
 	uint32 x, y;
 	int32 score = 0;
@@ -1382,19 +1339,22 @@ int32 M6BlastQuery<WORDSIZE>::AlignGappedWithTraceBack(M6Hsp& ioHsp)
 	sequence alignedQuery;
 	sequence alignedTarget;
 
+	uint32 targetSeed = (ioHsp.mTargetStart + ioHsp.mTargetEnd) / 2;
+	uint32 querySeed = (ioHsp.mQueryStart + ioHsp.mQueryEnd) / 2;
+
 	// start with the part before the seed
-	Data d1(ioHsp.mQuerySeed + 1, ioHsp.mTargetSeed + 1);
+	Data d1(querySeed + 1, targetSeed + 1);
 	RecordTraceBack tbb(d1);
 
 	score = AlignGapped(
-		mQuery.rbegin() + (mQuery.length() - ioHsp.mQuerySeed), mQuery.rend(),
-		ioHsp.mTarget.rbegin() + (ioHsp.mTarget.length() - ioHsp.mTargetSeed), ioHsp.mTarget.rend(),
+		mQuery.rbegin() + (mQuery.length() - querySeed), mQuery.rend(),
+		ioHsp.mTarget.rbegin() + (ioHsp.mTarget.length() - targetSeed), ioHsp.mTarget.rend(),
 		tbb, mXgFinal, x, y);
-	ioHsp.mQueryStart = ioHsp.mQuerySeed - x;
-	ioHsp.mTargetStart = ioHsp.mTargetSeed - y;
+	ioHsp.mQueryStart = querySeed - x;
+	ioHsp.mTargetStart = targetSeed - y;
 	
-	sequence::const_iterator qi = mQuery.begin() + ioHsp.mQuerySeed - x, qis = qi;
-	sequence::const_iterator si = ioHsp.mTarget.begin() + ioHsp.mTargetSeed - y, sis = si;
+	sequence::const_iterator qi = mQuery.begin() + querySeed - x, qis = qi;
+	sequence::const_iterator si = ioHsp.mTarget.begin() + targetSeed - y, sis = si;
 	
 	uint32 qLen = 1;
 	uint32 sLen = 1;
@@ -1428,21 +1388,21 @@ int32 M6BlastQuery<WORDSIZE>::AlignGappedWithTraceBack(M6Hsp& ioHsp)
 	sLen += static_cast<uint32>(si - sis);
 	
 	// the seed itself
-	alignedQuery += mQuery[ioHsp.mQuerySeed];
-	alignedTarget += ioHsp.mTarget[ioHsp.mTargetSeed];
-	score += mMatrix(mQuery[ioHsp.mQuerySeed], ioHsp.mTarget[ioHsp.mTargetSeed]);
+	alignedQuery += mQuery[querySeed];
+	alignedTarget += ioHsp.mTarget[targetSeed];
+	score += mMatrix(mQuery[querySeed], ioHsp.mTarget[targetSeed]);
 
 	// and the part after the seed
-	Data d2(mQuery.length() - ioHsp.mQuerySeed, ioHsp.mTarget.length() - ioHsp.mTargetSeed);
+	Data d2(mQuery.length() - querySeed, ioHsp.mTarget.length() - targetSeed);
 	RecordTraceBack tba(d2);
 
 	score += AlignGapped(
-		mQuery.begin() + ioHsp.mQuerySeed + 1, mQuery.end(),
-		ioHsp.mTarget.begin() + ioHsp.mTargetSeed + 1, ioHsp.mTarget.end(),
+		mQuery.begin() + querySeed + 1, mQuery.end(),
+		ioHsp.mTarget.begin() + targetSeed + 1, ioHsp.mTarget.end(),
 		tba, mXgFinal, x, y);
 
-	sequence::const_reverse_iterator qri = mQuery.rbegin() + (mQuery.length() - ioHsp.mQuerySeed) - 1 - x, qris = qri;
-	sequence::const_reverse_iterator sri = ioHsp.mTarget.rbegin() + (ioHsp.mTarget.length() - ioHsp.mTargetSeed) - 1 - y, sris = sri;
+	sequence::const_reverse_iterator qri = mQuery.rbegin() + (mQuery.length() - querySeed) - 1 - x, qris = qri;
+	sequence::const_reverse_iterator sri = ioHsp.mTarget.rbegin() + (ioHsp.mTarget.length() - targetSeed) - 1 - y, sris = sri;
 	
 	sequence q, s;
 	

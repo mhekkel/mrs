@@ -109,7 +109,9 @@ struct M6MatrixData
 	const char*	mName;
 	int8		mGapOpen, mGapExtend;
 	const int8*	mMatrix;
-	double		mGappedStats[5], mUngappedStats[5];
+	struct {
+		double	lambda, kappa, entropy, alpha, beta;
+	}			mGappedStats, mUngappedStats;
 } kM6MatrixData[] = {
 	{ "BLOSUM62", 11, 1, kM6Blosum62, { 0.267, 0.041, 0.14, 1.9, -30 }, { 0.3176, 0.134, 0.4012, 0.7916, -3.2 } }
 };
@@ -129,17 +131,17 @@ class M6Matrix
 	int32			OpenCost() const		{ return mData.mGapOpen; }
 	int32			ExtendCost() const		{ return mData.mGapExtend; }
 
-	double			GappedLambda() const	{ return mData.mGappedStats[0]; }
-	double			GappedKappa() const		{ return mData.mGappedStats[1]; }
-	double			GappedEntropy() const	{ return mData.mGappedStats[2]; }
-	double			GappedAlpha() const		{ return mData.mGappedStats[3]; }
-	double			GappedBeta() const		{ return mData.mGappedStats[4]; }
+	double			GappedLambda() const	{ return mData.mGappedStats.lambda; }
+	double			GappedKappa() const		{ return mData.mGappedStats.kappa; }
+	double			GappedEntropy() const	{ return mData.mGappedStats.entropy; }
+	double			GappedAlpha() const		{ return mData.mGappedStats.alpha; }
+	double			GappedBeta() const		{ return mData.mGappedStats.beta; }
 
-	double			UngappedLambda() const	{ return mData.mUngappedStats[0]; }
-	double			UngappedKappa() const	{ return mData.mUngappedStats[1]; }
-	double			UngappedEntropy() const	{ return mData.mUngappedStats[2]; }
-	double			UngappedAlpha() const	{ return mData.mUngappedStats[3]; }
-	double			UngappedBeta() const	{ return mData.mUngappedStats[4]; }
+	double			UngappedLambda() const	{ return mData.mUngappedStats.lambda; }     
+	double			UngappedKappa() const	{ return mData.mUngappedStats.kappa; }      
+	double			UngappedEntropy() const	{ return mData.mUngappedStats.entropy; }    
+	double			UngappedAlpha() const	{ return mData.mUngappedStats.alpha; }      
+	double			UngappedBeta() const	{ return mData.mUngappedStats.beta; }       
 
   private:
 	M6MatrixData	mData;

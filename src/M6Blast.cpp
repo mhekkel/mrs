@@ -17,6 +17,7 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/timer/timer.hpp>
 #include <boost/thread.hpp>
+#include <boost/program_options.hpp>
 
 #include "M6Blast.h"
 #include "M6Error.h"
@@ -28,6 +29,7 @@ using namespace zeep;
 namespace fs = boost::filesystem;
 namespace io = boost::iostreams;
 namespace ba = boost::algorithm;
+namespace po = boost::program_options;
 
 // --------------------------------------------------------------------
 
@@ -831,8 +833,12 @@ M6BlastQuery<WORDSIZE>::M6BlastQuery(const string& inQuery, bool inFilter, doubl
 {
 	if (mQuery.length() >= kM6MaxSequenceLength)
 		throw M6Exception("Query length exceeds maximum");
-	
-	string query(inQuery);
+
+	mUnfiltered.erase(remove_if(mUnfiltered.begin(), mUnfiltered.end(), [](char aa) -> bool {
+		return ResidueNr(aa) >= kM6ResCount;
+	}), mUnfiltered.end());
+
+	string query(mUnfiltered);
 	if (inFilter)
 		query = SEG(query);
 	
@@ -1479,6 +1485,8 @@ Result* Search(const fs::path& inDatabank,
 		if (inGapExtend == -1) inGapExtend = 1;
 	}
 
+	if (inWordSize == 0) inWordSize = 3;
+
 	M6Matrix matrix(inMatrix, inGapOpen, inGapExtend);
 
 	string query(inQuery), queryID("query"), queryDef;
@@ -1619,29 +1627,87 @@ ostream& operator<<(ostream& os, const M6Blast::Result& inResult)
 
 // --------------------------------------------------------------------
 
-int main()
+int main(int argc, char* const argv[])
 {
 	try
 	{
-		const char kQuery[] = ">sp|test1|test2 bla bla\nMALLKVKFDQKKRVKLAQGLWLMNWLSVLAGIVIFSLGLFLKIELRKRSDVMNNSESHFVPNSLIVMGVLSCVFNSLAGKICYDALDPAKYAKWKPWLKPYLAVCVLFNIALFLVTLCCFLMRGSLESTLAHGLKNGMKYYRDTDTPGRCFMKKTIDMLQIEFRCCGNNGFRDWFEIQWISNRYLDFSSKEVKDRIKSNVDGRYLVDGVPFSCCNPSSPRPCIQYQLTNNSAHYSYDHQTEELNLWVNGCRAALLSYYSSLMNSMGAVTLLVWLFEVTITIGLRYLHTALEGVSNPEDPECESEGWLLEKSVSETWKAFLESLKKLGKSNQVEAEGADAGQAPEAG";
-//		const char kQuery[] = ">sp|test1|test2 bla bla\nGSQFGKGKGQLIGVGAGALLGAILGNQIGAGMDEQDRRLAELTSQRALETTPSGTSIEWRNPDNGNYGYVTPSKTYKNST";
+		string matrix("BLOSUM62"), program = "blastp", query;
+		int32 gapOpen = -1, gapExtend = -1, wordSize = 0,
+			threads = boost::thread::hardware_concurrency(), reportLimit = 250;
+		bool filter = true, gapped = true;
+		double expect = 10;
 
-#if DEBUG
-		fs::path db("/data/fasta/sprot.fa");
-#else
-//		fs::path db("/data/fasta/uniprot_trembl.fasta");
-		fs::path db("/data/fasta/uniprot_sprot.fasta");
-#endif
+		po::options_description desc("m6-blast");
+		desc.add_options()
+			("query,q",			po::value<string>(),	"File containing query in FastA format")
+			("program,p",		po::value<string>(),	"Blast program (only supported program is blastp for now...)")
+			("databank,d",		po::value<string>(),	"Databank in FastA format")
+			("output,o",		po::value<string>(),	"Output file, default is stdout")
+			("report-limit,b",	po::value<string>(),	"Number of results to report")
+			("matrix,M",		po::value<string>(),	"Matrix (default is BLOSUM62)")
+			("word-size,W",		po::value<int32>(),		"Word size (0 invokes default)")
+			("gap-open,G",		po::value<int32>(),		"Cost to open a gap (-1 invokes default)")
+			("gap-extend,E",	po::value<int32>(),		"Cost to extend a gap (-1 invokes default)")
+			("no-filter",								"Do not mask low complexity regions in the query sequence")
+			("ungapped",								"Do not search for gapped alignments, only ungapped")
+			("expect,e",		po::value<double>(),	"Expectation value, default is 10.0")
+			("threads,a",		po::value<uint32>(),	"Nr of threads")
+			("help,h",									"Display help message")
+			;
+
+		po::variables_map vm;
+//		po::store(po::command_line_parser(argc, argv).options(desc).positional(p).run(), vm);
+		po::store(po::command_line_parser(argc, argv).options(desc).run(), vm);
+		po::notify(vm);
+
+		if (vm.count("help") or vm.count("databank") == 0 or vm.count("query") == 0)
+		{
+			cout << desc << "\n";
+			exit(1);
+		}
 		
-		M6Blast::Result* r = M6Blast::Search(db, kQuery, "blastp", "BLOSUM62", 3, 10.0, true, true, -1, -1, 250, 4);
+		fs::path queryFile(vm["query"].as<string>());
+		if (not fs::exists(queryFile))
+			throw M6Exception("Query file does not exist");
+		fs::ifstream queryData(queryFile);
+		if (not queryData.is_open())
+			throw M6Exception("Could not open query file");
+
+		for (;;)
+		{
+			string line;
+			getline(queryData, line);
+			if (line.empty() and queryData.eof())
+				break;
+			query += line + '\n';
+		}
 		
-		fs::ofstream out("test-output.xml");
+		fs::path databank(vm["databank"].as<string>());
+		if (not fs::exists(databank))
+			throw M6Exception("Databank does not exist");
 		
-		if (r != nullptr)
-			out << *r << endl;
+		if (vm.count("program"))		program = vm["program"].as<string>();
+		if (vm.count("matrix"))			matrix = vm["matrix"].as<string>();
+		if (vm.count("report-limit"))	reportLimit = vm["report-limit"].as<int32>();
+		if (vm.count("word-size"))		wordSize = vm["word-size"].as<int32>();
+		if (vm.count("gap-open"))		gapOpen = vm["gap-open"].as<int32>();
+		if (vm.count("gap-extend"))		gapOpen = vm["gap-extend"].as<int32>();
+		if (vm.count("no-filter"))		filter = false;
+		if (vm.count("ungapped"))		gapped = false;
+		if (vm.count("expect"))			expect = vm["expect"].as<double>();
+		if (vm.count("threads"))		threads = vm["threads"].as<int32>();
+
+		M6Blast::Result* r = M6Blast::Search(databank, query, program, matrix,
+			wordSize, expect, filter, gapped, gapOpen, gapExtend, reportLimit, threads);
+		
+		if (vm.count("output") and vm["output"].as<string>() != "stdout")
+		{
+			fs::ofstream out(vm["output"].as<string>());
+			out << *r;
+		}
 		else
-			out << "no hits found" << endl;
-
+			cout << *r << endl;
+		
 		delete r;
 	}
 	catch (exception& e)

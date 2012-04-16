@@ -601,10 +601,9 @@ struct M6DPData
 				M6DPData(size_t inDimX, size_t inDimY) : mDimX(inDimX), mDimY(inDimY)
 				{
 					mM6DPDataLength = (inDimX + 1) * (inDimY + 1);
-//					mM6DPData = reinterpret_cast<int16*>(calloc(mM6DPDataLength, sizeof(int16)));
 					mM6DPData = new int16[mM6DPDataLength];
 				}
-				~M6DPData()											{ free(mM6DPData); }
+				~M6DPData()											{ delete[] mM6DPData; }
 
 	int16		operator()(uint32 inI, uint32 inJ) const			{ return mM6DPData[inI * mDimY + inJ]; }
 	int16&		operator()(uint32 inI, uint32 inJ)					{ return mM6DPData[inI * mDimY + inJ]; }

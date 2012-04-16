@@ -601,7 +601,7 @@ struct M6DPData
 					mM6DPDataLength = (inDimX + 1) * (inDimY + 1);
 					mM6DPData = reinterpret_cast<int16*>(calloc(mM6DPDataLength, sizeof(int16)));
 				}
-				~M6DPData()												{ free(mM6DPData); }
+				~M6DPData()											{ free(mM6DPData); }
 
 	int16		operator()(uint32 inI, uint32 inJ) const			{ return mM6DPData[inI * mDimY + inJ]; }
 	int16&		operator()(uint32 inI, uint32 inJ)					{ return mM6DPData[inI * mDimY + inJ]; }
@@ -868,6 +868,7 @@ void M6BlastQuery<WORDSIZE>::Search(const char* inFasta, size_t inLength, uint32
 			mDbLength += dbLength;
 			mHits.insert(mHits.end(), hits.begin(), hits.end());
 		});
+
 		inFasta += n;
 		inLength -= n;
 	}
@@ -1592,10 +1593,12 @@ int main()
 		
 		M6Blast::Result* r = M6Blast::Search(db, kQuery, "blastp", "BLOSUM62", 3, 10.0, true, true, -1, -1, 250, 4);
 		
+		fs::ofstream out("test-output.xml");
+		
 		if (r != nullptr)
-			cout << *r << endl;
+			out << *r << endl;
 		else
-			cout << "no hits found" << endl;
+			out << "no hits found" << endl;
 
 		delete r;
 	}

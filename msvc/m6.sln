@@ -45,8 +45,6 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "m6-passwd", "m6-passwd\m6-p
 		{FC2A9881-F33D-4A44-A29D-D7A9F023A0DD} = {FC2A9881-F33D-4A44-A29D-D7A9F023A0DD}
 	EndProjectSection
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "blast", "blast\blast.vcxproj", "{0C20ACEE-F532-47D4-A386-606748AAB816}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Mixed Platforms = Debug|Mixed Platforms
@@ -147,18 +145,6 @@ Global
 		{15DB0D9E-9D3F-4C5C-9977-AB63B193423E}.Release|Win32.ActiveCfg = Release|x64
 		{15DB0D9E-9D3F-4C5C-9977-AB63B193423E}.Release|x64.ActiveCfg = Release|x64
 		{15DB0D9E-9D3F-4C5C-9977-AB63B193423E}.Release|x64.Build.0 = Release|x64
-		{0C20ACEE-F532-47D4-A386-606748AAB816}.Debug|Mixed Platforms.ActiveCfg = Debug|x64
-		{0C20ACEE-F532-47D4-A386-606748AAB816}.Debug|Mixed Platforms.Build.0 = Debug|x64
-		{0C20ACEE-F532-47D4-A386-606748AAB816}.Debug|Win32.ActiveCfg = Debug|Win32
-		{0C20ACEE-F532-47D4-A386-606748AAB816}.Debug|Win32.Build.0 = Debug|Win32
-		{0C20ACEE-F532-47D4-A386-606748AAB816}.Debug|x64.ActiveCfg = Debug|x64
-		{0C20ACEE-F532-47D4-A386-606748AAB816}.Debug|x64.Build.0 = Debug|x64
-		{0C20ACEE-F532-47D4-A386-606748AAB816}.Release|Mixed Platforms.ActiveCfg = Release|Win32
-		{0C20ACEE-F532-47D4-A386-606748AAB816}.Release|Mixed Platforms.Build.0 = Release|Win32
-		{0C20ACEE-F532-47D4-A386-606748AAB816}.Release|Win32.ActiveCfg = Release|Win32
-		{0C20ACEE-F532-47D4-A386-606748AAB816}.Release|Win32.Build.0 = Release|Win32
-		{0C20ACEE-F532-47D4-A386-606748AAB816}.Release|x64.ActiveCfg = Release|x64
-		{0C20ACEE-F532-47D4-A386-606748AAB816}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

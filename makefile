@@ -44,6 +44,7 @@ VPATH += src
 
 OBJECTS = \
 	$(OBJDIR)/M6BitStream.o \
+	$(OBJDIR)/M6Blast.o \
 	$(OBJDIR)/M6Builder.o \
 	$(OBJDIR)/M6Config.o \
 	$(OBJDIR)/M6Databank.o \
@@ -59,15 +60,12 @@ OBJECTS = \
 	$(OBJDIR)/M6MD5.o \
 	$(OBJDIR)/M6Progress.o \
 	$(OBJDIR)/M6Query.o \
+	$(OBJDIR)/M6SequenceFilter.o \
 	$(OBJDIR)/M6Tokenizer.o \
 
 OBJECTS.m6 = \
 	$(OBJECTS) \
 	$(OBJDIR)/M6CmdLineDriver.o
-
-OBJECTS.m6-make = \
-	$(OBJECTS) \
-	$(OBJDIR)/M6CmdLineBuild.o
 
 OBJECTS.m6-test = \
 	$(OBJECTS) \
@@ -81,11 +79,6 @@ OBJECTS.m6-server = \
 OBJECTS.m6-passwd = \
 	$(OBJECTS) \
 	$(OBJDIR)/M6Passwd.o
-
-OBJECTS.m6-blast = \
-	$(OBJDIR)/M6Error.o \
-	$(OBJDIR)/M6SequenceFilter.o \
-	$(OBJDIR)/M6Blast.o
 
 all: m6 m6-server m6-passwd
 

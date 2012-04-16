@@ -601,7 +601,8 @@ struct M6DPData
 				M6DPData(size_t inDimX, size_t inDimY) : mDimX(inDimX), mDimY(inDimY)
 				{
 					mM6DPDataLength = (inDimX + 1) * (inDimY + 1);
-					mM6DPData = reinterpret_cast<int16*>(calloc(mM6DPDataLength, sizeof(int16)));
+//					mM6DPData = reinterpret_cast<int16*>(calloc(mM6DPDataLength, sizeof(int16)));
+					mM6DPData = new int16[mM6DPDataLength];
 				}
 				~M6DPData()											{ free(mM6DPData); }
 
@@ -860,37 +861,42 @@ M6BlastQuery<WORDSIZE>::M6BlastQuery(const string& inQuery, bool inFilter, doubl
 template<int WORDSIZE>
 void M6BlastQuery<WORDSIZE>::Search(const char* inFasta, size_t inLength, uint32 inNrOfThreads)
 {
-	boost::thread_group t;
-	boost::mutex m;
-	
-	int64 k = inLength / inNrOfThreads;
-	for (uint32 i = 0; i < inNrOfThreads and inLength > 0; ++i)
+	if (inNrOfThreads <= 1)
+		SearchPart(inFasta, inLength, mDbCount, mDbLength, mHits);
+	else
 	{
-		int64 n = k;
-		if (n > inLength)
-			n = inLength;
-		const char* end = inFasta + n;
-		while (n < inLength and *end != '>')
-			++end, ++n;
+		boost::thread_group t;
+		boost::mutex m;
+		
+		int64 k = inLength / inNrOfThreads;
+		for (uint32 i = 0; i < inNrOfThreads and inLength > 0; ++i)
+		{
+			int64 n = k;
+			if (n > inLength)
+				n = inLength;
+			const char* end = inFasta + n;
+			while (n < inLength and *end != '>')
+				++end, ++n;
 
-		t.create_thread([inFasta, n, &m, this]() {
-			uint32 dbCount = 0;
-			int64 dbLength = 0;
-			vector<M6Hit*> hits;
-			
-			SearchPart(inFasta, n, dbCount, dbLength, hits);
+			t.create_thread([inFasta, n, &m, this]() {
+				uint32 dbCount = 0;
+				int64 dbLength = 0;
+				vector<M6Hit*> hits;
+				
+				SearchPart(inFasta, n, dbCount, dbLength, hits);
 
-			boost::mutex::scoped_lock lock(m);
-			mDbCount += dbCount;
-			mDbLength += dbLength;
-			mHits.insert(mHits.end(), hits.begin(), hits.end());
-		});
+				boost::mutex::scoped_lock lock(m);
+				mDbCount += dbCount;
+				mDbLength += dbLength;
+				mHits.insert(mHits.end(), hits.begin(), hits.end());
+			});
 
-		inFasta += n;
-		inLength -= n;
+			inFasta += n;
+			inLength -= n;
+		}
+		
+		t.join_all();
 	}
-	
-	t.join_all();
 	
 	int32 lengthAdjustment = ncbi::BlastComputeLengthAdjustment(mMatrix, static_cast<uint32>(mQuery.length()), mDbLength, mDbCount);
 
@@ -1639,7 +1645,7 @@ int main(int argc, char* const argv[])
 
 		po::options_description desc("m6-blast");
 		desc.add_options()
-			("query,q",			po::value<string>(),	"File containing query in FastA format")
+			("query,i",			po::value<string>(),	"File containing query in FastA format")
 			("program,p",		po::value<string>(),	"Blast program (only supported program is blastp for now...)")
 			("databank,d",		po::value<string>(),	"Databank in FastA format")
 			("output,o",		po::value<string>(),	"Output file, default is stdout")
@@ -1651,7 +1657,7 @@ int main(int argc, char* const argv[])
 			("no-filter",								"Do not mask low complexity regions in the query sequence")
 			("ungapped",								"Do not search for gapped alignments, only ungapped")
 			("expect,e",		po::value<double>(),	"Expectation value, default is 10.0")
-			("threads,a",		po::value<uint32>(),	"Nr of threads")
+			("threads,a",		po::value<int32>(),		"Nr of threads")
 			("help,h",									"Display help message")
 			;
 

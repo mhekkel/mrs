@@ -8,11 +8,11 @@ namespace M6Blast
 
 struct Hsp
 {
+	uint32				mHspNr;
 	uint32				mQueryStart;
 	uint32				mQueryEnd;
-	uint32				mSubjectStart;
-	uint32				mSubjectEnd;
-	uint32				mSubjectLength;
+	uint32				mTargetStart;
+	uint32				mTargetEnd;
 	uint32				mScore;
 	double				mBitScore;
 	double				mExpect;
@@ -20,20 +20,34 @@ struct Hsp
 	uint32				mPositive;
 	uint32				mGaps;
 	std::string			mQueryAlignment;
-	std::string			mSubjectAlignment;
+	std::string			mTargetAlignment;
 	std::string			mMidLine;
 };
 
 struct Hit
 {
+	uint32				mHitNr;
 	std::string			mID;
 	std::string			mAccession;
 	std::string			mDefLine;
+	uint32				mLength;
 	std::list<Hsp>		mHsps;
 };
 
 struct Result
 {
+	std::string		mProgram;
+	std::string		mDb;
+	std::string		mQueryID;
+	std::string		mQueryDef;
+	uint32			mQueryLength;
+	// parameters
+	std::string		mMatrix;
+	double			mExpect;
+	int32			mGapOpen;
+	int32			mGapExtend;
+	bool			mFilter;
+
 	uint32			mDbCount;
 	uint64			mDbLength;
 	uint64			mEffectiveSpace;

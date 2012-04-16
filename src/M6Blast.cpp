@@ -1470,7 +1470,7 @@ void M6BlastQuery<WORDSIZE>::AddHit(M6Hit* inHit)
 Result* Search(const fs::path& inDatabank,
 	const string& inQuery, const string& inProgram,
 	const string& inMatrix, uint32 inWordSize, double inExpect,
-	bool inFilter, bool inGapped, uint32 inGapOpen, uint32 inGapExtend,
+	bool inFilter, bool inGapped, int32 inGapOpen, int32 inGapExtend,
 	uint32 inReportLimit, uint32 inThreads)
 {
 	io::mapped_file file(inDatabank.string().c_str(), io::mapped_file::readonly);
@@ -1524,6 +1524,7 @@ Result* Search(const fs::path& inDatabank,
 
 	result->mProgram = inProgram;
 	result->mDb = inDatabank.string();
+	result->mExpect = inExpect;
 	result->mQueryID = queryID;
 	result->mQueryDef = queryDef;
 	result->mQueryLength = query.length();
@@ -1536,9 +1537,9 @@ Result* Search(const fs::path& inDatabank,
 	{
 		case 3:
 		{
-			M6BlastQuery<3> query(query, inFilter, inExpect, inGapped, matrix, inReportLimit);
-			query.Search(data, length);
-			query.Report(*result);
+			M6BlastQuery<3> q(query, inFilter, inExpect, inGapped, matrix, inReportLimit);
+			q.Search(data, length);
+			q.Report(*result);
 			break;
 		}
 
@@ -1560,9 +1561,9 @@ void operator&(xml::writer& w, const M6Blast::Hsp& inHsp)
 	w.element("Hsp_bit-score", boost::lexical_cast<string>(inHsp.mBitScore));
 	w.element("Hsp_score", boost::lexical_cast<string>(inHsp.mScore));
 	w.element("Hsp_evalue", boost::lexical_cast<string>(inHsp.mExpect));
-	w.element("Hsp_query-from", boost::lexical_cast<string>(inHsp.mQueryStart + 1));
+	w.element("Hsp_query-from", boost::lexical_cast<string>(inHsp.mQueryStart));
 	w.element("Hsp_query-to", boost::lexical_cast<string>(inHsp.mQueryEnd));
-	w.element("Hsp_hit-from", boost::lexical_cast<string>(inHsp.mTargetStart + 1));
+	w.element("Hsp_hit-from", boost::lexical_cast<string>(inHsp.mTargetStart));
 	w.element("Hsp_hit-to", boost::lexical_cast<string>(inHsp.mTargetEnd));
 	w.element("Hsp_identity", boost::lexical_cast<string>(inHsp.mIdentity));
 	w.element("Hsp_positive", boost::lexical_cast<string>(inHsp.mPositive));
@@ -1637,9 +1638,9 @@ int main()
 		const char kQuery[] = ">sp|test1|test2 bla bla\nMALLKVKFDQKKRVKLAQGLWLMNWLSVLAGIVIFSLGLFLKIELRKRSDVMNNSESHFVPNSLIVMGVLSCVFNSLAGKICYDALDPAKYAKWKPWLKPYLAVCVLFNIALFLVTLCCFLMRGSLESTLAHGLKNGMKYYRDTDTPGRCFMKKTIDMLQIEFRCCGNNGFRDWFEIQWISNRYLDFSSKEVKDRIKSNVDGRYLVDGVPFSCCNPSSPRPCIQYQLTNNSAHYSYDHQTEELNLWVNGCRAALLSYYSSLMNSMGAVTLLVWLFEVTITIGLRYLHTALEGVSNPEDPECESEGWLLEKSVSETWKAFLESLKKLGKSNQVEAEGADAGQAPEAG";
 
 #if DEBUG
-		fs::path db("C:/data/fasta/sprot.fa");
+		fs::path db("/data/fasta/sprot.fa");
 #else
-		fs::path db("C:/data/fasta/uniprot_sprot.fasta");
+		fs::path db("/data/fasta/uniprot_trembl.fasta");
 #endif
 		
 		M6Blast::Result* r = M6Blast::Search(db, kQuery, "blastp", "BLOSUM62", 3, 10.0, true, true, -1, -1, 250);

@@ -82,6 +82,11 @@ OBJECTS.m6-passwd = \
 	$(OBJECTS) \
 	$(OBJDIR)/M6Passwd.o
 
+OBJECTS.m6-blast = \
+	$(OBJDIR)/M6Error.o \
+	$(OBJDIR)/M6SequenceFilter.o \
+	$(OBJDIR)/M6Blast.o
+
 all: m6 m6-server m6-passwd
 
 m6: $(OBJECTS.m6)
@@ -103,6 +108,10 @@ m6-passwd: $(OBJECTS.m6-passwd)
 m6-test: $(OBJECTS.m6-test)
 	@ echo ">>" $@
 	@ $(CC) $(BOOST_INC_DIR:%=-I%) -o $@ -I. $^ $(LDFLAGS) $(BOOST_LIB_DIR)/libboost_unit_test_framework.a
+
+m6-blast: $(OBJECTS.m6-blast)
+	@ echo ">>" $@
+	@ $(CC) $(BOOST_INC_DIR:%=-I%) -o $@ -I. $^ $(LDFLAGS)
 
 $(OBJDIR)/%.o: %.cpp
 	@ echo ">>" $<

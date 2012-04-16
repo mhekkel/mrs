@@ -60,7 +60,7 @@ struct Result
 Result* Search(const boost::filesystem::path& inDatabank,
 	const std::string& inQuery, const std::string& inProgram,
 	const std::string& inMatrix, uint32 inWordSize, double inExpect,
-	bool inFilter, bool inGapped, uint32 inGapOpen, uint32 inGapExtend,
+	bool inFilter, bool inGapped, int32 inGapOpen, int32 inGapExtend,
 	uint32 inReportLimit, uint32 inThreads = 0);
 
 }

@@ -18,6 +18,8 @@
 #include <boost/thread.hpp>
 #include <boost/program_options.hpp>
 
+#include <boost/detail/atomic_count.hpp>
+
 #include "M6Blast.h"
 #include "M6Error.h"
 #include "M6Progress.h"
@@ -837,7 +839,7 @@ class M6BlastQuery
 template<int WORDSIZE>
 M6BlastQuery<WORDSIZE>::M6BlastQuery(const string& inQuery, bool inFilter, double inExpect,
 		bool inGapped, const M6Matrix& inMatrix, uint32 inReportLimit)
-	: mUnfiltered(inQuery), mQuery(inQuery.length(), 0), mMatrix(inMatrix), mExpect(inExpect), mGapped(inGapped), mReportLimit(inReportLimit)
+	: mUnfiltered(inQuery), mMatrix(inMatrix), mExpect(inExpect), mGapped(inGapped), mReportLimit(inReportLimit)
 	, mDbCount(0), mDbLength(0), mSearchSpace(0)
 {
 	if (mQuery.length() >= kM6MaxSequenceLength)
@@ -851,7 +853,7 @@ M6BlastQuery<WORDSIZE>::M6BlastQuery(const string& inQuery, bool inFilter, doubl
 	if (inFilter)
 		query = SEG(query);
 	
-	transform(query.begin(), query.end(), mQuery.begin(), [](char aa) -> uint8 {
+	transform(query.begin(), query.end(), back_inserter(mQuery), [](char aa) -> uint8 {
 		return ResidueNr(aa); 
 	});
 	
@@ -882,10 +884,10 @@ void M6BlastQuery<WORDSIZE>::Search(const char* inFasta, size_t inLength, uint32
 		boost::thread_group t;
 		boost::mutex m;
 		
-		int64 k = inLength / inNrOfThreads;
+		size_t k = inLength / inNrOfThreads;
 		for (uint32 i = 0; i < inNrOfThreads and inLength > 0; ++i)
 		{
-			int64 n = k;
+			size_t n = k;
 			if (n > inLength)
 				n = inLength;
 			const char* end = inFasta + n;
@@ -921,29 +923,26 @@ void M6BlastQuery<WORDSIZE>::Search(const char* inFasta, size_t inLength, uint32
 	
 	if (not mHits.empty())
 	{
-		boost::mutex m;
 		boost::thread_group t;
-		uint32 ix = 0;
+		boost::detail::atomic_count ix(-1);
 		
 		for (uint32 i = 0; i < inNrOfThreads; ++i)
 		{
-			t.create_thread([this, &m, &ix]() {
+			t.create_thread([this, &ix]() {
+				double lambda = mMatrix.GappedLambda(), logK = log(mMatrix.GappedKappa());
+
 				for (;;)
 				{
-					M6Hit* hit = nullptr;
-					{
-						boost::mutex::scoped_lock lock(m);
-						if (ix < mHits.size())
-							hit = mHits[ix++];
-					}
-
-					if (hit == nullptr)
+					uint32 next = ++ix;
+					if (next >= mHits.size())
 						break;
+					
+					M6Hit* hit = mHits[next];
 					
 					foreach (M6Hsp& hsp, hit->mHsps)
 						hsp.mScore = AlignGappedSecond(hit->mTarget, hsp);
 					
-					hit->Cleanup(mSearchSpace, mMatrix.GappedLambda(), log(mMatrix.GappedKappa()), mExpect);
+					hit->Cleanup(mSearchSpace, lambda, logK, mExpect);
 				}
 			});
 		}
@@ -979,10 +978,10 @@ void M6BlastQuery<WORDSIZE>::Report(Result& outResult)
 	foreach (M6Hit* hit, mHits)
 	{
 		Hit h;
-		h.mHitNr = outResult.mHits.size() + 1;
+		h.mHitNr = static_cast<uint32>(outResult.mHits.size() + 1);
 		boost::smatch m;
 		h.mDefLine = string(hit->mEntry, strchr(hit->mEntry, '\n'));
-		h.mLength = hit->mTarget.length();
+		h.mLength = static_cast<uint32>(hit->mTarget.length());
 
 		if (boost::regex_match(h.mDefLine, m, kM6FastARE, boost::match_not_dot_newline))
 		{
@@ -1001,7 +1000,7 @@ void M6BlastQuery<WORDSIZE>::Report(Result& outResult)
 		
 		foreach (M6Hsp& hsp, hit->mHsps)
 		{
-			Hsp p = { hit->mHsps.size() + 1, hsp.mQueryStart + 1, hsp.mQueryEnd,
+			Hsp p = { static_cast<uint32>(h.mHsps.size() + 1), hsp.mQueryStart + 1, hsp.mQueryEnd,
 				hsp.mTargetStart + 1, hsp.mTargetEnd, hsp.mScore, hsp.mBitScore, hsp.mExpect };
 			
 			p.mQueryAlignment.reserve(hsp.mAlignedQuery.length());
@@ -1285,7 +1284,6 @@ int32 M6BlastQuery<WORDSIZE>::AlignGapped(
 				M = B(i - 1, j - 1) + s(*x, *y);
 
 			// cut off the max value
-//			assert(M < numeric_limits<INT>::max());
 			if (M > numeric_limits<int16>::max())
 				M = numeric_limits<int16>::max();
 			

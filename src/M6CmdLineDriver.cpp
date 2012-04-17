@@ -88,7 +88,7 @@ void Blast(int argc, char* const argv[])
 	if (vm.count("report-limit"))	reportLimit = vm["report-limit"].as<int32>();
 	if (vm.count("word-size"))		wordSize = vm["word-size"].as<int32>();
 	if (vm.count("gap-open"))		gapOpen = vm["gap-open"].as<int32>();
-	if (vm.count("gap-extend"))		gapOpen = vm["gap-extend"].as<int32>();
+	if (vm.count("gap-extend"))		gapExtend = vm["gap-extend"].as<int32>();
 	if (vm.count("no-filter"))		filter = false;
 	if (vm.count("ungapped"))		gapped = false;
 	if (vm.count("expect"))			expect = vm["expect"].as<double>();

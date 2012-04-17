@@ -21,6 +21,7 @@
 #include <boost/detail/atomic_count.hpp>
 
 #include "M6Blast.h"
+#include "M6Matrix.h"
 #include "M6Error.h"
 #include "M6Progress.h"
 #include "M6SequenceFilter.h"
@@ -77,44 +78,6 @@ inline uint8 ResidueNr(char inAA)
 		result = kResidueNrTable[inAA - 'a'];
 	return result;
 }
-
-const int8 kM6Blosum62[] = {
-	  4,                                                                                                               // A
-	 -2,   4,                                                                                                          // B
-	  0,  -3,   9,                                                                                                     // C
-	 -2,   4,  -3,   6,                                                                                                // D
-	 -1,   1,  -4,   2,   5,                                                                                           // E
-	 -2,  -3,  -2,  -3,  -3,   6,                                                                                      // F
-	  0,  -1,  -3,  -1,  -2,  -3,   6,                                                                                 // G
-	 -2,   0,  -3,  -1,   0,  -1,  -2,   8,                                                                            // H
-	 -1,  -3,  -1,  -3,  -3,   0,  -4,  -3,   4,                                                                       // I
-	 -1,   0,  -3,  -1,   1,  -3,  -2,  -1,  -3,   5,                                                                  // K
-	 -1,  -4,  -1,  -4,  -3,   0,  -4,  -3,   2,  -2,   4,                                                             // L
-	 -1,  -3,  -1,  -3,  -2,   0,  -3,  -2,   1,  -1,   2,   5,                                                        // M
-	 -2,   3,  -3,   1,   0,  -3,   0,   1,  -3,   0,  -3,  -2,   6,                                                   // N
-	 -1,  -2,  -3,  -1,  -1,  -4,  -2,  -2,  -3,  -1,  -3,  -2,  -2,   7,                                              // P
-	 -1,   0,  -3,   0,   2,  -3,  -2,   0,  -3,   1,  -2,   0,   0,  -1,   5,                                         // Q
-	 -1,  -1,  -3,  -2,   0,  -3,  -2,   0,  -3,   2,  -2,  -1,   0,  -2,   1,   5,                                    // R
-	  1,   0,  -1,   0,   0,  -2,   0,  -1,  -2,   0,  -2,  -1,   1,  -1,   0,  -1,   4,                               // S
-	  0,  -1,  -1,  -1,  -1,  -2,  -2,  -2,  -1,  -1,  -1,  -1,   0,  -1,  -1,  -1,   1,   5,                          // T
-	  0,  -3,  -1,  -3,  -2,  -1,  -3,  -3,   3,  -2,   1,   1,  -3,  -2,  -2,  -3,  -2,   0,   4,                     // V
-	 -3,  -4,  -2,  -4,  -3,   1,  -2,  -2,  -3,  -3,  -2,  -1,  -4,  -4,  -2,  -3,  -3,  -2,  -3,  11,                // W
-	 -2,  -3,  -2,  -3,  -2,   3,  -3,   2,  -1,  -2,  -1,  -1,  -2,  -3,  -1,  -2,  -2,  -2,  -1,   2,   7,           // Y
-	 -1,   1,  -3,   1,   4,  -3,  -2,   0,  -3,   1,  -3,  -1,   0,  -1,   3,   0,   0,  -1,  -2,  -3,  -2,   4,      // Z
-	  0,  -1,  -2,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -2,  -1,  -1,   0,   0,  -1,  -2,  -1,  -1,  -1, // X
-};
-
-struct M6MatrixData
-{
-	const char*	mName;
-	int8		mGapOpen, mGapExtend;
-	const int8*	mMatrix;
-	struct {
-		double	lambda, kappa, entropy, alpha, beta;
-	}			mGappedStats, mUngappedStats;
-} kM6MatrixData[] = {
-	{ "BLOSUM62", 11, 1, kM6Blosum62, { 0.267, 0.041, 0.14, 1.9, -30 }, { 0.3176, 0.134, 0.4012, 0.7916, -3.2 } }
-};
 
 const int16
 	kSentinalScore = -9999;
@@ -543,10 +506,9 @@ struct M6DiagonalStartTable
 	
 	void	Reset(int32 inQueryLength, int32 inTargetLength)
 			{
-				mQueryLength = inQueryLength;
 				mTargetLength = inTargetLength;
 				
-				int32 n = mQueryLength + mTargetLength + 1;
+				int32 n = inQueryLength + inTargetLength + 1;
 				if (mTable == nullptr or n >= mTableLength)
 				{
 					uint32 k = ((n / 10240) + 1) * 10240;
@@ -567,7 +529,7 @@ struct M6DiagonalStartTable
 	M6DiagonalStartTable&	operator=(const M6DiagonalStartTable&);
 
 	int32*	mTable;
-	int32	mTableLength, mTargetLength, mQueryLength;
+	int32	mTableLength, mTargetLength;
 };
 
 // --------------------------------------------------------------------
@@ -578,7 +540,6 @@ struct M6DPData
 				{
 					mM6DPDataLength = (inDimX + 1) * (inDimY + 1);
 					mM6DPData = new int16[mM6DPDataLength];
-//					mM6DPData = reinterpret_cast<int16*>(malloc(mM6DPDataLength * sizeof(int16)));
 				}
 				~M6DPData()											{ delete[] mM6DPData; }
 
@@ -591,7 +552,7 @@ struct M6DPData
 	size_t		mDimY;
 };
 
-struct DiscardTraceBack
+struct M6DiscardTraceBack
 {
 	int16		operator()(int16 inB, int16 inIx, int16 inIy, uint32 /*inI*/, uint32 /*inJ*/) const
 					{ return max(max(inB, inIx), inIy); }
@@ -641,14 +602,14 @@ inline void ReadEntry(const char*& inFasta, const char* inEnd, sequence& outTarg
 
 	outTarget.clear();
 
-	bool nl = false;
+	bool bol = false;
 	while (inFasta != inEnd)
 	{
 		char ch = *inFasta++;
 		
 		if (ch == '\n')
-			nl = true;
-		else if (ch == '>' and nl)
+			bol = true;
+		else if (ch == '>' and bol)
 		{
 			--inFasta;
 			break;
@@ -658,7 +619,7 @@ inline void ReadEntry(const char*& inFasta, const char* inEnd, sequence& outTarg
 			uint8 rn = ResidueNr(ch);
 			if (rn < kM6ResCount)
 				outTarget += rn;
-			nl = false;
+			bol = false;
 		}
 	}
 }
@@ -1314,7 +1275,7 @@ int32 M6BlastQuery<WORDSIZE>::AlignGappedFirst(const sequence& inTarget, M6Hsp& 
 	uint32 targetSeed = (ioHsp.mTargetStart + ioHsp.mTargetEnd) / 2;
 	uint32 querySeed = (ioHsp.mQueryStart + ioHsp.mQueryEnd) / 2;
 	
-	DiscardTraceBack tb;
+	M6DiscardTraceBack tb;
 	
 	score = AlignGapped(
 		mQuery.begin() + querySeed + 1, mQuery.end(),

@@ -167,21 +167,12 @@ M6Matrix::M6Matrix(const string& inName, int32 inGapOpen, int32 inGapExtend)
 
 inline int8 M6Matrix::operator()(uint8 inAA1, uint8 inAA2) const
 {
-	int result = -4;
-
-	assert(inAA1 < kM6ResCount);
-	assert(inAA2 < kM6ResCount);
+	int8 result;
 
 	if (inAA1 >= inAA2)
-	{
-		if (inAA1 < kM6ResCount)
-			result = kM6Blosum62[(inAA1 * (inAA1 + 1)) / 2 + inAA2];
-	}
+		result = mData.mMatrix[(inAA1 * (inAA1 + 1)) / 2 + inAA2];
 	else
-	{
-		if (inAA2 < kM6ResCount)
-			result = kM6Blosum62[(inAA2 * (inAA2 + 1)) / 2 + inAA1];
-	}
+		result = mData.mMatrix[(inAA2 * (inAA2 + 1)) / 2 + inAA1];
 
 	return result;	
 }

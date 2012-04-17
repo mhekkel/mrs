@@ -803,7 +803,7 @@ class M6BlastQuery
 
   private:
 
-	void			SearchPart(const char* inFasta, size_t inLength,
+	void			SearchPart(const char* inFasta, size_t inLength, M6Progress& inProgress,
 						uint32& outDbCount, int64& outDbLength, vector<M6Hit*>& outHits) const;
 
 	int32			Extend(int32& ioQueryStart, const sequence& inTarget, int32& ioTargetStart, int32& ioDistance) const;
@@ -877,8 +877,10 @@ M6BlastQuery<WORDSIZE>::~M6BlastQuery()
 template<int WORDSIZE>
 void M6BlastQuery<WORDSIZE>::Search(const char* inFasta, size_t inLength, uint32 inNrOfThreads)
 {
+	M6Progress progress(inLength, "searching");
+	
 	if (inNrOfThreads <= 1)
-		SearchPart(inFasta, inLength, mDbCount, mDbLength, mHits);
+		SearchPart(inFasta, inLength, progress, mDbCount, mDbLength, mHits);
 	else
 	{
 		boost::thread_group t;
@@ -894,12 +896,12 @@ void M6BlastQuery<WORDSIZE>::Search(const char* inFasta, size_t inLength, uint32
 			while (n < inLength and *end != '>')
 				++end, ++n;
 
-			t.create_thread([inFasta, n, &m, this]() {
+			t.create_thread([inFasta, n, &m, &progress, this]() {
 				uint32 dbCount = 0;
 				int64 dbLength = 0;
 				vector<M6Hit*> hits;
 				
-				SearchPart(inFasta, n, dbCount, dbLength, hits);
+				SearchPart(inFasta, n, progress, dbCount, dbLength, hits);
 
 				boost::mutex::scoped_lock lock(m);
 				mDbCount += dbCount;
@@ -1042,7 +1044,7 @@ void M6BlastQuery<WORDSIZE>::Report(Result& outResult)
 }
 
 template<int WORDSIZE>
-void M6BlastQuery<WORDSIZE>::SearchPart(const char* inFasta, size_t inLength,
+void M6BlastQuery<WORDSIZE>::SearchPart(const char* inFasta, size_t inLength, M6Progress& inProgress,
 	uint32& outDbCount, int64& outDbLength, vector<M6Hit*>& outHits) const
 {
 	const char* end = inFasta + inLength;
@@ -1063,6 +1065,9 @@ void M6BlastQuery<WORDSIZE>::SearchPart(const char* inFasta, size_t inLength,
 		
 		const char* entry = inFasta;
 		ReadEntry(inFasta, end, target);
+
+		inProgress.Consumed(inFasta - entry);
+		
 		if (target.empty() or target.length() > kM6MaxSequenceLength)
 			continue;
 		

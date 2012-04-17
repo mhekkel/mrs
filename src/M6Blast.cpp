@@ -15,7 +15,6 @@
 #include <boost/foreach.hpp>
 #define foreach BOOST_FOREACH
 #include <boost/lexical_cast.hpp>
-#include <boost/timer/timer.hpp>
 #include <boost/thread.hpp>
 #include <boost/program_options.hpp>
 
@@ -371,8 +370,12 @@ struct M6Word
 	uint8			aa[WORDSIZE + 1];
 };
 
-template<> const uint32 M6Word<3>::kM6MaxWordIndex = 0x07FFF;
+template<> const uint32 M6Word<2>::kM6MaxWordIndex = 0x0003FF;
+template<> const uint32 M6Word<2>::kM6MaxIndex = kM6AACount * kM6AACount;
+template<> const uint32 M6Word<3>::kM6MaxWordIndex = 0x007FFF;
 template<> const uint32 M6Word<3>::kM6MaxIndex = kM6AACount * kM6AACount * kM6AACount;
+template<> const uint32 M6Word<4>::kM6MaxWordIndex = 0x0FFFFF;
+template<> const uint32 M6Word<4>::kM6MaxIndex = kM6AACount * kM6AACount * kM6AACount * kM6AACount;
 
 template<int WORDSIZE>
 bool M6Word<WORDSIZE>::PermutationIterator::Next(uint32& outIndex)
@@ -449,7 +452,9 @@ class M6WordHitIterator
 	Entry					mCurrent;
 };
 
-template<> const uint32 M6WordHitIterator<3>::kMask = 0x03FF;
+template<> const uint32 M6WordHitIterator<2>::kMask = 0x0001F;
+template<> const uint32 M6WordHitIterator<3>::kMask = 0x003FF;
+template<> const uint32 M6WordHitIterator<4>::kMask = 0x07FFF;
 
 template<int WORDSIZE>
 void M6WordHitIterator<WORDSIZE>::Init(const sequence& inQuery, 
@@ -604,6 +609,7 @@ struct M6DPData
 				{
 					mM6DPDataLength = (inDimX + 1) * (inDimY + 1);
 					mM6DPData = new int16[mM6DPDataLength];
+//					mM6DPData = reinterpret_cast<int16*>(malloc(mM6DPDataLength * sizeof(int16)));
 				}
 				~M6DPData()											{ delete[] mM6DPData; }
 
@@ -788,6 +794,7 @@ class M6BlastQuery
   public:
 					M6BlastQuery(const string& inQuery, bool inFilter, double inExpect,
 						bool inGapped, const M6Matrix& inMatrix, uint32 inReportLimit);
+					~M6BlastQuery();
 
 	void			Search(const char* inFasta, size_t inLength, uint32 inNrOfThreads);
 	void			Report(Result& outResult);
@@ -860,6 +867,12 @@ M6BlastQuery<WORDSIZE>::M6BlastQuery(const string& inQuery, bool inFilter, doubl
 }
 
 template<int WORDSIZE>
+M6BlastQuery<WORDSIZE>::~M6BlastQuery()
+{
+	for_each(mHits.begin(), mHits.end(), [](M6Hit* hit) { delete hit; });
+}
+
+template<int WORDSIZE>
 void M6BlastQuery<WORDSIZE>::Search(const char* inFasta, size_t inLength, uint32 inNrOfThreads)
 {
 	if (inNrOfThreads <= 1)
@@ -906,12 +919,35 @@ void M6BlastQuery<WORDSIZE>::Search(const char* inFasta, size_t inLength, uint32
 
 	mSearchSpace = effectiveDbLength * effectiveQueryLength;
 	
-	foreach (M6Hit* hit, mHits)
+	if (not mHits.empty())
 	{
-		foreach (M6Hsp& hsp, hit->mHsps)
-			hsp.mScore = AlignGappedSecond(hit->mTarget, hsp);
+		boost::mutex m;
+		boost::thread_group t;
+		uint32 ix = 0;
 		
-		hit->Cleanup(mSearchSpace, mMatrix.GappedLambda(), log(mMatrix.GappedKappa()), mExpect);
+		for (uint32 i = 0; i < inNrOfThreads; ++i)
+		{
+			t.create_thread([this, &m, &ix]() {
+				for (;;)
+				{
+					M6Hit* hit = nullptr;
+					{
+						boost::mutex::scoped_lock lock(m);
+						if (ix < mHits.size())
+							hit = mHits[ix++];
+					}
+
+					if (hit == nullptr)
+						break;
+					
+					foreach (M6Hsp& hsp, hit->mHsps)
+						hsp.mScore = AlignGappedSecond(hit->mTarget, hsp);
+					
+					hit->Cleanup(mSearchSpace, mMatrix.GappedLambda(), log(mMatrix.GappedKappa()), mExpect);
+				}
+			});
+		}
+		t.join_all();
 	}
 
 	mHits.erase(
@@ -919,7 +955,8 @@ void M6BlastQuery<WORDSIZE>::Search(const char* inFasta, size_t inLength, uint32
 		mHits.end());
 
 	sort(mHits.begin(), mHits.end(), [](const M6Hit* a, const M6Hit* b) -> bool {
-		return a->mHsps.front().mScore > b->mHsps.front().mScore;
+		return a->mHsps.front().mScore > b->mHsps.front().mScore or
+			(a->mHsps.front().mScore == b->mHsps.front().mScore and a->mEntry < b->mEntry);
 	});
 
 	if (mHits.size() > mReportLimit)
@@ -1481,8 +1518,6 @@ Result* Search(const fs::path& inDatabank,
 	const char* data = file.const_data();
 	size_t length = file.size();
 	
-	boost::timer::auto_cpu_timer t;
-
 	if (inProgram != "blastp")
 		throw M6Exception("Unsupported program %s", inProgram.c_str());
 	
@@ -1530,7 +1565,7 @@ Result* Search(const fs::path& inDatabank,
 	result->mExpect = inExpect;
 	result->mQueryID = queryID;
 	result->mQueryDef = queryDef;
-	result->mQueryLength = query.length();
+	result->mQueryLength = static_cast<uint32>(query.length());
 	result->mMatrix = inMatrix;
 	result->mGapOpen = inGapOpen;
 	result->mGapExtend = inGapExtend;
@@ -1538,9 +1573,25 @@ Result* Search(const fs::path& inDatabank,
 
 	switch (inWordSize)
 	{
+		case 2:
+		{
+			M6BlastQuery<2> q(query, inFilter, inExpect, inGapped, matrix, inReportLimit);
+			q.Search(data, length, inThreads);
+			q.Report(*result);
+			break;
+		}
+
 		case 3:
 		{
 			M6BlastQuery<3> q(query, inFilter, inExpect, inGapped, matrix, inReportLimit);
+			q.Search(data, length, inThreads);
+			q.Report(*result);
+			break;
+		}
+
+		case 4:
+		{
+			M6BlastQuery<4> q(query, inFilter, inExpect, inGapped, matrix, inReportLimit);
 			q.Search(data, length, inThreads);
 			q.Report(*result);
 			break;

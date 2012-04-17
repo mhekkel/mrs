@@ -33,7 +33,7 @@ LDFLAGS				+= -L $(HOME)/projects/pcre/lib
 CFLAGS				+= -I $(HOME)/projects/libarchive/include
 LDFLAGS				+= -L $(HOME)/projects/libarchive/lib
 ifneq ($(DEBUG),1)
-CFLAGS				+= -O3 -DNDEBUG
+CFLAGS				+= -O3 -DNDEBUG -g
 else
 CFLAGS				+= -g -DDEBUG 
 LDFLAGS				+= -g

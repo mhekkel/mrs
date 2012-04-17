@@ -55,8 +55,7 @@ const uint32
 	kM6MaxSequenceLength	= numeric_limits<uint16>::max();
 
 const int32
-	kM6HitWindow			= 40,
-	kM6UnusedDiagonal		= 0xf3f3f3f3;
+	kM6HitWindow			= 40;
 
 const double
 	kLn2 = log(2.);
@@ -445,13 +444,14 @@ class M6WordHitIterator
 
   private:
 
-	const uint8*			mTargetBegin;
 	const uint8*			mTargetCurrent;
 	const uint8*			mTargetEnd;
+	uint16					mTargetOffset;
 	const vector<Entry>&	mLookup;
 	const vector<uint16>&	mOffsets;
 	uint32					mIndex;
-	Entry					mCurrent;
+	const uint16*			mOffset;
+	uint16					mCount;
 };
 
 template<> const uint32 M6WordHitIterator<2>::kMask = 0x0001F;
@@ -501,14 +501,17 @@ void M6WordHitIterator<WORDSIZE>::Init(const sequence& inQuery,
 template<int WORDSIZE>
 void M6WordHitIterator<WORDSIZE>::Reset(const sequence& inTarget)
 {
-	mTargetBegin = mTargetCurrent = inTarget.c_str();
-	mTargetEnd = mTargetBegin + inTarget.length();
-	
+	mTargetCurrent = inTarget.c_str();
+	mTargetEnd = mTargetCurrent + inTarget.length();
+	mTargetOffset = 0;
 	mIndex = 0;
-	mCurrent.mCount = 0;
 
-	for (uint32 i = 0; i < WORDSIZE - 1 and mTargetCurrent != mTargetEnd; ++i)
+	for (uint32 i = 0; i < WORDSIZE and mTargetCurrent != mTargetEnd; ++i)
 		mIndex = mIndex << kM6Bits | *mTargetCurrent++;
+
+	Entry current = mLookup[mIndex];
+	mCount = current.mCount;
+	mOffset = &mOffsets[current.mDataOffset];
 }
 
 template<int WORDSIZE>
@@ -518,10 +521,10 @@ bool M6WordHitIterator<WORDSIZE>::Next(uint16& outQueryOffset, uint16& outTarget
 	
 	for (;;)
 	{
-		if (mCurrent.mCount-- > 0)
+		if (mCount-- > 0)
 		{
-			outQueryOffset = mOffsets[mCurrent.mDataOffset + mCurrent.mCount];
-			outTargetOffset = static_cast<uint16>(mTargetCurrent - mTargetBegin - WORDSIZE);
+			outQueryOffset = *mOffset++;
+			outTargetOffset = mTargetOffset;
 			result = true;
 			break;
 		}
@@ -530,7 +533,11 @@ bool M6WordHitIterator<WORDSIZE>::Next(uint16& outQueryOffset, uint16& outTarget
 			break;
 		
 		mIndex = ((mIndex & kMask) << kM6Bits) | *mTargetCurrent++;
-		mCurrent = mLookup[mIndex];
+		++mTargetOffset;
+		
+		Entry current = mLookup[mIndex];
+		mCount = current.mCount;
+		mOffset = &mOffsets[current.mDataOffset];
 	}
 
 	return result;
@@ -538,37 +545,12 @@ bool M6WordHitIterator<WORDSIZE>::Next(uint16& outQueryOffset, uint16& outTarget
 
 // --------------------------------------------------------------------
 
-struct M6Diagonal
-{
-			M6Diagonal() : mQuery(0), mTarget(0) {}
-
-			M6Diagonal(int32 inQuery, int32 inTarget)
-			{
-				int32 d = inQuery - inTarget;
-				if (d > 0)
-				{
-					mQuery = d;
-					mTarget = 0;
-				}
-				else
-				{
-					mQuery = 0;
-					mTarget = d;
-				}
-			}
-			
-	bool	operator<(const M6Diagonal& rhs) const
-				{ return mQuery < rhs.mQuery or (mQuery == rhs.mQuery and mTarget < rhs.mTarget); }
-
-	int32	mQuery, mTarget;
-};
-
 struct M6DiagonalStartTable
 {
 			M6DiagonalStartTable() : mTable(nullptr) {}
 			~M6DiagonalStartTable() { delete[] mTable; }
 	
-	void	Reset(uint32 inQueryLength, uint32 inTargetLength)
+	void	Reset(int32 inQueryLength, int32 inTargetLength)
 			{
 				mQueryLength = inQueryLength;
 				mTargetLength = inTargetLength;
@@ -583,17 +565,22 @@ struct M6DiagonalStartTable
 					mTableLength = k;
 				}
 				
-				memset(mTable, 0xf3, n * sizeof(int32));
+				fill(mTable, mTable + n, -inTargetLength);
 			}
 
-	int32&	operator[](const M6Diagonal& inD)
+	int32&	operator()(uint16 inQueryOffset, uint16 inTargetOffset)
 			{
-				assert(inD.mQuery < mQueryLength);
-				assert(inD.mTarget < mTargetLength);
-				assert(mTargetLength + inD.mTarget + inD.mQuery < mTableLength);
-				assert(mTargetLength + inD.mTarget + inD.mQuery >= 0);
-				return mTable[mTargetLength + inD.mTarget + inD.mQuery];
+				return mTable[mTargetLength - inTargetOffset + inQueryOffset];
 			}
+
+//	int32&	operator[](const M6Diagonal& inD)
+//			{
+//				assert(inD.mQuery < mQueryLength);
+//				assert(inD.mTarget < mTargetLength);
+//				assert(mTargetLength + inD.mTarget + inD.mQuery < mTableLength);
+//				assert(mTargetLength + inD.mTarget + inD.mQuery >= 0);
+//				return mTable[mTargetLength + inD.mTarget + inD.mQuery];
+//			}
 
   private:
 							M6DiagonalStartTable(const M6DiagonalStartTable&);
@@ -1048,7 +1035,7 @@ void M6BlastQuery<WORDSIZE>::SearchPart(const char* inFasta, size_t inLength, M6
 	uint32& outDbCount, int64& outDbLength, vector<M6Hit*>& outHits) const
 {
 	const char* end = inFasta + inLength;
-	uint32 queryLength = static_cast<uint32>(mQuery.length());
+	int32 queryLength = static_cast<int32>(mQuery.length());
 	
 	M6WordHitIterator iter(mWordHitData);
 	M6DiagonalStartTable diagonals;
@@ -1075,23 +1062,21 @@ void M6BlastQuery<WORDSIZE>::SearchPart(const char* inFasta, size_t inLength, M6
 		outDbLength += target.length();
 		
 		iter.Reset(target);
-		diagonals.Reset(queryLength, static_cast<uint32>(target.length()));
+		diagonals.Reset(queryLength, static_cast<int32>(target.length()));
 		
 		uint16 queryOffset, targetOffset;
 		while (iter.Next(queryOffset, targetOffset))
 		{
 			++hitsToDb;
 			
-			M6Diagonal d(queryOffset, targetOffset);
-			int32 m = diagonals[d];
-			
-			int32 distance = queryOffset - m;
+			int32& ds = diagonals(queryOffset, targetOffset);
+			int32 distance = queryOffset - ds;
 
-			if (m == kM6UnusedDiagonal or distance >= kM6HitWindow)
-				diagonals[d] = queryOffset;
+			if (distance >= kM6HitWindow)
+				ds = queryOffset;
 			else if (distance > WORDSIZE)
 			{
-				int32 queryStart = m;
+				int32 queryStart = ds;
 				int32 targetStart = targetOffset - distance;
 				int32 alignmentDistance = distance + WORDSIZE;
 
@@ -1129,7 +1114,7 @@ void M6BlastQuery<WORDSIZE>::SearchPart(const char* inFasta, size_t inLength, M6
 					hit->AddHsp(hsp);
 				}
 				
-				diagonals[d] = queryStart + alignmentDistance;
+				ds = queryStart + alignmentDistance;
 			}
 		}
 	}

@@ -569,18 +569,7 @@ struct M6DiagonalStartTable
 			}
 
 	int32&	operator()(uint16 inQueryOffset, uint16 inTargetOffset)
-			{
-				return mTable[mTargetLength - inTargetOffset + inQueryOffset];
-			}
-
-//	int32&	operator[](const M6Diagonal& inD)
-//			{
-//				assert(inD.mQuery < mQueryLength);
-//				assert(inD.mTarget < mTargetLength);
-//				assert(mTargetLength + inD.mTarget + inD.mQuery < mTableLength);
-//				assert(mTargetLength + inD.mTarget + inD.mQuery >= 0);
-//				return mTable[mTargetLength + inD.mTarget + inD.mQuery];
-//			}
+				{ return mTable[mTargetLength - inTargetOffset + inQueryOffset]; }
 
   private:
 							M6DiagonalStartTable(const M6DiagonalStartTable&);

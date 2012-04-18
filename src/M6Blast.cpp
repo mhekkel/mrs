@@ -1575,8 +1575,8 @@ void operator&(xml::writer& w, const M6Blast::Hit& inHit)
 
 ostream& operator<<(ostream& os, const M6Blast::Result& inResult)
 {
-	xml::writer w(os);
-	w.xml_decl(true);
+	xml::writer w(os, true);
+	w.doctype("BlastOutput", "-//NCBI//NCBI BlastOutput/EN", "http://www.ncbi.nlm.nih.gov/dtd/NCBI_BlastOutput.dtd");
 	w.start_element("BlastOutput");
 	w.element("BlastOutput_program", inResult.mProgram);
 	w.element("BlastOutput_db", inResult.mDb);
@@ -1604,11 +1604,20 @@ ostream& operator<<(ostream& os, const M6Blast::Result& inResult)
 	for_each(inResult.mHits.begin(), inResult.mHits.end(), [&](const M6Blast::Hit& hit) {
 		w & hit;
 	});
-	w.end_element();
-	w.end_element();
-	w.end_element();
-	
-	w.end_element();
+	w.end_element();	// Iteration_hits
+	w.start_element("Iteration_stat");
+	w.start_element("Statistics");
+	w.element("Statistics_db-num", boost::lexical_cast<string>(inResult.mDbCount));
+	w.element("Statistics_db-len", boost::lexical_cast<string>(inResult.mDbLength));
+	w.element("Statistics_eff-space", boost::lexical_cast<string>(inResult.mEffectiveSpace));
+	w.element("Statistics_kappa", boost::lexical_cast<string>(inResult.mKappa));
+	w.element("Statistics_lambda", boost::lexical_cast<string>(inResult.mLambda));
+	w.element("Statistics_entropy", boost::lexical_cast<string>(inResult.mEntropy));
+	w.end_element();	// Statistics
+	w.end_element();	// Iteration_stat
+	w.end_element();	// Iteration
+	w.end_element();	// BlastOutput_iterations
+	w.end_element();	// BlastOutput
 	return os;
 }
 

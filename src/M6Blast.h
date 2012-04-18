@@ -41,6 +41,8 @@ struct Result
 	std::string		mQueryID;
 	std::string		mQueryDef;
 	uint32			mQueryLength;
+	std::list<Hit>	mHits;
+
 	// parameters
 	std::string		mMatrix;
 	double			mExpect;
@@ -48,13 +50,13 @@ struct Result
 	int32			mGapExtend;
 	bool			mFilter;
 
+	// stats
 	uint32			mDbCount;
 	uint64			mDbLength;
 	uint64			mEffectiveSpace;
 	double			mKappa;
 	double			mLambda;
 	double			mEntropy;
-	std::list<Hit>	mHits;
 };
 
 Result* Search(const boost::filesystem::path& inDatabank,

@@ -41,7 +41,7 @@ namespace M6Blast
 typedef basic_string<uint8> sequence;
 
 boost::regex
-	kM6FastARE("^>(\\w+)((?:\\|([^| ]*))?(?:\\|([^| ]+))?(?:\\|([^| ]+))?(?:\\|([^| ]+))?) (.+)\n?");
+	kM6FastARE("^>(\\w+)((?:\\|([^| ]*))?(?:\\|([^| ]+))?(?:\\|([^| ]+))?(?:\\|([^| ]+))?)(?: (.+))\n?");
 
 const uint32
 	kM6AACount				= 22,	// 20 + B and Z
@@ -726,11 +726,14 @@ class M6BlastQuery
 {
   public:
 					M6BlastQuery(const string& inQuery, bool inFilter, double inExpect,
-						bool inGapped, const M6Matrix& inMatrix, uint32 inReportLimit);
+						const string& inMatrix, bool inGapped, int32 inGapOpen, int32 inGapExtend,
+						uint32 inReportLimit);
 					~M6BlastQuery();
 
+//	void			Search(const fs::path& inDatabank, uint32 inNrOfThreads);
 	void			Search(const char* inFasta, size_t inLength, uint32 inNrOfThreads);
 	void			Report(Result& outResult);
+	void			WriteAsFasta(ostream& inStream);
 
   private:
 
@@ -753,7 +756,7 @@ class M6BlastQuery
 
 	string			mUnfiltered;
 	sequence		mQuery;
-	const M6Matrix&	mMatrix;
+	M6Matrix		mMatrix;
 	double			mExpect, mCutOff;
 	bool			mGapped;
 	int32			mS1, mS2, mXu, mXg, mXgFinal;
@@ -769,8 +772,9 @@ class M6BlastQuery
 
 template<int WORDSIZE>
 M6BlastQuery<WORDSIZE>::M6BlastQuery(const string& inQuery, bool inFilter, double inExpect,
-		bool inGapped, const M6Matrix& inMatrix, uint32 inReportLimit)
-	: mUnfiltered(inQuery), mMatrix(inMatrix), mExpect(inExpect), mGapped(inGapped), mReportLimit(inReportLimit)
+		const string& inMatrix, bool inGapped, int32 inGapOpen, int32 inGapExtend, uint32 inReportLimit)
+	: mUnfiltered(inQuery), mMatrix(inMatrix, inGapOpen, inGapExtend)
+	, mExpect(inExpect), mGapped(inGapped), mReportLimit(inReportLimit)
 	, mDbCount(0), mDbLength(0), mSearchSpace(0)
 {
 	if (mQuery.length() >= kM6MaxSequenceLength)
@@ -804,6 +808,16 @@ M6BlastQuery<WORDSIZE>::~M6BlastQuery()
 {
 	for_each(mHits.begin(), mHits.end(), [](M6Hit* hit) { delete hit; });
 }
+
+//template<int WORDSIZE>
+//void M6BlastQuery<WORDSIZE>::Search(const fs::path& inDatabank, uint32 inNrOfThreads)
+//{
+//	io::mapped_file file(inDatabank.string().c_str(), io::mapped_file::readonly);
+//	if (not file.is_open())
+//		throw M6Exception("FastA file %s not open", inDatabank.string().c_str());
+//
+//	const char* data = file.const_data();
+//	size_t length = file.size();
 
 template<int WORDSIZE>
 void M6BlastQuery<WORDSIZE>::Search(const char* inFasta, size_t inLength, uint32 inNrOfThreads)
@@ -971,6 +985,24 @@ void M6BlastQuery<WORDSIZE>::Report(Result& outResult)
 			h.mHsps.push_back(p);
 		}
 		outResult.mHits.push_back(h);
+	}
+}
+
+template<int WORDSIZE>
+void M6BlastQuery<WORDSIZE>::WriteAsFasta(ostream& inStream)
+{
+	foreach (M6Hit* hit, mHits)
+	{
+		string seq;
+		foreach (uint8 r, hit->mTarget)
+		{
+			if (seq.length() % 73 == 72)
+				seq += '\n';
+			seq += kM6Residues[r];
+		}
+		
+		inStream << string(hit->mEntry, strchr(hit->mEntry, '\n')) << endl
+				 << seq << endl;
 	}
 }
 
@@ -1449,7 +1481,7 @@ Result* Search(const fs::path& inDatabank,
 
 	const char* data = file.const_data();
 	size_t length = file.size();
-	
+
 	if (inProgram != "blastp")
 		throw M6Exception("Unsupported program %s", inProgram.c_str());
 	
@@ -1460,8 +1492,6 @@ Result* Search(const fs::path& inDatabank,
 	}
 
 	if (inWordSize == 0) inWordSize = 3;
-
-	M6Matrix matrix(inMatrix, inGapOpen, inGapExtend);
 
 	string query(inQuery), queryID("query"), queryDef;
 
@@ -1507,7 +1537,7 @@ Result* Search(const fs::path& inDatabank,
 	{
 		case 2:
 		{
-			M6BlastQuery<2> q(query, inFilter, inExpect, inGapped, matrix, inReportLimit);
+			M6BlastQuery<2> q(query, inFilter, inExpect, inMatrix, inGapped, inGapOpen, inGapExtend, inReportLimit);
 			q.Search(data, length, inThreads);
 			q.Report(*result);
 			break;
@@ -1515,7 +1545,7 @@ Result* Search(const fs::path& inDatabank,
 
 		case 3:
 		{
-			M6BlastQuery<3> q(query, inFilter, inExpect, inGapped, matrix, inReportLimit);
+			M6BlastQuery<3> q(query, inFilter, inExpect, inMatrix, inGapped, inGapOpen, inGapExtend, inReportLimit);
 			q.Search(data, length, inThreads);
 			q.Report(*result);
 			break;
@@ -1523,7 +1553,7 @@ Result* Search(const fs::path& inDatabank,
 
 		case 4:
 		{
-			M6BlastQuery<4> q(query, inFilter, inExpect, inGapped, matrix, inReportLimit);
+			M6BlastQuery<4> q(query, inFilter, inExpect, inMatrix, inGapped, inGapOpen, inGapExtend, inReportLimit);
 			q.Search(data, length, inThreads);
 			q.Report(*result);
 			break;
@@ -1534,6 +1564,95 @@ Result* Search(const fs::path& inDatabank,
 	}
 	
 	return result.release();
+}
+
+void SearchAndWriteResultsAsFastA(std::ostream& inOutFile,
+	const boost::filesystem::path& inDatabank,
+	const std::string& inQuery, const std::string& inProgram,
+	const std::string& inMatrix, uint32 inWordSize, double inExpect,
+	bool inFilter, bool inGapped, int32 inGapOpen, int32 inGapExtend,
+	uint32 inReportLimit, uint32 inThreads)
+{
+	io::mapped_file file(inDatabank.string().c_str(), io::mapped_file::readonly);
+	if (not file.is_open())
+		throw M6Exception("FastA file %s not open", inDatabank.string().c_str());
+
+	const char* data = file.const_data();
+	size_t length = file.size();
+
+	if (inProgram != "blastp")
+		throw M6Exception("Unsupported program %s", inProgram.c_str());
+	
+	if (inGapped)
+	{
+		if (inGapOpen == -1) inGapOpen = 11;
+		if (inGapExtend == -1) inGapExtend = 1;
+	}
+
+	if (inWordSize == 0) inWordSize = 3;
+
+	string query(inQuery), queryID("query"), queryDef;
+
+	if (ba::starts_with(inQuery, ">"))
+	{
+		inOutFile << inQuery;
+		if (not ba::ends_with(inQuery, "\n"))
+			inOutFile << endl;
+		
+		boost::smatch m;
+		if (regex_search(inQuery, m, kM6FastARE, boost::match_not_dot_newline))
+		{
+			queryID = m[4];
+			if (queryID.empty())
+				queryID = m[2];
+			queryDef = m[7];
+			query = m.suffix();
+		}
+		else
+		{
+			queryID = inQuery.substr(1, inQuery.find('\n') - 1);
+			query = inQuery.substr(queryID.length() + 2, string::npos);
+
+			string::size_type s = queryID.find(' ');
+			if (s != string::npos)
+			{
+				queryDef = queryID.substr(s + 1);
+				queryID.erase(s, string::npos);
+			}
+		}
+	}
+	else
+		inOutFile << ">query" << endl << inQuery << endl;
+
+	switch (inWordSize)
+	{
+		case 2:
+		{
+			M6BlastQuery<2> q(query, inFilter, inExpect, inMatrix, inGapped, inGapOpen, inGapExtend, inReportLimit);
+			q.Search(data, length, inThreads);
+			q.WriteAsFasta(inOutFile);
+			break;
+		}
+
+		case 3:
+		{
+			M6BlastQuery<3> q(query, inFilter, inExpect, inMatrix, inGapped, inGapOpen, inGapExtend, inReportLimit);
+			q.Search(data, length, inThreads);
+			q.WriteAsFasta(inOutFile);
+			break;
+		}
+
+		case 4:
+		{
+			M6BlastQuery<4> q(query, inFilter, inExpect, inMatrix, inGapped, inGapOpen, inGapExtend, inReportLimit);
+			q.Search(data, length, inThreads);
+			q.WriteAsFasta(inOutFile);
+			break;
+		}
+
+		default:
+			throw M6Exception("Unsupported word size %d", inWordSize);	
+	}
 }
 
 }

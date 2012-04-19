@@ -49,6 +49,7 @@ void Blast(int argc, char* const argv[])
 		("ungapped",								"Do not search for gapped alignments, only ungapped")
 		("expect,e",		po::value<double>(),	"Expectation value, default is 10.0")
 		("threads,a",		po::value<int32>(),		"Nr of threads")
+		("write-fasta",								"Write output as FastaA")
 		("help,h",									"Display help message")
 		;
 
@@ -94,18 +95,33 @@ void Blast(int argc, char* const argv[])
 	if (vm.count("expect"))			expect = vm["expect"].as<double>();
 	if (vm.count("threads"))		threads = vm["threads"].as<int32>();
 
-	M6Blast::Result* r = M6Blast::Search(databank, query, program, matrix,
-		wordSize, expect, filter, gapped, gapOpen, gapExtend, reportLimit, threads);
-	
-	if (vm.count("output") and vm["output"].as<string>() != "stdout")
+	if (vm.count("write-fasta"))
 	{
-		fs::ofstream out(vm["output"].as<string>());
-		out << *r;
+		if (vm.count("output") and vm["output"].as<string>() != "stdout")
+		{
+			fs::ofstream out(vm["output"].as<string>());
+			M6Blast::SearchAndWriteResultsAsFastA(out, databank, query, program, matrix,
+				wordSize, expect, filter, gapped, gapOpen, gapExtend, reportLimit, threads);
+		}
+		else
+			M6Blast::SearchAndWriteResultsAsFastA(cout, databank, query, program, matrix,
+				wordSize, expect, filter, gapped, gapOpen, gapExtend, reportLimit, threads);
 	}
 	else
-		cout << *r << endl;
+	{
+		M6Blast::Result* r = M6Blast::Search(databank, query, program, matrix,
+			wordSize, expect, filter, gapped, gapOpen, gapExtend, reportLimit, threads);
 	
-	delete r;
+		if (vm.count("output") and vm["output"].as<string>() != "stdout")
+		{
+			fs::ofstream out(vm["output"].as<string>());
+			out << *r;
+		}
+		else
+			cout << *r << endl;
+	
+		delete r;
+	}
 }
 
 void Build(int argc, char* argv[])

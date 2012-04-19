@@ -25,7 +25,7 @@ LIBS				= m pthread archive bz2 z zeep pcre rt
 LDFLAGS				+= $(BOOST_LIB_DIR:%=-L%) $(LIBS:%=-l%) -g $(BOOST_LIBS:%=$(BOOST_LIB_DIR)/lib%.a) \
 							-L ../libzeep/
 
-CC					= icpc
+CXX					= icpc
 CFLAGS				+= $(BOOST_INC_DIR:%=-I%) -I. -pthread -std=c++0x -I../libzeep/
 CFLAGS				+= -I $(HOME)/projects/pcre/include -Wno-multichar
 CFLAGS				+= -Wno-deprecated
@@ -84,31 +84,31 @@ all: m6 m6-server m6-passwd
 
 m6: $(OBJECTS.m6)
 	@ echo ">>" $@
-	@ $(CC) $(BOOST_INC_DIR:%=-I%) -o $@ -I. $^ $(LDFLAGS)
+	@ $(CXX) $(BOOST_INC_DIR:%=-I%) -o $@ -I. $^ $(LDFLAGS)
 
 m6-make: $(OBJECTS.m6-make)
 	@ echo ">>" $@
-	@ $(CC) $(BOOST_INC_DIR:%=-I%) -o $@ -I. $^ $(LDFLAGS)
+	@ $(CXX) $(BOOST_INC_DIR:%=-I%) -o $@ -I. $^ $(LDFLAGS)
 
 m6-server: $(OBJECTS.m6-server)
 	@ echo ">>" $@
-	@ $(CC) $(BOOST_INC_DIR:%=-I%) -o $@ -I. $^ $(LDFLAGS)
+	@ $(CXX) $(BOOST_INC_DIR:%=-I%) -o $@ -I. $^ $(LDFLAGS)
 
 m6-passwd: $(OBJECTS.m6-passwd)
 	@ echo ">>" $@
-	@ $(CC) $(BOOST_INC_DIR:%=-I%) -o $@ -I. $^ $(LDFLAGS)
+	@ $(CXX) $(BOOST_INC_DIR:%=-I%) -o $@ -I. $^ $(LDFLAGS)
 
 m6-test: $(OBJECTS.m6-test)
 	@ echo ">>" $@
-	@ $(CC) $(BOOST_INC_DIR:%=-I%) -o $@ -I. $^ $(LDFLAGS) $(BOOST_LIB_DIR)/libboost_unit_test_framework.a
+	@ $(CXX) $(BOOST_INC_DIR:%=-I%) -o $@ -I. $^ $(LDFLAGS) $(BOOST_LIB_DIR)/libboost_unit_test_framework.a
 
 m6-blast: $(OBJECTS.m6-blast)
 	@ echo ">>" $@
-	@ $(CC) $(BOOST_INC_DIR:%=-I%) -o $@ -I. $^ $(LDFLAGS)
+	@ $(CXX) $(BOOST_INC_DIR:%=-I%) -o $@ -I. $^ $(LDFLAGS)
 
-$(OBJDIR)/%.o: %.cpp
+$(OBJDIR)/%.o: %.cpp | $(OBJDIR)
 	@ echo ">>" $<
-	@ $(CC) -MD -c -o $@ $< $(CFLAGS)
+	@ $(CXX) -MD -c -o $@ $< $(CFLAGS)
 
 include $(OBJECTS:%.o=%.d)
 

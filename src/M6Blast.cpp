@@ -916,21 +916,21 @@ void M6BlastQuery<WORDSIZE>::Report(Result& outResult)
 		h.mDefLine = string(hit->mEntry, strchr(hit->mEntry, '\n'));
 		h.mLength = static_cast<uint32>(hit->mTarget.length());
 
-		if (boost::regex_match(h.mDefLine, m, kM6FastARE, boost::match_not_dot_newline))
+		if (not boost::regex_match(h.mDefLine, m, kM6FastARE, boost::match_not_dot_newline))
+			throw M6Exception("Invalid defline: %s", h.mDefLine.c_str());
+					
+		if (m[1] == "sp")
 		{
-			if (m[1] == "sp")
-			{
-				h.mAccession = m[3];
-				h.mID = m[4];
-			}
-			else
-				h.mID = m[2];
-
-			h.mDefLine = m[7];
+			h.mAccession = m[3];
+			h.mID = m[4];
 		}
+		else if (m[2] != "")
+			h.mID = m[2];
 		else
-			h.mDefLine.erase(0, 1);
-		
+			h.mID = m[1];
+
+		h.mDefLine = m[7];
+
 		foreach (M6Hsp& hsp, hit->mHsps)
 		{
 			Hsp p = { static_cast<uint32>(h.mHsps.size() + 1), hsp.mQueryStart + 1, hsp.mQueryEnd,

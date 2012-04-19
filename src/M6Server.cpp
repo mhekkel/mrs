@@ -358,7 +358,8 @@ void M6Server::handle_entry(const zh::request& request, const el::scope& scope, 
 
 		process_xml(root, sub, "/");	
 
-		foreach (zx::element* link, format->find("link"))
+		zx::element_set links(format->find("link"));
+		foreach (zx::element* link, links)
 		{
 			try
 			{
@@ -1124,7 +1125,8 @@ void M6Server::create_redirect(const string& databank, uint32 inDocNr,
 
 void M6Server::LoadAllDatabanks()
 {
-	foreach (zx::element* db, mConfig->find("dbs/db"))
+	zx::element_set dbs(mConfig->find("dbs/db"));
+	foreach (zx::element* db, dbs)
 	{
 		string databank = db->content();
 

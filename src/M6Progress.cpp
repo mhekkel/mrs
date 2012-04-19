@@ -2,6 +2,10 @@
 
 #include <iostream>
 
+#if defined(__linux__)
+#include <unistd.h>
+#endif
+
 #include <boost/thread.hpp>
 #include <boost/format.hpp>
 #include <boost/date_time/posix_time/posix_time_types.hpp>
@@ -142,7 +146,6 @@ M6Progress::M6Progress(int64 inMax, const string& inAction)
 
 M6Progress::~M6Progress()
 {
-//	mImpl->mMutex.lock();
 	if (mImpl->mThread.joinable())
 	{
 		mImpl->mThread.interrupt();

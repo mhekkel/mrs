@@ -450,6 +450,9 @@ void M6WordHitIterator<WORDSIZE>::Init(const sequence& inQuery,
 	}
 	
 	assert(data == &outStaticData.mOffsets[0] + M);
+#if DEBUG
+	outStaticData.mOffsets.push_back(0);
+#endif
 }
 
 template<int WORDSIZE>

@@ -195,8 +195,7 @@ void M6Server::create_unauth_reply(bool stale, zh::reply& rep)
 	rep.set_header("WWW-Authenticate", challenge); 
 }
 
-void M6Server::handle_welcome(const zh::request& request,
-	const el::scope& scope, zh::reply& reply)
+void M6Server::handle_welcome(const zh::request& request, const el::scope& scope, zh::reply& reply)
 {
 	create_reply_from_template("index.html", scope, reply);
 }

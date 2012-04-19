@@ -918,7 +918,7 @@ void M6BlastQuery<WORDSIZE>::Report(Result& outResult)
 
 		if (not boost::regex_match(h.mDefLine, m, kM6FastARE, boost::match_not_dot_newline))
 			throw M6Exception("Invalid defline: %s", h.mDefLine.c_str());
-					
+
 		if (m[1] == "sp")
 		{
 			h.mAccession = m[3];
@@ -1565,8 +1565,10 @@ void operator&(xml::writer& w, const M6Blast::Hit& inHit)
 	w.start_element("Hit");
 	w.element("Hit_num", boost::lexical_cast<string>(inHit.mHitNr));
 	w.element("Hit_id", inHit.mID);
-	w.element("Hit_def", inHit.mDefLine);
-	w.element("Hit_accession", inHit.mAccession);
+	if (not inHit.mDefLine.empty())
+		w.element("Hit_def", inHit.mDefLine);
+	if (not inHit.mAccession.empty())
+		w.element("Hit_accession", inHit.mAccession);
 	w.element("Hit_len", boost::lexical_cast<string>(inHit.mLength));
 	w.start_element("Hit_hsps");
 	for_each(inHit.mHsps.begin(), inHit.mHsps.end(), [&](const M6Blast::Hsp& hsp) {
@@ -1601,7 +1603,8 @@ ostream& operator<<(ostream& os, const M6Blast::Result& inResult)
 	w.start_element("Iteration");
 	w.element("Iteration_iter-num", "1");
 	w.element("Iteration_query-ID", inResult.mQueryID);
-	w.element("Iteration_query-def", inResult.mQueryDef);
+	if (not inResult.mQueryDef.empty())
+		w.element("Iteration_query-def", inResult.mQueryDef);
 	w.element("Iteration_query-len", boost::lexical_cast<string>(inResult.mQueryLength));
 	w.start_element("Iteration_hits");
 	for_each(inResult.mHits.begin(), inResult.mHits.end(), [&](const M6Blast::Hit& hit) {

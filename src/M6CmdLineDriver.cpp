@@ -38,7 +38,8 @@ void Blast(int argc, char* const argv[])
 	desc.add_options()
 		("query,i",			po::value<string>(),	"File containing query in FastA format")
 		("program,p",		po::value<string>(),	"Blast program (only supported program is blastp for now...)")
-		("databank,d",		po::value<string>(),	"Databank in FastA format")
+		("databank,d",		po::value<vector<string>>(),
+													"Databank(s) in FastA format, can be specified multiple times")
 		("output,o",		po::value<string>(),	"Output file, default is stdout")
 		("report-limit,b",	po::value<int32>(),		"Number of results to report")
 		("matrix,M",		po::value<string>(),	"Matrix (default is BLOSUM62)")
@@ -79,10 +80,15 @@ void Blast(int argc, char* const argv[])
 			break;
 		query += line + '\n';
 	}
-	
-	fs::path databank(vm["databank"].as<string>());
-	if (not fs::exists(databank))
-		throw M6Exception("Databank does not exist");
+
+	vector<fs::path> databanks;
+	foreach (const string& p, vm["databank"].as<vector<string>>())
+	{
+		fs::path db(p);
+		if (not fs::exists(db))
+			throw M6Exception("Databank %s does not exist", p.c_str());
+		databanks.push_back(db);
+	}
 	
 	if (vm.count("program"))		program = vm["program"].as<string>();
 	if (vm.count("matrix"))			matrix = vm["matrix"].as<string>();
@@ -100,16 +106,16 @@ void Blast(int argc, char* const argv[])
 		if (vm.count("output") and vm["output"].as<string>() != "stdout")
 		{
 			fs::ofstream out(vm["output"].as<string>());
-			M6Blast::SearchAndWriteResultsAsFastA(out, databank, query, program, matrix,
+			M6Blast::SearchAndWriteResultsAsFastA(out, databanks, query, program, matrix,
 				wordSize, expect, filter, gapped, gapOpen, gapExtend, reportLimit, threads);
 		}
 		else
-			M6Blast::SearchAndWriteResultsAsFastA(cout, databank, query, program, matrix,
+			M6Blast::SearchAndWriteResultsAsFastA(cout, databanks, query, program, matrix,
 				wordSize, expect, filter, gapped, gapOpen, gapExtend, reportLimit, threads);
 	}
 	else
 	{
-		M6Blast::Result* r = M6Blast::Search(databank, query, program, matrix,
+		M6Blast::Result* r = M6Blast::Search(databanks, query, program, matrix,
 			wordSize, expect, filter, gapped, gapOpen, gapExtend, reportLimit, threads);
 	
 		if (vm.count("output") and vm["output"].as<string>() != "stdout")

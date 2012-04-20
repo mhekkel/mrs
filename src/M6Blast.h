@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <list>
 #include <vector>
 
 namespace M6Blast
@@ -59,14 +60,14 @@ struct Result
 	double			mEntropy;
 };
 
-Result* Search(const boost::filesystem::path& inDatabank,
+Result* Search(const std::vector<boost::filesystem::path>& inDatabanks,
 	const std::string& inQuery, const std::string& inProgram,
 	const std::string& inMatrix, uint32 inWordSize, double inExpect,
 	bool inFilter, bool inGapped, int32 inGapOpen, int32 inGapExtend,
 	uint32 inReportLimit, uint32 inThreads = 0);
 
 void SearchAndWriteResultsAsFastA(std::ostream& inOutFile,
-	const boost::filesystem::path& inDatabank,
+	const std::vector<boost::filesystem::path>& inDatabanks,
 	const std::string& inQuery, const std::string& inProgram,
 	const std::string& inMatrix, uint32 inWordSize, double inExpect,
 	bool inFilter, bool inGapped, int32 inGapOpen, int32 inGapExtend,

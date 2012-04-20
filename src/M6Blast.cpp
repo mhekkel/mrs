@@ -1,6 +1,7 @@
 #include "M6Lib.h"
 
 #include <iostream>
+#include <numeric>
 
 #include <zeep/xml/node.hpp>
 #include <zeep/xml/document.hpp>
@@ -658,16 +659,20 @@ void M6Hsp::CalculateExpect(int64 inSearchSpace, double inLambda, double inLogKa
 
 struct M6Hit
 {
-					M6Hit(const char* inEntry, const sequence& inTarget)
-						: mEntry(inEntry), mTarget(inTarget) {}
+					M6Hit(const char* inEntry, const sequence& inTarget);
 
 	void			AddHsp(const M6Hsp& inHsp);
 	void			Cleanup(int64 inSearchSpace, double inLambda, double inLogKappa, double inExpect);
 	
-	const char*		mEntry;
+	string			mDefLine;
 	sequence		mTarget;
 	vector<M6Hsp>	mHsps;
 };
+
+M6Hit::M6Hit(const char* inEntry, const sequence& inTarget)
+	: mDefLine(inEntry, strchr(inEntry, '\n')), mTarget(inTarget)
+{
+}
 
 void M6Hit::AddHsp(const M6Hsp& inHsp)
 {
@@ -730,8 +735,8 @@ class M6BlastQuery
 						uint32 inReportLimit);
 					~M6BlastQuery();
 
-//	void			Search(const fs::path& inDatabank, uint32 inNrOfThreads);
-	void			Search(const char* inFasta, size_t inLength, uint32 inNrOfThreads);
+	void			Search(const vector<fs::path>& inDatabanks, uint32 inNrOfThreads);
+//	void			Search(const char* inFasta, size_t inLength, uint32 inNrOfThreads);
 	void			Report(Result& outResult);
 	void			WriteAsFasta(ostream& inStream);
 
@@ -820,45 +825,58 @@ M6BlastQuery<WORDSIZE>::~M6BlastQuery()
 //	size_t length = file.size();
 
 template<int WORDSIZE>
-void M6BlastQuery<WORDSIZE>::Search(const char* inFasta, size_t inLength, uint32 inNrOfThreads)
+void M6BlastQuery<WORDSIZE>::Search(const vector<fs::path>& inDatabanks, uint32 inNrOfThreads)
 {
-	M6Progress progress(inLength, "searching");
+	int64 totalLength = accumulate(inDatabanks.begin(), inDatabanks.end(), 0LL,
+		[](int64 l, const fs::path& p) -> int64 { return l + fs::file_size(p); });
 	
-	if (inNrOfThreads <= 1)
-		SearchPart(inFasta, inLength, progress, mDbCount, mDbLength, mHits);
-	else
+	M6Progress progress(totalLength, "searching");
+	
+	foreach (const fs::path& p, inDatabanks)
 	{
-		boost::thread_group t;
-		boost::mutex m;
-		
-		size_t k = inLength / inNrOfThreads;
-		for (uint32 i = 0; i < inNrOfThreads and inLength > 0; ++i)
+		io::mapped_file file(p.string().c_str(), io::mapped_file::readonly);
+		if (not file.is_open())
+			throw M6Exception("FastA file %s not open", p.string().c_str());
+	
+		const char* data = file.const_data();
+		size_t length = file.size();
+
+		if (inNrOfThreads <= 1)
+			SearchPart(data, length, progress, mDbCount, mDbLength, mHits);
+		else
 		{
-			size_t n = k;
-			if (n > inLength)
-				n = inLength;
-			const char* end = inFasta + n;
-			while (n < inLength and *end != '>')
-				++end, ++n;
-
-			t.create_thread([inFasta, n, &m, &progress, this]() {
-				uint32 dbCount = 0;
-				int64 dbLength = 0;
-				vector<M6Hit*> hits;
-				
-				SearchPart(inFasta, n, progress, dbCount, dbLength, hits);
-
-				boost::mutex::scoped_lock lock(m);
-				mDbCount += dbCount;
-				mDbLength += dbLength;
-				mHits.insert(mHits.end(), hits.begin(), hits.end());
-			});
-
-			inFasta += n;
-			inLength -= n;
+			boost::thread_group t;
+			boost::mutex m;
+			
+			size_t k = length / inNrOfThreads;
+			for (uint32 i = 0; i < inNrOfThreads and length > 0; ++i)
+			{
+				size_t n = k;
+				if (n > length)
+					n = length;
+				const char* end = data + n;
+				while (n < length and *end != '>')
+					++end, ++n;
+	
+				t.create_thread([data, n, &m, &progress, this]() {
+					uint32 dbCount = 0;
+					int64 dbLength = 0;
+					vector<M6Hit*> hits;
+					
+					SearchPart(data, n, progress, dbCount, dbLength, hits);
+	
+					boost::mutex::scoped_lock lock(m);
+					mDbCount += dbCount;
+					mDbLength += dbLength;
+					mHits.insert(mHits.end(), hits.begin(), hits.end());
+				});
+	
+				data += n;
+				length -= n;
+			}
+			
+			t.join_all();
 		}
-		
-		t.join_all();
 	}
 	
 	int32 lengthAdjustment = ncbi::BlastComputeLengthAdjustment(mMatrix, static_cast<uint32>(mQuery.length()), mDbLength, mDbCount);
@@ -902,7 +920,7 @@ void M6BlastQuery<WORDSIZE>::Search(const char* inFasta, size_t inLength, uint32
 
 	sort(mHits.begin(), mHits.end(), [](const M6Hit* a, const M6Hit* b) -> bool {
 		return a->mHsps.front().mScore > b->mHsps.front().mScore or
-			(a->mHsps.front().mScore == b->mHsps.front().mScore and a->mEntry < b->mEntry);
+			(a->mHsps.front().mScore == b->mHsps.front().mScore and a->mDefLine < b->mDefLine);
 	});
 
 	if (mHits.size() > mReportLimit)
@@ -927,7 +945,7 @@ void M6BlastQuery<WORDSIZE>::Report(Result& outResult)
 		Hit h;
 		h.mHitNr = static_cast<uint32>(outResult.mHits.size() + 1);
 		boost::smatch m;
-		h.mDefLine = string(hit->mEntry, strchr(hit->mEntry, '\n'));
+		h.mDefLine = hit->mDefLine;
 		h.mLength = static_cast<uint32>(hit->mTarget.length());
 
 		if (not boost::regex_match(h.mDefLine, m, kM6FastARE, boost::match_not_dot_newline))
@@ -1001,7 +1019,7 @@ void M6BlastQuery<WORDSIZE>::WriteAsFasta(ostream& inStream)
 			seq += kM6Residues[r];
 		}
 		
-		inStream << string(hit->mEntry, strchr(hit->mEntry, '\n')) << endl
+		inStream << hit->mDefLine << endl
 				 << seq << endl;
 	}
 }
@@ -1469,19 +1487,12 @@ void M6BlastQuery<WORDSIZE>::AddHit(M6Hit* inHit, vector<M6Hit*>& inHitList) con
 
 // --------------------------------------------------------------------
 
-Result* Search(const fs::path& inDatabank,
+Result* Search(const vector<fs::path>& inDatabanks,
 	const string& inQuery, const string& inProgram,
 	const string& inMatrix, uint32 inWordSize, double inExpect,
 	bool inFilter, bool inGapped, int32 inGapOpen, int32 inGapExtend,
 	uint32 inReportLimit, uint32 inThreads)
 {
-	io::mapped_file file(inDatabank.string().c_str(), io::mapped_file::readonly);
-	if (not file.is_open())
-		throw M6Exception("FastA file %s not open", inDatabank.string().c_str());
-
-	const char* data = file.const_data();
-	size_t length = file.size();
-
 	if (inProgram != "blastp")
 		throw M6Exception("Unsupported program %s", inProgram.c_str());
 	
@@ -1523,7 +1534,8 @@ Result* Search(const fs::path& inDatabank,
 	unique_ptr<Result> result(new Result);
 
 	result->mProgram = inProgram;
-	result->mDb = inDatabank.string();
+	foreach (const fs::path& db, inDatabanks)
+		result->mDb += db.filename().string();
 	result->mExpect = inExpect;
 	result->mQueryID = queryID;
 	result->mQueryDef = queryDef;
@@ -1538,7 +1550,7 @@ Result* Search(const fs::path& inDatabank,
 		case 2:
 		{
 			M6BlastQuery<2> q(query, inFilter, inExpect, inMatrix, inGapped, inGapOpen, inGapExtend, inReportLimit);
-			q.Search(data, length, inThreads);
+			q.Search(inDatabanks, inThreads);
 			q.Report(*result);
 			break;
 		}
@@ -1546,7 +1558,7 @@ Result* Search(const fs::path& inDatabank,
 		case 3:
 		{
 			M6BlastQuery<3> q(query, inFilter, inExpect, inMatrix, inGapped, inGapOpen, inGapExtend, inReportLimit);
-			q.Search(data, length, inThreads);
+			q.Search(inDatabanks, inThreads);
 			q.Report(*result);
 			break;
 		}
@@ -1554,7 +1566,7 @@ Result* Search(const fs::path& inDatabank,
 		case 4:
 		{
 			M6BlastQuery<4> q(query, inFilter, inExpect, inMatrix, inGapped, inGapOpen, inGapExtend, inReportLimit);
-			q.Search(data, length, inThreads);
+			q.Search(inDatabanks, inThreads);
 			q.Report(*result);
 			break;
 		}
@@ -1566,20 +1578,12 @@ Result* Search(const fs::path& inDatabank,
 	return result.release();
 }
 
-void SearchAndWriteResultsAsFastA(std::ostream& inOutFile,
-	const boost::filesystem::path& inDatabank,
+void SearchAndWriteResultsAsFastA(std::ostream& inOutFile, const vector<fs::path>& inDatabanks,
 	const std::string& inQuery, const std::string& inProgram,
 	const std::string& inMatrix, uint32 inWordSize, double inExpect,
 	bool inFilter, bool inGapped, int32 inGapOpen, int32 inGapExtend,
 	uint32 inReportLimit, uint32 inThreads)
 {
-	io::mapped_file file(inDatabank.string().c_str(), io::mapped_file::readonly);
-	if (not file.is_open())
-		throw M6Exception("FastA file %s not open", inDatabank.string().c_str());
-
-	const char* data = file.const_data();
-	size_t length = file.size();
-
 	if (inProgram != "blastp")
 		throw M6Exception("Unsupported program %s", inProgram.c_str());
 	
@@ -1629,7 +1633,7 @@ void SearchAndWriteResultsAsFastA(std::ostream& inOutFile,
 		case 2:
 		{
 			M6BlastQuery<2> q(query, inFilter, inExpect, inMatrix, inGapped, inGapOpen, inGapExtend, inReportLimit);
-			q.Search(data, length, inThreads);
+			q.Search(inDatabanks, inThreads);
 			q.WriteAsFasta(inOutFile);
 			break;
 		}
@@ -1637,7 +1641,7 @@ void SearchAndWriteResultsAsFastA(std::ostream& inOutFile,
 		case 3:
 		{
 			M6BlastQuery<3> q(query, inFilter, inExpect, inMatrix, inGapped, inGapOpen, inGapExtend, inReportLimit);
-			q.Search(data, length, inThreads);
+			q.Search(inDatabanks, inThreads);
 			q.WriteAsFasta(inOutFile);
 			break;
 		}
@@ -1645,7 +1649,7 @@ void SearchAndWriteResultsAsFastA(std::ostream& inOutFile,
 		case 4:
 		{
 			M6BlastQuery<4> q(query, inFilter, inExpect, inMatrix, inGapped, inGapOpen, inGapExtend, inReportLimit);
-			q.Search(data, length, inThreads);
+			q.Search(inDatabanks, inThreads);
 			q.WriteAsFasta(inOutFile);
 			break;
 		}

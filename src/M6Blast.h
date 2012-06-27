@@ -31,7 +31,7 @@ struct Hit
 	std::string			mID;
 	std::string			mAccession;
 	std::string			mDefLine;
-	uint32				mLength;
+	std::string			mSequence;
 	std::list<Hsp>		mHsps;
 };
 

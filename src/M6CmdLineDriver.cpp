@@ -82,7 +82,8 @@ void Blast(int argc, char* const argv[])
 	}
 
 	vector<fs::path> databanks;
-	foreach (const string& p, vm["databank"].as<vector<string>>())
+	vector<string> dbs(vm["databank"].as<vector<string>>());
+	foreach (const string& p, dbs)
 	{
 		fs::path db(p);
 		if (not fs::exists(db))

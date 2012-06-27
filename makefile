@@ -9,8 +9,8 @@
 # makefile to match your current installation.
 
 #BOOST_LIB_SUFFIX	= 				# e.g. '-mt'
-BOOST_LIB_DIR		= $(HOME)/projects/boost-intel/lib
-BOOST_INC_DIR		= $(HOME)/projects/boost-intel/include
+BOOST_LIB_DIR		= $(HOME)/projects/boost/lib
+BOOST_INC_DIR		= $(HOME)/projects/boost/include
 
 PREFIX				?= /usr/local
 LIBDIR				?= $(PREFIX)/lib
@@ -25,9 +25,9 @@ LIBS				= m pthread archive bz2 z zeep pcre rt
 LDFLAGS				+= $(BOOST_LIB_DIR:%=-L%) $(LIBS:%=-l%) -g $(BOOST_LIBS:%=$(BOOST_LIB_DIR)/lib%.a) \
 							-L ../libzeep/
 
-CXX					= icpc
+CXX					= $(HOME)/bin/g++-4.6
 CFLAGS				+= $(BOOST_INC_DIR:%=-I%) -I. -pthread -std=c++0x -I../libzeep/
-CFLAGS				+= -I $(HOME)/projects/pcre/include -Wno-multichar
+CFLAGS				+= -I $(HOME)/projects/pcre/include -Wno-multichar 
 CFLAGS				+= -Wno-deprecated
 LDFLAGS				+= -L $(HOME)/projects/pcre/lib
 CFLAGS				+= -I $(HOME)/projects/libarchive/include

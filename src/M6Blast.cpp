@@ -379,19 +379,19 @@ class M6WordHitIterator
 
   public:
 
-	typedef M6Word<WORDSIZE>						M6Word;
-	typedef typename M6Word::PermutationIterator	M6WordPermutationIterator;
+	typedef M6Word<WORDSIZE>					Word;
+	typedef typename Word::PermutationIterator	WordPermutationIterator;
 
-	struct M6WordHitIteratorStaticData
+	struct WordHitIteratorStaticData
 	{
 		vector<Entry>		mLookup;
 		vector<uint16>		mOffsets;
 	};
-							M6WordHitIterator(const M6WordHitIteratorStaticData& inStaticData)
+							M6WordHitIterator(const WordHitIteratorStaticData& inStaticData)
 								: mLookup(inStaticData.mLookup), mOffsets(inStaticData.mOffsets) {}
 	
 	static void				Init(const sequence& inQuery, const M6Matrix& inMatrix,
-								uint32 inThreshhold, M6WordHitIteratorStaticData& outStaticData);
+								uint32 inThreshhold, WordHitIteratorStaticData& outStaticData);
 
 	void					Reset(const sequence& inTarget);
 	bool					Next(uint16& outQueryOffset, uint16& outTargetOffset);
@@ -415,18 +415,18 @@ template<> const uint32 M6WordHitIterator<4>::kMask = 0x07FFF;
 
 template<int WORDSIZE>
 void M6WordHitIterator<WORDSIZE>::Init(const sequence& inQuery, 
-	const M6Matrix& inMatrix, uint32 inThreshhold, M6WordHitIteratorStaticData& outStaticData)
+	const M6Matrix& inMatrix, uint32 inThreshhold, WordHitIteratorStaticData& outStaticData)
 {
-	uint64 N = M6Word::kM6MaxWordIndex;
+	uint64 N = Word::kM6MaxWordIndex;
 	size_t M = 0;
 	
 	vector<vector<uint16>> test(N);
 	
 	for (uint16 i = 0; i < inQuery.length() - WORDSIZE + 1; ++i)
 	{
-		M6Word w(inQuery.c_str() + i);
+		Word w(inQuery.c_str() + i);
 		
-		M6WordPermutationIterator p(w, inMatrix, inThreshhold);
+		WordPermutationIterator p(w, inMatrix, inThreshhold);
 		uint32 ix;
 
 		while (p.Next(ix))
@@ -669,6 +669,8 @@ struct M6Hit
 	vector<M6Hsp>	mHsps;
 };
 
+typedef shared_ptr<M6Hit> M6HitPtr;
+
 M6Hit::M6Hit(const char* inEntry, const sequence& inTarget)
 	: mDefLine(inEntry, strchr(inEntry, '\n')), mTarget(inTarget)
 {
@@ -736,14 +738,13 @@ class M6BlastQuery
 					~M6BlastQuery();
 
 	void			Search(const vector<fs::path>& inDatabanks, uint32 inNrOfThreads);
-//	void			Search(const char* inFasta, size_t inLength, uint32 inNrOfThreads);
 	void			Report(Result& outResult);
 	void			WriteAsFasta(ostream& inStream);
 
   private:
 
 	void			SearchPart(const char* inFasta, size_t inLength, M6Progress& inProgress,
-						uint32& outDbCount, int64& outDbLength, vector<M6Hit*>& outHits) const;
+						uint32& outDbCount, int64& outDbLength, vector<M6HitPtr>& outHits) const;
 
 	int32			Extend(int32& ioQueryStart, const sequence& inTarget, int32& ioTargetStart, int32& ioDistance) const;
 	template<class Iterator1, class Iterator2, class TraceBack>
@@ -754,10 +755,10 @@ class M6BlastQuery
 	int32			AlignGappedFirst(const sequence& inTarget, M6Hsp& ioHsp) const;
 	int32			AlignGappedSecond(const sequence& inTarget, M6Hsp& ioHsp) const;
 
-	void			AddHit(M6Hit* inHit, vector<M6Hit*>& inHitList) const;
+	void			AddHit(M6HitPtr inHit, vector<M6HitPtr>& inHitList) const;
 
-	typedef M6WordHitIterator<WORDSIZE>								M6WordHitIterator;
-	typedef typename M6WordHitIterator::M6WordHitIteratorStaticData	M6StaticData;
+	typedef M6WordHitIterator<WORDSIZE>								WordHitIterator;
+	typedef typename WordHitIterator::WordHitIteratorStaticData	M6StaticData;
 
 	string			mUnfiltered;
 	sequence		mQuery;
@@ -770,7 +771,7 @@ class M6BlastQuery
 	uint32			mDbCount;
 	int64			mDbLength, mSearchSpace;
 	
-	vector<M6Hit*>	mHits;
+	vector<M6HitPtr>mHits;
 	
 	M6StaticData	mWordHitData;
 };
@@ -805,24 +806,13 @@ M6BlastQuery<WORDSIZE>::M6BlastQuery(const string& inQuery, bool inFilter, doubl
 	// we're not using S2
 	mS2 =		static_cast<int32>((kLn2 * kM6GapTrigger + log(mMatrix.GappedKappa())) / mMatrix.GappedLambda());;	// yeah, that sucks... perhaps
 
-	M6WordHitIterator::Init(mQuery, mMatrix, kM6Threshold, mWordHitData);
+	WordHitIterator::Init(mQuery, mMatrix, kM6Threshold, mWordHitData);
 }
 
 template<int WORDSIZE>
 M6BlastQuery<WORDSIZE>::~M6BlastQuery()
 {
-	for_each(mHits.begin(), mHits.end(), [](M6Hit* hit) { delete hit; });
 }
-
-//template<int WORDSIZE>
-//void M6BlastQuery<WORDSIZE>::Search(const fs::path& inDatabank, uint32 inNrOfThreads)
-//{
-//	io::mapped_file file(inDatabank.string().c_str(), io::mapped_file::readonly);
-//	if (not file.is_open())
-//		throw M6Exception("FastA file %s not open", inDatabank.string().c_str());
-//
-//	const char* data = file.const_data();
-//	size_t length = file.size();
 
 template<int WORDSIZE>
 void M6BlastQuery<WORDSIZE>::Search(const vector<fs::path>& inDatabanks, uint32 inNrOfThreads)
@@ -861,14 +851,14 @@ void M6BlastQuery<WORDSIZE>::Search(const vector<fs::path>& inDatabanks, uint32 
 				t.create_thread([data, n, &m, &progress, this]() {
 					uint32 dbCount = 0;
 					int64 dbLength = 0;
-					vector<M6Hit*> hits;
+					vector<M6HitPtr> hits;
 					
-					SearchPart(data, n, progress, dbCount, dbLength, hits);
+					this->SearchPart(data, n, progress, dbCount, dbLength, hits);
 	
 					boost::mutex::scoped_lock lock(m);
 					mDbCount += dbCount;
 					mDbLength += dbLength;
-					mHits.insert(mHits.end(), hits.begin(), hits.end());
+					this->mHits.insert(mHits.end(), hits.begin(), hits.end());
 				});
 	
 				data += n;
@@ -902,10 +892,10 @@ void M6BlastQuery<WORDSIZE>::Search(const vector<fs::path>& inDatabanks, uint32 
 					if (next >= mHits.size())
 						break;
 					
-					M6Hit* hit = mHits[next];
+					M6HitPtr hit = mHits[next];
 					
 					foreach (M6Hsp& hsp, hit->mHsps)
-						hsp.mScore = AlignGappedSecond(hit->mTarget, hsp);
+						hsp.mScore = this->AlignGappedSecond(hit->mTarget, hsp);
 					
 					hit->Cleanup(mSearchSpace, lambda, logK, mExpect);
 				}
@@ -915,19 +905,16 @@ void M6BlastQuery<WORDSIZE>::Search(const vector<fs::path>& inDatabanks, uint32 
 	}
 
 	mHits.erase(
-		remove_if(mHits.begin(), mHits.end(), [](const M6Hit* hit) -> bool { return hit->mHsps.empty(); }),
+		remove_if(mHits.begin(), mHits.end(), [](const M6HitPtr hit) -> bool { return hit->mHsps.empty(); }),
 		mHits.end());
 
-	sort(mHits.begin(), mHits.end(), [](const M6Hit* a, const M6Hit* b) -> bool {
+	sort(mHits.begin(), mHits.end(), [](const M6HitPtr a, const M6HitPtr b) -> bool {
 		return a->mHsps.front().mScore > b->mHsps.front().mScore or
 			(a->mHsps.front().mScore == b->mHsps.front().mScore and a->mDefLine < b->mDefLine);
 	});
 
 	if (mHits.size() > mReportLimit)
-	{
-		for_each(mHits.begin() + mReportLimit, mHits.end(), [](M6Hit* hit) { delete hit; });
 		mHits.erase(mHits.begin() + mReportLimit, mHits.end());
-	}
 }
 
 template<int WORDSIZE>
@@ -940,13 +927,16 @@ void M6BlastQuery<WORDSIZE>::Report(Result& outResult)
 	outResult.mLambda = mMatrix.GappedLambda();
 	outResult.mEntropy = mMatrix.GappedEntropy();
 
-	foreach (M6Hit* hit, mHits)
+	foreach (M6HitPtr hit, mHits)
 	{
 		Hit h;
 		h.mHitNr = static_cast<uint32>(outResult.mHits.size() + 1);
 		boost::smatch m;
 		h.mDefLine = hit->mDefLine;
-		h.mLength = static_cast<uint32>(hit->mTarget.length());
+//		h.mLength = static_cast<uint32>(hit->mTarget.length());
+		h.mSequence.reserve(hit->mTarget.length());
+		transform(hit->mTarget.begin(), hit->mTarget.end(),
+			back_inserter(h.mSequence), [](uint8 r) -> char { return kM6Residues[r]; });
 
 		if (not boost::regex_match(h.mDefLine, m, kM6FastARE, boost::match_not_dot_newline))
 			throw M6Exception("Invalid defline: %s", h.mDefLine.c_str());
@@ -1009,7 +999,7 @@ void M6BlastQuery<WORDSIZE>::Report(Result& outResult)
 template<int WORDSIZE>
 void M6BlastQuery<WORDSIZE>::WriteAsFasta(ostream& inStream)
 {
-	foreach (M6Hit* hit, mHits)
+	foreach (M6HitPtr hit, mHits)
 	{
 		string seq;
 		foreach (uint8 r, hit->mTarget)
@@ -1026,23 +1016,26 @@ void M6BlastQuery<WORDSIZE>::WriteAsFasta(ostream& inStream)
 
 template<int WORDSIZE>
 void M6BlastQuery<WORDSIZE>::SearchPart(const char* inFasta, size_t inLength, M6Progress& inProgress,
-	uint32& outDbCount, int64& outDbLength, vector<M6Hit*>& outHits) const
+	uint32& outDbCount, int64& outDbLength, vector<M6HitPtr>& outHits) const
 {
 	const char* end = inFasta + inLength;
 	int32 queryLength = static_cast<int32>(mQuery.length());
 	
-	M6WordHitIterator iter(mWordHitData);
+	WordHitIterator iter(mWordHitData);
 	M6DiagonalStartTable diagonals;
 	sequence target;
 	target.reserve(kM6MaxSequenceLength);
 	
 	int64 hitsToDb = 0, extensions = 0, successfulExtensions = 0;
-	unique_ptr<M6Hit> hit;
+	M6HitPtr hit;
 	
 	while (inFasta != end)
 	{
 		if (hit)
-			AddHit(hit.release(), outHits);
+		{
+			AddHit(hit, outHits);
+			hit.reset();
+		}
 		
 		const char* entry = inFasta;
 		ReadEntry(inFasta, end, target);
@@ -1114,7 +1107,7 @@ void M6BlastQuery<WORDSIZE>::SearchPart(const char* inFasta, size_t inLength, M6
 	}
 
 	if (hit)
-		AddHit(hit.release(), outHits);
+		AddHit(hit, outHits);
 }
 
 template<int WORDSIZE>
@@ -1466,13 +1459,13 @@ int32 M6BlastQuery<WORDSIZE>::AlignGappedSecond(const sequence& inTarget, M6Hsp&
 }
 
 template<int WORDSIZE>
-void M6BlastQuery<WORDSIZE>::AddHit(M6Hit* inHit, vector<M6Hit*>& inHitList) const
+void M6BlastQuery<WORDSIZE>::AddHit(M6HitPtr inHit, vector<M6HitPtr>& inHitList) const
 {
 	sort(inHit->mHsps.begin(), inHit->mHsps.end(), greater<M6Hsp>());
 
 	inHitList.push_back(inHit);
 	
-	auto cmp = [](const M6Hit* a, const M6Hit* b) -> bool {
+	auto cmp = [](const M6HitPtr a, const M6HitPtr b) -> bool {
 		return a->mHsps.front().mScore > b->mHsps.front().mScore;
 	};
 	
@@ -1480,7 +1473,6 @@ void M6BlastQuery<WORDSIZE>::AddHit(M6Hit* inHit, vector<M6Hit*>& inHitList) con
 	if (inHitList.size() > mReportLimit)
 	{
 		pop_heap(inHitList.begin(), inHitList.end(), cmp);
-		delete inHitList.back();
 		inHitList.erase(inHitList.end() - 1);
 	}
 }
@@ -1692,7 +1684,7 @@ void operator&(xml::writer& w, const M6Blast::Hit& inHit)
 		w.element("Hit_def", inHit.mDefLine);
 	if (not inHit.mAccession.empty())
 		w.element("Hit_accession", inHit.mAccession);
-	w.element("Hit_len", boost::lexical_cast<string>(inHit.mLength));
+	w.element("Hit_len", boost::lexical_cast<string>(inHit.mSequence.length()));
 	w.start_element("Hit_hsps");
 	for_each(inHit.mHsps.begin(), inHit.mHsps.end(), [&](const M6Blast::Hsp& hsp) {
 		w & hsp;

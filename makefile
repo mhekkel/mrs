@@ -23,7 +23,7 @@ BOOST_LIBS			= system thread filesystem regex math_c99 math_c99f program_options
 BOOST_LIBS			:= $(BOOST_LIBS:%=boost_%$(BOOST_LIB_SUFFIX))
 LIBS				= m pthread archive bz2 z zeep pcre rt
 LDFLAGS				+= $(BOOST_LIB_DIR:%=-L%) $(LIBS:%=-l%) -g $(BOOST_LIBS:%=$(BOOST_LIB_DIR)/lib%.a) \
-							-L ../libzeep/
+							-L ../libzeep/ $(HOME)/lib64/libstdc++.a
 
 CXX					= $(HOME)/bin/g++-4.6
 CFLAGS				+= $(BOOST_INC_DIR:%=-I%) -I. -pthread -std=c++0x -I../libzeep/

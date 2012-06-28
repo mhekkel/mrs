@@ -16,7 +16,7 @@
 #include "M6Error.h"
 
 using namespace std;
-using namespace tr1;
+//using namespace tr1;
 
 // --------------------------------------------------------------------
 
@@ -53,7 +53,7 @@ ostream& operator<<(ostream& os, M6Token inToken)
 
 template<class InputIterator>
 inline
-tuple<InputIterator, uint32> ReadUTF8(InputIterator inIterator)
+tr1::tuple<InputIterator, uint32> ReadUTF8(InputIterator inIterator)
 {
 	uint32 uc;
 	
@@ -83,7 +83,7 @@ tuple<InputIterator, uint32> ReadUTF8(InputIterator inIterator)
 		}
 	}
 
-	return make_tuple(inIterator, uc);
+	return tr1::make_tuple(inIterator, uc);
 }
 
 template<class OutputIterator>
@@ -208,7 +208,7 @@ bool contains_han(const string& s)
 	while (si != s.end())
 	{
 		uint32 uc;
-		tie(si, uc) = ReadUTF8(si);
+		tr1::tie(si, uc) = ReadUTF8(si);
 		
 		if (is_han(uc))
 		{
@@ -830,7 +830,7 @@ void M6Tokenizer::CaseFold(string& ioString)
 	while (ptr < end)
 	{
 		uint32 ch = 0;
-		tie(ptr, ch) = ReadUTF8(ptr);
+		tr1::tie(ptr, ch) = ReadUTF8(ptr);
 		if (::ToLower(ch, s))
 			hasCombiningMarks = true;
 		if (s.size() > 1 or (s.size() == 1 and s[0] != ch))
@@ -860,7 +860,7 @@ void M6Tokenizer::Normalize(string& ioString)
 	while (ptr < end)
 	{
 		uint32 ch = 0;
-		tie(ptr, ch) = ReadUTF8(ptr);
+		tr1::tie(ptr, ch) = ReadUTF8(ptr);
 		if (::Decompose(ch, s))
 			hasCombiningMarks = true;
 	}

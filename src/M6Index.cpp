@@ -35,7 +35,27 @@
 using namespace std;
 namespace fs = boost::filesystem;
 
-class M6ValidationException;
+// DEBUG code
+
+class M6ValidationException : public std::exception
+{
+  public:
+					M6ValidationException(uint32 inPageNr, const char* inReason)
+						: mPageNr(inPageNr)
+					{
+#if defined(_MSC_VER)
+						sprintf_s(mReason, sizeof(mReason), "%s", inReason);
+#else
+						snprintf(mReason, sizeof(mReason), "%s", inReason);
+#endif
+					}
+			
+	const char*		what() const throw() { return mReason; }
+		
+	uint32			mPageNr;
+	char			mReason[512];
+};
+
 #define M6VALID_ASSERT(cond)	do { if (not (cond)) throw M6ValidationException(this->GetPageNr(), #cond ); } while (false)
 
 // --------------------------------------------------------------------
@@ -299,35 +319,35 @@ bool M6PageDataAccess<M6DataPage>::CanStore(const string& inKey) const
 	return mData.mN < kM6EntryCount and Free() >= (inKey.length() + 1 + sizeof(M6DataType));
 }
 
-template<class M6DataPage>
-void M6PageDataAccess<M6DataPage>::BinarySearch(const string& inKey, int32& outIndex, bool& outMatch, M6IndexImpl& inIndex) const
-{
-	outMatch = false;
-	
-	int32 L = 0, R = mData.mN - 1;
-	while (L <= R)
-	{
-		int32 i = (L + R) / 2;
-
-		const uint8* ko = mData.mKeys + mKeyOffsets[i];
-		const char* k = reinterpret_cast<const char*>(ko + 1);
-
-		int d = inIndex.CompareKeys(inKey.c_str(), inKey.length(), k, *ko);
-		if (d == 0)
-		{
-			outIndex = i;
-			outMatch = true;
-			break;
-		}
-		else if (d < 0)
-			R = i - 1;
-		else
-			L = i + 1;
-	}
-
-	if (not outMatch)
-		outIndex = R;
-}
+//template<class M6DataPage>
+//void M6PageDataAccess<M6DataPage>::BinarySearch(const string& inKey, int32& outIndex, bool& outMatch, M6IndexImpl& inIndex) const
+//{
+//	outMatch = false;
+//	
+//	int32 L = 0, R = mData.mN - 1;
+//	while (L <= R)
+//	{
+//		int32 i = (L + R) / 2;
+//
+//		const uint8* ko = mData.mKeys + mKeyOffsets[i];
+//		const char* k = reinterpret_cast<const char*>(ko + 1);
+//
+//		int d = inIndex.CompareKeys(inKey.c_str(), inKey.length(), k, *ko);
+//		if (d == 0)
+//		{
+//			outIndex = i;
+//			outMatch = true;
+//			break;
+//		}
+//		else if (d < 0)
+//			R = i - 1;
+//		else
+//			L = i + 1;
+//	}
+//
+//	if (not outMatch)
+//		outIndex = R;
+//}
 
 template<class M6DataPage>
 inline string M6PageDataAccess<M6DataPage>::GetKey(uint32 inIndex) const
@@ -736,9 +756,9 @@ template<class M6DataType>
 class M6IndexImplT : public M6IndexImpl
 {
   public:
-	typedef M6IndexPage<M6DataType>			M6IndexPage;
-	typedef M6LeafPage<M6DataType>			M6LeafPage;
-	typedef M6BranchPage<M6DataType>		M6BranchPage;
+	typedef M6IndexPage<M6DataType>			IndexPage;
+	typedef M6LeafPage<M6DataType>			LeafPage;
+	typedef M6BranchPage<M6DataType>		BranchPage;
 
 					M6IndexImplT(M6BasicIndex& inIndex, const fs::path& inPath,
 						M6IndexType inType, MOpenMode inMode);
@@ -832,9 +852,9 @@ template<class M6DataType>
 class M6IndexPage : public M6BasicPage
 {
   public:
-//	typedef M6IndexPage<M6DataType>		M6IndexPage;
-	typedef M6LeafPage<M6DataType>		M6LeafPage;
-	typedef M6BranchPage<M6DataType>	M6BranchPage;
+//	typedef M6IndexPage<M6DataType>		IndexPage;
+	typedef M6LeafPage<M6DataType>		LeafPage;
+	typedef M6BranchPage<M6DataType>	BranchPage;
 
 						M6IndexPage(M6IndexPageData* inData, uint32 inPageNr)
 							: M6BasicPage(inData, inPageNr) {}
@@ -843,10 +863,10 @@ class M6IndexPage : public M6BasicPage
 	
 	virtual bool		Find(const string& inKey, M6DataType& outValue) = 0;
 	virtual bool		Insert(string& ioKey, const M6DataType& inValue, uint32& outLink) = 0;
-	virtual bool		Erase(string& ioKey, int32 inIndex, M6BranchPage* inParent, M6BranchPage* inLinkPage, uint32 inLinkIndex) = 0;
+	virtual bool		Erase(string& ioKey, int32 inIndex, BranchPage* inParent, BranchPage* inLinkPage, uint32 inLinkIndex) = 0;
 
-	virtual void		Validate(const string& inKey, M6BranchPage* inParent) = 0;
-	virtual void		Dump(int inLevel, M6BranchPage* inParent) = 0;
+	virtual void		Validate(const string& inKey, BranchPage* inParent) = 0;
+	virtual void		Dump(int inLevel, BranchPage* inParent) = 0;
 };
 
 // --------------------------------------------------------------------
@@ -855,9 +875,9 @@ template<class M6DataType>
 class M6LeafPage : public M6IndexPage<M6DataType>
 {
   public:
-	typedef ::M6IndexPage<M6DataType>	M6IndexPage;
-//	typedef ::M6LeafPage<M6DataType>	M6LeafPage;
-	typedef ::M6BranchPage<M6DataType>	M6BranchPage;
+	typedef ::M6IndexPage<M6DataType>	IndexPage;
+	typedef ::M6LeafPage<M6DataType>	LeafPage;
+	typedef ::M6BranchPage<M6DataType>	BranchPage;
 
 	typedef typename M6IndexPageDataTypeFactory<M6DataType>::M6LeafPageDataType		M6DataPageType;
 	typedef M6PageDataAccess<M6DataPageType>										M6Access;
@@ -890,14 +910,14 @@ class M6LeafPage : public M6IndexPage<M6DataType>
 	
 	virtual bool		Find(const string& inKey, M6DataType& outValue);
 	virtual bool		Insert(string& ioKey, const M6DataType& inValue, uint32& outLink);
-	virtual bool		Erase(string& ioKey, int32 inIndex, M6BranchPage* inParent, M6BranchPage* inLinkPage, uint32 inLinkIndex);
+	virtual bool		Erase(string& ioKey, int32 inIndex, BranchPage* inParent, BranchPage* inLinkPage, uint32 inLinkIndex);
 
-	virtual void		Validate(const string& inKey, M6BranchPage* inParent);
-	virtual void		Dump(int inLevel, M6BranchPage* inParent);
+	virtual void		Validate(const string& inKey, BranchPage* inParent);
+	virtual void		Dump(int inLevel, BranchPage* inParent);
 
   private:
 
-	bool				Underflow(M6LeafPage& inRight, uint32 inIndex, M6BranchPage* inParent);
+	bool				Underflow(LeafPage& inRight, uint32 inIndex, BranchPage* inParent);
 	
 	M6IndexImpl&		mIndex;
 	M6DataPageType*		mData;
@@ -911,9 +931,9 @@ template<class M6DataType>
 class M6BranchPage : public M6IndexPage<M6DataType>
 {
   public:
-	typedef ::M6IndexPage<M6DataType>				M6IndexPage;
-	typedef ::M6LeafPage<M6DataType>				M6LeafPage;
-//	typedef ::M6BranchPage<M6DataType>				M6BranchPage;
+	typedef ::M6IndexPage<M6DataType>				IndexPage;
+	typedef ::M6LeafPage<M6DataType>				LeafPage;
+	typedef ::M6BranchPage<M6DataType>				BranchPage;
 
 	typedef M6IndexBranchPageData					M6DataPageType;
 	typedef M6PageDataAccess<M6DataPageType>		M6Access;
@@ -944,14 +964,14 @@ class M6BranchPage : public M6IndexPage<M6DataType>
 	
 	virtual bool		Find(const string& inKey, M6DataType& outValue);
 	virtual bool		Insert(string& ioKey, const M6DataType& inValue, uint32& outLink);
-	virtual bool		Erase(string& ioKey, int32 inIndex, M6BranchPage* inParent, M6BranchPage* inLinkPage, uint32 inLinkIndex);
+	virtual bool		Erase(string& ioKey, int32 inIndex, BranchPage* inParent, BranchPage* inLinkPage, uint32 inLinkIndex);
 
-	virtual void		Validate(const string& inKey, M6BranchPage* inParent);
-	virtual void		Dump(int inLevel, M6BranchPage* inParent);
+	virtual void		Validate(const string& inKey, BranchPage* inParent);
+	virtual void		Dump(int inLevel, BranchPage* inParent);
 
   private:
 
-	bool				Underflow(M6BranchPage& inRight, uint32 inIndex, M6BranchPage* inParent);
+	bool				Underflow(BranchPage& inRight, uint32 inIndex, BranchPage* inParent);
 
 	M6IndexImpl&		mIndex;
 	M6DataPageType*		mData;
@@ -963,7 +983,7 @@ class M6BranchPage : public M6IndexPage<M6DataType>
 
 template<class M6DataType>
 M6LeafPage<M6DataType>::M6LeafPage(M6IndexImpl& inIndexImpl, M6IndexPageData* inData, uint32 inPageNr)
-	: M6IndexPage(inData, inPageNr)
+	: M6IndexPage<M6DataType>(inData, inPageNr)
 	, mIndex(inIndexImpl)
 	, mData(reinterpret_cast<M6DataPageType*>(inData))
 	, mAccess(inData)
@@ -1002,7 +1022,7 @@ bool M6LeafPage<M6DataType>::Insert(string& ioKey, const M6DataType& inValue, ui
 		ix += 1;	// we need to insert at ix + 1
 
 		// create a new leaf page
-		M6LeafPage* next(mIndex.Allocate<M6LeafPage>());
+		LeafPage* next(mIndex.Allocate<LeafPage>());
 	
 		uint32 split = mData->mN / 2;
 
@@ -1030,7 +1050,7 @@ bool M6LeafPage<M6DataType>::Insert(string& ioKey, const M6DataType& inValue, ui
 }
 
 template<class M6DataType>
-bool M6LeafPage<M6DataType>::Erase(string& ioKey, int32 inIndex, M6BranchPage* inParent, M6BranchPage* inLinkPage, uint32 inLinkIndex)
+bool M6LeafPage<M6DataType>::Erase(string& ioKey, int32 inIndex, BranchPage* inParent, BranchPage* inLinkPage, uint32 inLinkIndex)
 {
 	bool result = false, match = false;
 	int32 ix;
@@ -1068,7 +1088,7 @@ bool M6LeafPage<M6DataType>::Erase(string& ioKey, int32 inIndex, M6BranchPage* i
 				if (inIndex + 1 < static_cast<int32>(inParent->GetN()))
 				{
 					// try to compensate using our right sibling
-					M6LeafPage* right(mIndex.Load<M6LeafPage>(inParent->GetValue(inIndex + 1)));
+					LeafPage* right(mIndex.Load<LeafPage>(inParent->GetValue(inIndex + 1)));
 					Underflow(*right, inIndex + 1, inParent);
 					mIndex.Release(right);
 				}
@@ -1082,7 +1102,7 @@ bool M6LeafPage<M6DataType>::Erase(string& ioKey, int32 inIndex, M6BranchPage* i
 					else
 						leftNr = inParent->GetLink();
 
-					M6LeafPage* left(mIndex.Load<M6LeafPage>(leftNr));
+					LeafPage* left(mIndex.Load<LeafPage>(leftNr));
 					left->Underflow(*this, inIndex, inParent);
 					mIndex.Release(left);
 				}
@@ -1096,7 +1116,7 @@ bool M6LeafPage<M6DataType>::Erase(string& ioKey, int32 inIndex, M6BranchPage* i
 }
 
 template<class M6DataType>
-bool M6LeafPage<M6DataType>::Underflow(M6LeafPage& inRight, uint32 inIndex, M6BranchPage* inParent)
+bool M6LeafPage<M6DataType>::Underflow(LeafPage& inRight, uint32 inIndex, BranchPage* inParent)
 {
 	// Page left of right contains too few entries, see if we can fix this
 	// first try a merge
@@ -1175,7 +1195,7 @@ bool M6LeafPage<M6DataType>::Underflow(M6LeafPage& inRight, uint32 inIndex, M6Br
 }
 
 template<class M6DataType>
-void M6LeafPage<M6DataType>::Validate(const string& inKey, M6BranchPage* inParent)
+void M6LeafPage<M6DataType>::Validate(const string& inKey, BranchPage* inParent)
 {
 //	M6VALID_ASSERT(mPageData.mN >= kM6MinEntriesPerPage or inParent == nullptr);
 	//M6VALID_ASSERT(inParent == nullptr or not TooSmall());
@@ -1192,14 +1212,14 @@ void M6LeafPage<M6DataType>::Validate(const string& inKey, M6BranchPage* inParen
 	
 	if (mData->mLink != 0)
 	{
-		M6LeafPage* next(mIndex.Load<M6LeafPage>(mData->mLink));
+		LeafPage* next(mIndex.Load<LeafPage>(mData->mLink));
 		M6VALID_ASSERT(mIndex.CompareKeys(GetKey(mData->mN - 1), next->GetKey(0)) < 0);
 		mIndex.Release(next);
 	}
 }
 
 template<class M6DataType>
-void M6LeafPage<M6DataType>::Dump(int inLevel, M6BranchPage* inParent)
+void M6LeafPage<M6DataType>::Dump(int inLevel, BranchPage* inParent)
 {
 	string prefix(inLevel * 2, ' ');
 
@@ -1211,7 +1231,7 @@ void M6LeafPage<M6DataType>::Dump(int inLevel, M6BranchPage* inParent)
 
 	if (mData->mLink)
 	{
-		M6LeafPage* next(mIndex.Load<M6LeafPage>(mData->mLink));
+		LeafPage* next(mIndex.Load<LeafPage>(mData->mLink));
 		cout << prefix << "  " << "link: " << next->GetKey(0) << endl;
 		mIndex.Release(next);
 	}
@@ -1221,7 +1241,7 @@ void M6LeafPage<M6DataType>::Dump(int inLevel, M6BranchPage* inParent)
 
 template<class M6DataType>
 M6BranchPage<M6DataType>::M6BranchPage(M6IndexImpl& inIndexImpl, M6IndexPageData* inData, uint32 inPageNr)
-	: M6IndexPage(inData, inPageNr)
+	: M6IndexPage<M6DataType>(inData, inPageNr)
 	, mIndex(inIndexImpl)
 	, mData(&inData->branch)
 	, mAccess(inData)
@@ -1244,7 +1264,7 @@ bool M6BranchPage<M6DataType>::Find(const string& inKey, M6DataType& outValue)
 	else
 		pageNr = GetValue(ix);
 	
-	M6IndexPage* page(mIndex.Load<M6IndexPage>(pageNr));
+	IndexPage* page(mIndex.Load<IndexPage>(pageNr));
 	bool result = page->Find(inKey, outValue);
 	mIndex.Release(page);
 	return result;
@@ -1271,7 +1291,7 @@ bool M6BranchPage<M6DataType>::Insert(string& ioKey, const M6DataType& inValue, 
 	else
 		pageNr = GetValue(ix);
 
-	M6IndexPage* page(mIndex.Load<M6IndexPage>(pageNr));
+	IndexPage* page(mIndex.Load<IndexPage>(pageNr));
 	
 	uint32 link;
 	if (page->Insert(ioKey, inValue, link))
@@ -1286,7 +1306,7 @@ bool M6BranchPage<M6DataType>::Insert(string& ioKey, const M6DataType& inValue, 
 			// the key needs to be inserted but it didn't fit
 			// so we need to split the page
 
-			M6BranchPage* next(mIndex.Allocate<M6BranchPage>());
+			BranchPage* next(mIndex.Allocate<BranchPage>());
 			
 			int32 split = mData->mN / 2;
 			string upKey;
@@ -1352,7 +1372,7 @@ bool M6BranchPage<M6DataType>::Insert(string& ioKey, const M6DataType& inValue, 
 }
 
 template<class M6DataType>
-bool M6BranchPage<M6DataType>::Erase(string& ioKey, int32 inIndex, M6BranchPage* inParent, M6BranchPage* inLinkPage, uint32 inLinkIndex)
+bool M6BranchPage<M6DataType>::Erase(string& ioKey, int32 inIndex, BranchPage* inParent, BranchPage* inLinkPage, uint32 inLinkIndex)
 {
 	bool result = false, match = false;
 	int32 ix;
@@ -1373,7 +1393,7 @@ bool M6BranchPage<M6DataType>::Erase(string& ioKey, int32 inIndex, M6BranchPage*
 	else
 		pageNr = GetValue(ix);
 	
-	M6IndexPage* page(mIndex.Load<M6IndexPage>(pageNr));
+	IndexPage* page(mIndex.Load<IndexPage>(pageNr));
 	if (page->Erase(ioKey, ix, this, inLinkPage, inLinkIndex))
 	{
 		result = true;
@@ -1383,7 +1403,7 @@ bool M6BranchPage<M6DataType>::Erase(string& ioKey, int32 inIndex, M6BranchPage*
 			if (inIndex + 1 < static_cast<int32>(inParent->GetN()))
 			{
 				// try to compensate using our right sibling
-				M6BranchPage* right(mIndex.Load<M6BranchPage>(inParent->GetValue(inIndex + 1)));
+				BranchPage* right(mIndex.Load<BranchPage>(inParent->GetValue(inIndex + 1)));
 				Underflow(*right, inIndex + 1, inParent);
 				mIndex.Release(right);
 			}
@@ -1391,7 +1411,7 @@ bool M6BranchPage<M6DataType>::Erase(string& ioKey, int32 inIndex, M6BranchPage*
 			if (TooSmall() and inIndex >= 0)
 			{
 				// if still too small, try with the left sibling
-				M6BranchPage* left(mIndex.Load<M6BranchPage>(inIndex > 0 ? inParent->GetValue(inIndex - 1) : inParent->mData->mLink));
+				BranchPage* left(mIndex.Load<BranchPage>(inIndex > 0 ? inParent->GetValue(inIndex - 1) : inParent->mData->mLink));
 				left->Underflow(*this, inIndex, inParent);
 				mIndex.Release(left);
 			}
@@ -1404,7 +1424,7 @@ bool M6BranchPage<M6DataType>::Erase(string& ioKey, int32 inIndex, M6BranchPage*
 }
 
 template<class M6DataType>
-bool M6BranchPage<M6DataType>::Underflow(M6BranchPage& inRight, uint32 inIndex, M6BranchPage* inParent)
+bool M6BranchPage<M6DataType>::Underflow(BranchPage& inRight, uint32 inIndex, BranchPage* inParent)
 {
 	// This page left of inRight contains too few entries, see if we can fix this
 	// first try a merge
@@ -1457,20 +1477,20 @@ bool M6BranchPage<M6DataType>::Underflow(M6BranchPage& inRight, uint32 inIndex, 
 }
 
 template<class M6DataType>
-void M6BranchPage<M6DataType>::Validate(const string& inKey, M6BranchPage* inParent)
+void M6BranchPage<M6DataType>::Validate(const string& inKey, BranchPage* inParent)
 {
 //		M6VALID_ASSERT(mData->mN >= kM6MinEntriesPerPage or inParent == nullptr);
 	//M6VALID_ASSERT(inParent == nullptr or not TooSmall());
 
 	for (uint32 i = 0; i < mData->mN; ++i)
 	{
-		M6IndexPage* link(mIndex.Load<M6IndexPage>(mData->mLink));
+		IndexPage* link(mIndex.Load<IndexPage>(mData->mLink));
 		link->Validate(inKey, this);
 		mIndex.Release(link);
 		
 		for (uint32 i = 0; i < mData->mN; ++i)
 		{
-			M6IndexPage* page(mIndex.Load<M6IndexPage>(GetValue(i)));
+			IndexPage* page(mIndex.Load<IndexPage>(GetValue(i)));
 			page->Validate(GetKey(i), this);
 			mIndex.Release(page);
 			if (i > 0)
@@ -1480,7 +1500,7 @@ void M6BranchPage<M6DataType>::Validate(const string& inKey, M6BranchPage* inPar
 }
 
 template<class M6DataType>
-void M6BranchPage<M6DataType>::Dump(int inLevel, M6BranchPage* inParent)
+void M6BranchPage<M6DataType>::Dump(int inLevel, BranchPage* inParent)
 {
 	string prefix(inLevel * 2, ' ');
 
@@ -1489,7 +1509,7 @@ void M6BranchPage<M6DataType>::Dump(int inLevel, M6BranchPage* inParent)
 		cout << GetKey(i) << (i + 1 < mData->mN ? ", " : "");
 	cout << "}" << endl;
 
-	M6IndexPage* link(mIndex.Load<M6IndexPage>(mData->mLink));
+	IndexPage* link(mIndex.Load<IndexPage>(mData->mLink));
 	link->Dump(inLevel + 1, this);
 	mIndex.Release(link);
 	
@@ -1497,7 +1517,7 @@ void M6BranchPage<M6DataType>::Dump(int inLevel, M6BranchPage* inParent)
 	{
 		cout << prefix << inLevel << '.' << i << ") " << GetKey(i) << endl;
 		
-		M6IndexPage* sub(mIndex.Load<M6IndexPage>(GetValue(i)));
+		IndexPage* sub(mIndex.Load<IndexPage>(GetValue(i)));
 		sub->Dump(inLevel + 1, this);
 		mIndex.Release(sub);
 	}
@@ -1624,6 +1644,38 @@ void M6IBitVectorImpl::Read()
 		mPageNr = mPage->GetLink();
 		mOffset = 0;
 	}
+}
+
+// --------------------------------------------------------------------
+
+template<class M6DataPage>
+void M6PageDataAccess<M6DataPage>::BinarySearch(const string& inKey, int32& outIndex, bool& outMatch, M6IndexImpl& inIndex) const
+{
+	outMatch = false;
+	
+	int32 L = 0, R = mData.mN - 1;
+	while (L <= R)
+	{
+		int32 i = (L + R) / 2;
+
+		const uint8* ko = mData.mKeys + mKeyOffsets[i];
+		const char* k = reinterpret_cast<const char*>(ko + 1);
+
+		int d = inIndex.CompareKeys(inKey.c_str(), inKey.length(), k, *ko);
+		if (d == 0)
+		{
+			outIndex = i;
+			outMatch = true;
+			break;
+		}
+		else if (d < 0)
+			R = i - 1;
+		else
+			L = i + 1;
+	}
+
+	if (not outMatch)
+		outIndex = R;
 }
 
 // --------------------------------------------------------------------
@@ -2045,7 +2097,7 @@ void M6IndexImplT<M6DataType>::Rollback()
 template<class M6DataType>
 void M6IndexImplT<M6DataType>::GetKey(uint32 inPage, uint32 inKeyNr, string& outKey)
 {
-	M6LeafPage* page = Load<M6LeafPage>(inPage);
+	LeafPage* page = Load<LeafPage>(inPage);
 	if (inKeyNr >= page->GetN())
 		THROW(("key index out of range"));
 	outKey = page->GetKey(inKeyNr);
@@ -2057,7 +2109,7 @@ bool M6IndexImplT<M6DataType>::GetNextKey(uint32& ioPage, uint32& ioKeyNr, strin
 {
 	bool result = false;
 	
-	M6LeafPage* page = Load<M6LeafPage>(ioPage);
+	LeafPage* page = Load<LeafPage>(ioPage);
 
 	if (ioKeyNr + 1 < page->GetN())
 	{
@@ -2109,7 +2161,7 @@ template<>
 uint32 M6IndexImplT<M6MultiData>::GetCount(uint32 inPage, uint32 inKeyNr)
 {
 	uint32 result = 0;
-	M6LeafPage* page = Load<M6LeafPage>(inPage);
+	LeafPage* page = Load<LeafPage>(inPage);
 
 	if (inKeyNr < page->GetN())
 		result = page->GetValue(inKeyNr).mCount;
@@ -2122,7 +2174,7 @@ template<>
 uint32 M6IndexImplT<M6MultiIDLData>::GetCount(uint32 inPage, uint32 inKeyNr)
 {
 	uint32 result = 0;
-	M6LeafPage* page = Load<M6LeafPage>(inPage);
+	LeafPage* page = Load<LeafPage>(inPage);
 
 	if (inKeyNr < page->GetN())
 		result = page->GetValue(inKeyNr).mCount;
@@ -2138,13 +2190,13 @@ void M6IndexImplT<M6DataType>::Insert(const string& inKey, const M6DataType& inV
 	{
 		if (mHeader.mRoot == 0)	// empty index?
 		{
-			M6IndexPage* root(Allocate<M6LeafPage>());
+			IndexPage* root(Allocate<LeafPage>());
 			mHeader.mRoot = mHeader.mFirstLeafPage = root->GetPageNr();
 			mHeader.mDepth = 1;
 			Release(root);
 		}
 		
-		M6IndexPage* root(Load<M6IndexPage>(mHeader.mRoot));
+		IndexPage* root(Load<IndexPage>(mHeader.mRoot));
 		
 		string key(inKey);
 		uint32 link;
@@ -2154,7 +2206,7 @@ void M6IndexImplT<M6DataType>::Insert(const string& inKey, const M6DataType& inV
 			// increase depth
 			++mHeader.mDepth;
 			
-			M6BranchPage* newRoot(Allocate<M6BranchPage>());
+			BranchPage* newRoot(Allocate<BranchPage>());
 			newRoot->SetLink(mHeader.mRoot);
 			newRoot->InsertKeyValue(key, link, 0);
 			mHeader.mRoot = newRoot->GetPageNr();
@@ -2311,7 +2363,7 @@ bool M6IndexImplT<M6DataType>::Erase(const string& inKey)
 	
 	try
 	{
-		M6IndexPage* root(Load<M6IndexPage>(mHeader.mRoot));
+		IndexPage* root(Load<IndexPage>(mHeader.mRoot));
 		
 		string key(inKey);
 	
@@ -2353,7 +2405,7 @@ bool M6IndexImplT<M6DataType>::Find(const string& inKey, M6DataType& outValue)
 	bool result = false;
 	if (mHeader.mRoot != 0)
 	{
-		M6IndexPage* root(Load<M6IndexPage>(mHeader.mRoot));
+		IndexPage* root(Load<IndexPage>(mHeader.mRoot));
 		result = root->Find(inKey, outValue);
 		Release(root);
 	}
@@ -2366,7 +2418,7 @@ M6Iterator* M6IndexImplT<uint32>::Find(const string& inKey)
 	M6Iterator* result = nullptr;
 	if (mHeader.mRoot != 0)
 	{
-		M6IndexPage* root(Load<M6IndexPage>(mHeader.mRoot));
+		IndexPage* root(Load<IndexPage>(mHeader.mRoot));
 		uint32 docNr;
 		if (root->Find(inKey, docNr))
 			result = new M6SingleDocIterator(docNr);
@@ -2381,7 +2433,7 @@ M6Iterator* M6IndexImplT<M6MultiData>::Find(const string& inKey)
 	M6Iterator* result = nullptr;
 	if (mHeader.mRoot != 0)
 	{
-		M6IndexPage* root(Load<M6IndexPage>(mHeader.mRoot));
+		IndexPage* root(Load<IndexPage>(mHeader.mRoot));
 		M6MultiData data;
 		if (root->Find(inKey, data))
 		{
@@ -2399,7 +2451,7 @@ M6Iterator* M6IndexImplT<M6MultiIDLData>::Find(const string& inKey)
 	M6Iterator* result = nullptr;
 	if (mHeader.mRoot != 0)
 	{
-		M6IndexPage* root(Load<M6IndexPage>(mHeader.mRoot));
+		IndexPage* root(Load<IndexPage>(mHeader.mRoot));
 		M6MultiIDLData data;
 		if (root->Find(inKey, data))
 		{
@@ -2423,7 +2475,7 @@ M6Iterator* M6IndexImplT<M6MultiIDLData>::FindString(const string& inString)
 	M6Iterator* result = nullptr;
 	if (mHeader.mRoot != 0)
 	{
-		M6IndexPage* root(Load<M6IndexPage>(mHeader.mRoot));
+		IndexPage* root(Load<IndexPage>(mHeader.mRoot));
 		M6MultiIDLData data;
 		vector<tr1::tuple<M6Iterator*,int64,uint32>> iterators;
 		bool ok = true;
@@ -2526,14 +2578,14 @@ void M6IndexImplT<M6DataType>::Vacuum(M6Progress& inProgress)
 			pageNr = n;
 		}
 
-		M6LeafPage* page = Load<M6LeafPage>(pageNr);
+		LeafPage* page = Load<LeafPage>(pageNr);
 
 		up.push_back(make_pair(page->GetKey(0), pageNr));
 		uint32 link = page->GetLink();
 		
 		while (link != 0)
 		{
-			M6LeafPage* next = Load<M6LeafPage>(ix1[link]);
+			LeafPage* next = Load<LeafPage>(ix1[link]);
 			if (next->GetN() == 0)
 			{
 				link = next->GetLink();
@@ -2626,7 +2678,7 @@ void M6IndexImplT<M6DataType>::FinishBatchMode(M6Progress& inProgress)
 	deque<pair<string,uint32>> up;
 	
 	// create a root
-	M6LeafPage* page(Allocate<M6LeafPage>());
+	LeafPage* page(Allocate<LeafPage>());
 	mHeader.mRoot = mHeader.mFirstLeafPage = page->GetPageNr();
 	mHeader.mDepth = 1;
 
@@ -2639,7 +2691,7 @@ void M6IndexImplT<M6DataType>::FinishBatchMode(M6Progress& inProgress)
 		
 		if (not page->CanStore(key))
 		{
-			M6LeafPage* next = Allocate<M6LeafPage>();
+			LeafPage* next = Allocate<LeafPage>();
 			
 			page->SetLink(next->GetPageNr());
 			inProgress.Consumed(page->GetN());
@@ -2672,7 +2724,7 @@ M6BasicPage* M6IndexImplT<M6DataType>::GetFirstLeafPage()
 {
 	M6BasicPage* result = nullptr;
 	if (mHeader.mFirstLeafPage != 0)
-		result = Load<M6LeafPage>(mHeader.mFirstLeafPage);
+		result = Load<LeafPage>(mHeader.mFirstLeafPage);
 	return result;
 }
 
@@ -2691,7 +2743,7 @@ void M6IndexImplT<M6DataType>::CreateUpLevels(deque<pair<string,uint32>>& up)
 		auto tuple = up.front();
 		up.pop_front();
 		
-		M6BranchPage* page(Allocate<M6BranchPage>());
+		BranchPage* page(Allocate<BranchPage>());
 		page->SetLink(tuple.second);
 		
 		// store this new page for the next round
@@ -2714,7 +2766,7 @@ void M6IndexImplT<M6DataType>::CreateUpLevels(deque<pair<string,uint32>>& up)
 				// special case, if up.size() == 2 and we can store both
 				// keys, store them and break the loop
 				if (up.size() == 2 and
-					page->GetN() + 1 < M6BranchPage::kM6EntryCount and
+					page->GetN() + 1 < BranchPage::kM6EntryCount and
 					page->Free() >= (up[0].first.length() + up[1].first.length() + 2 + 2 * sizeof(uint32)))
 				{
 					page->InsertKeyValue(up[0].first, up[0].second, page->GetN());
@@ -2734,7 +2786,7 @@ void M6IndexImplT<M6DataType>::CreateUpLevels(deque<pair<string,uint32>>& up)
 	
 			// cannot store the tuple, create new page
 			Release(page);
-			page = Allocate<M6BranchPage>();
+			page = Allocate<BranchPage>();
 			page->SetLink(tuple.second);
 	
 			nextUp.push_back(make_pair(tuple.first, page->GetPageNr()));
@@ -2753,17 +2805,17 @@ void M6IndexImplT<M6DataType>::CreateUpLevels(deque<pair<string,uint32>>& up)
 template<class M6DataType>
 M6BasicPage* M6IndexImplT<M6DataType>::CreateLeafPage(M6IndexPageData* inData, uint32 inPageNr)
 {
-	if (inData->leaf.mType != M6LeafPage::M6DataPageType::kIndexPageType)
-		THROW(("Inconsistent page type, expected %c, found %c", M6LeafPage::M6DataPageType::kIndexPageType, inData->leaf.mType));
-	return new M6LeafPage(*this, inData, inPageNr);
+	if (inData->leaf.mType != LeafPage::M6DataPageType::kIndexPageType)
+		THROW(("Inconsistent page type, expected %c, found %c", LeafPage::M6DataPageType::kIndexPageType, inData->leaf.mType));
+	return new LeafPage(*this, inData, inPageNr);
 }
 
 template<class M6DataType>
 M6BasicPage* M6IndexImplT<M6DataType>::CreateBranchPage(M6IndexPageData* inData, uint32 inPageNr)
 {
-	if (inData->leaf.mType != M6BranchPage::M6DataPageType::kIndexPageType)
-		THROW(("Inconsistent page type, expected %c, found %c", M6BranchPage::M6DataPageType::kIndexPageType, inData->leaf.mType));
-	return new M6BranchPage(*this, inData, inPageNr);
+	if (inData->leaf.mType != BranchPage::M6DataPageType::kIndexPageType)
+		THROW(("Inconsistent page type, expected %c, found %c", BranchPage::M6DataPageType::kIndexPageType, inData->leaf.mType));
+	return new BranchPage(*this, inData, inPageNr);
 }
 
 template<class M6DataType>
@@ -2773,7 +2825,7 @@ void M6IndexImplT<M6DataType>::Validate()
 	{
 		if (mHeader.mRoot != 0)
 		{
-			M6IndexPage* root(Load<M6IndexPage>(mHeader.mRoot));
+			IndexPage* root(Load<IndexPage>(mHeader.mRoot));
 			root->Validate("", nullptr);
 			Release(root);
 		}
@@ -2797,7 +2849,7 @@ void M6IndexImplT<M6DataType>::Dump()
 		 << "Dumping tree" << endl
 		 << endl;
 
-	M6IndexPage* root(Load<M6IndexPage>(mHeader.mRoot));
+	IndexPage* root(Load<IndexPage>(mHeader.mRoot));
 	root->Dump(0, nullptr);
 	Release(root);
 }
@@ -2980,27 +3032,6 @@ bool M6BasicIndex::IsInBatchMode()
 {
 	return mImpl->IsInBatchMode();
 }
-
-// DEBUG code
-
-class M6ValidationException : public std::exception
-{
-  public:
-					M6ValidationException(uint32 inPageNr, const char* inReason)
-						: mPageNr(inPageNr)
-					{
-#if defined(_MSC_VER)
-						sprintf_s(mReason, sizeof(mReason), "%s", inReason);
-#else
-						snprintf(mReason, sizeof(mReason), "%s", inReason);
-#endif
-					}
-			
-	const char*		what() const throw() { return mReason; }
-		
-	uint32			mPageNr;
-	char			mReason[512];
-};
 
 // --------------------------------------------------------------------
 
@@ -3210,7 +3241,7 @@ bool M6WeightedBasicIndex::Find(const string& inKey, M6WeightedIterator& outIter
 void M6WeightedBasicIndex::CalculateDocumentWeights(uint32 inDocCount,
 	vector<float>& outWeights, M6Progress& inProgress)
 {
-	typedef M6LeafPage<M6MultiData> M6LeafPage;
+	typedef M6LeafPage<M6MultiData> LeafPage;
 	
 	vector<uint32> docs;
 	float max = static_cast<float>(inDocCount);
@@ -3220,7 +3251,7 @@ void M6WeightedBasicIndex::CalculateDocumentWeights(uint32 inDocCount,
 
 	while (page != nullptr)
 	{
-		M6LeafPage* leaf = dynamic_cast<M6LeafPage*>(page);
+		LeafPage* leaf = dynamic_cast<LeafPage*>(page);
 		if (leaf == nullptr)
 			THROW(("invalid index"));
 		

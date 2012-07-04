@@ -25,7 +25,7 @@ LIBS				= m pthread archive bz2 z zeep pcre rt
 LDFLAGS				+= $(BOOST_LIB_DIR:%=-L%) $(LIBS:%=-l%) -g $(BOOST_LIBS:%=$(BOOST_LIB_DIR)/lib%.a) \
 							-L ../libzeep/ $(HOME)/lib64/libstdc++.a
 
-CXX					= $(HOME)/bin/g++-4.6
+CXX					= c++
 CFLAGS				+= $(BOOST_INC_DIR:%=-I%) -I. -pthread -std=c++0x -I../libzeep/
 CFLAGS				+= -I $(HOME)/projects/pcre/include -Wno-multichar 
 CFLAGS				+= -Wno-deprecated

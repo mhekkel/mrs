@@ -10,7 +10,10 @@
 #include <boost/format.hpp>
 #include <boost/date_time/posix_time/posix_time_types.hpp>
 #include <boost/lexical_cast.hpp>
+
+#if BOOST_VERSION >= 104800
 #include <boost/timer/timer.hpp>
+#endif
 
 #if defined(__linux__) || defined(__INTEL_COMPILER_BUILD_DATE)
 #include <atomic>
@@ -67,8 +70,10 @@ struct M6ProgressImpl
 	string			mAction, mMessage;
 	boost::mutex	mMutex;
 	boost::thread	mThread;
+#if BOOST_VERSION >= 104800
 	boost::timer::cpu_timer
 					mTimer;
+#endif
 };
 
 void M6ProgressImpl::Run()
@@ -132,7 +137,10 @@ void M6ProgressImpl::PrintDone()
 {
 	int width = 80;
 
-	string msg = mAction + " done in " + mTimer.format(0, "%ts cpu / %ws wall");
+	string msg = mAction + " done";
+#if BOOST_VERSION >= 104800
+	msg += " in " + mTimer.format(0, "%ts cpu / %ws wall");
+#endif
 	if (msg.length() < width)
 		msg += string(width - msg.length(), ' ');
 	

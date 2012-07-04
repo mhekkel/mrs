@@ -8,7 +8,7 @@
 #include <boost/format.hpp>
 #include <boost/foreach.hpp>
 #define foreach BOOST_FOREACH
-#include <boost/timer/timer.hpp>
+//#include <boost/timer/timer.hpp>
 
 #include "M6Builder.h"
 #include "M6Databank.h"
@@ -26,7 +26,7 @@ int VERBOSE;
 
 void Blast(int argc, char* const argv[])
 {
-	boost::timer::auto_cpu_timer t;
+//	boost::timer::auto_cpu_timer t;
 
 	string matrix("BLOSUM62"), program = "blastp", query;
 	int32 gapOpen = -1, gapExtend = -1, wordSize = 0,

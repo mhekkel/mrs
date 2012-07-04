@@ -8,9 +8,12 @@
 #define foreach BOOST_FOREACH
 #include <boost/filesystem/fstream.hpp>
 #include <boost/algorithm/string.hpp>
-#include <boost/random/random_device.hpp>
 #include <boost/date_time/posix_time/posix_time_types.hpp>
 #include <boost/program_options.hpp>
+
+#if BOOST_VERSION >= 104800
+#include <boost/random/random_device.hpp>
+#endif
 
 #include "M6Databank.h"
 #include "M6Server.h"
@@ -54,9 +57,18 @@ M6AuthInfo::M6AuthInfo(const string& inRealm)
 	, mLastNC(0)
 {
 	using namespace boost::gregorian;
-	
+
+#if BOOST_VERSION >= 104800
 	boost::random::random_device rng;
 	uint32 data[4] = { rng(), rng(), rng(), rng() };
+#else
+	uint32 data[4] = {
+		static_cast<uint32>(random()),
+		static_cast<uint32>(random()),
+		static_cast<uint32>(random()),
+		static_cast<uint32>(random())
+	};
+#endif
 
 	mNonce = M6MD5(data, sizeof(data)).Finalise();
 	mCreated = pt::second_clock::local_time();

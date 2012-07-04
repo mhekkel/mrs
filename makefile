@@ -19,11 +19,12 @@ MANDIR				?= $(PREFIX)/man/man3
 
 OBJDIR				= obj
 
-BOOST_LIBS			= system thread filesystem regex math_c99 math_c99f program_options iostreams timer chrono random
+BOOST_LIBS			= system thread filesystem regex math_c99 math_c99f program_options iostreams 
 BOOST_LIBS			:= $(BOOST_LIBS:%=boost_%$(BOOST_LIB_SUFFIX))
 LIBS				= m pthread archive bz2 z zeep pcre rt
-LDFLAGS				+= $(BOOST_LIB_DIR:%=-L%) $(LIBS:%=-l%) -g $(BOOST_LIBS:%=$(BOOST_LIB_DIR)/lib%.a) \
-							-L ../libzeep/ $(HOME)/lib64/libstdc++.a
+#LDFLAGS				+= $(BOOST_LIB_DIR:%=-L%) $(LIBS:%=-l%) -g $(BOOST_LIBS:%=$(BOOST_LIB_DIR)/lib%.a) \
+#							-L ../libzeep/ $(HOME)/lib64/libstdc++.a
+LDFLAGS				+= $(LIBS:%=-l%) $(BOOST_LIBS:%=-l%) -g -L ../libzeep/ 
 
 CXX					= c++
 CFLAGS				+= $(BOOST_INC_DIR:%=-I%) -I. -pthread -std=c++0x -I../libzeep/

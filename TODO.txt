@@ -1,0 +1,18 @@
+Todo
+
+Basic:
+
+- Blast/Clustal
+- SOAP services
+- Set up testing framework
+- Status pages
+
+Indexing:
+
+- Replacement for makefiles
+
+Search:
+
+- Score is very low (factor 10?)
+- Too many alternatives
+- optional suggestions dropdown

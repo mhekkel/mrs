@@ -6,6 +6,7 @@ Basic:
 - SOAP services
 - Set up testing framework
 - Status pages
+- Test framework
 
 Indexing:
 

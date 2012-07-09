@@ -7,3 +7,4 @@ Do NOT use the default libpcre code that comes with your OS. It usually is build
 build PCRE with:
 
 ./configure --disable-stack-for-recursion --enable-utf8 --prefix=$HOME/projects/pcre
+

@@ -62,12 +62,7 @@ M6AuthInfo::M6AuthInfo(const string& inRealm)
 	boost::random::random_device rng;
 	uint32 data[4] = { rng(), rng(), rng(), rng() };
 #else
-	uint32 data[4] = {
-		static_cast<uint32>(random()),
-		static_cast<uint32>(random()),
-		static_cast<uint32>(random()),
-		static_cast<uint32>(random())
-	};
+	uint32 data[4] = { random(), random(), random(), random() };
 #endif
 
 	mNonce = M6MD5(data, sizeof(data)).Finalise();
@@ -143,6 +138,19 @@ M6Server::M6Server(zx::element* inConfig)
 //	mount("man",			boost::bind(&M6Server::handle_file, this, _1, _2, _3));
 	mount("images",			boost::bind(&M6Server::handle_file, this, _1, _2, _3));
 	mount("favicon.ico",	boost::bind(&M6Server::handle_file, this, _1, _2, _3));
+
+	mount("blast",			boost::bind(&WebSearch::handle_blast, this, _1, _2, _3));
+	mount("blastJobResult",	boost::bind(&WebSearch::handle_blast_results_ajax, this, _1, _2, _3));
+	mount("blastJobStatus",	boost::bind(&WebSearch::handle_blast_status_ajax, this, _1, _2, _3));
+	mount("blastJobSubmit",	boost::bind(&WebSearch::handle_blast_submit_ajax, this, _1, _2, _3));
+	mount("align",			boost::bind(&WebSearch::handle_align, this, _1, _2, _3));
+	mount("alignJobSubmit",	boost::bind(&WebSearch::handle_align_submit_ajax, this, _1, _2, _3));
+
+	mount("ajax/blast/result",	boost::bind(&WebSearch::handle_blast_results_ajax, this, _1, _2, _3));
+	mount("ajax/blast/status",	boost::bind(&WebSearch::handle_blast_status_ajax, this, _1, _2, _3));
+	mount("ajax/blast/submit",	boost::bind(&WebSearch::handle_blast_submit_ajax, this, _1, _2, _3));
+	mount("ajax/align/submit",	boost::bind(&WebSearch::handle_align_submit_ajax, this, _1, _2, _3));
+
 
 	add_processor("entry",	boost::bind(&M6Server::process_mrs_entry, this, _1, _2, _3));
 	add_processor("link",	boost::bind(&M6Server::process_mrs_link, this, _1, _2, _3));

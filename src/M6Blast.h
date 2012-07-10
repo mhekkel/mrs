@@ -4,6 +4,8 @@
 #include <list>
 #include <vector>
 
+#include <boost/filesystem/path.hpp>
+
 namespace M6Blast
 {
 

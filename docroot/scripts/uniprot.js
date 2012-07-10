@@ -1,3 +1,8 @@
+//	UniProt formatting code in JavaScript.
+//
+//	The formatter is implemented as a class since it is somewhat more complex than average.
+//	To parse DE lines, a sub class is used, this subclass is a recursive descent parser.
+
 UniProt = {
 
 	// DE line Parser
@@ -270,6 +275,46 @@ UniProt = {
 		return "<td>" + ref.nr + "</td><td class='sub_entry'>" + s + "</td>";
 	},
 
+	createSequence: function(seq, floc) {
+		seq = seq.replace(/\s+/gm, '');
+		
+		var aaf = new Array();
+		for (i in seq) aaf[i] = "";
+		
+		for (i in floc) {
+			if (floc[i].length == 0) continue;
+			for (var j = floc[i].from - 1; j < floc[i].to; ++j)
+				if (aaf[j].length == 0) aaf[j] = i; else aaf[j] += ';' + i;
+		}
+		
+		for (var i = 0; i < aaf.length; ++i) {
+			var j = i + 1;
+			while (j < aaf.length && aaf[j] == aaf[i]) ++j;
+			
+			var segment = { from: i, to: j - 1, features: aaf[i] };
+			UniProt.segments.push(segment);
+			i = j - 1;
+		}
+		
+		var result = $("<pre/>"), i = 0;
+		for (j in UniProt.segments) {
+			var s = '';
+			for (var k = UniProt.segments[j].from; k <= UniProt.segments[j].to; ++k) {
+				s += seq[i];
+				++i;
+				if (i % 60 == 0) s += '\n'
+				else if (i % 10 == 0) s += ' ';
+			}
+			result.append($("<span class='segment'/>").attr("id", "segment-" + j).append(s));
+			$.each(UniProt.segments[j].features.split(';'), function(index, value) {
+				if (value != null && value.length > 0)
+					UniProt.features[value].push(j);
+			});
+		}
+	
+		return result;
+	},
+
 	toHtml: function(text) {
 		var info = new Array();
 		var name = new Array();
@@ -487,9 +532,27 @@ UniProt = {
 						$("<td class='right'/>").append(len ? len : ''),
 						$("<td/>").append(m[4] ? m[4].replace(/\n *(?=\/)/gm, '<br/>') : '')
 					).attr('id', featureId).addClass('feature')
-					.click(function()		{ UniProt.selectFeature(this.id); })
-					.mouseover(function()	{ UniProt.enterFeature(this.id); })
-					.mouseleave(function()	{ UniProt.leaveFeature(this.id); })
+					.click(function() {
+						$('.feature').removeClass('highlighted');
+						$('#' + this.id).addClass('highlighted');
+						$('.segment').removeClass('highlighted');
+						var nr = this.id.substr("feature-".length) - 1;
+						$.each(UniProt.features[nr], function(index, value) {
+							$("#segment-" + value).addClass('highlighted');
+						});
+					})
+					.mouseover(function() {
+						var nr = this.id.substr("feature-".length) - 1;
+						$.each(UniProt.features[nr], function(index, value) {
+							$("#segment-" + value).addClass('hover-feature');
+						});
+					 })
+					.mouseleave(function() {
+						var nr = this.id.substr("feature-".length) - 1;
+						$.each(UniProt.features[nr], function(index, value) {
+							$("#segment-" + value).removeClass('hover-feature');
+						});
+					})
 					.appendTo(ftbl);
 				}
 			}
@@ -562,72 +625,33 @@ UniProt = {
 		
 		return table;
 	},
-
-	createSequence: function(seq, floc) {
-		seq = seq.replace(/\s+/gm, '');
+	
+	toFastA: function(text) {
+		var id, de, seq;
+	
+		var re = /^(([A-Z]{2})   ).+\n(\2.+\n)*/gm;
 		
-		var aaf = new Array();
-		for (i in seq) aaf[i] = "";
-		
-		for (i in floc) {
-			if (floc[i].length == 0) continue;
-			for (var j = floc[i].from - 1; j < floc[i].to; ++j)
-				if (aaf[j].length == 0) aaf[j] = i; else aaf[j] += ';' + i;
-		}
-		
-		for (var i = 0; i < aaf.length; ++i) {
-			var j = i + 1;
-			while (j < aaf.length && aaf[j] == aaf[i]) ++j;
-			
-			var segment = { from: i, to: j - 1, features: aaf[i] };
-			UniProt.segments.push(segment);
-			i = j - 1;
-		}
-		
-		var result = $("<pre/>"), i = 0;
-		for (j in UniProt.segments) {
-			var s = '';
-			for (var k = UniProt.segments[j].from; k <= UniProt.segments[j].to; ++k) {
-				s += seq[i];
-				++i;
-				if (i % 60 == 0) s += '\n'
-				else if (i % 10 == 0) s += ' ';
+		var m;
+		while ((m = re.exec(text)) != null) {
+			if (m[2] == 'ID') {
+				id = m[0].replace(/ID\s+((<[^<>]+>|[^ <])+)\s+(.+)/, "$1").replace(/\s+$/, "");
 			}
-			result.append($("<span class='segment'/>").attr("id", "segment-" + j).append(s));
-			$.each(UniProt.segments[j].features.split(';'), function(index, value) {
-				if (value != null && value.length > 0)
-					UniProt.features[value].push(j);
-			});
+			else if (m[2] == "DE" && de == null) {
+				var parser = UniProt.parser;
+				parser.parse(m[0].replace(/^DE   /gm, ''));
+
+				if (parser.name != null && parser.name.name != null)
+					de = parser.name.name;
+			}
+			else if (m[2] == 'SQ') {
+				var rx = /^SQ   .*\n((     .+\n)+)/m;
+				if ((m = rx.exec(text)) != null) {
+					seq = m[1].replace(/\s+/g, "").replace(/.{72}/g, "$&\n");
+				}
+			}
 		}
-	
-		return result;
-	},
-	
-	enterFeature: function(id)
-	{
-		var nr = id.substr("feature-".length) - 1;
-		$.each(UniProt.features[nr], function(index, value) {
-			$("#segment-" + value).addClass('hover-feature');
-		});
-	},
-	
-	leaveFeature: function(id)
-	{
-		var nr = id.substr("feature-".length) - 1;
-		$.each(UniProt.features[nr], function(index, value) {
-			$("#segment-" + value).removeClass('hover-feature');
-		});
-	},
-	
-	selectFeature: function(id)
-	{
-		$('.feature').removeClass('highlighted');
-		$('#' + id).addClass('highlighted');
-		$('.segment').removeClass('highlighted');
-		var nr = id.substr("feature-".length) - 1;
-		$.each(UniProt.features[nr], function(index, value) {
-			$("#segment-" + value).addClass('highlighted');
-		});
+		
+		return { id: id, de: de, seq: seq };
 	}
 }
 
@@ -635,3 +659,6 @@ Format.toHtml = function(text) {
 	return UniProt.toHtml(text);
 }
 
+Format.toFastA = function(text) {
+	return UniProt.toFastA(text);
+}

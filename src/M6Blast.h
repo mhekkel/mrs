@@ -11,30 +11,30 @@ namespace M6Blast
 
 struct Hsp
 {
-	uint32				mHspNr;
-	uint32				mQueryStart;
-	uint32				mQueryEnd;
-	uint32				mTargetStart;
-	uint32				mTargetEnd;
-	uint32				mScore;
-	double				mBitScore;
-	double				mExpect;
-	uint32				mIdentity;
-	uint32				mPositive;
-	uint32				mGaps;
-	std::string			mQueryAlignment;
-	std::string			mTargetAlignment;
-	std::string			mMidLine;
+	uint32			mHspNr;
+	uint32			mQueryStart;
+	uint32			mQueryEnd;
+	uint32			mTargetStart;
+	uint32			mTargetEnd;
+	uint32			mScore;
+	double			mBitScore;
+	double			mExpect;
+	uint32			mIdentity;
+	uint32			mPositive;
+	uint32			mGaps;
+	std::string		mQueryAlignment;
+	std::string		mTargetAlignment;
+	std::string		mMidLine;
 };
 
 struct Hit
 {
-	uint32				mHitNr;
-	std::string			mID;
-	std::string			mAccession;
-	std::string			mDefLine;
-	std::string			mSequence;
-	std::list<Hsp>		mHsps;
+	uint32			mHitNr;
+	std::string		mID;
+	std::string		mAccession;
+	std::string		mDefLine;
+	std::string		mSequence;
+	std::list<Hsp>	mHsps;
 };
 
 struct Result

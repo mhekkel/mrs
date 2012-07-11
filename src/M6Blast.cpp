@@ -12,8 +12,8 @@
 #include <boost/detail/atomic_count.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <boost/thread.hpp>
+#include <boost/lexical_cast.hpp>
 
-#include <zeep/xml/serialize.hpp>
 #include <zeep/xml/writer.hpp>
 
 #include "M6Blast.h"
@@ -2164,7 +2164,7 @@ void operator&(xml::writer& w, const M6Blast::Hit& inHit)
 		w & hsp;
 	});
 	w.end_element();	
-	w.end_element();	
+	w.end_element();
 }
 
 ostream& operator<<(ostream& os, const M6Blast::Result& inResult)

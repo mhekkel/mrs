@@ -6,6 +6,8 @@
 	<srvdir>/data/</srvdir>
 	<mrsdir>/data/mrs/</mrsdir>
 	<rawdir>/data/raw/</rawdir>
+	
+	<blast-cache>/data/blast-cache/</blast-cache>
 
 	<server type="www" addr="0.0.0.0" port="18090">
 		<docroot>./docroot/</docroot>

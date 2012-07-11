@@ -172,240 +172,229 @@ function gappedChanged() {
 //  or
 //    s (a string containing a concatenation of the above, delimited by '||')
 
-function BlastJob() {
-	if (arguments.length == 1) {	// rebuild from string
-		args = arguments[0].split('&');
-		
-		if (args.length < 11)
-			throw "invalid job string";
-
-		this.query =		unescape(args[0].split('=')[1]);
-		this.program =		unescape(args[1].split('=')[1]);
-		this.db =			unescape(args[2].split('=')[1]);
-		this.expect = 		unescape(args[3].split('=')[1]);
-		this.filter = 		unescape(args[4].split('=')[1]);
-		this.wordSize = 	unescape(args[5].split('=')[1]);
-		this.matrix = 		unescape(args[6].split('=')[1]);
-		this.gapOpen = 		unescape(args[7].split('=')[1]);
-		this.gapExtend = 	unescape(args[8].split('=')[1]);
-		this.reportLimit =	unescape(args[9].split('=')[1]);
-		this.remoteID =		unescape(args[10].split('=')[1]);
-		this.queryID =		unescape(args[11].split('=')[1]);
-
-		// default status
-		this.status = 'stored';
-	} else {
-		this.query =		arguments[0];
-		this.program =		arguments[1];
-		this.db =			arguments[2];
-		this.expect = 		arguments[3];
-		this.filter = 		arguments[4];
-		this.wordSize = 	arguments[5];
-		this.matrix = 		arguments[6];
-		this.gapOpen = 		arguments[7];
-		this.gapExtend = 	arguments[8];
-		this.reportLimit =	arguments[9];
-
-		// default status
-		this.status = 'new';
-		this.queryID = 'unknown';
-	}
-
-	this.error = null;
-
-	// now that we have our arguments, we first generate a local ID
+function BlastJob(archived)
+{
+	this.nr = BlastJob.nextNr++;
+	this.query = null;
+	this.queryID = null;
+	this.program = "blastp";
+	this.db = null;
+	this.expect = 10.0;
+	this.filter = true;
+	this.wordSize = 0,
+	this.matrix = 'BLOSUM62';
+	this.gapped = true;
+	this.gapOpen = -1;
+	this.gapExtend = -1;
+	this.reportLimit = 250;
+	this.remoteID = null;
 	this.localID = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
 	    var r = Math.random()*16|0, v = c == 'x' ? r : (r&0x3|0x8);
 	    return v.toString(16);
 	});
-	
-	// and a number
-	this.nr = BlastJob.nextNr++;
+	this.status = 'new';
+	this.error = null;
+
+	if (archived != null)
+	{
+		var args = {}, self = $(this);
+		$(archived.split('&')).each(function(s,v) {
+			var kv = v.split('=');
+			self.prop(kv[0], kv[1]);
+		});
+		
+		// default status
+		this.status = 'stored';
+	}
 }
 
 BlastJob.nextNr = 1;
 BlastJob.selected = null;
 
-BlastJob.prototype.validate = function() {
-	var result = false;
+BlastJob.prototype = {
 	
-	if (this.query.length <= this.wordSize) {
-		alert("query should be longer than word size (" + this.wordSize + ')');
-		return false;
-	}
-	
-	var result = this.query.match(/^>(\S+)( .*)?((\r?\n(.*))+)/);
-	if (result != null) {
-		this.queryID = result[1];
-		this.query = result[3];
-	}
-
-	this.query = this.query.replace(/\s/g, '');
-
-	result = this.query.match(/([^LAGSVETKDPIRNQFYMHCWBZXU])/i);
-	if (result) {
-		alert("Query contains invalid characters: '" + result[1] + "'");
-		return false;
-	}
-	
-	var valid = validGapValues(this.matrix);
-	for (v in valid) {
-		if (valid[v][0] == this.gapOpen && valid[v][1] == this.gapExtend) {
-			result = true;
-			break;
+	validate: function() {
+		var result = false;
+		
+		if (this.query.length <= this.wordSize) {
+			alert("query should be longer than word size (" + this.wordSize + ')');
+			return false;
 		}
-	}
+		
+		var result = this.query.match(/^>(\S+)( .*)?((\r?\n(.*))+)/);
+		if (result != null) {
+			this.queryID = result[1];
+			this.query = result[3];
+		}
 	
-	if (result == false)
-		alert('Unsupported combination for Matrix and gap open/gap extend values');
+		this.query = this.query.replace(/\s/g, '');
 	
-	return result;
-}
-
-BlastJob.prototype.submitted = function(response) {
-	this.update();
-}
-
-BlastJob.prototype.setStatus = function(response) {
-	this.status = response.status;
-
-	if (response.id != null) {
-		this.remoteID = response.id;
-	}
-
-	if (response.queryID != null) {
-		this.queryID = response.qid;
-	}
-	
-	if (this.status == 'finished') {
-		this.hitCount = response.hitCount;
-		this.bestEValue = response.bestEValue;
-	}
-
-	if (response.error != null) {
-		this.error = response.error;
-	}
-
-	this.update();
-}
-
-BlastJob.prototype.update = function() {
-	var row = document.getElementById(this.localID);
-	if (row == null) {
-		throw "Row not found for BlastJob";
-	}
-
-	$(row.cells[1]).text(this.queryID);
-	var className = 'clickable';
-	if (BlastJob.selected == this) {
-		className += ' selected';
-	}
-
-	switch (this.status) {
-		case 'finished': {
-			this.hitCount = this.hitCount;
-			this.bestEValue = this.bestEValue;
-			
-			switch (this.hitCount) {
-				case 0: 
-					$(row.cells[3]).text('no hits found');
-					break;
-				case 1:
-					$(row.cells[3]).text('1 hit found');
-					break;
-				default:
-					$(row.cells[3]).text(this.hitCount + ' hits found');
-					break;
+		result = this.query.match(/([^LAGSVETKDPIRNQFYMHCWBZXU])/i);
+		if (result) {
+			alert("Query contains invalid characters: '" + result[1] + "'");
+			return false;
+		}
+		
+		var valid = validGapValues(this.matrix);
+		for (v in valid) {
+			if (valid[v][0] == this.gapOpen && valid[v][1] == this.gapExtend) {
+				result = true;
+				break;
 			}
-			break;
 		}
-		case 'error': {
-			if (this.error != null) {
-				$(row.cells[3]).text(this.error);
-			} else {
-				$(row.cells[3]).text('error');
+		
+		if (result == false)
+			alert('Unsupported combination for Matrix and gap open/gap extend values');
+		
+		return result;
+	},
+	
+	submitted: function(response) {
+		this.update();
+	},
+
+	setStatus: function(response) {
+		this.status = response.status;
+	
+		if (response.id != null) {
+			this.remoteID = response.id;
+		}
+	
+		if (response.queryID != null) {
+			this.queryID = response.qid;
+		}
+		
+		if (this.status == 'finished') {
+			this.hitCount = response.hitCount;
+			this.bestEValue = response.bestEValue;
+		}
+	
+		if (response.error != null) {
+			this.error = response.error;
+		}
+	
+		this.update();
+	},
+	
+	update: function() {
+		var row = document.getElementById(this.localID);
+		if (row == null) {
+			throw "Row not found for BlastJob";
+		}
+	
+		$(row.cells[1]).text(this.queryID);
+		var className = 'clickable';
+		if (BlastJob.selected == this) {
+			className += ' selected';
+		}
+	
+		switch (this.status) {
+			case 'finished': {
+				this.hitCount = this.hitCount;
+				this.bestEValue = this.bestEValue;
+				
+				switch (this.hitCount) {
+					case 0: 
+						$(row.cells[3]).text('no hits found');
+						break;
+					case 1:
+						$(row.cells[3]).text('1 hit found');
+						break;
+					default:
+						$(row.cells[3]).text(this.hitCount + ' hits found');
+						break;
+				}
+				break;
 			}
-			className += ' error';
-			break;
+			case 'error': {
+				if (this.error != null) {
+					$(row.cells[3]).text(this.error);
+				} else {
+					$(row.cells[3]).text('error');
+				}
+				className += ' error';
+				break;
+			}
+			case 'queued': {
+				$(row.cells[3]).text('queued');
+				break;
+			}
+			case 'running': {
+				$(row.cells[3]).text('running');
+				className += ' active';
+				break;
+			}
+			default: {
+				$(row.cells[3]).text(this.status);
+				break;
+			}
 		}
-		case 'queued': {
-			$(row.cells[3]).text('queued');
-			break;
-		}
-		case 'running': {
-			$(row.cells[3]).text('running');
-			className += ' active';
-			break;
-		}
-		default: {
-			$(row.cells[3]).text(this.status);
-			break;
-		}
-	}
+		
+		row.className = className;
+	},
 	
-	row.className = className;
-}
-
-BlastJob.prototype.selectJob = function() {
-	if (BlastJob.selected != this) {
-		if (BlastJob.selected != null) {
-			jQuery('#' + BlastJob.selected.localID).removeClass('selected');
+	selectJob: function() {
+		if (BlastJob.selected != this) {
+			if (BlastJob.selected != null) {
+				jQuery('#' + BlastJob.selected.localID).removeClass('selected');
+			}
+			BlastJob.selected = this;
+			jQuery('#' + this.localID).addClass('selected');
 		}
-		BlastJob.selected = this;
-		jQuery('#' + this.localID).addClass('selected');
-	}
+		
+		with (document.getElementById("blastForm")) {
+			query.value = '>' + this.queryID + '\n' + this.query.replace(/(.{72})/g, "$1\n");
+			program.value = this.program;
+			db.value = this.db;
+			expect.value = this.expect;
+			filter.checked = this.filter;
+			wordSize.value = this.wordSize;
+			matrix.value = this.matrix;
+			gapped.checked = this.gapped;
+			gapOpen.value = this.gapOpen;
+			gapExtend.value = this.gapExtend;
+			reportLimit.value = this.reportLimit;
+		}
+		
+		if (this.result == null) {
+			var resultList = document.getElementById('blastResult');
+			jQuery(resultList).fadeOut("fast");
 	
-	with (document.getElementById("blastForm")) {
-		query.value = '>' + this.queryID + '\n' + this.query.replace(/(.{72})/g, "$1\n");
-		program.value = this.program;
-		db.value = this.db;
-		expect.value = this.expect;
-		filter.checked = (this.filter == 'true');
-		wordSize.value = this.wordSize;
-		matrix.value = this.matrix;
-		gapped.checked = this.gapOpen > 0;
-		gapOpen.value = this.gapOpen;
-		gapExtend.value = this.gapExtend;
-		reportLimit.value = this.reportLimit;
-	}
+			this.result = new BlastResult(this);
+		} else {
+			this.result.updateResultList();
+		}
+	},
 	
-	if (this.result == null) {
-		var resultList = document.getElementById('blastResult');
-		jQuery(resultList).fadeOut("fast");
-
-		this.result = new BlastResult(this);
-	} else {
-		this.result.updateResultList();
+	toString: function() {
+		return ('query=' + escape(this.query) + '&' +
+				'program=' + escape(this.program) + '&' +
+				'db=' + escape(this.db) + '&' +
+				'expect=' + escape(this.expect) + '&' +
+				'filter=' + escape(this.filter ? 'true' : 'false') + '&' +
+				'wordSize=' + escape(this.wordSize) + '&' +
+				'matrix=' + escape(this.matrix) + '&' +
+				'gapped=' + (this.gapped ? 'true' : 'false') + '&' +
+				'gapOpen=' + escape(this.gapOpen) + '&' +
+				'gapExtend=' + escape(this.gapExtend) + '&' +
+				'reportLimit=' + escape(this.reportLimit));
+	},
+	
+	getData: function() {
+		return {
+			id: this.localID,
+			query: this.query,
+			program: this.program,
+			db: this.db,
+			expect: this.expect,
+			filter: this.filter,
+			wordSize: this.wordSize,
+			matrix: this.matrix,
+			gapOpen: this.gapOpen,
+			gapExtend: this.gapExtend,
+			reportLimit: this.reportLimit
+		};
 	}
-}
-
-BlastJob.prototype.toString = function() {
-	return ('query=' + escape(this.query) + '&' +
-			'program=' + escape(this.program) + '&' +
-			'db=' + escape(this.db) + '&' +
-			'expect=' + escape(this.expect) + '&' +
-			'filter=' + escape(this.filter) + '&' +
-			'wordSize=' + escape(this.wordSize) + '&' +
-			'matrix=' + escape(this.matrix) + '&' +
-			'gapOpen=' + escape(this.gapOpen) + '&' +
-			'gapExtend=' + escape(this.gapExtend) + '&' +
-			'reportLimit=' + escape(this.reportLimit));
-}
-
-BlastJob.prototype.getData = function() {
-	return {
-		id: this.localID,
-		query: this.query,
-		program: this.program,
-		db: this.db,
-		expect: this.expect,
-		filter: this.filter,
-		wordSize: this.wordSize,
-		matrix: this.matrix,
-		gapOpen: this.gapOpen,
-		gapExtend: this.gapExtend,
-		reportLimit: this.reportLimit
-	};
 }
 
 //---------------------------------------------------------------------
@@ -830,7 +819,7 @@ BlastJobs = {
 			for (var i = 0; i < storedJobs.length; ++i) {
 				try {
 					var blastJob = new BlastJob(storedJobs[i]);
-					if (blastJob.localID != null) {
+					if (blastJob.query != null) {
 						BlastJobs.jobs.push(blastJob);
 					}
 				} catch (e) {}
@@ -839,10 +828,6 @@ BlastJobs = {
 		
 		BlastJobs.updateList();
 		BlastJobs.poll();
-	},
-	
-	ajaxErrorCB: function(event, req, opts) {
-		alert(req.responseText);
 	},
 	
 	store: function() {
@@ -1069,17 +1054,18 @@ BlastJobs = {
 	
 			var job;
 			with (blastForm) {
-				job = new BlastJob(
-					query.value,
-					program.value,
-					db.value,
-					expect.value,
-					filter.checked ? 'true' : 'false',
-					wordSize.value,
-					matrix.value,
-					gapped.checked ? gapOpen.value : -1,
-					gapped.checked ? gapExtend.value : -1,
-					reportLimit.value);
+				job = new BlastJob();
+				job.query = query.value;
+				job.program = program.value;
+				job.db = db.value;
+				job.expect = expect.value;
+				job.filter = filter.checked;
+				job.wordSize = wordSize.value;
+				job.matrix = matrix.value;
+				job.gapped = gapped.checked;
+				job.gapOpen = gapOpen.value;
+				job.gapExtend = gapExtend.value;
+				job.reportLimit = reportLimit.value;
 			}
 			
 			if (job.validate() == false) {

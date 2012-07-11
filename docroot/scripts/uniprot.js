@@ -641,7 +641,7 @@ UniProt = {
 				parser.parse(m[0].replace(/^DE   /gm, ''));
 
 				if (parser.name != null && parser.name.name != null)
-					de = parser.name.name;
+					de = $(parser.name.name).text();  // strip out tags
 			}
 			else if (m[2] == 'SQ') {
 				var rx = /^SQ   .*\n((     .+\n)+)/m;

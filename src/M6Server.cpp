@@ -10,6 +10,7 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/date_time/posix_time/posix_time_types.hpp>
 #include <boost/program_options.hpp>
+#include <boost/uuid/uuid_io.hpp>
 
 #if BOOST_VERSION >= 104800
 #include <boost/random/random_device.hpp>
@@ -25,6 +26,7 @@
 #include "M6Tokenizer.h"
 #include "M6Builder.h"
 #include "M6MD5.h"
+#include "M6BlastCache.h"
 
 using namespace std;
 namespace fs = boost::filesystem;
@@ -139,18 +141,14 @@ M6Server::M6Server(zx::element* inConfig)
 	mount("images",			boost::bind(&M6Server::handle_file, this, _1, _2, _3));
 	mount("favicon.ico",	boost::bind(&M6Server::handle_file, this, _1, _2, _3));
 
-	//mount("blast",			boost::bind(&WebSearch::handle_blast, this, _1, _2, _3));
-	//mount("blastJobResult",	boost::bind(&WebSearch::handle_blast_results_ajax, this, _1, _2, _3));
-	//mount("blastJobStatus",	boost::bind(&WebSearch::handle_blast_status_ajax, this, _1, _2, _3));
-	//mount("blastJobSubmit",	boost::bind(&WebSearch::handle_blast_submit_ajax, this, _1, _2, _3));
-	//mount("align",			boost::bind(&WebSearch::handle_align, this, _1, _2, _3));
-	//mount("alignJobSubmit",	boost::bind(&WebSearch::handle_align_submit_ajax, this, _1, _2, _3));
+	mount("blast",				boost::bind(&M6Server::handle_blast, this, _1, _2, _3));
+	mount("ajax/blast/submit",	boost::bind(&M6Server::handle_blast_submit_ajax, this, _1, _2, _3));
+	mount("ajax/blast/status",	boost::bind(&M6Server::handle_blast_status_ajax, this, _1, _2, _3));
+	mount("ajax/blast/result",	boost::bind(&M6Server::handle_blast_results_ajax, this, _1, _2, _3));
 
-	//mount("ajax/blast/result",	boost::bind(&WebSearch::handle_blast_results_ajax, this, _1, _2, _3));
-	//mount("ajax/blast/status",	boost::bind(&WebSearch::handle_blast_status_ajax, this, _1, _2, _3));
-	//mount("ajax/blast/submit",	boost::bind(&WebSearch::handle_blast_submit_ajax, this, _1, _2, _3));
-	//mount("ajax/align/submit",	boost::bind(&WebSearch::handle_align_submit_ajax, this, _1, _2, _3));
-
+	//mount("align",			boost::bind(&M6Server::handle_align, this, _1, _2, _3));
+	//mount("alignJobSubmit",	boost::bind(&M6Server::handle_align_submit_ajax, this, _1, _2, _3));
+	//mount("ajax/align/submit",	boost::bind(&M6Server::handle_align_submit_ajax, this, _1, _2, _3));
 
 	add_processor("entry",	boost::bind(&M6Server::process_mrs_entry, this, _1, _2, _3));
 	add_processor("link",	boost::bind(&M6Server::process_mrs_link, this, _1, _2, _3));
@@ -1360,6 +1358,458 @@ void M6Server::SpellCheck(const string& inDatabank, const string& inTerm,
 			db->SuggestCorrection(inTerm, outCorrections);
 	}
 }
+
+// ====================================================================
+// Blast
+
+void M6Server::handle_blast(const zeep::http::request& request, const el::scope& scope, zeep::http::reply& reply)
+{
+	// default parameters
+	string id, db, matrix = "BLOSUM62", expect = "10.0", query;
+	int wordSize = 0, gapOpen = -1, gapExtend = -1, reportLimit = 250;
+	bool filter = true, gapped = true;
+
+	zeep::http::parameter_map params;
+	get_parameters(scope, params);
+
+	el::scope sub(scope);
+
+//	// fetch some parameters, if any
+//	db = params.get("db", "pdb").as<string>();
+//	id = params.get("id", "").as<string>();
+//	
+//	if (not id.empty() and mDbTable.Loaded(db) and mNoBlast.count(db) == 0)
+//	{
+//		CDatabankPtr mrsDb = mDbTable[db];
+//		string sequence;
+//		
+//		if (mrsDb->GetBlastDbCount() > 0)
+//			mrsDb->GetSequence(mrsDb->GetDocumentNr(id), 0, sequence);
+//		else
+//			sequence = WFormat::Instance()->Format(mDbTable, db, id, "sequence");
+//		
+//		string::size_type n = 0;
+//		while (n + 72 < sequence.length())
+//		{
+//			sequence.insert(sequence.begin() + n + 72, 1, '\n');
+//			n += 73;
+//		}
+//		
+//		string title = GetEntry(mrsDb, id, "title");
+//		
+//		stringstream s;
+//		s << '>' << id << ' ' << title << endl << sequence << endl;
+//		query = s.str();
+//		
+//		sub.put("query", query);
+//	}
+	
+	vector<el::object> databanks;
+	foreach (M6LoadedDatabank& db, mLoadedDatabanks)
+	{
+//		if (not db->GetBlastDbCount() or mNoBlast.count(dbi.GetID()))
+//			continue;
+		
+		el::object databank;
+		databank["id"] = db.mID;
+		databank["name"] = db.mName;
+		databanks.push_back(databank);
+	}
+	sub.put("databanks", el::object(databanks));
+//	sub.put("blastdb", db);
+
+	const char* expectRange[] = { "0.001", "0.01", "0.1", "1.0", "10.0", "100.0", "1000.0" };
+	sub.put("expectRange", expectRange, boost::end(expectRange));
+	sub.put("expect", expect);
+
+	uint32 wordSizeRange[] = { 0, 2, 3, 4 };
+	sub.put("wordSizeRange", wordSizeRange, boost::end(wordSizeRange));
+	sub.put("wordSize", wordSize);
+
+	const char* matrices[] = { "BLOSUM45", "BLOSUM50", "BLOSUM62", "BLOSUM80", "BLOSUM90", "PAM30", "PAM70", "PAM250" };
+	sub.put("matrices", matrices, boost::end(matrices));
+	sub.put("matrix", matrix);
+
+	int32 gapOpenRange[] = { -1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14 };
+	sub.put("gapOpenRange", gapOpenRange, boost::end(gapOpenRange));
+	sub.put("gapOpen", gapOpen);
+
+	int32 gapExtendRange[] = { -1, 1, 2, 3, 4 };
+	sub.put("gapExtendRange", gapExtendRange, boost::end(gapExtendRange));
+	sub.put("gapExtend", gapExtend);
+
+	uint32 reportLimitRange[] = { 100, 250, 500, 1000 };
+	sub.put("reportLimitRange", reportLimitRange, boost::end(reportLimitRange));
+	sub.put("reportLimit", reportLimit);
+
+	sub.put("filter", filter);
+	sub.put("gapped", gapped);
+
+	create_reply_from_template("blast.html", sub, reply);
+}
+
+void M6Server::handle_blast_results_ajax(const zeep::http::request& request, const el::scope& scope, zeep::http::reply& reply)
+{
+	zeep::http::parameter_map params;
+	get_parameters(scope, params);
+
+	string id = params.get("job", "").as<string>();
+	uint32 hitNr = params.get("hit", 0).as<uint32>();
+	
+	ostringstream json;
+	
+//	// try to fetch the job
+//	CBlastJobPtr job = CBlastJobProcessor::Instance()->Find(id);
+//	const CBlastResult* result;
+//	if (job != nullptr)
+//		result = job->Result();
+//	
+//	if (not job)
+		json << "{\"error\":\"Job expired\"}";
+//	else if (job->Status() != bj_Finished)
+//		json << "{\"error\":\"Invalid job status\"}";
+//	else if (result == nullptr)
+//		json << "{\"error\":\"Internal error (no result?)\"}";
+//	else if (hitNr > 0)	// we need to return the hsps for this hit
+//	{
+//		const CBlastHitList& hits(result->hits);
+//		if (hitNr > hits.size())
+//			THROW(("Hitnr out of range"));
+//		
+//		CBlastHitList::const_iterator hit = hits.begin();
+//		advance(hit, hitNr - 1);
+//		
+//		const CBlastHspList& hsps(hit->hsps);
+//		
+//		json << '[';
+//		
+//		uint32 nr = 1;
+//		foreach (const CBlastHsp& hsp, hsps)
+//		{
+//			if (nr > 1)
+//				json << ',';
+//			
+//			string queryAlignment = hsp.queryAlignment;
+//			
+//			// calculate the offsets for the graphical representation of this hsp
+//	        uint32 qf = hsp.queryStart;
+//	        uint32 qt = hsp.queryEnd;
+//	        uint32 ql = static_cast<uint32>(job->Sequence().length());
+//	
+//	        uint32 sf = hsp.subjectStart;
+//	        uint32 st = hsp.subjectEnd;
+//	        uint32 sl = hsp.subjectLength;
+//	
+//	        uint32 length = static_cast<uint32>(queryAlignment.length());
+//	        uint32 before = qf;
+//	        if (before < sf)
+//	            before = sf;
+//	
+//	        uint32 after = ql - qt;
+//	        if (after < sl - st)
+//	            after = sl - st;
+//	
+//	        length += before + after;
+//	
+//	        float factor = 150;
+//	        factor /= length;
+//	
+//			uint32 ql1, ql2, ql3, ql4, sl1, sl2, sl3, sl4;
+//	
+//	        if (qf < before)
+//	            ql1 = uint32(factor * (before - qf));
+//	        else
+//	            ql1 = 0;
+//	        ql2 = uint32(factor * qf);
+//	        ql3 = uint32(factor * queryAlignment.length());
+//	        ql4 = uint32(factor * (ql - qt));
+//	
+//	        if (sf < before)
+//	            sl1 = uint32(factor * (before - sf));
+//	        else
+//	            sl1 = 0;
+//	        sl2 = uint32(factor * sf);
+//	        sl3 = uint32(factor * queryAlignment.length());
+//	        sl4 = uint32(factor * (sl - st));
+//	
+//	        if (ql1 > 0 and ql1 + ql2 < sl2)
+//	            ql1 = sl2 - ql2;
+//	
+//	        if (sl1 > 0 and sl1 + sl2 < ql2)
+//	            sl1 = ql2 - sl2;
+//
+//			json << '{'
+//				 << "\"nr\":" << nr << ','
+//				 << "\"score\":" << hsp.score << ','
+//				 << "\"bitScore\":" << hsp.bitScore << ','
+//				 << "\"expect\":" << hsp.expect << ','
+//				 << "\"queryAlignment\":\"" << queryAlignment << "\","
+//				 << "\"queryStart\":" << hsp.queryStart << ','
+//				 << "\"subjectAlignment\":\"" << hsp.subjectAlignment << "\","
+//				 << "\"subjectStart\":" << hsp.subjectStart << ','
+//				 << "\"midLine\":\"" << hsp.midLine << "\","
+//				 << "\"identity\":" << hsp.identity << ','
+//				 << "\"positive\":" << hsp.positive << ','
+//				 << "\"gaps\":" << hsp.gaps << ','
+//				 << "\"ql\":[" << ql1 << ',' << ql2 << ',' << ql3 << ',' << ql4 << ']' << ','
+//				 << "\"sl\":[" << sl1 << ',' << sl2 << ',' << sl3 << ',' << sl4 << ']'
+//				 << '}';
+//
+//			++nr;
+//		}
+//
+//		json << ']';
+//	}
+//	else
+//	{
+//		json << '[';
+//		
+//		CDatabankPtr db = job->Databank();
+//		
+//		uint32 nr = 1;
+//		const CBlastHitList& hits(result->hits);
+//		foreach (const CBlastHit& hit, hits)
+//		{
+//			if (nr > 1)
+//				json << ',';
+//			
+//			const CBlastHspList& hsps(hit.hsps);
+//			if (hsps.empty())
+//				continue;
+//			const CBlastHsp& best = hsps.front();
+//
+//			uint32 coverageStart = 0, coverageLength = 0, coverageColor = 1;
+//			float bin = (best.positive * 4.0f) / best.queryAlignment.length();
+//
+//			if (bin >= 3.5)
+//				coverageColor = 1;
+//			else if (bin >= 3)
+//				coverageColor = 2;
+//			else if (bin >= 2.5)
+//				coverageColor = 3;
+//			else if (bin >= 2)
+//				coverageColor = 4;
+//			else
+//				coverageColor = 5;
+//
+//			float queryLength = static_cast<float>(job->Sequence().length());
+//			const int kGraphicWidth = 100;
+//
+//			coverageStart = uint32(best.queryStart * kGraphicWidth / queryLength);
+//			coverageLength = uint32(best.queryAlignment.length() * kGraphicWidth / queryLength);
+//			
+//			string title = GetEntry(db, hit.documentID, "title");
+//			ba::replace_all(title, "\\", "\\\\");
+//			ba::replace_all(title, "\"", "\\\"");
+//			
+//			json << '{'
+//				 << "\"nr\":" << nr << ','
+//				 << "\"doc\":\"" << hit.documentID << "\","
+//				 << "\"seq\":\"" << hit.sequenceID << "\","
+//				 << "\"desc\":\"" << title << "\","
+//				 << "\"bitScore\":" << best.bitScore << ','
+//				 << "\"expect\":" << best.expect << ','
+//				 << "\"hsps\":" << hsps.size() << ','
+//				 << "\"coverage\":{"
+//					 << "\"start\":" << coverageStart << ','
+//					 << "\"length\":" << coverageLength << ',' 
+//					 << "\"color\":" << coverageColor
+//					 << '}'
+//				 << '}';
+//
+//			++nr;
+//		}
+//
+//		json << ']';
+//	}
+	
+	reply.set_content(json.str(), "text/javascript");
+}
+
+ostream& operator<<(ostream& os, M6BlastJobStatus status)
+{
+	switch (status)
+	{
+		case bj_Unknown:	os << '"' << "unknown" << '"'; break;
+		case bj_Queued:		os << '"' << "queued" << '"'; break;
+		case bj_Running:	os << '"' << "running" << '"'; break;
+		case bj_Finished:	os << '"' << "finished" << '"'; break;
+		case bj_Error:		os << '"' << "error" << '"'; break;
+	}
+	
+	return os;
+}
+
+void M6Server::handle_blast_status_ajax(const zeep::http::request& request, const el::scope& scope, zeep::http::reply& reply)
+{
+	zeep::http::parameter_map params;
+	get_parameters(scope, params);
+
+	string ids = params.get("jobs", "").as<string>();
+	vector<string> jobs;
+	
+	if (not ids.empty())
+		ba::split(jobs, ids, ba::is_any_of(";"));
+
+	ostringstream json;
+	json << '[';
+	bool first = true;
+	foreach (const string& id, jobs)
+	{
+		try
+		{
+//			CBlastJobPtr job = CBlastJobProcessor::Instance()->Find(id);
+//			if (not job)
+//				continue;
+			
+			if (not first)
+				json << ',';
+			first = false;
+
+//			switch (job->Status())
+//			{
+//				case bj_Finished:
+//					json << boost::format("{\"id\":\"%1%\",\"status\":%2%,\"hitCount\":%3%,\"bestEValue\":%4%}")
+//						% job->ID() % job->Status() % job->HitCount() % job->BestEValue();
+//					break;
+//				
+//				case bj_Error:
+					json << boost::format("{\"id\":\"%1%\",\"status\":%2%,\"error\":\"%3%\"}")
+						% id % bj_Error % "fout";
+//					break;
+//				
+//				default:
+//					json << boost::format("{\"id\":\"%1%\",\"status\":%2%}")
+//						% job->ID() % job->Status();
+//					break;
+//			}
+		}
+		catch (...) {}
+	}
+	json << ']';
+
+	reply.set_content(json.str(), "text/javascript");
+}
+
+void M6Server::handle_blast_submit_ajax(
+	const zeep::http::request&	request,
+	const el::scope&			scope,
+	zeep::http::reply&			reply)
+{
+	// default parameters
+	string id, db, matrix, expect, query, program;
+	int wordSize = 0, gapOpen = -1, gapExtend = -1, reportLimit = 250;
+	bool filter = true, gapped = true;
+
+	zeep::http::parameter_map params;
+	get_parameters(scope, params);
+
+	// fetch the parameters
+	id = params.get("id", "").as<string>();			// id is used by the client
+	db = params.get("db", "pdb").as<string>();
+	matrix = params.get("matrix", "BLOSUM62").as<string>();
+	expect = params.get("expect", "10.0").as<string>();
+	query = params.get("query", "").as<string>();
+	program = params.get("program", "blastp").as<string>();
+
+	wordSize = params.get("wordSize", wordSize).as<int>();
+	gapped = params.get("gapped", true).as<bool>();
+	gapOpen = params.get("gapOpen", gapOpen).as<int>();
+	gapExtend = params.get("gapExtend", gapExtend).as<int>();
+	reportLimit = params.get("reportLimit", reportLimit).as<int>();
+	filter = params.get("filter", true).as<bool>();
+	
+	// first parse the query (in case it is in FastA format)
+	ba::replace_all(query, "\r\n", "\n");
+	ba::replace_all(query, "\r", "\n");
+	istringstream is(query);
+	string qid;
+	
+	try
+	{
+		query.clear();
+		for (;;)
+		{
+			string line;
+			getline(is, line);
+			if (line.empty() and is.eof())
+				break;
+			
+			if (qid.empty() and ba::starts_with(line, ">"))
+			{
+				qid = line.substr(1);
+				continue;
+			}
+			
+			ba::to_upper(line);
+			query += line;
+		}
+
+			// validate the sequence
+		if (program == "blastn" or program == "blastx" or program == "tblastx")
+		{
+			if (not ba::all(query, ba::is_any_of("ACGT")))
+			{
+				PRINT(("Error in parameters:\n%s", request.payload.c_str()));
+				THROW(("not a valid sequence"));
+			}
+		}
+		else
+		{
+			if (not ba::all(query, ba::is_any_of("LAGSVETKDPIRNQFYMHCWBZXU")))
+			{
+				PRINT(("Error in parameters:\n%s", request.payload.c_str()));
+				THROW(("not a valid sequence"));
+			}
+		}
+		
+//		CDatabankPtr mrsDb = mDbTable[db];
+//		
+//		// validate the program/query/db combo
+//		if (mrsDb->GetBlastDbSeqType() != ((program == "blastn" or program == "tblastn" or program == "tblastx") ? 'N' : 'P'))
+//			THROW(("Invalid databank for blast program"));
+//		
+//		CBlastJobPtr job = CBlastJobProcessor::Instance()->Submit(
+//			mrsDb, "", query, program, matrix, wordSize,
+//			boost::lexical_cast<double>(expect), filter,
+//			gapped, gapOpen, gapExtend, reportLimit);
+
+		boost::uuids::uuid jobId = M6BlastCache::Instance().Submit(
+			"", query, matrix, wordSize,
+			boost::lexical_cast<double>(expect), filter,
+			gapped, gapOpen, gapExtend, reportLimit);
+	
+		// and answer with the created job ID
+		ostringstream json;
+
+//		switch (job->Status())
+//		{
+//			case bj_Finished:
+//				json << boost::format("{\"clientId\":\"%1%\",\"id\":\"%2%\",\"qid\":\"%3%\",\"status\":%4%,\"hitCount\":%5%,\"bestEValue\":%6%}")
+//					% id % job->ID() % qid % job->Status() % job->HitCount() % job->BestEValue();
+//				break;
+//			
+//			case bj_Error:
+//				json << boost::format("{\"clientId\":\"%1%\",\"id\":\"%2%\",\"qid\":\"%3%\",\"status\":%4%,\"error\":\"%5%\"}")
+//					% id % job->ID() % qid % job->Status() % job->Error();
+//				break;
+//			
+//			default:
+				json << boost::format("{\"clientId\":\"%1%\",\"id\":\"%2%\",\"qid\":\"%3%\",\"status\":%4%}")
+					% id % jobId % qid % bj_Queued;
+//				break;
+//		}
+
+		reply.set_content(json.str(), "text/javascript");
+	}
+	catch (exception& e)
+	{
+		reply.set_content(
+			(boost::format("{\"clientId\":\"%1%\",\"status\":\"error\",\"error\":\"%2%\"}") % id % e.what()).str(),
+			"text/javascript");
+	}
+}
+
 
 void M6Server::ValidateAuthentication(const zh::request& request)
 {

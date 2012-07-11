@@ -33,8 +33,11 @@ namespace M6Blast
 typedef std::basic_string<uint8> sequence;
 
 // 22 real letters and 1 dummy (X is the dummy, B and Z are pseudo letters)
-extern const char kResidues[]; // = "ABCDEFGHIKLMNPQRSTVWYZX";
-extern const uint8 kResidueNrTable[];
+const char kResidues[] = "ABCDEFGHIKLMNPQRSTVWYZX";
+const uint8 kResidueNrTable[] = {
+//	A   B   C   D   E   F   G   H   I       K   L   M   N       P   Q   R   S   T  U=X  V   W   X   Y   Z
+	0,  1,  2,  3,  4,  5,  6,  7,  8, 23,  9, 10, 11, 12, 23, 13, 14, 15, 16, 17, 22, 18, 19, 22, 20, 21
+};
 
 inline uint8 ResidueNr(char inAA)
 {

@@ -1,3 +1,5 @@
+#include "M6Lib.h"
+
 #include <sstream>
 #include <iostream>
 
@@ -7,8 +9,7 @@
 #define foreach BOOST_FOREACH
 #include <boost/bind.hpp>
 
-#include "utils.h"
-#include "../mtrx/matrices.h"
+#include "M6Matrix.h"
 
 using namespace std;
 namespace io = boost::iostreams;
@@ -223,7 +224,7 @@ const int8 kMPam70[] = {
 	 -2,  -2,  -6,  -3,  -3,  -5,  -3,  -3,  -3,  -3,  -4,  -3,  -2,  -3,  -2,  -3,  -1,  -2,  -2,  -7,  -5,  -3,  -3, // x
 };
 
-const MMatrixData kMMatrixData[] = {
+const MatrixData kMatrixData[] = {
     { "BLOSUM45", 13, 3, kMBlosum45, { 0.207, 0.049, 0.14,  1.5,  -22 }, { 0.2291, 0.0924, 0.2514, 0.9113, -5.7 } },
     { "BLOSUM45", 12, 3, kMBlosum45, { 0.199, 0.039, 0.11,  1.8,  -34 }, { 0.2291, 0.0924, 0.2514, 0.9113, -5.7 } },
     { "BLOSUM45", 11, 3, kMBlosum45, { 0.190, 0.031, 0.095, 2.0,  -38 }, { 0.2291, 0.0924, 0.2514, 0.9113, -5.7 } },

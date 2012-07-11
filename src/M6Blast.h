@@ -68,12 +68,12 @@ Result* Search(const std::vector<boost::filesystem::path>& inDatabanks,
 	bool inFilter, bool inGapped, int32 inGapOpen, int32 inGapExtend,
 	uint32 inReportLimit, uint32 inThreads = 0);
 
-void SearchAndWriteResultsAsFastA(std::ostream& inOutFile,
-	const std::vector<boost::filesystem::path>& inDatabanks,
-	const std::string& inQuery, const std::string& inProgram,
-	const std::string& inMatrix, uint32 inWordSize, double inExpect,
-	bool inFilter, bool inGapped, int32 inGapOpen, int32 inGapExtend,
-	uint32 inReportLimit, uint32 inThreads = 0);
+//void SearchAndWriteResultsAsFastA(std::ostream& inOutFile,
+//	const std::vector<boost::filesystem::path>& inDatabanks,
+//	const std::string& inQuery, const std::string& inProgram,
+//	const std::string& inMatrix, uint32 inWordSize, double inExpect,
+//	bool inFilter, bool inGapped, int32 inGapOpen, int32 inGapExtend,
+//	uint32 inReportLimit, uint32 inThreads = 0);
 
 }
 

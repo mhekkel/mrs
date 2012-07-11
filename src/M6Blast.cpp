@@ -13,6 +13,9 @@
 #include <boost/filesystem/operations.hpp>
 #include <boost/thread.hpp>
 
+#include <zeep/xml/serialize.hpp>
+#include <zeep/xml/writer.hpp>
+
 #include "M6Blast.h"
 #include "M6Matrix.h"
 #include "M6Error.h"
@@ -20,6 +23,8 @@
 #include "M6SequenceFilter.h"
 
 using namespace std;
+using namespace zeep;
+
 namespace ba = boost::algorithm;
 namespace fs = boost::filesystem;
 namespace io = boost::iostreams;
@@ -2034,177 +2039,182 @@ Result* Search(const vector<fs::path>& inDatabanks,
 	return result.release();
 }
 
-//void SearchAndWriteResultsAsFastA(std::ostream& inOutFile, const vector<fs::path>& inDatabanks,
-//	const std::string& inQuery, const std::string& inProgram,
-//	const std::string& inMatrix, uint32 inWordSize, double inExpect,
-//	bool inFilter, bool inGapped, int32 inGapOpen, int32 inGapExtend,
-//	uint32 inReportLimit, uint32 inThreads)
-//{
-//	if (inProgram != "blastp")
-//		throw Exception("Unsupported program %s", inProgram.c_str());
-//	
-//	if (inGapped)
-//	{
-//		if (inGapOpen == -1) inGapOpen = 11;
-//		if (inGapExtend == -1) inGapExtend = 1;
-//	}
-//
-//	if (inWordSize == 0) inWordSize = 3;
-//
-//	string query(inQuery), queryID("query"), queryDef;
-//
-//	if (ba::starts_with(inQuery, ">"))
-//	{
-//		inOutFile << inQuery;
-//		if (not ba::ends_with(inQuery, "\n"))
-//			inOutFile << endl;
-//		
-//		boost::smatch m;
-//		if (regex_search(inQuery, m, kFastARE, boost::match_not_dot_newline))
-//		{
-//			queryID = m[4];
-//			if (queryID.empty())
-//				queryID = m[2];
-//			queryDef = m[7];
-//			query = m.suffix();
-//		}
-//		else
-//		{
-//			queryID = inQuery.substr(1, inQuery.find('\n') - 1);
-//			query = inQuery.substr(queryID.length() + 2, string::npos);
-//
-//			string::size_type s = queryID.find(' ');
-//			if (s != string::npos)
-//			{
-//				queryDef = queryID.substr(s + 1);
-//				queryID.erase(s, string::npos);
-//			}
-//		}
-//	}
-//	else
-//		inOutFile << ">query" << endl << inQuery << endl;
-//
-//	switch (inWordSize)
-//	{
-//		case 2:
-//		{
-//			BlastQuery<2> q(query, inFilter, inExpect, inMatrix, inGapped, inGapOpen, inGapExtend, inReportLimit);
-//			q.Search(inDatabanks, inThreads);
-//			q.WriteAsFasta(inOutFile);
-//			break;
-//		}
-//
-//		case 3:
-//		{
-//			BlastQuery<3> q(query, inFilter, inExpect, inMatrix, inGapped, inGapOpen, inGapExtend, inReportLimit);
-//			q.Search(inDatabanks, inThreads);
-//			q.WriteAsFasta(inOutFile);
-//			break;
-//		}
-//
-//		case 4:
-//		{
-//			BlastQuery<4> q(query, inFilter, inExpect, inMatrix, inGapped, inGapOpen, inGapExtend, inReportLimit);
-//			q.Search(inDatabanks, inThreads);
-//			q.WriteAsFasta(inOutFile);
-//			break;
-//		}
-//
-//		default:
-//			throw Exception("Unsupported word size %d", inWordSize);	
-//	}
-//}
+void SearchAndWriteResultsAsFastA(std::ostream& inOutFile, const vector<fs::path>& inDatabanks,
+	const std::string& inQuery, const std::string& inProgram,
+	const std::string& inMatrix, uint32 inWordSize, double inExpect,
+	bool inFilter, bool inGapped, int32 inGapOpen, int32 inGapExtend,
+	uint32 inReportLimit, uint32 inThreads)
+{
+	if (inProgram != "blastp")
+		throw M6Exception("Unsupported program %s", inProgram.c_str());
+	
+	if (inGapped)
+	{
+		if (inGapOpen == -1) inGapOpen = 11;
+		if (inGapExtend == -1) inGapExtend = 1;
+	}
+
+	if (inWordSize == 0) inWordSize = 3;
+
+	string query(inQuery), queryID("query"), queryDef;
+
+	if (ba::starts_with(inQuery, ">"))
+	{
+		inOutFile << inQuery;
+		if (not ba::ends_with(inQuery, "\n"))
+			inOutFile << endl;
+		
+		boost::smatch m;
+		if (regex_search(inQuery, m, kFastARE, boost::match_not_dot_newline))
+		{
+			queryID = m[4];
+			if (queryID.empty())
+				queryID = m[2];
+			queryDef = m[7];
+			query = m.suffix();
+		}
+		else
+		{
+			queryID = inQuery.substr(1, inQuery.find('\n') - 1);
+			query = inQuery.substr(queryID.length() + 2, string::npos);
+
+			string::size_type s = queryID.find(' ');
+			if (s != string::npos)
+			{
+				queryDef = queryID.substr(s + 1);
+				queryID.erase(s, string::npos);
+			}
+		}
+	}
+	else
+		inOutFile << ">query" << endl << inQuery << endl;
+
+	int64 totalLength = accumulate(inDatabanks.begin(), inDatabanks.end(), 0LL,
+		[](int64 l, const fs::path& p) -> int64 { return l + fs::file_size(p); });
+	
+	M6Progress progress(totalLength, "blast");
+
+	switch (inWordSize)
+	{
+		case 2:
+		{
+			BlastQuery<2> q(query, inFilter, inExpect, inMatrix, inGapped, inGapOpen, inGapExtend, inReportLimit);
+			q.Search(inDatabanks, progress, inThreads);
+			q.WriteAsFasta(inOutFile);
+			break;
+		}
+
+		case 3:
+		{
+			BlastQuery<3> q(query, inFilter, inExpect, inMatrix, inGapped, inGapOpen, inGapExtend, inReportLimit);
+			q.Search(inDatabanks, progress, inThreads);
+			q.WriteAsFasta(inOutFile);
+			break;
+		}
+
+		case 4:
+		{
+			BlastQuery<4> q(query, inFilter, inExpect, inMatrix, inGapped, inGapOpen, inGapExtend, inReportLimit);
+			q.Search(inDatabanks, progress, inThreads);
+			q.WriteAsFasta(inOutFile);
+			break;
+		}
+
+		default:
+			throw M6Exception("Unsupported word size %d", inWordSize);	
+	}
+}
 
 }
 
-//// --------------------------------------------------------------------
-//
-//void operator&(xml::writer& w, const M6Blast::Hsp& inHsp)
-//{
-//	w.start_element("Hsp");
-//	w.element("Hsp_num", boost::lexical_cast<string>(inHsp.mHspNr));
-//	w.element("Hsp_bit-score", boost::lexical_cast<string>(inHsp.mBitScore));
-//	w.element("Hsp_score", boost::lexical_cast<string>(inHsp.mScore));
-//	w.element("Hsp_evalue", boost::lexical_cast<string>(inHsp.mExpect));
-//	w.element("Hsp_query-from", boost::lexical_cast<string>(inHsp.mQueryStart));
-//	w.element("Hsp_query-to", boost::lexical_cast<string>(inHsp.mQueryEnd));
-//	w.element("Hsp_hit-from", boost::lexical_cast<string>(inHsp.mTargetStart));
-//	w.element("Hsp_hit-to", boost::lexical_cast<string>(inHsp.mTargetEnd));
-//	w.element("Hsp_identity", boost::lexical_cast<string>(inHsp.mIdentity));
-//	w.element("Hsp_positive", boost::lexical_cast<string>(inHsp.mPositive));
-//	w.element("Hsp_align-len", boost::lexical_cast<string>(inHsp.mQueryAlignment.length()));
-//	w.element("Hsp_qseq", inHsp.mQueryAlignment);
-//	w.element("Hsp_hseq", inHsp.mTargetAlignment);
-//	w.element("Hsp_midline", inHsp.mMidLine);
-//	w.end_element();
-//}
-//
-//void operator&(xml::writer& w, const M6Blast::Hit& inHit)
-//{
-//	w.start_element("Hit");
-//	w.element("Hit_num", boost::lexical_cast<string>(inHit.mHitNr));
-//	w.element("Hit_id", inHit.mID);
-//	if (not inHit.mDefLine.empty())
-//		w.element("Hit_def", inHit.mDefLine);
-//	if (not inHit.mAccession.empty())
-//		w.element("Hit_accession", inHit.mAccession);
-//	w.element("Hit_len", boost::lexical_cast<string>(inHit.mSequence.length()));
-//	w.start_element("Hit_hsps");
-//	for_each(inHit.mHsps.begin(), inHit.mHsps.end(), [&](const M6Blast::Hsp& hsp) {
-//		w & hsp;
-//	});
-//	w.end_element();	
-//	w.end_element();	
-//}
-//
-//ostream& operator<<(ostream& os, const M6Blast::Result& inResult)
-//{
-//	xml::writer w(os, true);
-//	w.doctype("BlastOutput", "-//NCBI//NCBI BlastOutput/EN", "http://www.ncbi.nlm.nih.gov/dtd/NCBI_BlastOutput.dtd");
-//	w.start_element("BlastOutput");
-//	w.element("BlastOutput_program", inResult.mProgram);
-//	w.element("BlastOutput_db", inResult.mDb);
-//	w.element("BlastOutput_query-ID", inResult.mQueryID);
-//	w.element("BlastOutput_query-def", inResult.mQueryDef);
-//	w.element("BlastOutput_query-len", boost::lexical_cast<string>(inResult.mQueryLength));
-//	
-//	w.start_element("BlastOutput_param");
-//	w.start_element("Parameters");
-//	w.element("Parameters_matrix", inResult.mMatrix);
-//	w.element("Parameters_expect", boost::lexical_cast<string>(inResult.mExpect));
-//	w.element("Parameters_gap-open", boost::lexical_cast<string>(inResult.mGapOpen));
-//	w.element("Parameters_gap-extend", boost::lexical_cast<string>(inResult.mGapExtend));
-//	w.element("Parameters_filter", inResult.mFilter ? "T" : "F");
-//	w.end_element();
-//	w.end_element();
-//	
-//	w.start_element("BlastOutput_iterations");
-//	w.start_element("Iteration");
-//	w.element("Iteration_iter-num", "1");
-//	w.element("Iteration_query-ID", inResult.mQueryID);
-//	if (not inResult.mQueryDef.empty())
-//		w.element("Iteration_query-def", inResult.mQueryDef);
-//	w.element("Iteration_query-len", boost::lexical_cast<string>(inResult.mQueryLength));
-//	w.start_element("Iteration_hits");
-//	for_each(inResult.mHits.begin(), inResult.mHits.end(), [&](const M6Blast::Hit& hit) {
-//		w & hit;
-//	});
-//	w.end_element();	// Iteration_hits
-//	w.start_element("Iteration_stat");
-//	w.start_element("Statistics");
-//	w.element("Statistics_db-num", boost::lexical_cast<string>(inResult.mDbCount));
-//	w.element("Statistics_db-len", boost::lexical_cast<string>(inResult.mDbLength));
-//	w.element("Statistics_eff-space", boost::lexical_cast<string>(inResult.mEffectiveSpace));
-//	w.element("Statistics_kappa", boost::lexical_cast<string>(inResult.mKappa));
-//	w.element("Statistics_lambda", boost::lexical_cast<string>(inResult.mLambda));
-//	w.element("Statistics_entropy", boost::lexical_cast<string>(inResult.mEntropy));
-//	w.end_element();	// Statistics
-//	w.end_element();	// Iteration_stat
-//	w.end_element();	// Iteration
-//	w.end_element();	// BlastOutput_iterations
-//	w.end_element();	// BlastOutput
-//	return os;
-//}
+// --------------------------------------------------------------------
+
+void operator&(xml::writer& w, const M6Blast::Hsp& inHsp)
+{
+	w.start_element("Hsp");
+	w.element("Hsp_num", boost::lexical_cast<string>(inHsp.mHspNr));
+	w.element("Hsp_bit-score", boost::lexical_cast<string>(inHsp.mBitScore));
+	w.element("Hsp_score", boost::lexical_cast<string>(inHsp.mScore));
+	w.element("Hsp_evalue", boost::lexical_cast<string>(inHsp.mExpect));
+	w.element("Hsp_query-from", boost::lexical_cast<string>(inHsp.mQueryStart));
+	w.element("Hsp_query-to", boost::lexical_cast<string>(inHsp.mQueryEnd));
+	w.element("Hsp_hit-from", boost::lexical_cast<string>(inHsp.mTargetStart));
+	w.element("Hsp_hit-to", boost::lexical_cast<string>(inHsp.mTargetEnd));
+	w.element("Hsp_identity", boost::lexical_cast<string>(inHsp.mIdentity));
+	w.element("Hsp_positive", boost::lexical_cast<string>(inHsp.mPositive));
+	w.element("Hsp_align-len", boost::lexical_cast<string>(inHsp.mQueryAlignment.length()));
+	w.element("Hsp_qseq", inHsp.mQueryAlignment);
+	w.element("Hsp_hseq", inHsp.mTargetAlignment);
+	w.element("Hsp_midline", inHsp.mMidLine);
+	w.end_element();
+}
+
+void operator&(xml::writer& w, const M6Blast::Hit& inHit)
+{
+	w.start_element("Hit");
+	w.element("Hit_num", boost::lexical_cast<string>(inHit.mHitNr));
+	w.element("Hit_id", inHit.mID);
+	if (not inHit.mDefLine.empty())
+		w.element("Hit_def", inHit.mDefLine);
+	if (not inHit.mAccession.empty())
+		w.element("Hit_accession", inHit.mAccession);
+	w.element("Hit_len", boost::lexical_cast<string>(inHit.mSequence.length()));
+	w.start_element("Hit_hsps");
+	for_each(inHit.mHsps.begin(), inHit.mHsps.end(), [&](const M6Blast::Hsp& hsp) {
+		w & hsp;
+	});
+	w.end_element();	
+	w.end_element();	
+}
+
+ostream& operator<<(ostream& os, const M6Blast::Result& inResult)
+{
+	xml::writer w(os, true);
+	w.doctype("BlastOutput", "-//NCBI//NCBI BlastOutput/EN", "http://www.ncbi.nlm.nih.gov/dtd/NCBI_BlastOutput.dtd");
+	w.start_element("BlastOutput");
+	w.element("BlastOutput_program", inResult.mProgram);
+	w.element("BlastOutput_db", inResult.mDb);
+	w.element("BlastOutput_query-ID", inResult.mQueryID);
+	w.element("BlastOutput_query-def", inResult.mQueryDef);
+	w.element("BlastOutput_query-len", boost::lexical_cast<string>(inResult.mQueryLength));
+	
+	w.start_element("BlastOutput_param");
+	w.start_element("Parameters");
+	w.element("Parameters_matrix", inResult.mMatrix);
+	w.element("Parameters_expect", boost::lexical_cast<string>(inResult.mExpect));
+	w.element("Parameters_gap-open", boost::lexical_cast<string>(inResult.mGapOpen));
+	w.element("Parameters_gap-extend", boost::lexical_cast<string>(inResult.mGapExtend));
+	w.element("Parameters_filter", inResult.mFilter ? "T" : "F");
+	w.end_element();
+	w.end_element();
+	
+	w.start_element("BlastOutput_iterations");
+	w.start_element("Iteration");
+	w.element("Iteration_iter-num", "1");
+	w.element("Iteration_query-ID", inResult.mQueryID);
+	if (not inResult.mQueryDef.empty())
+		w.element("Iteration_query-def", inResult.mQueryDef);
+	w.element("Iteration_query-len", boost::lexical_cast<string>(inResult.mQueryLength));
+	w.start_element("Iteration_hits");
+	for_each(inResult.mHits.begin(), inResult.mHits.end(), [&](const M6Blast::Hit& hit) {
+		w & hit;
+	});
+	w.end_element();	// Iteration_hits
+	w.start_element("Iteration_stat");
+	w.start_element("Statistics");
+	w.element("Statistics_db-num", boost::lexical_cast<string>(inResult.mDbCount));
+	w.element("Statistics_db-len", boost::lexical_cast<string>(inResult.mDbLength));
+	w.element("Statistics_eff-space", boost::lexical_cast<string>(inResult.mEffectiveSpace));
+	w.element("Statistics_kappa", boost::lexical_cast<string>(inResult.mKappa));
+	w.element("Statistics_lambda", boost::lexical_cast<string>(inResult.mLambda));
+	w.element("Statistics_entropy", boost::lexical_cast<string>(inResult.mEntropy));
+	w.end_element();	// Statistics
+	w.end_element();	// Iteration_stat
+	w.end_element();	// Iteration
+	w.end_element();	// BlastOutput_iterations
+	w.end_element();	// BlastOutput
+	return os;
+}
 
 // --------------------------------------------------------------------
 //

@@ -139,17 +139,17 @@ M6Server::M6Server(zx::element* inConfig)
 	mount("images",			boost::bind(&M6Server::handle_file, this, _1, _2, _3));
 	mount("favicon.ico",	boost::bind(&M6Server::handle_file, this, _1, _2, _3));
 
-	mount("blast",			boost::bind(&WebSearch::handle_blast, this, _1, _2, _3));
-	mount("blastJobResult",	boost::bind(&WebSearch::handle_blast_results_ajax, this, _1, _2, _3));
-	mount("blastJobStatus",	boost::bind(&WebSearch::handle_blast_status_ajax, this, _1, _2, _3));
-	mount("blastJobSubmit",	boost::bind(&WebSearch::handle_blast_submit_ajax, this, _1, _2, _3));
-	mount("align",			boost::bind(&WebSearch::handle_align, this, _1, _2, _3));
-	mount("alignJobSubmit",	boost::bind(&WebSearch::handle_align_submit_ajax, this, _1, _2, _3));
+	//mount("blast",			boost::bind(&WebSearch::handle_blast, this, _1, _2, _3));
+	//mount("blastJobResult",	boost::bind(&WebSearch::handle_blast_results_ajax, this, _1, _2, _3));
+	//mount("blastJobStatus",	boost::bind(&WebSearch::handle_blast_status_ajax, this, _1, _2, _3));
+	//mount("blastJobSubmit",	boost::bind(&WebSearch::handle_blast_submit_ajax, this, _1, _2, _3));
+	//mount("align",			boost::bind(&WebSearch::handle_align, this, _1, _2, _3));
+	//mount("alignJobSubmit",	boost::bind(&WebSearch::handle_align_submit_ajax, this, _1, _2, _3));
 
-	mount("ajax/blast/result",	boost::bind(&WebSearch::handle_blast_results_ajax, this, _1, _2, _3));
-	mount("ajax/blast/status",	boost::bind(&WebSearch::handle_blast_status_ajax, this, _1, _2, _3));
-	mount("ajax/blast/submit",	boost::bind(&WebSearch::handle_blast_submit_ajax, this, _1, _2, _3));
-	mount("ajax/align/submit",	boost::bind(&WebSearch::handle_align_submit_ajax, this, _1, _2, _3));
+	//mount("ajax/blast/result",	boost::bind(&WebSearch::handle_blast_results_ajax, this, _1, _2, _3));
+	//mount("ajax/blast/status",	boost::bind(&WebSearch::handle_blast_status_ajax, this, _1, _2, _3));
+	//mount("ajax/blast/submit",	boost::bind(&WebSearch::handle_blast_submit_ajax, this, _1, _2, _3));
+	//mount("ajax/align/submit",	boost::bind(&WebSearch::handle_align_submit_ajax, this, _1, _2, _3));
 
 
 	add_processor("entry",	boost::bind(&M6Server::process_mrs_entry, this, _1, _2, _3));

@@ -87,6 +87,7 @@
     <ClCompile Include="..\..\src\M6Index.cpp" />
     <ClCompile Include="..\..\src\M6Iterator.cpp" />
     <ClCompile Include="..\..\src\M6Lexicon.cpp" />
+    <ClCompile Include="..\..\src\M6Matrix.cpp" />
     <ClCompile Include="..\..\src\M6Progress.cpp" />
     <ClCompile Include="..\..\src\M6Query.cpp" />
     <ClCompile Include="..\..\src\M6SequenceFilter.cpp" />

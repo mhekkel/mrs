@@ -41,7 +41,7 @@ M6Config::~M6Config()
 	delete mConfig;
 }
 
-zx::element* M6Config::LoadDatabank(const std::string& inDatabank)
+zx::element* M6Config::LoadDatabank(const string& inDatabank)
 {
 	string dbConfigPath = (boost::format("/m6-config/databank[@id='%1%']") % inDatabank).str();
 	auto dbConfig = mConfig->find(dbConfigPath);
@@ -54,7 +54,7 @@ zx::element* M6Config::LoadDatabank(const std::string& inDatabank)
 	return dbConfig.front();
 }
 
-zx::element* M6Config::LoadParser(const std::string& inParser)
+zx::element* M6Config::LoadParser(const string& inParser)
 {
 	string dbConfigPath = (boost::format("/m6-config/parser[@id='%1%']") % inParser).str();
 	auto dbConfig = mConfig->find(dbConfigPath);
@@ -77,7 +77,12 @@ zeep::xml::element_set M6Config::LoadServers()
 	return mConfig->find("/m6-config/server");
 }
 
-string M6Config::FindGlobal(const std::string& inXPath)
+zeep::xml::element_set M6Config::Find(const string& inXPath)
+{
+	return mConfig->find(inXPath);
+}
+
+string M6Config::FindGlobal(const string& inXPath)
 {
 	zeep::xml::element* e = mConfig->find_first(inXPath);
 	string result;

@@ -1101,7 +1101,7 @@ inline void ReadEntry(const char*& inFasta, const char* inEnd, sequence& outTarg
 struct HspData
 {
 	uint32		mScore;
-	uint32		mQueryStart, mQueryEnd, mTargetStart, mTargetEnd;
+	uint32		mQueryStart, mQueryEnd, mTargetStart, mTargetEnd, mTargetLength;
 	sequence	mAlignedQuery, mAlignedTarget;
 	double		mBitScore;
 	double		mExpect;
@@ -1384,12 +1384,12 @@ void BlastQuery<WORDSIZE>::Search(const vector<fs::path>& inDatabanks, M6Progres
 template<int WORDSIZE>
 void BlastQuery<WORDSIZE>::Report(Result& outResult)
 {
-	outResult.mDbCount = mDbCount;
-	outResult.mDbLength = mDbLength;
-	outResult.mEffectiveSpace = mSearchSpace;
-	outResult.mKappa = mMatrix.GappedKappa();
-	outResult.mLambda = mMatrix.GappedLambda();
-	outResult.mEntropy = mMatrix.GappedEntropy();
+	outResult.mStats.mDbCount = mDbCount;
+	outResult.mStats.mDbLength = mDbLength;
+	outResult.mStats.mEffectiveSpace = mSearchSpace;
+	outResult.mStats.mKappa = mMatrix.GappedKappa();
+	outResult.mStats.mLambda = mMatrix.GappedLambda();
+	outResult.mStats.mEntropy = mMatrix.GappedEntropy();
 
 	foreach (HitPtr hit, mHits)
 	{
@@ -1420,7 +1420,8 @@ void BlastQuery<WORDSIZE>::Report(Result& outResult)
 		foreach (HspData& hsp, hit->mHsps)
 		{
 			Hsp p = { static_cast<uint32>(h.mHsps.size() + 1), hsp.mQueryStart + 1, hsp.mQueryEnd,
-				hsp.mTargetStart + 1, hsp.mTargetEnd, hsp.mScore, hsp.mBitScore, hsp.mExpect };
+				hsp.mTargetStart + 1, hsp.mTargetEnd, hsp.mTargetLength,
+				hsp.mScore, hsp.mBitScore, hsp.mExpect };
 			
 			p.mQueryAlignment.reserve(hsp.mAlignedQuery.length());
 			p.mTargetAlignment.reserve(hsp.mAlignedTarget.length());
@@ -1549,6 +1550,7 @@ void BlastQuery<WORDSIZE>::SearchPart(const char* inFasta, size_t inLength, M6Pr
 					hsp.mQueryEnd = queryStart + alignmentDistance;
 					hsp.mTargetStart = targetStart;
 					hsp.mTargetEnd = targetStart + alignmentDistance;
+					hsp.mTargetLength = static_cast<uint32>(target.length());
 
 					if (not hit)
 						hit.reset(new HitData(entry, target));
@@ -1994,17 +1996,21 @@ Result* Search(const vector<fs::path>& inDatabanks,
 
 	unique_ptr<Result> result(new Result);
 
-	result->mProgram = inProgram;
+	result->mParams.mProgram = inProgram;
 	foreach (const fs::path& db, inDatabanks)
 		result->mDb += db.filename().string();
-	result->mExpect = inExpect;
+	result->mParams.mExpect = inExpect;
 	result->mQueryID = queryID;
 	result->mQueryDef = queryDef;
 	result->mQueryLength = static_cast<uint32>(query.length());
-	result->mMatrix = inMatrix;
-	result->mGapOpen = inGapOpen;
-	result->mGapExtend = inGapExtend;
-	result->mFilter = inFilter;
+	result->mParams.mMatrix = inMatrix;
+	result->mParams.mGapped = inGapped;
+	result->mParams.mGapOpen = inGapOpen;
+	result->mParams.mGapExtend = inGapExtend;
+	result->mParams.mFilter = inFilter;
+
+	if (inThreads < 1)
+		inThreads = boost::thread::hardware_concurrency();
 
 	switch (inWordSize)
 	{
@@ -2094,6 +2100,9 @@ void SearchAndWriteResultsAsFastA(std::ostream& inOutFile, const vector<fs::path
 	
 	M6Progress progress(totalLength, "blast");
 
+	if (inThreads < 1)
+		inThreads = boost::thread::hardware_concurrency();
+
 	switch (inWordSize)
 	{
 		case 2:
@@ -2172,7 +2181,7 @@ ostream& operator<<(ostream& os, const M6Blast::Result& inResult)
 	xml::writer w(os, true);
 	w.doctype("BlastOutput", "-//NCBI//NCBI BlastOutput/EN", "http://www.ncbi.nlm.nih.gov/dtd/NCBI_BlastOutput.dtd");
 	w.start_element("BlastOutput");
-	w.element("BlastOutput_program", inResult.mProgram);
+	w.element("BlastOutput_program", inResult.mParams.mProgram);
 	w.element("BlastOutput_db", inResult.mDb);
 	w.element("BlastOutput_query-ID", inResult.mQueryID);
 	w.element("BlastOutput_query-def", inResult.mQueryDef);
@@ -2180,11 +2189,14 @@ ostream& operator<<(ostream& os, const M6Blast::Result& inResult)
 	
 	w.start_element("BlastOutput_param");
 	w.start_element("Parameters");
-	w.element("Parameters_matrix", inResult.mMatrix);
-	w.element("Parameters_expect", boost::lexical_cast<string>(inResult.mExpect));
-	w.element("Parameters_gap-open", boost::lexical_cast<string>(inResult.mGapOpen));
-	w.element("Parameters_gap-extend", boost::lexical_cast<string>(inResult.mGapExtend));
-	w.element("Parameters_filter", inResult.mFilter ? "T" : "F");
+	w.element("Parameters_matrix", inResult.mParams.mMatrix);
+	w.element("Parameters_expect", boost::lexical_cast<string>(inResult.mParams.mExpect));
+	if (inResult.mParams.mGapped)
+	{
+		w.element("Parameters_gap-open", boost::lexical_cast<string>(inResult.mParams.mGapOpen));
+		w.element("Parameters_gap-extend", boost::lexical_cast<string>(inResult.mParams.mGapExtend));
+	}
+	w.element("Parameters_filter", inResult.mParams.mFilter ? "T" : "F");
 	w.end_element();
 	w.end_element();
 	
@@ -2202,12 +2214,12 @@ ostream& operator<<(ostream& os, const M6Blast::Result& inResult)
 	w.end_element();	// Iteration_hits
 	w.start_element("Iteration_stat");
 	w.start_element("Statistics");
-	w.element("Statistics_db-num", boost::lexical_cast<string>(inResult.mDbCount));
-	w.element("Statistics_db-len", boost::lexical_cast<string>(inResult.mDbLength));
-	w.element("Statistics_eff-space", boost::lexical_cast<string>(inResult.mEffectiveSpace));
-	w.element("Statistics_kappa", boost::lexical_cast<string>(inResult.mKappa));
-	w.element("Statistics_lambda", boost::lexical_cast<string>(inResult.mLambda));
-	w.element("Statistics_entropy", boost::lexical_cast<string>(inResult.mEntropy));
+	w.element("Statistics_db-num", boost::lexical_cast<string>(inResult.mStats.mDbCount));
+	w.element("Statistics_db-len", boost::lexical_cast<string>(inResult.mStats.mDbLength));
+	w.element("Statistics_eff-space", boost::lexical_cast<string>(inResult.mStats.mEffectiveSpace));
+	w.element("Statistics_kappa", boost::lexical_cast<string>(inResult.mStats.mKappa));
+	w.element("Statistics_lambda", boost::lexical_cast<string>(inResult.mStats.mLambda));
+	w.element("Statistics_entropy", boost::lexical_cast<string>(inResult.mStats.mEntropy));
 	w.end_element();	// Statistics
 	w.end_element();	// Iteration_stat
 	w.end_element();	// Iteration

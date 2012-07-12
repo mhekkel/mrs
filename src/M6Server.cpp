@@ -1405,16 +1405,19 @@ void M6Server::handle_blast(const zeep::http::request& request, const el::scope&
 //	}
 	
 	vector<el::object> databanks;
-	foreach (M6LoadedDatabank& db, mLoadedDatabanks)
+	foreach (auto db, M6Config::Instance().Find("//blast/dbs/db"))
 	{
-//		if (not db->GetBlastDbCount() or mNoBlast.count(dbi.GetID()))
-//			continue;
-		
 		el::object databank;
-		databank["id"] = db.mID;
-		databank["name"] = db.mName;
+		databank["id"] = db->get_attribute("id");
+		
+		string name = db->get_attribute("name");
+		if (name.empty())
+			name = db->get_attribute("id");
+		
+		databank["name"] = name;
 		databanks.push_back(databank);
 	}
+		
 	sub.put("databanks", el::object(databanks));
 //	sub.put("blastdb", db);
 
@@ -1458,170 +1461,170 @@ void M6Server::handle_blast_results_ajax(const zeep::http::request& request, con
 	
 	ostringstream json;
 	
+	M6BlastResultPtr result(M6BlastCache::Instance().JobResult(id));
+	
 //	// try to fetch the job
 //	CBlastJobPtr job = CBlastJobProcessor::Instance()->Find(id);
 //	const CBlastResult* result;
 //	if (job != nullptr)
 //		result = job->Result();
-//	
-//	if (not job)
+	
+	if (not result)
 		json << "{\"error\":\"Job expired\"}";
 //	else if (job->Status() != bj_Finished)
 //		json << "{\"error\":\"Invalid job status\"}";
 //	else if (result == nullptr)
 //		json << "{\"error\":\"Internal error (no result?)\"}";
-//	else if (hitNr > 0)	// we need to return the hsps for this hit
-//	{
-//		const CBlastHitList& hits(result->hits);
-//		if (hitNr > hits.size())
-//			THROW(("Hitnr out of range"));
-//		
-//		CBlastHitList::const_iterator hit = hits.begin();
-//		advance(hit, hitNr - 1);
-//		
-//		const CBlastHspList& hsps(hit->hsps);
-//		
-//		json << '[';
-//		
-//		uint32 nr = 1;
-//		foreach (const CBlastHsp& hsp, hsps)
-//		{
-//			if (nr > 1)
-//				json << ',';
-//			
-//			string queryAlignment = hsp.queryAlignment;
-//			
-//			// calculate the offsets for the graphical representation of this hsp
-//	        uint32 qf = hsp.queryStart;
-//	        uint32 qt = hsp.queryEnd;
-//	        uint32 ql = static_cast<uint32>(job->Sequence().length());
-//	
-//	        uint32 sf = hsp.subjectStart;
-//	        uint32 st = hsp.subjectEnd;
-//	        uint32 sl = hsp.subjectLength;
-//	
-//	        uint32 length = static_cast<uint32>(queryAlignment.length());
-//	        uint32 before = qf;
-//	        if (before < sf)
-//	            before = sf;
-//	
-//	        uint32 after = ql - qt;
-//	        if (after < sl - st)
-//	            after = sl - st;
-//	
-//	        length += before + after;
-//	
-//	        float factor = 150;
-//	        factor /= length;
-//	
-//			uint32 ql1, ql2, ql3, ql4, sl1, sl2, sl3, sl4;
-//	
-//	        if (qf < before)
-//	            ql1 = uint32(factor * (before - qf));
-//	        else
-//	            ql1 = 0;
-//	        ql2 = uint32(factor * qf);
-//	        ql3 = uint32(factor * queryAlignment.length());
-//	        ql4 = uint32(factor * (ql - qt));
-//	
-//	        if (sf < before)
-//	            sl1 = uint32(factor * (before - sf));
-//	        else
-//	            sl1 = 0;
-//	        sl2 = uint32(factor * sf);
-//	        sl3 = uint32(factor * queryAlignment.length());
-//	        sl4 = uint32(factor * (sl - st));
-//	
-//	        if (ql1 > 0 and ql1 + ql2 < sl2)
-//	            ql1 = sl2 - ql2;
-//	
-//	        if (sl1 > 0 and sl1 + sl2 < ql2)
-//	            sl1 = ql2 - sl2;
-//
-//			json << '{'
-//				 << "\"nr\":" << nr << ','
-//				 << "\"score\":" << hsp.score << ','
-//				 << "\"bitScore\":" << hsp.bitScore << ','
-//				 << "\"expect\":" << hsp.expect << ','
-//				 << "\"queryAlignment\":\"" << queryAlignment << "\","
-//				 << "\"queryStart\":" << hsp.queryStart << ','
-//				 << "\"subjectAlignment\":\"" << hsp.subjectAlignment << "\","
-//				 << "\"subjectStart\":" << hsp.subjectStart << ','
-//				 << "\"midLine\":\"" << hsp.midLine << "\","
-//				 << "\"identity\":" << hsp.identity << ','
-//				 << "\"positive\":" << hsp.positive << ','
-//				 << "\"gaps\":" << hsp.gaps << ','
-//				 << "\"ql\":[" << ql1 << ',' << ql2 << ',' << ql3 << ',' << ql4 << ']' << ','
-//				 << "\"sl\":[" << sl1 << ',' << sl2 << ',' << sl3 << ',' << sl4 << ']'
-//				 << '}';
-//
-//			++nr;
-//		}
-//
-//		json << ']';
-//	}
-//	else
-//	{
-//		json << '[';
-//		
-//		CDatabankPtr db = job->Databank();
-//		
-//		uint32 nr = 1;
-//		const CBlastHitList& hits(result->hits);
-//		foreach (const CBlastHit& hit, hits)
-//		{
-//			if (nr > 1)
-//				json << ',';
-//			
-//			const CBlastHspList& hsps(hit.hsps);
-//			if (hsps.empty())
-//				continue;
-//			const CBlastHsp& best = hsps.front();
-//
-//			uint32 coverageStart = 0, coverageLength = 0, coverageColor = 1;
-//			float bin = (best.positive * 4.0f) / best.queryAlignment.length();
-//
-//			if (bin >= 3.5)
-//				coverageColor = 1;
-//			else if (bin >= 3)
-//				coverageColor = 2;
-//			else if (bin >= 2.5)
-//				coverageColor = 3;
-//			else if (bin >= 2)
-//				coverageColor = 4;
-//			else
-//				coverageColor = 5;
-//
-//			float queryLength = static_cast<float>(job->Sequence().length());
-//			const int kGraphicWidth = 100;
-//
-//			coverageStart = uint32(best.queryStart * kGraphicWidth / queryLength);
-//			coverageLength = uint32(best.queryAlignment.length() * kGraphicWidth / queryLength);
-//			
-//			string title = GetEntry(db, hit.documentID, "title");
-//			ba::replace_all(title, "\\", "\\\\");
-//			ba::replace_all(title, "\"", "\\\"");
-//			
-//			json << '{'
-//				 << "\"nr\":" << nr << ','
-//				 << "\"doc\":\"" << hit.documentID << "\","
-//				 << "\"seq\":\"" << hit.sequenceID << "\","
-//				 << "\"desc\":\"" << title << "\","
-//				 << "\"bitScore\":" << best.bitScore << ','
-//				 << "\"expect\":" << best.expect << ','
-//				 << "\"hsps\":" << hsps.size() << ','
-//				 << "\"coverage\":{"
-//					 << "\"start\":" << coverageStart << ','
-//					 << "\"length\":" << coverageLength << ',' 
-//					 << "\"color\":" << coverageColor
-//					 << '}'
-//				 << '}';
-//
-//			++nr;
-//		}
-//
-//		json << ']';
-//	}
+	else if (hitNr > 0)	// we need to return the hsps for this hit
+	{
+		const list<M6Blast::Hit>& hits(result->mHits);
+		if (hitNr > hits.size())
+			THROW(("Hitnr out of range"));
+		
+		list<M6Blast::Hit>::const_iterator hit = hits.begin();
+		advance(hit, hitNr - 1);
+		
+		const list<M6Blast::Hsp>& hsps(hit->mHsps);
+		
+		json << '[';
+		
+		uint32 nr = 1;
+		foreach (const M6Blast::Hsp& hsp, hsps)
+		{
+			if (nr > 1)
+				json << ',';
+			
+			string queryAlignment = hsp.mQueryAlignment;
+			
+			// calculate the offsets for the graphical representation of this hsp
+	        uint32 qf = hsp.mQueryStart;
+	        uint32 qt = hsp.mQueryEnd;
+	        uint32 ql = result->mQueryLength;
+	
+	        uint32 sf = hsp.mTargetStart;
+	        uint32 st = hsp.mTargetEnd;
+	        uint32 sl = hsp.mTargetLength;
+	
+	        uint32 length = static_cast<uint32>(queryAlignment.length());
+	        uint32 before = qf;
+	        if (before < sf)
+	            before = sf;
+	
+	        uint32 after = ql - qt;
+	        if (after < sl - st)
+	            after = sl - st;
+	
+	        length += before + after;
+	
+	        float factor = 150;
+	        factor /= length;
+	
+			uint32 ql1, ql2, ql3, ql4, sl1, sl2, sl3, sl4;
+	
+	        if (qf < before)
+	            ql1 = uint32(factor * (before - qf));
+	        else
+	            ql1 = 0;
+	        ql2 = uint32(factor * qf);
+	        ql3 = uint32(factor * queryAlignment.length());
+	        ql4 = uint32(factor * (ql - qt));
+	
+	        if (sf < before)
+	            sl1 = uint32(factor * (before - sf));
+	        else
+	            sl1 = 0;
+	        sl2 = uint32(factor * sf);
+	        sl3 = uint32(factor * queryAlignment.length());
+	        sl4 = uint32(factor * (sl - st));
+	
+	        if (ql1 > 0 and ql1 + ql2 < sl2)
+	            ql1 = sl2 - ql2;
+	
+	        if (sl1 > 0 and sl1 + sl2 < ql2)
+	            sl1 = ql2 - sl2;
+
+			json << '{'
+				 << "\"nr\":" << nr << ','
+				 << "\"score\":" << hsp.mScore << ','
+				 << "\"bitScore\":" << hsp.mBitScore << ','
+				 << "\"expect\":" << hsp.mExpect << ','
+				 << "\"queryAlignment\":\"" << queryAlignment << "\","
+				 << "\"queryStart\":" << hsp.mQueryStart << ','
+				 << "\"subjectAlignment\":\"" << hsp.mTargetAlignment << "\","
+				 << "\"subjectStart\":" << hsp.mTargetStart << ','
+				 << "\"midLine\":\"" << hsp.mMidLine << "\","
+				 << "\"identity\":" << hsp.mIdentity << ','
+				 << "\"positive\":" << hsp.mPositive << ','
+				 << "\"gaps\":" << hsp.mGaps << ','
+				 << "\"ql\":[" << ql1 << ',' << ql2 << ',' << ql3 << ',' << ql4 << ']' << ','
+				 << "\"sl\":[" << sl1 << ',' << sl2 << ',' << sl3 << ',' << sl4 << ']'
+				 << '}';
+
+			++nr;
+		}
+
+		json << ']';
+	}
+	else
+	{
+		json << '[';
+		
+		uint32 nr = 1;
+		const list<M6Blast::Hit>& hits(result->mHits);
+		foreach (const M6Blast::Hit& hit, hits)
+		{
+			if (nr > 1)
+				json << ',';
+			
+			const list<M6Blast::Hsp>& hsps(hit.mHsps);
+			if (hsps.empty())
+				continue;
+			const M6Blast::Hsp& best = hsps.front();
+
+			uint32 coverageStart = 0, coverageLength = 0, coverageColor = 1;
+			float bin = (best.mPositive * 4.0f) / best.mQueryAlignment.length();
+
+			if (bin >= 3.5)
+				coverageColor = 1;
+			else if (bin >= 3)
+				coverageColor = 2;
+			else if (bin >= 2.5)
+				coverageColor = 3;
+			else if (bin >= 2)
+				coverageColor = 4;
+			else
+				coverageColor = 5;
+
+			float queryLength = result->mQueryLength;
+			const int kGraphicWidth = 100;
+
+			coverageStart = uint32(best.mQueryStart * kGraphicWidth / queryLength);
+			coverageLength = uint32(best.mQueryAlignment.length() * kGraphicWidth / queryLength);
+			
+			string title = hit.mDefLine;
+			ba::replace_all(title, "\\", "\\\\");
+			ba::replace_all(title, "\"", "\\\"");
+			
+			json << '{'
+				 << "\"nr\":" << nr << ','
+				 << "\"doc\":\"" << hit.mID << "\","
+				 << "\"seq\":\"" << "" /* chain ID of zo */ << "\","
+				 << "\"desc\":\"" << title << "\","
+				 << "\"bitScore\":" << best.mBitScore << ','
+				 << "\"expect\":" << best.mExpect << ','
+				 << "\"hsps\":" << hsps.size() << ','
+				 << "\"coverage\":{"
+					 << "\"start\":" << coverageStart << ','
+					 << "\"length\":" << coverageLength << ',' 
+					 << "\"color\":" << coverageColor
+					 << '}'
+				 << '}';
+
+			++nr;
+		}
+
+		json << ']';
+	}
 	
 	reply.set_content(json.str(), "text/javascript");
 }
@@ -1658,31 +1661,34 @@ void M6Server::handle_blast_status_ajax(const zeep::http::request& request, cons
 	{
 		try
 		{
-//			CBlastJobPtr job = CBlastJobProcessor::Instance()->Find(id);
-//			if (not job)
-//				continue;
+			M6BlastJobStatus status;
+			string error;
+			uint32 hitCount;
+			double bestScore;
+			
+			tr1::tie(status, error, hitCount, bestScore) = M6BlastCache::Instance().JobStatus(id);
 			
 			if (not first)
 				json << ',';
 			first = false;
 
-//			switch (job->Status())
-//			{
-//				case bj_Finished:
-//					json << boost::format("{\"id\":\"%1%\",\"status\":%2%,\"hitCount\":%3%,\"bestEValue\":%4%}")
-//						% job->ID() % job->Status() % job->HitCount() % job->BestEValue();
-//					break;
-//				
-//				case bj_Error:
+			switch (status)
+			{
+				case bj_Finished:
+					json << boost::format("{\"id\":\"%1%\",\"status\":%2%,\"hitCount\":%3%,\"bestEValue\":%4%}")
+						% id % status % hitCount % bestScore;
+					break;
+				
+				case bj_Error:
 					json << boost::format("{\"id\":\"%1%\",\"status\":%2%,\"error\":\"%3%\"}")
-						% id % bj_Error % "fout";
-//					break;
-//				
-//				default:
-//					json << boost::format("{\"id\":\"%1%\",\"status\":%2%}")
-//						% job->ID() % job->Status();
-//					break;
-//			}
+						% id % status % error;
+					break;
+				
+				default:
+					json << boost::format("{\"id\":\"%1%\",\"status\":%2%}")
+						% id % status;
+					break;
+			}
 		}
 		catch (...) {}
 	}
@@ -1774,8 +1780,8 @@ void M6Server::handle_blast_submit_ajax(
 //			boost::lexical_cast<double>(expect), filter,
 //			gapped, gapOpen, gapExtend, reportLimit);
 
-		boost::uuids::uuid jobId = M6BlastCache::Instance().Submit(
-			"", query, matrix, wordSize,
+		string jobId = M6BlastCache::Instance().Submit(
+			db, query, matrix, wordSize,
 			boost::lexical_cast<double>(expect), filter,
 			gapped, gapOpen, gapExtend, reportLimit);
 	

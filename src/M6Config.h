@@ -12,6 +12,8 @@ class M6Config
 	static M6Config&	Instance();
 
 	std::string			FindGlobal(const std::string& inXPath);
+	zeep::xml::element_set
+						Find(const std::string& inXPath);
 
 	zeep::xml::element*	LoadDatabank(const std::string& inDatabank);
 	zeep::xml::element_set

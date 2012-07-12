@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE m6-config SYSTEM "http://mrs.cmbi.ru.nl/dtd/m6-config.dtd">
+<!--<!DOCTYPE m6-config SYSTEM "http://mrs.cmbi.ru.nl/dtd/m6-config.dtd">-->
 <m6-config>
 	
 <!--	<srvdir>/srv/mrs</srvdir>-->
@@ -7,7 +7,23 @@
 	<mrsdir>/data/mrs/</mrsdir>
 	<rawdir>/data/raw/</rawdir>
 	
-	<blast-cache>/data/blast-cache/</blast-cache>
+	<blast>
+		<cache-dir>/data/blast-cache/</cache-dir>
+		<cache-index>C:/data/blast-cache/index.db</cache-index>
+		
+		<dbs>
+			<db id="sprot" name="SwissProt">
+				<file>/data/fasta/uniprot_sprot.fasta</file>
+			</db>
+			<db id="trembl" name="TrEMBL">
+				<file>/data/fasta/uniprot_trembl.fasta</file>
+			</db>
+			<db id="uniprot" name="UniProt (SwissProt + TrEMBL)">
+				<file>/data/fasta/uniprot_sprot.fasta</file>
+				<file>/data/fasta/uniprot_trembl.fasta</file>
+			</db>
+		</dbs>
+	</blast>
 
 	<server type="www" addr="0.0.0.0" port="18090">
 		<docroot>./docroot/</docroot>

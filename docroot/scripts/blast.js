@@ -390,6 +390,7 @@ BlastJob.prototype = {
 			filter: this.filter,
 			wordSize: this.wordSize,
 			matrix: this.matrix,
+			gapped: this.gapped,
 			gapOpen: this.gapOpen,
 			gapExtend: this.gapExtend,
 			reportLimit: this.reportLimit
@@ -484,7 +485,7 @@ BlastResult.prototype.updateResultList2 = function(resultList) {
 		// ID
 		cell = row.insertCell(row.cells.length);
 		cell.innerHTML =
-			"<a href='entry?db=" + escape(this.job.db) + "&amp;id=" + escape(hit.doc) + "' onclick='doStopPropagation(event);'>" +
+			"<a href='link?db=" + escape(this.job.db) + "&amp;ix=id&amp;id=" + escape(hit.doc) + "' onclick='doStopPropagation(event);'>" +
 			hit.doc + "</a>";
 		if (hit.seq.length > 0) {
 			cell.innerHTML += '.' + hit.seq;

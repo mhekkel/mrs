@@ -1430,7 +1430,10 @@ void BlastQuery<WORDSIZE>::Report(Result& outResult)
 			for (sequence::const_iterator qf = hsp.mAlignedQuery.begin(), t = hsp.mAlignedTarget.begin();
 				qf != hsp.mAlignedQuery.end(); ++qf, ++t, ++qu)
 			{
-				p.mQueryAlignment += *qf == '-' ? '-' : kResidues[*qf];
+				char r = *qf == '-' ? '-' : kResidues[*qf];
+				if (r == 'X')
+					r = tolower(kResidues[*qu]);
+				p.mQueryAlignment += r;
 				p.mTargetAlignment += *t == '-' ? '-' : kResidues[*t];
 				
 				if (*t == '-' or *qf == '-')

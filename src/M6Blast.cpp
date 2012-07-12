@@ -1405,7 +1405,7 @@ void BlastQuery<WORDSIZE>::Report(Result& outResult)
 		if (not boost::regex_match(h.mDefLine, m, kFastARE, boost::match_not_dot_newline))
 			throw M6Exception("Invalid defline: %s", h.mDefLine.c_str());
 
-		if (m[1] == "sp")
+		if (m[1] == "sp" or m[1] == "tr")
 		{
 			h.mAccession = m[3];
 			h.mID = m[4];

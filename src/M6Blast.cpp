@@ -151,107 +151,79 @@ inline int8 Matrix::operator()(char inAA1, char inAA2) const
 }
 
 // --------------------------------------------------------------------
+//	Simplified low complexity filter code, based on DUST/SEG. Dropped 
+//	DNA code, we're protein only.
 
 namespace filter
 {
 
-class Alphabet
-{
-  public:
-					Alphabet(const char* inChars);
-	
-	bool			Contains(char inChar) const;
-	long			GetIndex(char inChar) const;
-	long			GetSize() const					{ return mAlphaSize; }
-	double			GetLnSize() const				{ return mAlphaLnSize; }
+//const char kAlphabet[] = { 'A', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'K', 'L', 'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'V', 'W', 'Y' };
 
-  private:
-	long			mAlphaSize;
-	double			mAlphaLnSize;
-	long			mAlphaIndex[128];
-	const char*		mAlphaChars;
+const uint32 kAlphabetSize		= 20;
+const double kLnAlphabetSize	= log(20.);
+
+const uint8 kAlphabetIndex[] = {
+//	A   B   C   D   E   F   G   H   I       K   L   M   N       P   Q   R   S   T  U=X  V   W   X   Y   Z
+	0, 20,  1,  2,  3,  4,  5,  6,  7, 20,  8,  9, 10, 11, 20, 12, 13, 14, 15, 16, 20, 17, 18, 20, 19, 20
 };
 
-Alphabet::Alphabet(const char* inChars)
-	: mAlphaChars(inChars)
+struct Alphabet
 {
-	mAlphaSize = static_cast<int>(strlen(inChars));
-	mAlphaLnSize = log(static_cast<double>(mAlphaSize));
-	
-	for (uint32 i = 0; i < 128; ++i)
-	{
-		mAlphaIndex[i] =
-			static_cast<long>(find(mAlphaChars, mAlphaChars + mAlphaSize, toupper(i)) - mAlphaChars);
-	}
-}
+	static int32	GetIndex(char inChar)
+					{
+						inChar |= 040;
+						return (inChar >= 'a' and inChar <= 'y') ? kAlphabetIndex[inChar - 'a'] : 20;
+					}
 
-bool Alphabet::Contains(char inChar) const
-{
-	bool result = false;
-	if (inChar >= 0)
-		result = mAlphaIndex[toupper(inChar)] < mAlphaSize;
-	return result;
-}
-
-long Alphabet::GetIndex(char inChar) const
-{
-	return mAlphaIndex[toupper(inChar)];
-}
-
-const Alphabet
-	kProtAlphabet = Alphabet("ACDEFGHIKLMNPQRSTVWY"),
-	kNuclAlphabet = Alphabet("ACGTU");
+	static bool		Contains(char inChar)						{ return GetIndex(inChar) < 20; }
+};
 
 class Window
 {
   public:
-			Window(const string& inSequence, long inStart, long inLength, const Alphabet& inAlphabet);
+			Window(const string& inSequence, int32 inStart, int32 inLength);
 
 	void	CalcEntropy();
 	bool	ShiftWindow();
 	
 	double	GetEntropy() const			{ return mEntropy; }
-	long	GetBogus() const			{ return mBogus; }
+	int32	GetBogus() const			{ return mBogus; }
 	
-	void	DecState(long inCount);
-	void	IncState(long inCount);
+	void	DecState(int32 inCount);
+	void	IncState(int32 inCount);
 	
-	void	Trim(long& ioEndL, long& ioEndR, long inMaxTrim);
+	void	Trim(int32& ioEndL, int32& ioEndR, int32 inMaxTrim);
 
   private:
 	const string&	mSequence;
-	vector<long>	mComposition;
-	vector<long>	mState;
-	long			mStart;
-	long			mLength;
-	long			mBogus;
+	int32			mComposition[kAlphabetSize];
+	int32			mState[kAlphabetSize + 1];
+	int32			mStart;
+	int32			mLength;
+	int32			mBogus;
 	double			mEntropy;
-	const Alphabet&mAlphabet;
 };
 
-Window::Window(const string& inSequence, long inStart, long inLength, const Alphabet& inAlphabet)
+Window::Window(const string& inSequence, int32 inStart, int32 inLength)
 	: mSequence(inSequence)
-	, mComposition(inAlphabet.GetSize())
 	, mStart(inStart)
 	, mLength(inLength)
 	, mBogus(0)
 	, mEntropy(-2.0)
-	, mAlphabet(inAlphabet)
 {
-	long alphaSize = mAlphabet.GetSize();
+	fill(mComposition, mComposition + kAlphabetSize, 0);
+	fill(mState, mState + kAlphabetSize + 1, 0);
 	
-	for (long i = mStart; i < mStart + mLength; ++i)
+	for (int32 i = mStart; i < mStart + mLength; ++i)
 	{
-		if (mAlphabet.Contains(mSequence[i]))
-			++mComposition[mAlphabet.GetIndex(mSequence[i])];
+		if (Alphabet::Contains(mSequence[i]))
+			++mComposition[Alphabet::GetIndex(mSequence[i])];
 		else
 			++mBogus;
 	}
 	
-	mState.insert(mState.begin(), alphaSize + 1, 0);
-
 	int n = 0;
-	for (long i = 0; i < alphaSize; ++i)
+	for (int32 i = 0; i < kAlphabetSize; ++i)
 	{
 		if (mComposition[i] > 0)
 		{
@@ -260,7 +232,7 @@ Window::Window(const string& inSequence, long inStart, long inLength, const Alph
 		}
 	}
 	
-	sort(mState.begin(), mState.begin() + n, greater<long>());
+	sort(mState, mState + n, greater<int32>());
 }
 
 void Window::CalcEntropy()
@@ -268,12 +240,12 @@ void Window::CalcEntropy()
 	mEntropy = 0.0;
 
 	double total = 0.0;
-	for (uint32 i = 0; i < mState.size() and mState[i] != 0; ++i)
+	for (uint32 i = 0; i < kAlphabetSize and mState[i] != 0; ++i)
 		total += mState[i];
 
 	if (total != 0.0)
 	{
-		for (uint32 i = 0; i < mState.size() and mState[i]; ++i)
+		for (uint32 i = 0; i < kAlphabetSize and mState[i]; ++i)
 		{
 			double t = mState[i] / total;
 			mEntropy += t * log(t);
@@ -282,9 +254,9 @@ void Window::CalcEntropy()
 	}
 }
 
-void Window::DecState(long inClass)
+void Window::DecState(int32 inClass)
 {
-	for (uint32 ix = 0; ix < mState.size() and mState[ix] != 0; ++ix)
+	for (uint32 ix = 0; ix < kAlphabetSize and mState[ix] != 0; ++ix)
 	{
 		if (mState[ix] == inClass and mState[ix + 1] < inClass)
 		{
@@ -294,9 +266,9 @@ void Window::DecState(long inClass)
 	}
 }
 
-void Window::IncState(long inClass)
+void Window::IncState(int32 inClass)
 {
-	for (uint32 ix = 0; ix < mState.size(); ++ix)
+	for (uint32 ix = 0; ix < kAlphabetSize; ++ix)
 	{
 		if (mState[ix] == inClass)
 		{
@@ -312,9 +284,9 @@ bool Window::ShiftWindow()
 		return false;
 	
 	char ch = mSequence[mStart];
-	if (mAlphabet.Contains(ch))
+	if (Alphabet::Contains(ch))
 	{
-		long ix = mAlphabet.GetIndex(ch);
+		int32 ix = Alphabet::GetIndex(ch);
 		DecState(mComposition[ix]);
 		--mComposition[ix];
 	}
@@ -324,9 +296,9 @@ bool Window::ShiftWindow()
 	++mStart;
 	
 	ch = mSequence[mStart + mLength - 1];
-	if (mAlphabet.Contains(ch))
+	if (Alphabet::Contains(ch))
 	{
-		long ix = mAlphabet.GetIndex(ch);
+		int32 ix = Alphabet::GetIndex(ch);
 		IncState(mComposition[ix]);
 		++mComposition[ix];
 	}
@@ -339,7 +311,7 @@ bool Window::ShiftWindow()
 	return true;
 }
 
-static double lnfac(long inN)
+double lnfac(int32 inN)
 {
     const double c[] = {
          76.18009172947146,
@@ -349,9 +321,13 @@ static double lnfac(long inN)
          0.1208650973866179e-2,
         -0.5395239384953e-5
     };
-	static map<long,double> sLnFacMap;
+
+	static double sLnFacMap[100] = {};
 	
-	if (sLnFacMap.find(inN) == sLnFacMap.end())
+	double result;
+	if (inN >= 0 and inN < 100 and sLnFacMap[inN] != 0)
+		result = sLnFacMap[inN];
+	else
 	{
 		double x = inN + 1;
 		double t = x + 5.5;
@@ -362,27 +338,30 @@ static double lnfac(long inN)
 	    	++x;
 	        ser += c[i] / x;
 	    }
-	    sLnFacMap[inN] = -t + log(2.5066282746310005 * ser / (inN + 1));
+	    
+	    result = -t + log(2.5066282746310005 * ser / (inN + 1));
+	    if (inN >= 0 and inN < 100)
+	    	sLnFacMap[inN] = result;
 	}
 	
-	return sLnFacMap[inN];
+	return result;
 }
 
-static double lnperm(vector<long>& inState, long inTotal)
+double lnperm(int32 inState[], int32 inTotal)
 {
 	double ans = lnfac(inTotal);
-	for (uint32 i = 0; i < inState.size() and inState[i] != 0; ++i)
+	for (uint32 i = 0; i < kAlphabetSize and inState[i] != 0; ++i)
 		ans -= lnfac(inState[i]);
 	return ans;
 }
 
-static double lnass(vector<long>& inState, Alphabet inAlphabet)
+double lnass(int32 inState[])
 {
-    double result = lnfac(inAlphabet.GetSize());
-    if (inState.size() == 0 or inState[0] == 0)
+    double result = lnfac(kAlphabetSize);
+    if (kAlphabetSize == 0 or inState[0] == 0)
         return result;
     
-    int total = inAlphabet.GetSize();
+    int total = kAlphabetSize;
     int cl = 1;
     int i = 1;
     int sv_cl = inState[0];
@@ -409,38 +388,38 @@ static double lnass(vector<long>& inState, Alphabet inAlphabet)
     return result;
 }
 
-static double lnprob(vector<long>& inState, long inTotal, const Alphabet& inAlphabet)
+double lnprob(int32 inState[], int32 inTotal)
 {
 	double ans1, ans2 = 0, totseq;
 
-	totseq = inTotal * inAlphabet.GetLnSize();
-	ans1 = lnass(inState, inAlphabet);
-	if (ans1 > -100000.0 and inState[0] != numeric_limits<long>::min())
+	totseq = inTotal * kLnAlphabetSize;
+	ans1 = lnass(inState);
+	if (ans1 > -100000.0 and inState[0] != numeric_limits<int32>::min())
 		ans2 = lnperm(inState, inTotal);
 	else
 		throw M6Exception("Error in calculating lnass");
 	return ans1 + ans2 - totseq;
 }
 
-void Window::Trim(long& ioEndL, long& ioEndR, long inMaxTrim)
+void Window::Trim(int32& ioEndL, int32& ioEndR, int32 inMaxTrim)
 {
 	double minprob = 1.0;
-	long lEnd = 0;
-	long rEnd = mLength - 1;
+	int32 lEnd = 0;
+	int32 rEnd = mLength - 1;
 	int minLen = 1;
 	int maxTrim = inMaxTrim;
 	if (minLen < mLength - maxTrim)
 		minLen = mLength - maxTrim;
 	
-	for (long len = mLength; len > minLen; --len)
+	for (int32 len = mLength; len > minLen; --len)
 	{
-		Window w(mSequence, mStart, len, mAlphabet);
+		Window w(mSequence, mStart, len);
 		
 		int i = 0;
 		bool shift = true;
 		while (shift)
 		{
-			double prob = lnprob(w.mState, len, mAlphabet);
+			double prob = lnprob(&w.mState[0], len);
 			if (prob < minprob)
 			{
 				minprob = prob;
@@ -456,13 +435,12 @@ void Window::Trim(long& ioEndL, long& ioEndR, long inMaxTrim)
 	ioEndR -= mLength - rEnd - 1;
 }
 
-static bool GetEntropy(const string& inSequence, const Alphabet& inAlphabet,
-	long inWindow, long inMaxBogus, vector<double>& outEntropy)
+bool GetEntropy(const string& inSequence, int32 inWindow, int32 inMaxBogus, vector<double>& outEntropy)
 {
 	bool result = false;
 
-	long downset = (inWindow + 1) / 2 - 1;
-	long upset = inWindow - downset;
+	int32 downset = (inWindow + 1) / 2 - 1;
+	int32 upset = inWindow - downset;
 	
 	if (inWindow <= inSequence.length())
 	{
@@ -470,12 +448,12 @@ static bool GetEntropy(const string& inSequence, const Alphabet& inAlphabet,
 		outEntropy.clear();
 		outEntropy.insert(outEntropy.begin(), inSequence.length(), -1.0);
 		
-		Window win(inSequence, 0, inWindow, inAlphabet);
+		Window win(inSequence, 0, inWindow);
 		win.CalcEntropy();
 		
-		long first = downset;
-		long last = static_cast<long>(inSequence.length() - upset);
-		for (long i = first; i <= last; ++i)
+		int32 first = downset;
+		int32 last = static_cast<int32>(inSequence.length() - upset);
+		for (int32 i = first; i <= last; ++i)
 		{
 //			if (GetPunctuation() and win.HasDash())
 //			{
@@ -493,74 +471,59 @@ static bool GetEntropy(const string& inSequence, const Alphabet& inAlphabet,
 	return result;
 }
 
-static void GetMaskSegments(bool inProtein, const string& inSequence, long inOffset,
-	vector<pair<long,long> >& outSegments)
+void GetMaskSegments(const string& inSequence, int32 inOffset, vector<pair<int32,int32> >& outSegments)
 {
 	double loCut, hiCut;
-	long window, maxbogus, maxtrim;
-	const Alphabet* alphabet;
+	int32 window, maxbogus, maxtrim;
 
-	if (inProtein)
-	{
-		window = 12;
-		loCut = 2.2;
-		hiCut = 2.5;
-		maxtrim = 50;
-		maxbogus = 2;
-		alphabet = &kProtAlphabet;
-	}
-	else
-	{
-		window = 32;
-		loCut = 1.4;
-		hiCut = 1.6;
-		maxtrim = 100;
-		maxbogus = 3;
-		alphabet = &kNuclAlphabet;
-	}
+	window = 12;
+	loCut = 2.2;
+	hiCut = 2.5;
+	maxtrim = 50;
+	maxbogus = 2;
 
-	long downset = (window + 1) / 2 - 1;
-	long upset = window - downset;
+	int32 downset = (window + 1) / 2 - 1;
+	int32 upset = window - downset;
 	
 	vector<double> e;
-	GetEntropy(inSequence, *alphabet, window, maxbogus, e);
+	GetEntropy(inSequence, window, maxbogus, e);
 
-	long first = downset;
-	long last = static_cast<long>(inSequence.length() - upset);
-	long lowlim = first;
+	int32 first = downset;
+	int32 last = static_cast<int32>(inSequence.length() - upset);
+	int32 lowlim = first;
 
-	for (long i = first; i <= last; ++i)
+	for (int32 i = first; i <= last; ++i)
 	{
 		if (e[i] <= loCut and e[i] != -1.0)
 		{
-			long loi = i;
+			int32 loi = i;
 			while (loi >= lowlim and e[loi] != -1.0 and e[loi] <= hiCut)
 				--loi;
 			++loi;
 			
-			long hii = i;
+			int32 hii = i;
 			while (hii <= last and e[hii] != -1.0 and e[hii] <= hiCut)
 				++hii;
 			--hii;
 			
-			long leftend = loi - downset;
-			long rightend = hii + upset - 1;
+			int32 leftend = loi - downset;
+			int32 rightend = hii + upset - 1;
 			
 			string s(inSequence.substr(leftend, rightend - leftend + 1));
-			Window w(s, 0, rightend - leftend + 1, *alphabet);
+			Window w(s, 0, rightend - leftend + 1);
 			w.Trim(leftend, rightend, maxtrim);
 
 			if (i + upset - 1 < leftend)
 			{
-				long lend = loi - downset;
-				long rend = leftend - 1;
+				int32 lend = loi - downset;
+				int32 rend = leftend - 1;
 				
 				string left(inSequence.substr(lend, rend - lend + 1));
-				GetMaskSegments(inProtein, left, inOffset + lend, outSegments);
+				GetMaskSegments(left, inOffset + lend, outSegments);
 			}
 			
 			outSegments.push_back(
-				pair<long,long>(leftend + inOffset, rightend + inOffset + 1));
+				pair<int32,int32>(leftend + inOffset, rightend + inOffset + 1));
 			i = rightend + downset;
 			if (i > hii)
 				i = hii;
@@ -573,45 +536,18 @@ string SEG(const string& inSequence)
 {
 	string result = inSequence;
 	
-	vector<pair<long,long> > segments;
-	GetMaskSegments(true, result, 0, segments);
+	vector<pair<int32,int32> > segments;
+	GetMaskSegments(result, 0, segments);
 	
 	for (uint32 i = 0; i < segments.size(); ++i)
 	{
-		for (long j = segments[i].first; j < segments[i].second; ++j)
+		for (int32 j = segments[i].first; j < segments[i].second; ++j)
 			result[j] = 'X';
 	}
 	
 	return result;
 }
 
-string DUST(const string& inSequence)
-{
-	string result = inSequence;
-	
-	vector<pair<long,long> > segments;
-	GetMaskSegments(false, inSequence, 0, segments);
-	
-	for (uint32 i = 0; i < segments.size(); ++i)
-	{
-		for (long j = segments[i].first; j < segments[i].second; ++j)
-			result[j] = 'X';
-	}
-	
-	return result;
-}
-
-//int main()
-//{
-//	string seq;
-//	
-//	ifstream in("input.seq", ios::binary);
-//	in >> seq;
-//	cout << FilterProtSeq(seq);
-//	return 0;
-//}
-
-	
 }
 
 // --------------------------------------------------------------------
@@ -2048,100 +1984,9 @@ Result* Search(const vector<fs::path>& inDatabanks,
 	return result.release();
 }
 
-void SearchAndWriteResultsAsFastA(std::ostream& inOutFile, const vector<fs::path>& inDatabanks,
-	const std::string& inQuery, const std::string& inProgram,
-	const std::string& inMatrix, uint32 inWordSize, double inExpect,
-	bool inFilter, bool inGapped, int32 inGapOpen, int32 inGapExtend,
-	uint32 inReportLimit, uint32 inThreads)
-{
-	if (inProgram != "blastp")
-		throw M6Exception("Unsupported program %s", inProgram.c_str());
-	
-	if (inGapped)
-	{
-		if (inGapOpen == -1) inGapOpen = 11;
-		if (inGapExtend == -1) inGapExtend = 1;
-	}
-
-	if (inWordSize == 0) inWordSize = 3;
-
-	string query(inQuery), queryID("query"), queryDef;
-
-	if (ba::starts_with(inQuery, ">"))
-	{
-		inOutFile << inQuery;
-		if (not ba::ends_with(inQuery, "\n"))
-			inOutFile << endl;
-		
-		boost::smatch m;
-		if (regex_search(inQuery, m, kFastARE, boost::match_not_dot_newline))
-		{
-			queryID = m[4];
-			if (queryID.empty())
-				queryID = m[2];
-			queryDef = m[7];
-			query = m.suffix();
-		}
-		else
-		{
-			queryID = inQuery.substr(1, inQuery.find('\n') - 1);
-			query = inQuery.substr(queryID.length() + 2, string::npos);
-
-			string::size_type s = queryID.find(' ');
-			if (s != string::npos)
-			{
-				queryDef = queryID.substr(s + 1);
-				queryID.erase(s, string::npos);
-			}
-		}
-	}
-	else
-		inOutFile << ">query" << endl << inQuery << endl;
-
-	int64 totalLength = accumulate(inDatabanks.begin(), inDatabanks.end(), 0LL,
-		[](int64 l, const fs::path& p) -> int64 { return l + fs::file_size(p); });
-	
-	M6Progress progress(totalLength, "blast");
-
-	if (inThreads < 1)
-		inThreads = boost::thread::hardware_concurrency();
-
-	switch (inWordSize)
-	{
-		case 2:
-		{
-			BlastQuery<2> q(query, inFilter, inExpect, inMatrix, inGapped, inGapOpen, inGapExtend, inReportLimit);
-			q.Search(inDatabanks, progress, inThreads);
-			q.WriteAsFasta(inOutFile);
-			break;
-		}
-
-		case 3:
-		{
-			BlastQuery<3> q(query, inFilter, inExpect, inMatrix, inGapped, inGapOpen, inGapExtend, inReportLimit);
-			q.Search(inDatabanks, progress, inThreads);
-			q.WriteAsFasta(inOutFile);
-			break;
-		}
-
-		case 4:
-		{
-			BlastQuery<4> q(query, inFilter, inExpect, inMatrix, inGapped, inGapOpen, inGapExtend, inReportLimit);
-			q.Search(inDatabanks, progress, inThreads);
-			q.WriteAsFasta(inOutFile);
-			break;
-		}
-
-		default:
-			throw M6Exception("Unsupported word size %d", inWordSize);	
-	}
-}
-
-}
-
 // --------------------------------------------------------------------
 
-void operator&(xml::writer& w, const M6Blast::Hsp& inHsp)
+void operator&(xml::writer& w, const Hsp& inHsp)
 {
 	w.start_element("Hsp");
 	w.element("Hsp_num", boost::lexical_cast<string>(inHsp.mHspNr));
@@ -2161,7 +2006,7 @@ void operator&(xml::writer& w, const M6Blast::Hsp& inHsp)
 	w.end_element();
 }
 
-void operator&(xml::writer& w, const M6Blast::Hit& inHit)
+void operator&(xml::writer& w, const Hit& inHit)
 {
 	w.start_element("Hit");
 	w.element("Hit_num", boost::lexical_cast<string>(inHit.mHitNr));
@@ -2172,154 +2017,62 @@ void operator&(xml::writer& w, const M6Blast::Hit& inHit)
 		w.element("Hit_accession", inHit.mAccession);
 	w.element("Hit_len", boost::lexical_cast<string>(inHit.mSequence.length()));
 	w.start_element("Hit_hsps");
-	for_each(inHit.mHsps.begin(), inHit.mHsps.end(), [&](const M6Blast::Hsp& hsp) {
+	for_each(inHit.mHsps.begin(), inHit.mHsps.end(), [&](const Hsp& hsp) {
 		w & hsp;
 	});
 	w.end_element();	
 	w.end_element();
 }
 
-ostream& operator<<(ostream& os, const M6Blast::Result& inResult)
+void Result::WriteAsNCBIBlastXML(ostream& os)
 {
 	xml::writer w(os, true);
 	w.doctype("BlastOutput", "-//NCBI//NCBI BlastOutput/EN", "http://www.ncbi.nlm.nih.gov/dtd/NCBI_BlastOutput.dtd");
 	w.start_element("BlastOutput");
-	w.element("BlastOutput_program", inResult.mParams.mProgram);
-	w.element("BlastOutput_db", inResult.mDb);
-	w.element("BlastOutput_query-ID", inResult.mQueryID);
-	w.element("BlastOutput_query-def", inResult.mQueryDef);
-	w.element("BlastOutput_query-len", boost::lexical_cast<string>(inResult.mQueryLength));
+	w.element("BlastOutput_program", mParams.mProgram);
+	w.element("BlastOutput_db", mDb);
+	w.element("BlastOutput_query-ID", mQueryID);
+	w.element("BlastOutput_query-def", mQueryDef);
+	w.element("BlastOutput_query-len", boost::lexical_cast<string>(mQueryLength));
 	
 	w.start_element("BlastOutput_param");
 	w.start_element("Parameters");
-	w.element("Parameters_matrix", inResult.mParams.mMatrix);
-	w.element("Parameters_expect", boost::lexical_cast<string>(inResult.mParams.mExpect));
-	if (inResult.mParams.mGapped)
+	w.element("Parameters_matrix", mParams.mMatrix);
+	w.element("Parameters_expect", boost::lexical_cast<string>(mParams.mExpect));
+	if (mParams.mGapped)
 	{
-		w.element("Parameters_gap-open", boost::lexical_cast<string>(inResult.mParams.mGapOpen));
-		w.element("Parameters_gap-extend", boost::lexical_cast<string>(inResult.mParams.mGapExtend));
+		w.element("Parameters_gap-open", boost::lexical_cast<string>(mParams.mGapOpen));
+		w.element("Parameters_gap-extend", boost::lexical_cast<string>(mParams.mGapExtend));
 	}
-	w.element("Parameters_filter", inResult.mParams.mFilter ? "T" : "F");
+	w.element("Parameters_filter", mParams.mFilter ? "T" : "F");
 	w.end_element();
 	w.end_element();
 	
 	w.start_element("BlastOutput_iterations");
 	w.start_element("Iteration");
 	w.element("Iteration_iter-num", "1");
-	w.element("Iteration_query-ID", inResult.mQueryID);
-	if (not inResult.mQueryDef.empty())
-		w.element("Iteration_query-def", inResult.mQueryDef);
-	w.element("Iteration_query-len", boost::lexical_cast<string>(inResult.mQueryLength));
+	w.element("Iteration_query-ID", mQueryID);
+	if (not mQueryDef.empty())
+		w.element("Iteration_query-def", mQueryDef);
+	w.element("Iteration_query-len", boost::lexical_cast<string>(mQueryLength));
 	w.start_element("Iteration_hits");
-	for_each(inResult.mHits.begin(), inResult.mHits.end(), [&](const M6Blast::Hit& hit) {
+	for_each(mHits.begin(), mHits.end(), [&](const Hit& hit) {
 		w & hit;
 	});
 	w.end_element();	// Iteration_hits
 	w.start_element("Iteration_stat");
 	w.start_element("Statistics");
-	w.element("Statistics_db-num", boost::lexical_cast<string>(inResult.mStats.mDbCount));
-	w.element("Statistics_db-len", boost::lexical_cast<string>(inResult.mStats.mDbLength));
-	w.element("Statistics_eff-space", boost::lexical_cast<string>(inResult.mStats.mEffectiveSpace));
-	w.element("Statistics_kappa", boost::lexical_cast<string>(inResult.mStats.mKappa));
-	w.element("Statistics_lambda", boost::lexical_cast<string>(inResult.mStats.mLambda));
-	w.element("Statistics_entropy", boost::lexical_cast<string>(inResult.mStats.mEntropy));
+	w.element("Statistics_db-num", boost::lexical_cast<string>(mStats.mDbCount));
+	w.element("Statistics_db-len", boost::lexical_cast<string>(mStats.mDbLength));
+	w.element("Statistics_eff-space", boost::lexical_cast<string>(mStats.mEffectiveSpace));
+	w.element("Statistics_kappa", boost::lexical_cast<string>(mStats.mKappa));
+	w.element("Statistics_lambda", boost::lexical_cast<string>(mStats.mLambda));
+	w.element("Statistics_entropy", boost::lexical_cast<string>(mStats.mEntropy));
 	w.end_element();	// Statistics
 	w.end_element();	// Iteration_stat
 	w.end_element();	// Iteration
 	w.end_element();	// BlastOutput_iterations
 	w.end_element();	// BlastOutput
-	return os;
 }
 
-// --------------------------------------------------------------------
-//
-//int main(int argc, char* const argv[])
-//{
-//	try
-//	{
-//		string matrix("BLOSUM62"), program = "blastp", query;
-//		int32 gapOpen = -1, gapExtend = -1, wordSize = 0,
-//			threads = boost::thread::hardware_concurrency(), reportLimit = 250;
-//		bool filter = true, gapped = true;
-//		double expect = 10;
-//
-//		po::options_description desc("m6-blast");
-//		desc.add_options()
-//			("query,i",			po::value<string>(),	"File containing query in FastA format")
-//			("program,p",		po::value<string>(),	"Blast program (only supported program is blastp for now...)")
-//			("databank,d",		po::value<string>(),	"Databank in FastA format")
-//			("output,o",		po::value<string>(),	"Output file, default is stdout")
-//			("report-limit,b",	po::value<string>(),	"Number of results to report")
-//			("matrix,M",		po::value<string>(),	"Matrix (default is BLOSUM62)")
-//			("word-size,W",		po::value<int32>(),		"Word size (0 invokes default)")
-//			("gap-open,G",		po::value<int32>(),		"Cost to open a gap (-1 invokes default)")
-//			("gap-extend,E",	po::value<int32>(),		"Cost to extend a gap (-1 invokes default)")
-//			("no-filter",								"Do not mask low complexity regions in the query sequence")
-//			("ungapped",								"Do not search for gapped alignments, only ungapped")
-//			("expect,e",		po::value<double>(),	"Expectation value, default is 10.0")
-//			("threads,a",		po::value<int32>(),		"Nr of threads")
-//			("help,h",									"Display help message")
-//			;
-//
-//		po::variables_map vm;
-////		po::store(po::command_line_parser(argc, argv).options(desc).positional(p).run(), vm);
-//		po::store(po::command_line_parser(argc, argv).options(desc).run(), vm);
-//		po::notify(vm);
-//
-//		if (vm.count("help") or vm.count("databank") == 0 or vm.count("query") == 0)
-//		{
-//			cout << desc << "\n";
-//			exit(1);
-//		}
-//		
-//		fs::path queryFile(vm["query"].as<string>());
-//		if (not fs::exists(queryFile))
-//			throw M6Exception("Query file does not exist");
-//		fs::ifstream queryData(queryFile);
-//		if (not queryData.is_open())
-//			throw M6Exception("Could not open query file");
-//
-//		for (;;)
-//		{
-//			string line;
-//			getline(queryData, line);
-//			if (line.empty() and queryData.eof())
-//				break;
-//			query += line + '\n';
-//		}
-//		
-//		fs::path databank(vm["databank"].as<string>());
-//		if (not fs::exists(databank))
-//			throw M6Exception("Databank does not exist");
-//		
-//		if (vm.count("program"))		program = vm["program"].as<string>();
-//		if (vm.count("matrix"))			matrix = vm["matrix"].as<string>();
-//		if (vm.count("report-limit"))	reportLimit = vm["report-limit"].as<int32>();
-//		if (vm.count("word-size"))		wordSize = vm["word-size"].as<int32>();
-//		if (vm.count("gap-open"))		gapOpen = vm["gap-open"].as<int32>();
-//		if (vm.count("gap-extend"))		gapOpen = vm["gap-extend"].as<int32>();
-//		if (vm.count("no-filter"))		filter = false;
-//		if (vm.count("ungapped"))		gapped = false;
-//		if (vm.count("expect"))			expect = vm["expect"].as<double>();
-//		if (vm.count("threads"))		threads = vm["threads"].as<int32>();
-//
-//		M6Blast::Result* r = M6Blast::Search(databank, query, program, matrix,
-//			wordSize, expect, filter, gapped, gapOpen, gapExtend, reportLimit, threads);
-//		
-//		if (vm.count("output") and vm["output"].as<string>() != "stdout")
-//		{
-//			fs::ofstream out(vm["output"].as<string>());
-//			out << *r;
-//		}
-//		else
-//			cout << *r << endl;
-//		
-//		delete r;
-//	}
-//	catch (exception& e)
-//	{
-//		cerr << e.what() << endl;
-//	}
-//	
-//	return 0;
-//}
+}

@@ -1374,35 +1374,8 @@ void M6Server::handle_blast(const zeep::http::request& request, const el::scope&
 
 	el::scope sub(scope);
 
-//	// fetch some parameters, if any
-//	db = params.get("db", "pdb").as<string>();
-//	id = params.get("id", "").as<string>();
-//	
-//	if (not id.empty() and mDbTable.Loaded(db) and mNoBlast.count(db) == 0)
-//	{
-//		CDatabankPtr mrsDb = mDbTable[db];
-//		string sequence;
-//		
-//		if (mrsDb->GetBlastDbCount() > 0)
-//			mrsDb->GetSequence(mrsDb->GetDocumentNr(id), 0, sequence);
-//		else
-//			sequence = WFormat::Instance()->Format(mDbTable, db, id, "sequence");
-//		
-//		string::size_type n = 0;
-//		while (n + 72 < sequence.length())
-//		{
-//			sequence.insert(sequence.begin() + n + 72, 1, '\n');
-//			n += 73;
-//		}
-//		
-//		string title = GetEntry(mrsDb, id, "title");
-//		
-//		stringstream s;
-//		s << '>' << id << ' ' << title << endl << sequence << endl;
-//		query = s.str();
-//		
-//		sub.put("query", query);
-//	}
+	// fetch some parameters, if any
+	db = params.get("db", "sprot").as<string>();
 	
 	vector<el::object> databanks;
 	foreach (auto db, M6Config::Instance().Find("//blast/dbs/db"))
@@ -1418,8 +1391,8 @@ void M6Server::handle_blast(const zeep::http::request& request, const el::scope&
 		databanks.push_back(databank);
 	}
 		
-	sub.put("databanks", el::object(databanks));
-//	sub.put("blastdb", db);
+	sub.put("blastdatabanks", el::object(databanks));
+	sub.put("blastdb", db);
 
 	const char* expectRange[] = { "0.001", "0.01", "0.1", "1.0", "10.0", "100.0", "1000.0" };
 	sub.put("expectRange", expectRange, boost::end(expectRange));

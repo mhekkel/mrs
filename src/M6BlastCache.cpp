@@ -76,6 +76,8 @@ M6BlastCache::M6BlastCache()
 	, mFetchParamsStmt(nullptr)
 	, mWorkerThread([this](){ this->Work(); })
 {
+	boost::mutex::scoped_lock lock(mDbMutex);
+	
 	string s = M6Config::Instance().FindGlobal("//blast/cache-dir");
 	if (s.empty())
 		s = M6Config::Instance().FindGlobal("//srvdir") + "blast-cache";
@@ -215,13 +217,17 @@ tuple<M6BlastJobStatus,string,uint32,double> M6BlastCache::JobStatus(const strin
 M6BlastResultPtr M6BlastCache::JobResult(const string& inJobID)
 {
 	M6BlastResultPtr result;
-	
-	foreach (auto& c, mResultCache)
-	{
-		if (c.id == inJobID)
+
+	{	
+		boost::mutex::scoped_lock lock(mCacheMutex);
+
+		foreach (auto& c, mResultCache)
 		{
-			result = c.result;
-			break;
+			if (c.id == inJobID)
+			{
+				result = c.result;
+				break;
+			}
 		}
 	}
 	
@@ -314,7 +320,7 @@ void M6BlastCache::Work()
 	using namespace boost::posix_time;
 
 	// wait a little at start up
-	boost::this_thread::sleep(seconds(5));
+	boost::this_thread::sleep(seconds(1));
 
 	boost::mutex::scoped_lock lock(mDbMutex);
 	
@@ -439,6 +445,8 @@ void M6BlastCache::ExecuteJob(const string& inJobID)
 
 void M6BlastCache::CacheResult(const string& inJobID, M6BlastResultPtr inResult)
 {
+	boost::mutex::scoped_lock lock(mCacheMutex);
+
 	Cached c = { inJobID, inResult };
 	mResultCache.push_front(c);
 }
@@ -459,4 +467,16 @@ void M6BlastCache::SetJobStatus(const string inJobId, const string& inStatus, co
 	int err = sqlite3_step(mUpdateStatusStmt);
 	if (err != SQLITE_OK and err != SQLITE_ROW and err != SQLITE_DONE)
 		THROW_IF_SQLITE3_ERROR(err, mCacheDB);
+}
+
+void M6BlastCache::Purge(bool inDeleteFiles)
+{
+	boost::mutex::scoped_lock lock(mDbMutex);
+	
+	ExecuteStatement("DELETE FROM blast_cache");
+	
+	if (inDeleteFiles)
+	{
+		// TODO implement
+	}
 }

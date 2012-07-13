@@ -46,6 +46,8 @@ class M6BlastCache
 									bool inGapped, int32 inGapOpen, int32 inGapExtend,
 									uint32 inReportLimit);
 
+	void						Purge(bool inDeleteFiles = false);
+
   private:
 
 								M6BlastCache();
@@ -70,7 +72,7 @@ class M6BlastCache
 	sqlite3_stmt*				mUpdateStatusStmt;
 	sqlite3_stmt*				mFetchParamsStmt;
 	boost::thread				mWorkerThread;
-	boost::mutex				mDbMutex;
+	boost::mutex				mDbMutex, mCacheMutex;
 	boost::condition			mEmptyCondition, mWorkCondition;
 	
 	struct Cached

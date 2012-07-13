@@ -2,7 +2,12 @@ Todo
 
 Basic:
 
-- Blast/Clustal
+- Blast
+	- store original def line of FastA file to be able to find databank
+	- Admin page to clear cache
+	- automatic clean cache
+
+- Clustal
 - SOAP services
 - Set up testing framework
 - Status pages

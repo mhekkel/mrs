@@ -50,7 +50,7 @@ void Blast(int argc, char* const argv[])
 		("ungapped",								"Do not search for gapped alignments, only ungapped")
 		("expect,e",		po::value<double>(),	"Expectation value, default is 10.0")
 		("threads,a",		po::value<int32>(),		"Nr of threads")
-		("write-fasta",								"Write output as FastaA")
+		//("write-fasta",								"Write output as FastaA")
 		("help,h",									"Display help message")
 		;
 
@@ -102,19 +102,19 @@ void Blast(int argc, char* const argv[])
 	if (vm.count("expect"))			expect = vm["expect"].as<double>();
 	if (vm.count("threads"))		threads = vm["threads"].as<int32>();
 
-	if (vm.count("write-fasta"))
-	{
-		if (vm.count("output") and vm["output"].as<string>() != "stdout")
-		{
-			fs::ofstream out(vm["output"].as<string>());
-			M6Blast::SearchAndWriteResultsAsFastA(out, databanks, query, program, matrix,
-				wordSize, expect, filter, gapped, gapOpen, gapExtend, reportLimit, threads);
-		}
-		else
-			M6Blast::SearchAndWriteResultsAsFastA(cout, databanks, query, program, matrix,
-				wordSize, expect, filter, gapped, gapOpen, gapExtend, reportLimit, threads);
-	}
-	else
+	//if (vm.count("write-fasta"))
+	//{
+	//	if (vm.count("output") and vm["output"].as<string>() != "stdout")
+	//	{
+	//		fs::ofstream out(vm["output"].as<string>());
+	//		M6Blast::SearchAndWriteResultsAsFastA(out, databanks, query, program, matrix,
+	//			wordSize, expect, filter, gapped, gapOpen, gapExtend, reportLimit, threads);
+	//	}
+	//	else
+	//		M6Blast::SearchAndWriteResultsAsFastA(cout, databanks, query, program, matrix,
+	//			wordSize, expect, filter, gapped, gapOpen, gapExtend, reportLimit, threads);
+	//}
+	//else
 	{
 		M6Blast::Result* r = M6Blast::Search(databanks, query, program, matrix,
 			wordSize, expect, filter, gapped, gapOpen, gapExtend, reportLimit, threads);
@@ -122,10 +122,10 @@ void Blast(int argc, char* const argv[])
 		if (vm.count("output") and vm["output"].as<string>() != "stdout")
 		{
 			fs::ofstream out(vm["output"].as<string>());
-			out << *r;
+			r->WriteAsNCBIBlastXML(out);
 		}
 		else
-			cout << *r << endl;
+			r->WriteAsNCBIBlastXML(cout);
 	
 		delete r;
 	}

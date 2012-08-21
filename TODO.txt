@@ -1,9 +1,21 @@
 Todo
 
+Choices:
+
+- Joined databanks? Aliases?
+- near operator, how to implement? new query language?
+- parser language: graphical or text based?
+- configuration: store in xml config file, use sqlite, or both?
+
+
+
 Basic:
+
+- el::object => JSON code
 
 - Blast
 	- store original def line of FastA file to be able to find databank
+	  or create alias system in config?
 	- Admin page to clear cache
 	- automatic clean cache
 

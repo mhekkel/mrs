@@ -375,19 +375,29 @@ sub parse
 	{
 		my $key = $1;
 		my $value = $&;
-
-		print "key: $key\nvalue: $value\n\n";
 		
+		$value =~ s/^$key   //m ;
+
 		if ($key eq 'ID')
 		{
-			if ($value =~ m/^ID   (\w+)\n/)
-			{
-				$self->index_unique_string('id', $1);
-				$self->store_attribute('id', $1);
-			}
-			
+			$value =~ m/^(\w+)/ or die "No ID in UniProt record?\n$key   $value\n";
+			$self->index_unique_string('id', $1);
+			$self->store_attribute('id', $1);
 			next;
 		}
+
+		if ($key eq 'AC')
+		{
+			foreach my $ac (split(m/;\s*/, $value))
+			{
+				$self->index_unique_string('ac', $ac);
+				$self->store_attribute('ac', $ac);
+			}
+			next;
+		}
+
+		
+		
 		
 #		
 #		

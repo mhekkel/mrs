@@ -29,7 +29,6 @@
 #include "M6BlastCache.h"
 
 using namespace std;
-using namespace std::tr1;
 
 namespace fs = boost::filesystem;
 namespace io = boost::iostreams;
@@ -181,11 +180,11 @@ void M6BlastCache::ExecuteStatement(const string& stmt)
 	THROW_IF_SQLITE3_ERROR(err, mCacheDB);
 }
 
-tuple<M6BlastJobStatus,string,uint32,double> M6BlastCache::JobStatus(const string& inJobID)
+tr1::tuple<M6BlastJobStatus,string,uint32,double> M6BlastCache::JobStatus(const string& inJobID)
 {
 	boost::mutex::scoped_lock lock(mDbMutex);
 
-	tuple<M6BlastJobStatus,string,uint32,double> result;
+	tr1::tuple<M6BlastJobStatus,string,uint32,double> result;
 	
 	string id = boost::lexical_cast<string>(inJobID);
 
@@ -206,10 +205,10 @@ tuple<M6BlastJobStatus,string,uint32,double> M6BlastCache::JobStatus(const strin
 		length = sqlite3_column_bytes(mSelectByIDStmt, 1);
 		string error(text, length);
 
-		result = make_tuple(ParseStatus(status), error, sqlite3_column_int(mSelectByIDStmt, 2), sqlite3_column_double(mSelectByIDStmt, 3));
+		result = tr1::make_tuple(ParseStatus(status), error, sqlite3_column_int(mSelectByIDStmt, 2), sqlite3_column_double(mSelectByIDStmt, 3));
 	}
 	else
-		result = make_tuple(bj_Unknown, "", 0, 0);
+		result = tr1::make_tuple(bj_Unknown, "", 0, 0);
 
 	return result;
 }

@@ -371,12 +371,12 @@ sub parse
 		'DEC'	=> 12
 	);
 	
-	foreach my $blob ($text =~ m/^(?:([A-Z]{2})   ).+\n(?:\1.+\n)*/)
+	while ($text =~ m/^(?:([A-Z]{2})   ).+\n(?:\1.+\n)*/gm)
 	{
-		print $1, ":\n", Dumper($blob);
-		
 		my $key = $1;
 		my $value = $&;
+
+		print "key: $key\nvalue: $value\n\n";
 		
 		if ($key eq 'ID')
 		{

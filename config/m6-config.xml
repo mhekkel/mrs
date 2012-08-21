@@ -9,7 +9,7 @@
 	
 	<blast>
 		<cache-dir>/data/blast-cache/</cache-dir>
-		<cache-index>C:/data/blast-cache/index.db</cache-index>
+		<cache-index>/data/blast-cache/index.db</cache-index>
 		
 		<dbs>
 			<db id="sprot" name="SwissProt">

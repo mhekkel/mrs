@@ -76,6 +76,7 @@ OBJECTS.m6-test = \
 
 OBJECTS.m6-server = \
 	$(OBJECTS) \
+	$(OBJDIR)/M6BlastCache.o \
 	$(OBJDIR)/M6Server.o \
 
 OBJECTS.m6-passwd = \
@@ -94,7 +95,7 @@ m6-make: $(OBJECTS.m6-make)
 
 m6-server: $(OBJECTS.m6-server)
 	@ echo ">>" $@
-	@ $(CXX) $(BOOST_INC_DIR:%=-I%) -o $@ -I. $^ $(LDFLAGS)
+	@ $(CXX) $(BOOST_INC_DIR:%=-I%) -o $@ -I. $^ $(LDFLAGS) -lsqlite3
 
 m6-passwd: $(OBJECTS.m6-passwd)
 	@ echo ">>" $@

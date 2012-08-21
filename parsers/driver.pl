@@ -11,12 +11,16 @@ BEGIN
 }
 
 use Data::Dumper;
-use LWP::Simple qw(get);
+use LWP::Simple;
 
 sub readDoc
 {
 	my $id = shift;
-	my $doc = get(sprintf('http://mrs.cmbi.ru.nl/mrs-5/download?db=uniprot&id=%s', $id);
+#	my $url  = sprintf('http://mrs.cmbi.ru.nl/mrs-5/download?db=uniprot&id=%s', $id);
+	my $url  = sprintf('http://mrs.cmbi.ru.nl:18080/download?db=uniprot&id=%s', $id);
+
+	my $doc = get($url) or die $!;
+
 	return $doc;
 }
 
@@ -25,8 +29,8 @@ sub main()
 	my $script = MRS::load_script('.', 'uniprot');
 	
 	my $doc = &readDoc('104k_thepa');
-	
-	$script->parse();
+
+	$script->parse($doc);
 }
 
 &main();

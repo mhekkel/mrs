@@ -64,7 +64,7 @@ M6AuthInfo::M6AuthInfo(const string& inRealm)
 	boost::random::random_device rng;
 	uint32 data[4] = { rng(), rng(), rng(), rng() };
 #else
-	uint32 data[4] = { random(), random(), random(), random() };
+	int64 data[2] = { random(), random() };
 #endif
 
 	mNonce = M6MD5(data, sizeof(data)).Finalise();

@@ -37,6 +37,7 @@
 #include "M6DataSource.h"
 #include "M6Queue.h"
 #include "M6Config.h"
+#include "M6Parser.h"
 
 using namespace std;
 using namespace std::tr1;
@@ -101,7 +102,8 @@ class M6Processor
 	M6Databank&		mDatabank;
 	M6Lexicon&		mLexicon;
 	zx::element*	mConfig;
-	M6ExprPtr		mScript;
+//	M6ExprPtr		mScript;
+	M6Parser*		mParser;
 	M6FileQueue		mFileQueue;
 	M6DocQueue		mDocQueue;
 	bool			mUseDocQueue;
@@ -598,19 +600,21 @@ struct M6StopExpr : public M6Expr
 
 M6Processor::M6Processor(M6Databank& inDatabank, M6Lexicon& inLexicon,
 		zx::element* inTemplate)
-	: mDatabank(inDatabank), mLexicon(inLexicon), mConfig(inTemplate)
+	: mDatabank(inDatabank), mLexicon(inLexicon), mConfig(inTemplate), mParser(nullptr)
 {
 	string parser = mConfig->get_attribute("parser");
 	if (parser.empty())
 		THROW(("Missing parser attribute"));
 	
-	zx::element* script = M6Config::Instance().LoadParser(parser);
-	if (script != nullptr)
-		mScript = ParseScript(script);
+//	zx::element* script = M6Config::Instance().LoadParser(parser);
+//	if (script != nullptr)
+//		mScript = ParseScript(script);
+	mParser = new M6PerlParser(parser);
 }
 
 M6Processor::~M6Processor()
 {
+	delete mParser;
 }
 
 M6ExprPtr M6Processor::ParseScript(zx::element* inScript)
@@ -804,7 +808,8 @@ void M6Processor::ProcessDocument(const string& inDoc)
 	M6InputDocument* doc = new M6InputDocument(mDatabank, inDoc);
 	
 	M6Argument arg(inDoc.c_str(), inDoc.length());
-	mScript->Evaluate(doc, arg);
+//	mScript->Evaluate(doc, arg);
+	mParser->ParseDocument(doc);
 	
 	doc->Tokenize(mLexicon, 0);
 	doc->Compress();
@@ -817,7 +822,8 @@ M6InputDocument* M6Processor::IndexDocument(const string& inDoc)
 	M6InputDocument* doc = new M6InputDocument(mDatabank, inDoc);
 	
 	M6Argument arg(inDoc.c_str(), inDoc.length());
-	mScript->Evaluate(doc, arg);
+//	mScript->Evaluate(doc, arg);
+	mParser->ParseDocument(doc);
 	
 	doc->Tokenize(mLexicon, 0);
 	return doc;
@@ -879,8 +885,9 @@ void M6Processor::ProcessDocument()
 
 		M6InputDocument* doc = new M6InputDocument(mDatabank, text);
 		
-		M6Argument arg(text.c_str(), text.length());
-		mScript->Evaluate(doc, arg);
+		//M6Argument arg(text.c_str(), text.length());
+		//mScript->Evaluate(doc, arg);
+		mParser->ParseDocument(doc);
 		
 		doc->Tokenize(*tsLexicon, 0);
 		doc->Compress();

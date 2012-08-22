@@ -1,6 +1,5 @@
 #!perl
 
-
 BEGIN
 {
 	if ($^O eq 'MSWin32')
@@ -10,34 +9,7 @@ BEGIN
 	}
 }
 
-use Data::Dumper;
-use LWP::Simple;
-
-sub readDoc
-{
-	my $id = shift;
-#	my $url  = sprintf('http://mrs.cmbi.ru.nl/mrs-5/download?db=uniprot&id=%s', $id);
-	my $url  = sprintf('http://mrs.cmbi.ru.nl:18080/download?db=uniprot&id=%s', $id);
-
-	my $doc = get($url) or die $!;
-
-	return $doc;
-}
-
-sub main()
-{
-	my $script = MRS::load_script('.', 'uniprot');
-	
-	my $doc = &readDoc('104k_thepa');
-
-	$script->parse($doc);
-}
-
-&main();
-exit;
-
-
-package MRS;
+package M6;
 
 our $VERSION = '6.0';
 
@@ -68,8 +40,8 @@ sub load_script
 	
 	my $package = valid_package_name($name);
 
-	my $script_name = "MRS::Script";
-	
+	my $script_name = "M6::Script";
+
 	if ($package ne 'default')
 	{
 		my $plugin = "${mrs_script_dir}/${name}.pm";
@@ -106,7 +78,7 @@ sub load_script
 	return $script_name->new('script_dir' => $mrs_script_dir);
 };
 
-package MRS::Script;
+package M6::Script;
 
 use strict;
 use Data::Dumper;
@@ -115,14 +87,13 @@ use File::stat;
 require Exporter;
 require DynaLoader;
 
-our @ISA = qw(Exporter DynaLoader MRS);
+our @ISA = qw(Exporter DynaLoader M6);
 our @EXPORT = qw( );
 
 sub new
 {
 	my $pkg = shift;
-#	my $self = MRS::new_MRS_Script(@_);
-	my $self = { @_ };
+	my $self = M6::new_M6_Script(@_);
 	bless $self, $pkg if defined($self);
 }
 
@@ -131,7 +102,7 @@ sub DESTROY
 	return unless $_[0]->isa('HASH');
 	my $self = tied(%{$_[0]});
 	return unless defined $self;
-	MRS::delete_MRS_Script($self);
+	M6::delete_M6_Script($self);
 }
 
 sub TIEHASH
@@ -176,48 +147,6 @@ sub index_name
 	$result = $index unless defined $result;
 
 	return $result;
-}
-
-sub index_unique_string
-{
-	my ($self, $name, $value) = @_;
-	
-	print "index_unique_string($name, $value)\n";
-}
-
-sub index_text
-{
-	my ($self, $name, $value) = @_;
-	
-	print "index_text($name, $value)\n";
-}
-
-sub index_number
-{
-	my ($self, $name, $value) = @_;
-	
-	print "index_number($name, $value)\n";
-}
-
-sub index_word
-{
-	my ($self, $name, $value) = @_;
-	
-	print "index_word($name, $value)\n";
-}
-
-sub index_date
-{
-	my ($self, $name, $value) = @_;
-	
-	print "index_date($name, $value)\n";
-}
-
-sub store_attribute
-{
-	my ($self, $name, $value) = @_;
-	
-	print "store_attribute($name, $value)\n";
 }
 
 1;

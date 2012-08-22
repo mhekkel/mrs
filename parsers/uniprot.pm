@@ -1,8 +1,8 @@
-package MRS::Script::uniprot;
+package M6::Script::uniprot;
 
 use utf8;
 
-our @ISA = "MRS::Script";
+our @ISA = "M6::Script";
 
 use strict;
 use warnings;
@@ -44,14 +44,13 @@ sub new
 #		sp300	=> [ 'sp100', 'sp200' ],		# for debugging purposes
 #	);
 
-#	my $self = new MRS::Script(
-	my $self = {
+	my $self = new M6::Script(
 		attr					=> [ 'title', 'acc' ],
 		indices					=> \%INDICES,
 		@_
-	};
+	);
 	
-	return bless $self, "MRS::Script::uniprot";
+	return bless $self, "M6::Script::uniprot";
 }
 
 #sub version
@@ -104,7 +103,7 @@ sub parse
 		{
 			$value =~ m/^(\w+)/ or die "No ID in UniProt record?\n$key   $value\n";
 			$self->index_unique_string('id', $1);
-			$self->store_attribute('id', $1);
+			$self->set_attribute('id', $1);
 		}
 		elsif ($key eq 'AC')
 		{
@@ -112,12 +111,12 @@ sub parse
 			foreach my $ac (split(m/;\s*/, $value))
 			{
 				$self->index_unique_string('ac', $ac);
-				$self->store_attribute('ac', $ac) unless ++$n > 1;
+				$self->set_attribute('ac', $ac) unless ++$n > 1;
 			}
 		}
 		elsif ($key eq 'DE')
 		{
-			$self->store_attribute('title', $1) if ($value =~ m/Full=(.+?);/);
+			$self->set_attribute('title', $1) if ($value =~ m/Full=(.+?);/);
 			$self->index_text('de', $value);
 #
 #			if ($value =~ /(EC\s*)(\d+\.\d+\.\d+\.\d+)/)
@@ -167,7 +166,7 @@ sub parse
 			{
 				$self->index_number('length', $1);
 				$self->index_number('mw', $2);
-				$self->index_word('crc64', $3);
+				$self->index_string('crc64', $3);
 			}
 			
 #			my $sequence = substr($text, pos $text);

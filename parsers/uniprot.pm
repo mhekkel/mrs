@@ -7,7 +7,6 @@ our @ISA = "M6::Script";
 use strict;
 use warnings;
 use POSIX qw/strftime/;
-use Data::Dumper;
 
 our $commentLine1 = "-----------------------------------------------------------------------";
 our $commentLine2 = "Copyrighted by the UniProt Consortium, see http://www.uniprot.org/terms";
@@ -39,13 +38,7 @@ sub new
 {
 	my $invocant = shift;
 
-#	my %merge_databanks = (
-#		uniprot => [ 'sprot', 'trembl' ],
-#		sp300	=> [ 'sp100', 'sp200' ],		# for debugging purposes
-#	);
-
 	my $self = new M6::Script(
-		attr					=> [ 'title', 'acc' ],
 		indices					=> \%INDICES,
 		@_
 	);
@@ -129,7 +122,8 @@ sub parse
 			if ($value =~ m/(\d{2})-([A-Z]{3})-(\d{4})/) {
 				my $date = sprintf('%4.4d-%2.2d-%2.2d', $3, $months{$2}, $1);
 				
-				eval { $self->index_date('dt', $date); };
+#				eval { $self->index_date('dt', $date); };
+				eval { $self->index_string('dt', $date); };
 				
 				warn $@ if $@;
 			}
@@ -168,6 +162,8 @@ sub parse
 				$self->index_number('mw', $2);
 				$self->index_string('crc64', $3);
 			}
+			
+			last;
 			
 #			my $sequence = substr($text, pos $text);
 #			$sequence =~ s/\s//g;

@@ -185,6 +185,34 @@ sub index_unique_string
 	print "index_unique_string($name, $value)\n";
 }
 
+sub index_text
+{
+	my ($self, $name, $value) = @_;
+	
+	print "index_text($name, $value)\n";
+}
+
+sub index_number
+{
+	my ($self, $name, $value) = @_;
+	
+	print "index_number($name, $value)\n";
+}
+
+sub index_word
+{
+	my ($self, $name, $value) = @_;
+	
+	print "index_word($name, $value)\n";
+}
+
+sub index_date
+{
+	my ($self, $name, $value) = @_;
+	
+	print "index_date($name, $value)\n";
+}
+
 sub store_attribute
 {
 	my ($self, $name, $value) = @_;

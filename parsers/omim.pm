@@ -5,7 +5,11 @@ our @ISA = "M6::Script";
 sub new
 {
 	my $invocant = shift;
-	my $self = new M6::Script(@_);
+	my $self = new M6::Script(
+		firstdocline => '*RECORD*',
+		trailer => '*END*',
+		@_
+	);
 	return bless $self, "M6::Script::omim";
 }
 

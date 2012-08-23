@@ -12,25 +12,6 @@ using namespace std;
 namespace fs = boost::filesystem;
 
 // --------------------------------------------------------------------
-
-void M6Parser::ParseDocument(M6InputDocument* inDoc)
-{
-	mDoc = inDoc;
-}
-
-//// --------------------------------------------------------------------
-//
-//M6XMLScriptParser::M6XMLScriptParser(zeep::xml::element* inScript)
-//{
-//}
-//
-//void M6XMLScriptParser::ParseDocument(M6InputDocument* inDoc)
-//{
-//	M6Parser::ParseDocument(inDoc);
-//	// ...
-//}
-
-// --------------------------------------------------------------------
 // Perl based parser implementation
 
 #if defined(_MSC_VER)
@@ -55,10 +36,10 @@ void boot_Win32CORE(pTHX_ CV* cv);
 
 // ------------------------------------------------------------------
 
-struct M6PerlParserImpl
+struct M6ParserImpl
 {
-						M6PerlParserImpl(const string& inScriptName, const fs::path& inScriptDir);
-						~M6PerlParserImpl();
+						M6ParserImpl(const string& inScriptName);
+						~M6ParserImpl();
 
 	void				Parse(M6InputDocument* inDoc);
 	void				GetVersion(string& outVersion);
@@ -82,7 +63,7 @@ struct M6PerlParserImpl
 	static const char*	kM6ScriptType;
 	static const char*	kM6ScriptObjectName;
 
-	static M6PerlParserImpl*
+	static M6ParserImpl*
 						GetObject(SV* inScalar);
 
 	HV*					GetHash()				{ return mParserHash; }
@@ -93,20 +74,24 @@ struct M6PerlParserImpl
 	PerlInterpreter*	mPerl;
 	SV*					mParser;
 	HV*					mParserHash;
-	static M6PerlParserImpl* sConstructingImp;
+	static M6ParserImpl* sConstructingImp;
+	static boost::mutex	sInitMutex;
 
 	M6InputDocument*	mDocument;
 };
 
-const char* M6PerlParserImpl::kM6ScriptType = "M6::Script";
-const char* M6PerlParserImpl::kM6ScriptObjectName = "M6::Script::Object";
-M6PerlParserImpl* M6PerlParserImpl::sConstructingImp = nullptr;
+const char* M6ParserImpl::kM6ScriptType = "M6::Script";
+const char* M6ParserImpl::kM6ScriptObjectName = "M6::Script::Object";
+M6ParserImpl* M6ParserImpl::sConstructingImp = nullptr;
+boost::mutex M6ParserImpl::sInitMutex;
 
-M6PerlParserImpl::M6PerlParserImpl(const string& inScriptName, const fs::path& inScriptDir)
+M6ParserImpl::M6ParserImpl(const string& inScriptName)
 	: mPerl(nullptr)
 	, mParser(nullptr)
 	, mParserHash(nullptr)
 {
+	boost::mutex::scoped_lock lock(sInitMutex);
+	
 	static bool sInited = false;
 	if (not sInited)
 	{
@@ -118,6 +103,15 @@ M6PerlParserImpl::M6PerlParserImpl(const string& inScriptName, const fs::path& i
 		sInited = true;
 	}
 
+	fs::path scriptdir = M6Config::Instance().FindGlobal("/m6-config/scriptdir");
+	if (not fs::exists(scriptdir))
+	{
+		if (fs::exists("./parsers"))
+			scriptdir = fs::path("./parsers");
+		else
+			THROW(("scriptdir not found or incorrectly specified (%s)", scriptdir.c_str()));
+	}
+	
 	mPerl = perl_alloc();
 	if (mPerl == nullptr)
 		THROW(("error allocating perl interpreter"));
@@ -128,10 +122,10 @@ M6PerlParserImpl::M6PerlParserImpl(const string& inScriptName, const fs::path& i
 	
 	PERL_SET_CONTEXT(mPerl);
 		
-	fs::path baseParser = inScriptDir / "M6Script.pm";
+	fs::path baseParser = scriptdir / "M6Script.pm";
 
 	if (not fs::exists(baseParser))
-		THROW(("The M6Script.pm script could not be found in %s", inScriptDir.c_str()));
+		THROW(("The M6Script.pm script could not be found in %s", scriptdir.c_str()));
 	
 	string baseParserPath = baseParser.string();
 	const char* embedding[] = { "", baseParserPath.c_str() };
@@ -147,12 +141,10 @@ M6PerlParserImpl::M6PerlParserImpl(const string& inScriptName, const fs::path& i
 //	(void)hv_store_ent(mParserHash,
 //		newSVpv("raw_dir", 7),
 //		newSVpv(path.c_str(), path.length()), 0);
+//	(void)hv_store_ent(mParserHash,
+//		newSVpv("script_dir", 7),
+//		newSVpv(path.c_str(), path.length()), 0);
 
-	string path = inScriptDir.string();
-	(void)hv_store_ent(mParserHash,
-		newSVpv("script_dir", 7),
-		newSVpv(path.c_str(), path.length()), 0);
-	
 	int err = perl_parse(mPerl, xs_init, 2, const_cast<char**>(embedding), nullptr);
 	SV* errgv = GvSV(PL_errgv);
 
@@ -171,7 +163,7 @@ M6PerlParserImpl::M6PerlParserImpl(const string& inScriptName, const fs::path& i
 	SAVETMPS;
 	PUSHMARK(SP);
 	
-	path = inScriptDir.string();
+	string path = scriptdir.string();
 	XPUSHs(sv_2mortal(newSVpv(path.c_str(), path.length())));
 	XPUSHs(sv_2mortal(newSVpv(inScriptName.c_str(), inScriptName.length())));
 
@@ -202,14 +194,18 @@ M6PerlParserImpl::M6PerlParserImpl(const string& inScriptName, const fs::path& i
 	LEAVE;
 }
 
-M6PerlParserImpl::~M6PerlParserImpl()
+M6ParserImpl::~M6ParserImpl()
 {
+	boost::mutex::scoped_lock lock(sInitMutex);
+
+	PERL_SET_CONTEXT(mPerl);
+
 	PL_perl_destruct_level = 0;
 	perl_destruct(mPerl);
 	perl_free(mPerl);
 }
 
-void M6PerlParserImpl::Parse(M6InputDocument* inDocument)
+void M6ParserImpl::Parse(M6InputDocument* inDocument)
 {
 	mDocument = inDocument;
 	
@@ -291,18 +287,18 @@ void M6PerlParserImpl::Parse(M6InputDocument* inDocument)
 	FREETMPS;
 	LEAVE;
 
+	mDocument = nullptr;
+
 	if (not errmsg.empty())
 	{
 		cerr << endl
 			 << "Error parsing document: " << endl
 			 << errmsg << endl;
-		exit(1);
+		THROW(("Error parsing document: %s", errmsg.c_str()));
 	}
-		
-	mDocument = nullptr;
 }
 
-//void M6PerlParserImpl::GetVersion(
+//void M6ParserImpl::GetVersion(
 //	string&				outVersion)
 //{
 //	PERL_SET_CONTEXT(mPerl);
@@ -341,10 +337,10 @@ void M6PerlParserImpl::Parse(M6InputDocument* inDocument)
 //	mUserData = nullptr;
 //}
 
-M6PerlParserImpl* M6PerlParserImpl::GetObject(
+M6ParserImpl* M6ParserImpl::GetObject(
 	SV*					inScalar)
 {
-	M6PerlParserImpl* result = nullptr;
+	M6ParserImpl* result = nullptr;
 	
 	if (SvGMAGICAL(inScalar))
 		mg_get(inScalar);
@@ -372,7 +368,7 @@ M6PerlParserImpl* M6PerlParserImpl::GetObject(
 			tmp = SvIV(SvRV(inScalar));
 		
 		if (tmp != 0 and strcmp(kM6ScriptType, HvNAME(SvSTASH(SvRV(inScalar)))) == 0)
-			result = reinterpret_cast<M6PerlParserImpl*>(tmp);
+			result = reinterpret_cast<M6ParserImpl*>(tmp);
 	}
 	
 	return result;
@@ -380,7 +376,7 @@ M6PerlParserImpl* M6PerlParserImpl::GetObject(
 
 // ------------------------------------------------------------------
 
-string M6PerlParserImpl::operator[](const char* inEntry)
+string M6ParserImpl::operator[](const char* inEntry)
 {
 	string result;
 	
@@ -398,7 +394,7 @@ string M6PerlParserImpl::operator[](const char* inEntry)
 	return result;
 }
 
-string M6PerlParserImpl::GetString(SV* inScalar)
+string M6ParserImpl::GetString(SV* inScalar)
 {
 	string result;
 	
@@ -425,7 +421,7 @@ XS(_M6_Script_new)
 	SV* obj = newSV(0);
 	HV* hash = newHV();
 	
-	sv_setref_pv(obj, "M6::Script", M6PerlParserImpl::sConstructingImp);
+	sv_setref_pv(obj, "M6::Script", M6ParserImpl::sConstructingImp);
 	HV* stash = SvSTASH(SvRV(obj));
 	
 	GV* gv = *(GV**)hv_fetch(stash, "OWNER", 5, true);
@@ -454,7 +450,7 @@ XS(_M6_Script_new)
 
 		SvREFCNT_inc(value);
 		
-		HE* e = hv_store_ent(M6PerlParserImpl::sConstructingImp->GetHash(), key, value, 0);
+		HE* e = hv_store_ent(M6ParserImpl::sConstructingImp->GetHash(), key, value, 0);
 		if (e == nullptr)
 			sv_free(value);
 	}
@@ -483,7 +479,7 @@ XS(_M6_Script_FIRSTKEY)
 	if (items != 1)
 		croak("Usage: M6::Script::FIRSTKEY(self);");
 
-	M6PerlParserImpl* proxy = M6PerlParserImpl::GetObject(ST(0));
+	M6ParserImpl* proxy = M6ParserImpl::GetObject(ST(0));
 	
 	if (proxy == nullptr)
 		croak("Error, M6::Script object is not specified");
@@ -508,7 +504,7 @@ XS(_M6_Script_NEXTKEY)
 	if (items < 1)
 		croak("Usage: M6::Script::NEXTKEY(self);");
 
-	M6PerlParserImpl* proxy = M6PerlParserImpl::GetObject(ST(0));
+	M6ParserImpl* proxy = M6ParserImpl::GetObject(ST(0));
 	
 	if (proxy == nullptr)
 		croak("Error, M6::Script object is not specified");
@@ -532,7 +528,7 @@ XS(_M6_Script_FETCH)
 	if (items != 2)
 		croak("Usage: M6::Script::FETCH(self, name);");
 
-	M6PerlParserImpl* proxy = M6PerlParserImpl::GetObject(ST(0));
+	M6ParserImpl* proxy = M6ParserImpl::GetObject(ST(0));
 	
 	if (proxy == nullptr)
 		croak("Error, M6::Script object is not specified");
@@ -565,7 +561,7 @@ XS(_M6_Script_STORE)
 	if (items != 3)
 		croak("Usage: M6::Script::STORE(self, name, value);");
 
-	M6PerlParserImpl* proxy = M6PerlParserImpl::GetObject(ST(0));
+	M6ParserImpl* proxy = M6ParserImpl::GetObject(ST(0));
 	
 	if (proxy == nullptr)
 		croak("Error, M6::Script object is not specified");
@@ -589,7 +585,7 @@ XS(_M6_Script_CLEAR)
 	if (items < 1)
 		croak("Usage: M6::Script::CLEAR(self);");
 
-	M6PerlParserImpl* proxy = M6PerlParserImpl::GetObject(ST(0));
+	M6ParserImpl* proxy = M6ParserImpl::GetObject(ST(0));
 	
 	if (proxy == nullptr)
 		croak("Error, M6::Script object is not specified");
@@ -606,7 +602,7 @@ XS(_M6_Script_set_attribute)
 	if (items != 3)
 		croak("Usage: M6::Script::set_attribute(self, field, text);");
 	
-	M6PerlParserImpl* proxy = M6PerlParserImpl::GetObject(ST(0));
+	M6ParserImpl* proxy = M6ParserImpl::GetObject(ST(0));
 	if (proxy == nullptr)
 		croak("Error, M6::Script object is not specified");
 	
@@ -642,7 +638,7 @@ XS(_M6_Script_index_text)
 	if (items != 3)
 		croak("Usage: M6::Script::index_text(self, indexname, text);");
 	
-	M6PerlParserImpl* proxy = M6PerlParserImpl::GetObject(ST(0));
+	M6ParserImpl* proxy = M6ParserImpl::GetObject(ST(0));
 	if (proxy == nullptr)
 		croak("Error, M6::Script object is not specified");
 
@@ -683,7 +679,7 @@ XS(_M6_Script_index_string)
 	if (items != 3)
 		croak("Usage: M6::Script::index_string(self, indexname, str);");
 	
-	M6PerlParserImpl* proxy = M6PerlParserImpl::GetObject(ST(0));
+	M6ParserImpl* proxy = M6ParserImpl::GetObject(ST(0));
 	if (proxy == nullptr)
 		croak("Error, M6::Script object is not specified");
 	
@@ -721,7 +717,7 @@ XS(_M6_Script_index_unique_string)
 	if (items != 3)
 		croak("Usage: M6::Script::index_unique_string(self, indexname, str);");
 	
-	M6PerlParserImpl* proxy = M6PerlParserImpl::GetObject(ST(0));
+	M6ParserImpl* proxy = M6ParserImpl::GetObject(ST(0));
 	if (proxy == nullptr)
 		croak("Error, M6::Script object is not specified");
 	
@@ -759,7 +755,7 @@ XS(_M6_Script_index_number)
 	if (items != 3)
 		croak("Usage: M6::Script::index_number(self, indexname, value);");
 	
-	M6PerlParserImpl* proxy = M6PerlParserImpl::GetObject(ST(0));
+	M6ParserImpl* proxy = M6ParserImpl::GetObject(ST(0));
 	if (proxy == nullptr)
 		croak("Error, M6::Script object is not specified");
 	
@@ -798,7 +794,7 @@ XS(_M6_Script_index_date)
 	if (items != 3)
 		croak("Usage: M6::Script::index_date(self, indexname, date);");
 	
-	M6PerlParserImpl* proxy = M6PerlParserImpl::GetObject(ST(0));
+	M6ParserImpl* proxy = M6ParserImpl::GetObject(ST(0));
 	if (proxy == nullptr)
 		croak("Error, M6::Script object is not specified");
 	
@@ -836,7 +832,7 @@ XS(_M6_Script_add_link)
 	if (items != 3)
 		croak("Usage: M6::Script::add_link(self, databank, value);");
 	
-	M6PerlParserImpl* proxy = M6PerlParserImpl::GetObject(ST(0));
+	M6ParserImpl* proxy = M6ParserImpl::GetObject(ST(0));
 	if (proxy == nullptr)
 		croak("Error, M6::Script object is not specified");
 	
@@ -908,27 +904,29 @@ void xs_init(pTHX)
 //	sv_setiv(get_sv("M6::INDEX_STRING", true),		eIndexString);
 }
 
-M6PerlParser::M6PerlParser(const string& inName)
+M6Parser::M6Parser(const string& inName)
 	: mName(inName)
 {
 }
 
-void M6PerlParser::ParseDocument(M6InputDocument* inDoc)
+M6Parser::~M6Parser()
 {
-	fs::path scriptdir = M6Config::Instance().FindGlobal("/m6-config/scriptdir");
-	
-	if (not fs::exists(scriptdir))
-	{
-		if (fs::exists("./parsers"))
-			scriptdir = fs::path("./parsers");
-		else
-			THROW(("scriptdir not found or incorrectly specified (%s)", scriptdir.c_str()));
-	}
-	
+}
+
+void M6Parser::ParseDocument(M6InputDocument* inDoc)
+{
+	// create thread local impl here
 	if (mImpl.get() == nullptr)
-		mImpl.reset(new M6PerlParserImpl(mName, scriptdir));
+		mImpl.reset(new M6ParserImpl(mName));
 	
-	M6Parser::ParseDocument(inDoc);
 	mImpl->Parse(inDoc);
 }
 
+string M6Parser::GetValue(const string& inName)
+{
+	// create thread local impl here
+	if (mImpl.get() == nullptr)
+		mImpl.reset(new M6ParserImpl(mName));
+
+	return mImpl->operator[](inName.c_str());
+}

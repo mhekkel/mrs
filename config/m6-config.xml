@@ -45,407 +45,26 @@
 		</realm>
 	</server>
 
-	<parser id="pdbfinder">
-		<match regex="^\s?(\w+)\s+:\s(.+)\n">
-			<switch test="1">
-				<case value="id">
-					<capture nr="2">
-						<index name="id" unique="true" type="string"/>
-						<attr name="id"/>
-					</capture>
-				</case>
-				<case value="header">
-					<capture nr="2">
-						<to-lower />
-						<index name="header" type="string"/>
-						<attr name="title"/>
-					</capture>
-				</case>
-				<case value="author">
-					<capture nr="2">
-						<replace what="\." with=". "/>
-						<index name="author" type="text"/>
-					</capture>
-				</case>
-				<case value="chain">
-					<stop/>
-				</case>
-				<default>
-					<capture nr="2">
-						<index name="text" type="text"/>
-					</capture>
-				</default>
-			</switch>
-		</match>
-	</parser>
-
-	<parser id="omim">
-		<match regex="^\*FIELD\* (\w\w)\n((?:(?:\n|[^*\n].*\n)++|\*(?!FIELD).*\n)+)">
-			<switch test="1">
-				<case value="NO">
-					<capture nr="2">
-						<index name="id" unique="true" type="string"/>
-						<attr name="id"/>
-					</capture>
-				</case>
-				<case value="TI">
-					<capture nr="2">
-						<index name="title" type="text"/>
-						<split separator=";;">
-							<if iteration="1">
-								<to-lower />
-								<substr length="255" />
-								<replace what="\s+" with=" " />
-								<attr name="title"/>
-							</if>
-						</split>
-					</capture>
-				</case>
-				<default>
-					<capture nr="2">
-						<index name="text" type="text"/>
-					</capture>
-				</default>
-			</switch>
-		</match>
-	</parser>
-	
 	<format id="omim">
 		<script src="scripts/omim.js" />
-
 		<link regex="(?&lt;=\()(?:[^();]+?; )?(\d{6})(?:\.(\d{4}))?(?=\))"
 			db="omim" ix="id" id="$1" anchor="$2" />
 	</format>
 	
-	<parser id="uniprot">
-		<match regex="^(?:([A-Z]{2})   ).+\n(?:\1.+\n)*">
-			<switch test="1">
-				<case value="ID">
-					<replace what="^ID   (.+)\n" with="$1 "/>
-					<match regex="^(\w+)" capture="1">
-						<index name="id" unique="true" type="string"/>
-						<attr name="id"/>
-					</match>
-				</case>
-				<case value="AC">
-					<replace what="^AC   (.+)\n" with="$1 "/>
-					<split separator=";\s*">
-						<index name="ac" unique="true" type="string"/>
-					</split>
-				</case>
-				<case value="DE">
-					<replace what="^DE   (.+)\n" with="$1 "/>
-					<match regex="\w+: ((?:[^:;]+;\s*)+)" capture="1">
-						<if iteration="1">
-							<match regex="\w+=([^;]+);" capture="1">
-								<if iteration="1">
-									<attr name="title"/>
-								</if>
-							</match>
-						</if>
-						<match regex="\w+=(.+)" capture="1">
-							<index name="de"/>
-						</match>
-					</match>
-				</case>
-				<case value="GN">
-					<replace what="^GN   (.+)\n" with="$1 "/>
-					<split separator=";\s*">
-						<match regex="(?:\w+=)?(.+)" capture="1">
-							<index name="gn"/>
-						</match>
-					</split>
-				</case>
-				<case value="OS">
-					<replace what="^OS   (.+?)\.?\n" with="$1 "/>
-					<index name="os" />
-				</case>
-				<case value="OC">
-					<replace what="^OC   (.+?)\.?\n" with="$1 "/>
-					<split separator=";\s*">
-						<index name="oc" type="string" />
-					</split>
-				</case>
-				<case value="DR">
-					<replace what="^DR   (.+)\n" with="$1 "/>
-					<replace what="^(\w+); ([^;]+);.*" with="$1:$2" />
-					<index name="dr" type="string" />
-				</case>
-				<case value="KW">
-					<replace what="^KW   (.+?)\.?\n" with="$1 "/>
-					<split separator=";\s*">
-						<index name="kw" type="string"/>
-					</split>
-				</case>
-				<case value="FT">
-					<replace what="^FT.{32}(.+)" with="$1\n" />
-					<index name="ft"/>
-				</case>
-				<case value="RX">
-					<match regex="MEDLINE=([^;]+);" capture="1">
-						<index name="medline"/>
-					</match>
-					<match regex="PubMed=([^;]+);" capture="1">
-						<index name="pubmed"/>
-					</match>
-					<match regex="DOI=([^;]+);" capture="1">
-						<index name="doi" type="string"/>
-					</match>
-				</case>
-				<case value="SQ">
-					<stop/>
-				</case>
-				<default>
-					<replace what="^.{5}(.+)\n" with="$1\n"/>
-					<index name="text"/>
-				</default>
-			</switch>
-		</match>
-	</parser>
-
 	<format id="uniprot">
 		<script src="scripts/uniprot.js" />
 		<link regex="(?&lt;=DR   EMBL; )(\S+)(?=;)" db="embl" ix="id" id="$1" />
 		<link regex="(?&lt;=DR   PDB; )(\S+)(?=;)" db="pdb" ix="id" id="$1" />
 	</format>
 
-	<parser id="embl">
-		<match regex="^(?:([A-Z]{2})   ).+\n(?:\1.+\n)*">
-			<switch test="1">
-				<case value="ID">
-					<match regex="^ID   (\w+);" capture="1">
-						<index name="id" unique="true" type="string"/>
-						<attr name="id"/>
-					</match>
-				</case>
-				<case value="AC">
-					<replace what="^AC   (.+)\n" with="$1 "/>
-					<split separator=";\s*">
-						<index name="ac" unique="true" type="string"/>
-					</split>
-				</case>
-				<case value="DE">
-					<replace what="^DE   (.+)\n" with="$1 "/>
-					<index name="title"/>
-					<split separator=";">
-						<if iteration="1">
-							<substr length="255" />
-							<attr name="title"/>
-						</if>
-					</split>
-				</case>
-				<case value="DR">
-					<match regex="^DR   (([^;]+); ([^;]+));.*" capture="1">
-						<replace what="([^-/;]+)(?:[-/][^;]+)?; (.+)" with="$1:$2" />
-						<index name="dr" type="string" />
-					</match>
-				</case>
-				<case value='FT'>
-					<replace what="^FT   " with=""/>
-					<match regex="^\w+\s+((?:\S.+)(?:\n\s{15,}.+)*)" capture="1">
-						<match regex='/(\w+)=(?|([^"].+)|"((?:[^"]++|"")*)")\n?'>
-							<switch test="1">
-								<case value="translation"/>
-								<case value="db_xref"><capture nr="2"><index name="db_xref"/></capture></case>
-								<default>
-									<capture nr="2"><index name="feature"/></capture>
-								</default>
-							</switch>
-						</match>
-					</match>
-				</case>
-				<case value="XX"/>
-				<case value="DT"/>
-				<case value="RN"/>
-				<case value="RP"/>
-				<case value="FH"/>
-				<case value="SQ">
-					<stop/>
-				</case>
-				<default>
-					<replace what="^.{5}(.+)\n" with="$1\n"/>
-					<index name="text"/>
-				</default>
-			</switch>
-		</match>
-	</parser>
-
-	<parser id="enzyme">
-		<match regex="^(?:([A-Z]{2})   ).+\n(?:\1.+\n)*">
-			<switch test="1">
-				<case value="ID">
-					<match regex="(\d+\.\d+\.\d+\.\d+)" capture="1">
-						<index name="id" unique="true" type="string"/>
-						<attr name="id"/>
-					</match>
-				</case>
-				<case value="DE">
-					<replace what="^DE   (.+)\n?" with="$1 "/>
-					<index name="de"/>
-					<substr length="255"/>
-					<attr name="title"/>
-				</case>
-				<case value="PR">
-					<replace what="^PR   PROSITE; (.+)\n?" with="$1 "/>
-					<index name="pr"/>
-				</case>
-				<default>
-					<replace what="^.{5}(.+)\n" with="$1\n"/>
-					<index name="text"/>
-				</default>
-			</switch>
-		</match>
-	</parser>
-
 	<format id="enzyme">
 		<link regex="([A-Z]+[A-Z0-9]+)(?=, )" db="sprot" ix="ac" id="$1" />
 	</format>
 
-	<parser id="genbank">
-		<match regex="^\s*(\w+)\s+((?:.+)(?:\n\s{5,}.+)*)">
-			<switch test="1">
-				<case value='locus'>
-					<capture nr="2">
-						<substr start="0" length="15" />
-						<index name="id" unique="true" type="string"/>
-						<attr name="id"/>
-					</capture>
-					<capture nr="2">
-						<substr start="52" length="3" />
-						<index name="division" type="string"/>
-					</capture>
-<!--					<capture nr="2">-->
-<!--						<substr start="56" length="12" />-->
-<!--						<index name="date" type="string"/>-->
-<!--					</capture>-->
-				</case>
-				
-				<case value='definition'>
-					<capture nr="2">
-						<replace what="\s\s+" with=" "/>
-						<replace what=";.+" with=""/>
-						<substr length="255"/>
-						<index name="title" />
-						<attr name="title"/>
-					</capture>
-				</case>
-
-				<case value='accession'>
-					<capture nr="2">
-						<split separator="\s+">
-							<index name="accession" unique="true" type="string"/>
-						</split>
-					</capture>
-				</case>
-
-				<case value='dblink'>
-					<capture nr="2">
-						<index name="dblink" type="string"/>
-					</capture>
-				</case>
-				
-				<case value='version'>
-					<match regex="(\S+)\s+GI:(\d+)">
-						<capture nr="1">
-							<index name="version" unique="true" type="string"/>
-						</capture>
-						<capture nr="2">
-							<index name="gi" unique="true" type="string" />
-						</capture>
-					</match>
-				</case>
-				
-				<case value='keywords'>
-					<capture nr="2">
-						<replace what="\.$" />
-						<split separator=";\s*">
-							<index name="keywords" type="string"/>
-						</split>
-					</capture>
-				</case>
-
-				<case value='features'>
-					<match regex="^\s{5}\w+\s+((?:\S.+)(?:\n\s{20,}.+)*)" capture="1">
-						<match regex='/(\w+)=(?|([^"].+)|"((?:[^"]++|"")*)")\n?'>
-							<switch test="1">
-								<case value="translation"/>
-								<case value="db_xref"><capture nr="2"><index name="db_xref"/></capture></case>
-								<default>
-									<capture nr="2"><index name="feature"/></capture>
-								</default>
-							</switch>
-						</match>
-					</match>
-				</case>
-				
-				<case value='origin'>
-					<stop />
-				</case>
-				
-				<default>
-					<capture nr="2"><index name="text"/></capture>
-				</default>
-			</switch>
-		</match>
-	</parser>
-	
-	<parser id="taxonomy">
-		<match regex="^([A-Z][^:]+?) +: (.+)\n">
-			<switch test="1">
-				<case value='ID'>
-					<capture nr="2">
-						<index name="id"/>
-						<attr name="id"/>
-					</capture>
-				</case>
-				<case value='SCIENTIFIC NAME'>
-					<capture nr="2">
-						<index name='sn' type='string'/>
-						<index name='text'/>
-						<attr name='title'/>
-					</capture>
-				</case>
-				<default>
-					<capture nr="2">
-						<index name="text"/>
-					</capture>
-				</default>
-			</switch>
-		</match>
-	</parser>
-	
 	<format id="taxonomy">
 		<link regex="(?&lt;=^PARENT ID                 : )(\d+)" ix="id" id="$1" />
 	</format>
 
-<!--	<parser id="mediawiki" type="sax" docxpath="/mediawiki/page">-->
-<!--		<match xpath="title">-->
-<!--			<index name="title" />-->
-<!--		</match>-->
-<!--		<match xpath="text">-->
-<!--			<preprocess plugin="mediawiki"/>-->
-<!--			<index name="text" />-->
-<!--		</match>-->
-<!--	</parser>-->
-
-	<parser id="mediawiki">
-		<match regex="&lt;title&gt;(.+)&lt;/title&gt;" capture="1">
-			<index name="title" type="string"/>
-			<attr name="title"/>
-		</match>
-		<match regex="&lt;text.+?&gt;((?:.|\n)+)&lt;/text&gt;" capture="1">
-			<replace what="&amp;lt;" with="&lt;"/>
-			<replace what="&amp;gt;" with="&gt;"/>
-			<replace what="&amp;amp;" with="&amp;"/>
-			<replace what="&amp;quot;" with="&quot;"/>
-			<replace what="\[\[[-a-z]+:((?&gt;[^][\n]+))\]\]"/>
-			<replace what="&lt;[^&lt;&gt;]++&gt;"/>
-			<replace what="(\[\[(?:(\w+):)?([^][\n|]++)(?:\|(([^][\n|]++)|(?1))*)?\]\])"
-				with="{$4 ? $4 : $3}" />
-			<index name="text"/>
-		</match>
-	</parser>
-	
 	<databank id="pdbfinder" parser="pdbfinder">
 		<name>PDBFINDER</name>
 <!--		<file>C:\Users\maarten\projects\m6\test\pdbfinder.m6</file> -->
@@ -457,23 +76,6 @@
 <!--		<source>C:\Users\maarten\projects\m6\test\PDBFIND2.TXT</source> -->
 <!--		<source>C:\Users\maarten\projects\m6\test\pdbfind2-head-2.txt</source>-->
 		<source>pdbfinder/pdbfind2-head.txt</source> 
-		
-		<!-- if no header-line or document-separator element is specified, the
-			 entire file is considered to be one document. -->
-		
-		<!-- header-line's will be stripped off each file. If document-separator
-			 below is specified as first-line-matches then this header is of course not needed. -->
-		<header-line>^//.*</header-line>
-
-		<!-- document-separator indicates either the start or the end of a document.
-			 The content is interpreted based on the type attribute.
-			 If type is last-line-equals (default) then a line equal to the content
-			 indicates the end of a document.
-			 The other types are last-line-matches (content is a regex), first-line-equal
-			 and first-line-matches.
-		-->
-		<document-separator type="last-line-equals">//</document-separator>
-
 	</databank>
 	
 	<!-- omim -->
@@ -483,7 +85,6 @@
 		<file>/data/mrs/omim.m6</file>
 		<locale>en_US.UTF-8</locale>
 		<source>omim/omim.dat.gz</source>
-		<document-separator type="first-line-equals">*RECORD*</document-separator>
 	</databank>
 	
 	<databank id="mini-omim" parser="omim" format="omim">
@@ -492,15 +93,13 @@
 		<file>/data/mrs/omim.m6</file>
 		<locale>en_US.UTF-8</locale>
 		<source>omim/mini-omim.dat</source>
-		<document-separator type="first-line-equals">*RECORD*</document-separator>
 	</databank>
 	
 	<databank id="test-embl" parser="embl">
 		<name>EMBL</name>
 		<info>http://www.ebi.ac.uk/embl/index.html</info>
 		<file>/data/mrs/embl.m6</file>
-		<source>embl/test.dat</source>
-		<document-separator type="last-line-equals">//</document-separator>
+		<source>embl/cum*.dat.gz</source>
 	</databank>
 
 	<databank id="embl" parser="embl">
@@ -508,7 +107,6 @@
 		<info>http://www.ebi.ac.uk/embl/index.html</info>
 		<file>/data/mrs/embl.m6</file>
 		<source>embl_release/*.dat.gz</source>
-		<document-separator type="last-line-equals">//</document-separator>
 	</databank>
 
 	<databank id="embl-con" parser="embl">
@@ -516,7 +114,6 @@
 		<info>http://www.ebi.ac.uk/embl/index.html</info>
 		<file>/data/mrs/embl.m6</file>
 		<source>embl/rel_con_*.dat.gz</source>
-		<document-separator type="last-line-equals">//</document-separator>
 	</databank>
 
 	<databank id="embl-est" parser="embl">
@@ -524,7 +121,6 @@
 		<info>http://www.ebi.ac.uk/embl/index.html</info>
 		<file>/data/mrs/embl.m6</file>
 		<source>embl/rel_est_*.dat.gz</source>
-		<document-separator type="last-line-equals">//</document-separator>
 	</databank>
 
 	<databank id="embl-gss" parser="embl">
@@ -532,7 +128,6 @@
 		<info>http://www.ebi.ac.uk/embl/index.html</info>
 		<file>/data/mrs/embl.m6</file>
 		<source>embl/rel_gss_*.dat.gz</source>
-		<document-separator type="last-line-equals">//</document-separator>
 	</databank>
 
 	<databank id="embl-htc" parser="embl">
@@ -540,7 +135,6 @@
 		<info>http://www.ebi.ac.uk/embl/index.html</info>
 		<file>/data/mrs/embl.m6</file>
 		<source>embl/rel_htc_*.dat.gz</source>
-		<document-separator type="last-line-equals">//</document-separator>
 	</databank>
 
 	<databank id="embl-htg" parser="embl">
@@ -548,7 +142,6 @@
 		<info>http://www.ebi.ac.uk/embl/index.html</info>
 		<file>/data/mrs/embl.m6</file>
 		<source>embl/rel_htg_*.dat.gz</source>
-		<document-separator type="last-line-equals">//</document-separator>
 	</databank>
 
 	<databank id="embl-pat" parser="embl">
@@ -556,7 +149,6 @@
 		<info>http://www.ebi.ac.uk/embl/index.html</info>
 		<file>/data/mrs/embl.m6</file>
 		<source>embl/rel_pat_*.dat.gz</source>
-		<document-separator type="last-line-equals">//</document-separator>
 	</databank>
 
 	<databank id="embl-std" parser="embl">
@@ -564,7 +156,6 @@
 		<info>http://www.ebi.ac.uk/embl/index.html</info>
 		<file>/data/mrs/embl.m6</file>
 		<source>embl/rel_std_*.dat.gz</source>
-		<document-separator type="last-line-equals">//</document-separator>
 	</databank>
 
 	<databank id="embl-sts" parser="embl">
@@ -572,7 +163,6 @@
 		<info>http://www.ebi.ac.uk/embl/index.html</info>
 		<file>/data/mrs/embl.m6</file>
 		<source>embl/rel_sts_*.dat.gz</source>
-		<document-separator type="last-line-equals">//</document-separator>
 	</databank>
 
 	<databank id="embl-tsa" parser="embl">
@@ -580,7 +170,6 @@
 		<info>http://www.ebi.ac.uk/embl/index.html</info>
 		<file>/data/mrs/embl.m6</file>
 		<source>embl/rel_tsa_*.dat.gz</source>
-		<document-separator type="last-line-equals">//</document-separator>
 	</databank>
 
 	<databank id="embl-wgs" parser="embl">
@@ -588,7 +177,6 @@
 		<info>http://www.ebi.ac.uk/embl/index.html</info>
 		<file>/data/mrs/embl.m6</file>
 		<source>embl/rel_wgs_*.dat.gz</source>
-		<document-separator type="last-line-equals">//</document-separator>
 	</databank>
 
 	<databank id="enzyme" parser="enzyme" format="enzyme">
@@ -596,7 +184,6 @@
 		<info>http://ca.expasy.org/enzyme/</info>
 		<file>/data/mrs/enzyme.m6</file>
 		<source>enzyme/enzyme.dat</source>
-		<document-separator type="last-line-equals">//</document-separator>
 	</databank>
 
 	<databank id="sprot" parser="uniprot" format="uniprot">
@@ -604,7 +191,6 @@
 		<info>http://www.uniprot.org/</info>
 		<file>/data/mrs/sprot.m6</file>
 		<source>uniprot/uniprot_sprot.dat.gz</source>
-		<document-separator type="last-line-equals">//</document-separator>
 	</databank>
 
 	<databank id="sprotw" parser="uniprot" format="uniprot">
@@ -612,7 +198,6 @@
 		<info>http://www.uniprot.org/</info>
 		<file>/data/mrs/sprot.m6</file>
 		<source>test/sprot-mini.dat</source>
-		<document-separator type="last-line-equals">//</document-separator>
 	</databank>
 	
 	<databank id="trembl" parser="uniprot" format="uniprot">
@@ -620,37 +205,30 @@
 		<info>http://www.uniprot.org/</info>
 		<file>/data/mrs/trembl.m6</file>
 		<source>uniprot/uniprot_trembl.dat.gz</source>
-		<document-separator type="last-line-equals">//</document-separator>
 	</databank>
 	
 	<databank id="genbank" parser="genbank">
 		<name>Genbank</name>
 		<file>/data/mrs/genbank.m6</file>
 		<source>genbank/*.seq.gz</source>
-		<document-separator type="last-line-equals">//</document-separator>
 	</databank>
 
 	<databank id="refseq" parser="genbank">
 		<name>Refseq</name>
 		<file>/data/mrs/refseq.m6</file>
 		<source>refseq_release/*gpff.gz;refseq_release/*gbff.gz</source>
-		<document-separator type="last-line-equals">//</document-separator>
 	</databank>
 
 	<databank id="taxonomy" parser="taxonomy" format="taxonomy">
 		<name>Taxonomy</name>
 		<file>/data/mrs/taxonomy.m6</file>
 		<source>taxonomy/taxonomy.dat</source>
-		<document-separator type="last-line-equals">//</document-separator>
 	</databank>
 
 	<databank id="nlwiki" parser="mediawiki">
 		<name>Wikipedia - Nederlandstalig</name>
 		<file>/data/mrs/nlwiki.m6</file>
 		<source>nlwiki/nlwiki-latest-pages-articles.xml.bz2</source>
-
-		<document-separator type="first-line-equals">  &lt;page&gt;</document-separator>
-		<document-separator type="last-line-equals">  &lt;/page&gt;</document-separator>
 	</databank>
 
 	<databank id="mini-sprot-fasta">

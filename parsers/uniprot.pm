@@ -14,7 +14,10 @@ our $commentLine3 = "Distributed under the Creative Commons Attribution-NoDerivs
 sub new
 {
 	my $invocant = shift;
-	my $self = new M6::Script(@_);
+	my $self = new M6::Script(
+		lastdocline => '//',
+		@_
+	);
 	return bless $self, "M6::Script::uniprot";
 }
 

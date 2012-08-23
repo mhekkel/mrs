@@ -133,7 +133,7 @@ void Blast(int argc, char* const argv[])
 
 void Build(int argc, char* argv[])
 {
-	po::options_description desc("m6 build");
+	po::options_description desc("m6 build [databank]");
 	desc.add_options()
 		("databank,d",	po::value<string>(),	"Databank to build")
 		("config-file,c", po::value<string>(),	"Configuration file")
@@ -183,7 +183,7 @@ void Build(int argc, char* argv[])
 
 void Query(int argc, char* argv[])
 {
-	po::options_description desc("m6 query");
+	po::options_description desc("m6 query [databank] [query]");
 	desc.add_options()
 		("databank,d",	po::value<string>(),	"Databank to build")
 		("query,q", po::value<string>(),		"Query term")
@@ -263,7 +263,7 @@ void Query(int argc, char* argv[])
 
 void Info(int argc, char* argv[])
 {
-	po::options_description desc("m6 info");
+	po::options_description desc("m6 info [databank]");
 	desc.add_options()
 		("databank,d",	po::value<string>(),	"Databank to build")
 		("config-file,c", po::value<string>(),	"Configuration file")
@@ -369,7 +369,7 @@ void Info(int argc, char* argv[])
 
 void Dump(int argc, char* argv[])
 {
-	po::options_description desc("m6 dump");
+	po::options_description desc("m6 dump [databank]");
 	desc.add_options()
 		("databank,d",	po::value<string>(),	"Databank to build")
 		("config-file,c", po::value<string>(),	"Configuration file")
@@ -423,9 +423,73 @@ void Dump(int argc, char* argv[])
 	
 }
 
+void Entry(int argc, char* argv[])
+{
+	po::options_description desc("m6 entry [databank] [id]");
+	desc.add_options()
+		("databank,d",	po::value<string>(),	"Databank to build")
+		("config-file,c", po::value<string>(),	"Configuration file")
+		("entry,e", po::value<string>(),		"Entry ID to display")
+		("verbose,v",							"Be verbose")
+		("help,h",								"Display help message")
+		;
+
+	po::positional_options_description p;
+	p.add("databank", 1);
+	p.add("entry", 2);
+	
+	po::variables_map vm;
+	po::store(po::command_line_parser(argc, argv).options(desc).positional(p).run(), vm);
+	po::notify(vm);
+
+	if (vm.count("help") or vm.count("databank") == 0 or vm.count("entry") == 0)
+	{
+		cout << desc << "\n";
+		exit(1);
+	}
+	
+	if (vm.count("verbose"))
+		VERBOSE = 1;
+	
+	string databank = vm["databank"].as<string>();
+
+	fs::path configFile("config/m6-config.xml");
+	if (vm.count("config-file"))
+		configFile = vm["config-file"].as<string>();
+	
+	if (not fs::exists(configFile))
+		THROW(("Configuration file not found (\"%s\")", configFile.string().c_str()));
+	
+	M6Config::SetConfigFile(configFile);
+
+	zeep::xml::element* config = M6Config::Instance().LoadDatabank(databank);
+	if (not config)
+		THROW(("Configuration for %s is missing", databank.c_str()));
+
+	zeep::xml::element* file = config->find_first("file");
+	if (not file)
+		THROW(("Invalid config-file, file is missing"));
+
+	fs::path path = file->content();
+	M6Databank db(path.string(), eReadOnly);
+	
+	unique_ptr<M6Iterator> iter(db.Find("id", vm["entry"].as<string>()));
+	uint32 docNr;
+	float rank;
+
+	if (not iter or not iter->Next(docNr, rank))
+		THROW(("Entry not found"));
+
+	unique_ptr<M6Document> doc(db.Fetch(docNr));
+	if (not doc)
+		THROW(("Failed to fetch document???"));
+	
+	cout << doc->GetText() << endl;
+}
+
 void Vacuum(int argc, char* argv[])
 {
-	po::options_description desc("m6 vacuum");
+	po::options_description desc("m6 vacuum [databank]");
 	desc.add_options()
 		("databank,d",	po::value<string>(),	"Databank to build")
 		("config-file,c", po::value<string>(),	"Configuration file")
@@ -475,7 +539,7 @@ void Vacuum(int argc, char* argv[])
 
 void Validate(int argc, char* argv[])
 {
-	po::options_description desc("m6 validate");
+	po::options_description desc("m6 validate [databank]");
 	desc.add_options()
 		("databank,d",	po::value<string>(),	"Databank to build")
 		("config-file,c", po::value<string>(),	"Configuration file")
@@ -531,7 +595,7 @@ int main(int argc, char* argv[])
 		{
 			cout << "Usage: m6 command [options]" << endl
 				 << endl
-				 << "  Command can be one of: build, query, info" << endl
+				 << "  Command can be one of: blast, build, query, info, entry, dump, vacuum, validate" << endl
 				 << "  Use m6 command --help for more info on each command" << endl;
 			exit(1);
 		}
@@ -544,6 +608,8 @@ int main(int argc, char* argv[])
 			Query(argc - 1, argv + 1);
 		else if (strcmp(argv[1], "info") == 0)
 			Info(argc - 1, argv + 1);
+		else if (strcmp(argv[1], "entry") == 0)
+			Entry(argc - 1, argv + 1);
 		else if (strcmp(argv[1], "dump") == 0)
 			Dump(argc - 1, argv + 1);
 		else if (strcmp(argv[1], "vacuum") == 0)

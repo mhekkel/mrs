@@ -34,4 +34,5 @@ Search:
 - Score is very low (factor 10?)
 - Too many alternatives
 - optional suggestions dropdown
+- Fix highlighting search terms when search term is a 'string'
 

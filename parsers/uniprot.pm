@@ -61,10 +61,25 @@ sub parse
 		}
 		elsif ($key eq 'DT')
 		{
-			while ($value =~ m/(\d{2})-(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)-(\d{4})/g) {
+			while ($value =~ m/(\d{2})-(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)-(\d{4})/g)
+			{
 				my $date = sprintf('%4.4d-%2.2d-%2.2d', $3, $months{$2}, $1);
 #				$self->index_date('dt', $date);
 				$self->index_string('dt', $date);
+			}
+		}
+		elsif ($key eq 'GN')
+		{
+			while ($value =~ m/(?:\w+=)?(.+);/g)
+			{
+				$self->index_text(lc $key, $1);
+			}
+		}
+		elsif ($key eq 'OC' or $key eq 'KW')
+		{
+			while ($value =~ m/(.+);/g)
+			{
+				$self->index_string('oc', $1);
 			}
 		}
 		elsif ($key eq 'CC')
@@ -73,6 +88,13 @@ sub parse
 			{
 				$self->index_text('cc', $&)
 					unless ($& eq $commentLine1 or $& eq $commentLine2 or $& eq $commentLine3);
+			}
+		}
+		elsif ($key eq 'RX')
+		{
+			while ($value =~ m/(MEDLINE|PubMed|DOI)=([^;]+);/g)
+			{
+				$self->index_string(lc $1, $2);
 			}
 		}
 		elsif (substr($key, 0, 1) eq 'R')

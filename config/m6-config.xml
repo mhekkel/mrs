@@ -7,7 +7,7 @@
 	<mrsdir>/data/mrs/</mrsdir>
 	<rawdir>/data/raw/</rawdir>
 <!--	<scriptdir>/data/parsers</scriptdir>-->
-	<scriptdir>./parsers</scriptdir>
+	<scriptdir>/home/maarten/projects/m6/parsers</scriptdir>
 	
 	<blast>
 		<cache-dir>/data/blast-cache/</cache-dir>

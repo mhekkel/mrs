@@ -33,7 +33,9 @@ void M6Parser::ParseDocument(M6InputDocument* inDoc)
 // --------------------------------------------------------------------
 // Perl based parser implementation
 
+#if defined(_MSC_VER)
 #include <Windows.h>
+#endif
 #include "EXTERN.h"
 #include "perl.h"
 #include "XSUB.h"
@@ -915,10 +917,13 @@ void M6PerlParser::ParseDocument(M6InputDocument* inDoc)
 {
 	fs::path scriptdir = M6Config::Instance().FindGlobal("/m6-config/scriptdir");
 	
-	if (not fs::exists(scriptdir) and fs::exists("./parsers"))
-		scriptdir = fs::path("./parsers");
-	else
-		THROW(("scriptdir not found or incorrectly specified"));
+	if (not fs::exists(scriptdir))
+	{
+		if (fs::exists("./parsers"))
+			scriptdir = fs::path("./parsers");
+		else
+			THROW(("scriptdir not found or incorrectly specified (%s)", scriptdir.c_str()));
+	}
 	
 	if (mImpl.get() == nullptr)
 		mImpl.reset(new M6PerlParserImpl(mName, scriptdir));

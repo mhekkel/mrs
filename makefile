@@ -12,6 +12,8 @@
 BOOST_LIB_DIR		= $(HOME)/projects/boost/lib
 BOOST_INC_DIR		= $(HOME)/projects/boost/include
 
+PERL				?= /usr/bin/perl
+
 PREFIX				?= /usr/local
 LIBDIR				?= $(PREFIX)/lib
 INCDIR				?= $(PREFIX)/include
@@ -30,9 +32,11 @@ CXX					= c++
 CFLAGS				+= $(BOOST_INC_DIR:%=-I%) -I. -pthread -std=c++0x -I../libzeep/
 CFLAGS				+= -I $(HOME)/projects/pcre/include -Wno-multichar 
 CFLAGS				+= -Wno-deprecated
+CFLAGS				+= $(shell $(PERL) -MExtUtils::Embed -e perl_inc)
 LDFLAGS				+= -L $(HOME)/projects/pcre/lib
 CFLAGS				+= -I $(HOME)/projects/libarchive/include
 LDFLAGS				+= -L $(HOME)/projects/libarchive/lib
+LDFLAGS				+= $(shell $(PERL) -MExtUtils::Embed -e ldopts)
 ifneq ($(DEBUG),1)
 CFLAGS				+= -O3 -DNDEBUG -g
 else
@@ -60,6 +64,7 @@ OBJECTS = \
 	$(OBJDIR)/M6Lexicon.o \
 	$(OBJDIR)/M6Matrix.o \
 	$(OBJDIR)/M6MD5.o \
+	$(OBJDIR)/M6Parser.o \
 	$(OBJDIR)/M6Progress.o \
 	$(OBJDIR)/M6Query.o \
 	$(OBJDIR)/M6SequenceFilter.o \

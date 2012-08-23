@@ -27,9 +27,7 @@ sub parse
 		elsif ($key eq 'TI')
 		{
 			$self->index_text('title', $value);
-			$value = $1 if $value =~ m/^(.+);;/;
-			$value =~ s/\s+/ /g;
-			$value = substr($value, 0, 255) if length($value) > 255;
+			$value = $1 if $value =~ m/^[*#+%^]?[0-9]{6} (.+)/m ;
 			$self->set_attribute('title', lc $value);
 		}
 		elsif ($key eq 'CD' or $key eq 'ED')

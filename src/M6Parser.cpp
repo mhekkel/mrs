@@ -6,6 +6,7 @@
 
 #include "M6Parser.h"
 #include "M6Error.h"
+#include "M6Config.h"
 
 using namespace std;
 namespace fs = boost::filesystem;
@@ -70,7 +71,8 @@ struct M6PerlParserImpl
 	void				IndexNumber(const string& inIndex, const char* inText, size_t inLength)
 							{ mDocument->Index(inIndex, eM6NumberData, false, inText, inLength); }
 
-//	void				IndexLink(const string& inDatabank, const string& inValue);
+	void				AddLink(const string& inDatabank, const string& inValue)
+							{ mDocument->AddLink(inDatabank, inValue); }
 	void				SetAttribute(const string& inField, const char* inValue, size_t inLength)
 							{ mDocument->SetAttribute(inField, inValue, inLength); }
 
@@ -465,7 +467,7 @@ XS(_M6_Script_DESTROY)
 	dXSARGS;
 	
 	if (items != 1)
-		croak("Usage: M6::Script::FIRSTKEY(self);");
+		croak("Usage: M6::Script::DESTROY(self);");
 
 	// the parser was deleted
 
@@ -583,7 +585,7 @@ XS(_M6_Script_CLEAR)
 	dXSARGS;
 	
 	if (items < 1)
-		croak("Usage: M6::Script::NEXTKEY(self);");
+		croak("Usage: M6::Script::CLEAR(self);");
 
 	M6PerlParserImpl* proxy = M6PerlParserImpl::GetObject(ST(0));
 	
@@ -611,13 +613,13 @@ XS(_M6_Script_set_attribute)
 	
 	ptr = SvPV(ST(1), len);
 	if (ptr == nullptr)
-		croak("Error, no field defined in call to StoreMetaData");
+		croak("Error, no field defined in call to set_attribute");
 	
 	string name(ptr, len);
 
 	ptr = SvPV(ST(2), len);
 	if (ptr == nullptr)
-		croak("Error, no text defined in call to StoreMetaData");
+		croak("Error, no text defined in call to set_attribute");
 	
 	try
 	{
@@ -650,7 +652,7 @@ XS(_M6_Script_index_text)
 	
 	ptr = SvPV(ST(1), len);
 	if (ptr == nullptr or len == 0)
-		croak("Error, indexname is undefined in call to IndexText");
+		croak("Error, indexname is undefined in call to index_text");
 
 	index.assign(ptr, len);
 	
@@ -690,7 +692,7 @@ XS(_M6_Script_index_string)
 	
 	ptr = SvPV(ST(1), len);
 	if (ptr == nullptr or len == 0)
-		croak("Error, indexname is undefined in call to IndexWord");
+		croak("Error, indexname is undefined in call to index_string");
 
 	string index(ptr, len);
 	
@@ -728,7 +730,7 @@ XS(_M6_Script_index_unique_string)
 	
 	ptr = SvPV(ST(1), len);
 	if (ptr == nullptr or len == 0)
-		croak("Error, indexname is undefined in call to IndexWord");
+		croak("Error, indexname is undefined in call to index_unique_string");
 
 	string index(ptr, len);
 	
@@ -767,7 +769,7 @@ XS(_M6_Script_index_number)
 	
 	ptr = SvPV(ST(1), len);
 	if (ptr == nullptr or len == 0)
-		croak("Error, indexname is undefined in call to IndexValue");
+		croak("Error, indexname is undefined in call to index_number");
 
 	index.assign(ptr, len);
 	
@@ -805,13 +807,13 @@ XS(_M6_Script_index_date)
 	
 	ptr = SvPV(ST(1), len);
 	if (ptr == nullptr or len == 0)
-		croak("Error, indexname is undefined in call to IndexDate");
+		croak("Error, indexname is undefined in call to index_date");
 
 	string index(ptr, len);
 	
 	ptr = SvPV(ST(2), len);
 	if (ptr == nullptr or len == 0)
-		croak("Error, value is undefined in call to IndexDate");
+		croak("Error, value is undefined in call to index_date");
 
 	try
 	{
@@ -825,45 +827,45 @@ XS(_M6_Script_index_date)
 	XSRETURN(0);
 }
 
-//XS(_M6_Script_IndexLink)
-//{
-//	dXSARGS;
-//	
-//	if (items != 3)
-//		croak("Usage: M6::Script::IndexLink(self, databank, value);");
-//	
-//	M6PerlParserImpl* proxy = M6PerlParserImpl::GetObject(ST(0));
-//	if (proxy == nullptr)
-//		croak("Error, M6::Script object is not specified");
-//	
-//	// fetch the parameters
-//	
-//	const char* ptr;
-//	STRLEN len;
-//	
-//	ptr = SvPV(ST(1), len);
-//	if (ptr == nullptr or len == 0)
-//		croak("Error, databank is undefined in call to IndexLink");
-//
-//	string databank(ptr, len);
-//	
-//	ptr = SvPV(ST(2), len);
-//	if (ptr == nullptr or len == 0)
-//		croak("Error, value is undefined in call to IndexLink");
-//
-//	string value(ptr, len);
-//	
-//	try
-//	{
-//		proxy->IndexLink(databank, value);
-//	}
-//	catch (exception& e)
-//	{
-//		croak(e.what());
-//	}
-//	
-//	XSRETURN(0);
-//}
+XS(_M6_Script_add_link)
+{
+	dXSARGS;
+	
+	if (items != 3)
+		croak("Usage: M6::Script::add_link(self, databank, value);");
+	
+	M6PerlParserImpl* proxy = M6PerlParserImpl::GetObject(ST(0));
+	if (proxy == nullptr)
+		croak("Error, M6::Script object is not specified");
+	
+	// fetch the parameters
+	
+	const char* ptr;
+	STRLEN len;
+	
+	ptr = SvPV(ST(1), len);
+	if (ptr == nullptr or len == 0)
+		croak("Error, databank is undefined in call to add_link");
+
+	string databank(ptr, len);
+	
+	ptr = SvPV(ST(2), len);
+	if (ptr == nullptr or len == 0)
+		croak("Error, value is undefined in call to add_link");
+
+	string value(ptr, len);
+	
+	try
+	{
+		proxy->AddLink(databank, value);
+	}
+	catch (exception& e)
+	{
+		croak(e.what());
+	}
+	
+	XSRETURN(0);
+}
 
 void xs_init(pTHX)
 {
@@ -894,8 +896,8 @@ void xs_init(pTHX)
 	newXS(const_cast<char*>("M6::Script::index_number"), _M6_Script_index_number, file);
 	newXS(const_cast<char*>("M6::Script::index_date"), _M6_Script_index_date, file);
 	
-//	newXS(const_cast<char*>("M6::Script::IndexLink"), _M6_Script_IndexLink, file);
-//
+	newXS(const_cast<char*>("M6::Script::add_link"), _M6_Script_add_link, file);
+
 //	// a couple of constants
 //	sv_setiv(get_sv("M6::IS_VALUE_INDEX", true),	eIsValue);
 //	sv_setiv(get_sv("M6::INDEX_NUMBERS", true),	eIndexNumbers);
@@ -904,241 +906,6 @@ void xs_init(pTHX)
 //	sv_setiv(get_sv("M6::INDEX_STRING", true),		eIndexString);
 }
 
-// ------------------------------------------------------------------
-
-//CParser::CParser(
-//	const string&		inDatabank,
-//	const string&		inScriptName,
-//	const fs::path&		inRawDir,
-//	const fs::path&		inScriptDir,
-//	bool				inUtf8Clean)
-//	: mImpl(new M6PerlParserImpl(inDatabank, inScriptName, inRawDir, inScriptDir, inUtf8Clean))
-//{
-//}
-//
-//CParser::~CParser()
-//{
-//	delete mImpl;
-//}
-//
-//void CParser::Parse(
-//	CReader&			inReader,
-//	void*				inUserData,
-//	CDocCallback		inCallback)
-//{
-//	mImpl->Parse(inReader, inUserData, inCallback);
-//}
-//
-//void CParser::GetInfo(
-//	string&				outName,
-//	string&				outVersion,
-//	string&				outUrl,
-//	string&				outSection,
-//	string&				outCharSet,
-//	vector<string>&		outMetaDataFields,
-//	vector<CIndexInfo>&	outIndexInfo)
-//{
-//	M6PerlParserImpl& hash = *mImpl;
-//	
-//	outName =		hash["name"];
-//	outUrl =		hash["url"];
-//	outSection =	hash["section"];
-//	outCharSet =	hash["charset"];
-//	
-//	if (outCharSet.empty())
-//	{
-//		cerr << "Warning: assuming ASCII character set since charset is not defined" << endl;
-//		outCharSet = "ascii";
-//	}
-//	
-//	mImpl->mUtf8 = (outCharSet == "utf8" or outCharSet == "utf-8");
-//
-//	mImpl->GetVersion(outVersion);
-//	
-//	SV** sv = hv_fetch(mImpl->GetHash(), "meta", 4, 0);
-//	if (sv != nullptr)
-//	{
-//		AV* av = nullptr;
-//	
-//		if (SvTYPE(*sv) == SVt_PVAV)
-//			av = (AV*)*sv;
-//		else if (SvROK(*sv))
-//		{
-//			SV* rv = SvRV(*sv);
-//			if (SvTYPE(rv) == SVt_PVAV)
-//				av = (AV*)rv;
-//		}
-//		
-//		if (av != nullptr)
-//		{
-//			for (int i = 0; i < av_len(av) + 1; ++i)
-//			{
-//				sv = av_fetch(av, i, 0);
-//				if (sv != nullptr and SvPOK(*sv))
-//					outMetaDataFields.push_back(SvPVX(*sv));
-//			}
-//		}
-//	}
-//	
-//	// index info, if any
-//
-//	sv = hv_fetch(mImpl->GetHash(), "indices", 7, 0);
-//	if (sv != nullptr)
-//	{
-//		HV* hv = nullptr;
-//	
-//		if (SvTYPE(*sv) == SVt_PVHV)
-//			hv = (HV*)*sv;
-//		else if (SvROK(*sv))
-//		{
-//			SV* rv = SvRV(*sv);
-//			if (SvTYPE(rv) == SVt_PVHV)
-//				hv = (HV*)rv;
-//		}
-//		
-//		if (hv != nullptr)
-//		{
-//			uint32 n = hv_iterinit(hv);
-//			
-//			while (n-- > 0)
-//			{
-//				STRLEN len;
-//				
-//				HE* he = hv_iternext(hv);
-//				
-//				if (he == nullptr)
-//					break;
-//				
-//				CIndexInfo info;
-//				info.id = info.name = HePV(he, len);
-//				info.idl = true;
-//				info.casesensitive = false;
-//				
-//				SV* v = HeVAL(he);
-//				if (v != nullptr)
-//				{
-//					if (SvRV(v))
-//						v = SvRV(v);
-//					
-//					if (SvTYPE(v) == SVt_PVHV)
-//					{
-//						HV* hash = (HV*)v;
-//						
-//						sv = hv_fetch(hash, "name", 4, 0);
-//						if (sv != nullptr)
-//							info.name = SvPV(*sv, len);
-//						
-//						sv = hv_fetch(hash, "meta", 4, 0);
-//						if (sv != nullptr)
-//							info.meta = SvPV(*sv, len);
-//						
-//						sv = hv_fetch(hash, "idl", 3, 0);
-//						if (sv != nullptr and SvIOK(*sv))
-//							info.idl = SvIVX(*sv) != 0;
-//						
-//						sv = hv_fetch(hash, "casesensitive", 13, 0);
-//						if (sv != nullptr and SvIOK(*sv) and SvIVX(*sv) != 0)
-//						{
-//							mImpl->mCaseSensitiveIndices.insert(info.id);
-//							info.casesensitive = true;
-//						}
-//					}
-//					else if (SvTYPE(v) == SVt_PV)
-//						info.name = SvPV(v, len);
-//					
-//					outIndexInfo.push_back(info);
-//				}
-//			}
-//		}
-//	}
-//}
-//
-//bool CParser::GetBlastInfo(
-//	string&			outBlastType,
-//	char&			outSequenceType)
-//{
-//	M6PerlParserImpl& hash = *mImpl;
-//	bool result = false;
-//	
-//	outBlastType = hash["blast"];
-//	string seqType = hash["seqtype"];
-//
-//	if (outBlastType.empty())
-//		outBlastType = "mrs";
-//	else
-//	{
-//		result = true;
-//		if (seqType != "P" and seqType != "N")
-//			seqType = "P";
-//		outSequenceType = seqType[0];
-//	}
-//	
-//	return result;
-//}
-//
-//void CParser::CollectRawFiles(
-//	vector<fs::path>&	outRawFiles)
-//{
-//	mImpl->CollectRawFiles(outRawFiles);
-//}
-//
-//void CParser::GetCompressionInfo(
-//	string&		outCompressionAlgorithm,
-//	int32&		outCompressionLevel,
-//	string&		outCompressionDictionary)
-//{
-//	M6PerlParserImpl& hash = *mImpl;
-//	
-//	outCompressionAlgorithm = hash["compression"];
-//	if (outCompressionAlgorithm.length() == 0)
-////		outCompressionAlgorithm = "zlib";
-//		outCompressionAlgorithm = "fastlz";
-//	
-//	outCompressionDictionary = hash["compression_dictionary"];
-//	
-//	string l = hash["compression_level"];
-//	outCompressionLevel = 1;
-//	if (l.length() > 0)
-//		outCompressionLevel = atoi(l.c_str());
-//	if (outCompressionLevel < 0 or outCompressionLevel > 9)
-//		outCompressionLevel = 3;
-//}
-//
-//bool CParser::GetStopWords(
-//	set<string>&	outStopwords)
-//{
-//	bool result = false;
-//	
-//	SV** sv = hv_fetch(mImpl->GetHash(), "stopwords", 9, 0);
-//	if (sv != nullptr)
-//	{
-//		AV* av = nullptr;
-//	
-//		if (SvTYPE(*sv) == SVt_PVAV)
-//			av = (AV*)*sv;
-//		else if (SvROK(*sv))
-//		{
-//			SV* rv = SvRV(*sv);
-//			if (SvTYPE(rv) == SVt_PVAV)
-//				av = (AV*)rv;
-//		}
-//		
-//		if (av != nullptr)
-//		{
-//			result = true;
-//			
-//			for (int i = 0; i < av_len(av) + 1; ++i)
-//			{
-//				sv = av_fetch(av, i, 0);
-//				if (sv != nullptr and SvPOK(*sv))
-//					outStopwords.insert(SvPVX(*sv));
-//			}
-//		}
-//	}
-//	
-//	return result;
-//}
-
 M6PerlParser::M6PerlParser(const string& inName)
 	: mName(inName)
 {
@@ -1146,8 +913,15 @@ M6PerlParser::M6PerlParser(const string& inName)
 
 void M6PerlParser::ParseDocument(M6InputDocument* inDoc)
 {
+	fs::path scriptdir = M6Config::Instance().FindGlobal("/m6-config/scriptdir");
+	
+	if (not fs::exists(scriptdir) and fs::exists("./parsers"))
+		scriptdir = fs::path("./parsers");
+	else
+		THROW(("scriptdir not found or incorrectly specified"));
+	
 	if (mImpl.get() == nullptr)
-		mImpl.reset(new M6PerlParserImpl(mName, "C:/Users/maarten/projects/m6/parsers"));
+		mImpl.reset(new M6PerlParserImpl(mName, scriptdir));
 	
 	M6Parser::ParseDocument(inDoc);
 	mImpl->Parse(inDoc);

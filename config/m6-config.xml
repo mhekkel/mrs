@@ -6,6 +6,8 @@
 	<srvdir>/data/</srvdir>
 	<mrsdir>/data/mrs/</mrsdir>
 	<rawdir>/data/raw/</rawdir>
+<!--	<scriptdir>/data/parsers</scriptdir>-->
+	<scriptdir>./parsers</scriptdir>
 	
 	<blast>
 		<cache-dir>/data/blast-cache/</cache-dir>
@@ -113,47 +115,6 @@
 
 		<link regex="(?&lt;=\()(?:[^();]+?; )?(\d{6})(?:\.(\d{4}))?(?=\))"
 			db="omim" ix="id" id="$1" anchor="$2" />
-
-		<match regex="^\*FIELD\* (\w\w)\n((?:(?:\n|[^*\n].*\n)++|\*(?!FIELD).*\n)+)">
-			<switch test="1" capture="2">
-				<case value="CS">
-					<split separator="\n\n">
-						<split separator=":">
-							<if iteration="1"><tag tagname="dt" /></if>
-							<if iteration="2"><tag tagname="dd" /></if>
-						</split>
-					</split>
-					<tag tagname="dl"/>
-				</case>
-				<case value="CN ED">
-					<br/>
-					<tag tagname="p"/>
-				</case>
-				<default>
-					<split separator="\n\n">
-						<link what="\b((\d{6})(?:\.(\d{4}))?)"
-							text="$1" db="omim" id="$2" anchor="$3" />
-						<tag what="^[A-Z ]+$" tagname="h4" />
-						<anchor what="^\.(\d{4})" name=".$1" />
-						<tag tagname="p" />
-					</split>
-				</default>
-			</switch>
-			<remap what="^\*FIELD\* (\w\w)">
-				<key>AV</key><value>Allelic variation</value>
-				<key>CD</key><value>Creation date</value>
-				<key>CN</key><value>Contributor name</value>
-				<key>CS</key><value>Clinical Synopsis</value>
-				<key>ED</key><value>Edit history</value>
-				<key>MN</key><value>Mini-Mim</value>
-				<key>NO</key><value>Number</value>
-				<key>RF</key><value>References</value>
-				<key>SA</key><value>See Also</value>
-				<key>TI</key><value>Title</value>
-				<key>TX</key><value>Text</value>
-			</remap>
-			<print/>
-		</match>
 	</format>
 	
 	<parser id="uniprot">
@@ -337,8 +298,7 @@
 	</parser>
 
 	<format id="enzyme">
-		<link regex="([A-Z]+[A-Z0-9]+)(?=, [A-Z]+_[A-Z0-9]+\s+;)"
-			db="sprot" ix="ac" id="$1" />
+		<link regex="([A-Z]+[A-Z0-9]+)(?=, )" db="sprot" ix="ac" id="$1" />
 	</format>
 
 	<parser id="genbank">

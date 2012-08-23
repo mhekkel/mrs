@@ -6,75 +6,17 @@ our @ISA = "M6::Script";
 
 use strict;
 use warnings;
-use POSIX qw/strftime/;
 
 our $commentLine1 = "-----------------------------------------------------------------------";
 our $commentLine2 = "Copyrighted by the UniProt Consortium, see http://www.uniprot.org/terms";
 our $commentLine3 = "Distributed under the Creative Commons Attribution-NoDerivs License";
 
-our %INDICES = (
-	id			=> 'Identification',
-	ac			=> 'Accession number',
-	cc			=> 'Comments and Notes',
-	dt			=> 'Date',
-	de			=> 'Description',
-	gn			=> 'Gene name',
-	os			=> 'Organism species',
-	og			=> 'Organelle',
-	oc			=> 'Organism classification',
-	ox			=> 'Taxonomy cross-reference',
-	'ref'		=> 'Any reference field',
-	dr			=> 'Database cross-reference',
-	kw			=> 'Keywords',
-	ft			=> 'Feature table data',
-	sv			=> 'Sequence version',
-	fh			=> 'Feature table header',
-	crc64		=> 'The CRC64 checksum for the sequence',
-	'length'	=> 'The length of the sequence',
-	mw			=> 'Molecular weight',
-);
-
 sub new
 {
 	my $invocant = shift;
-
-	my $self = new M6::Script(
-		indices					=> \%INDICES,
-		@_
-	);
-	
+	my $self = new M6::Script(@_);
 	return bless $self, "M6::Script::uniprot";
 }
-
-#sub version
-#{
-#	my ($self) = @_;
-#
-#	my $raw_dir = $self->{raw_dir} or die "raw_dir is not defined\n";
-#	my $db = $self->{db} or die "db is not defined\n";
-#	
-#	$raw_dir =~ s|$db/?$|uniprot|;
-#	my $version;
-#
-#	open RELDATE, "<$raw_dir/reldate.txt";
-#	while (my $line = <RELDATE>)
-#	{
-#		if ($db eq 'sprot' and $line =~ /Swiss-Prot/) {
-#			$version = $line;
-#			last;
-#		}
-#		elsif ($db eq 'trembl' and $line =~ /TrEMBL/) {
-#			$version = $line;
-#			last;
-#		}
-#	}
-#	close RELDATE;
-#
-#	$version = $self->SUPER::version() unless defined $version;
-#	chomp($version);
-#	
-#	return $version;
-#}
 
 sub parse
 {
@@ -111,21 +53,18 @@ sub parse
 		{
 			$self->set_attribute('title', $1) if ($value =~ m/Full=(.+?);/);
 			$self->index_text('de', $value);
-#
-#			if ($value =~ /(EC\s*)(\d+\.\d+\.\d+\.\d+)/)
-#			{
-#				$self->IndexLink('enzyme', $2);
-#			}
+
+			while ($value =~ /(EC\s*)(\d+\.\d+\.\d+\.\d+)/g)
+			{
+				$self->add_link('enzyme', $2);
+			}
 		}
 		elsif ($key eq 'DT')
 		{
-			if ($value =~ m/(\d{2})-([A-Z]{3})-(\d{4})/) {
+			while ($value =~ m/(\d{2})-(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)-(\d{4})/g) {
 				my $date = sprintf('%4.4d-%2.2d-%2.2d', $3, $months{$2}, $1);
-				
-#				eval { $self->index_date('dt', $date); };
-				eval { $self->index_string('dt', $date); };
-				
-				warn $@ if $@;
+#				$self->index_date('dt', $date);
+				$self->index_string('dt', $date);
 			}
 		}
 		elsif ($key eq 'CC')
@@ -142,15 +81,10 @@ sub parse
 		}
 		elsif ($key eq 'DR')
 		{
-#			if ($value =~ m/\s*(.+?); (.+?); (.+?)\./)
-#			{
-#				my $db = $1;
-#				$id = $2;
-#
-#				$id = $3 if ($links{$1}->{value} == 2);
-#
-#				$self->IndexLink($db, $id);
-#			}
+			while ($value =~ m/^(.+?); (.+?);/g)
+			{
+				$self->add_link($1, $2);
+			}
 			
 			$self->index_text('dr', $value);
 		}
@@ -163,13 +97,12 @@ sub parse
 				$self->index_string('crc64', $3);
 			}
 			
-			last;
-			
 #			my $sequence = substr($text, pos $text);
 #			$sequence =~ s/\s//g;
 #			$sequence =~ s|//$||;
-#			
-#print $sequence, "\n";
+#			$self->add_sequence($sequence);
+			
+			last;
 		}
 		elsif ($key ne 'XX')
 		{

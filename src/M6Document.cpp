@@ -220,16 +220,23 @@ void M6InputDocument::Index(const string& inIndex,
 	}
 }
 
-void M6InputDocument::IndexSequence(const string& inIndex, uint32 inWordSize,
-	const char* inSequence, size_t inLength)
-{
-	auto ix = GetIndexTokens(inIndex, eM6TextData);
+//void M6InputDocument::IndexSequence(const string& inIndex, uint32 inWordSize,
+//	const char* inSequence, size_t inLength)
+//{
+//	auto ix = GetIndexTokens(inIndex, eM6TextData);
+//
+//	for (uint32 i = 0; i + inWordSize <= inLength; ++i)
+//	{
+//		uint32 t = mDocLexicon.Store(inSequence++, inWordSize);
+//		ix->mTokens.push_back(t);
+//	}
+//}
 
-	for (uint32 i = 0; i + inWordSize <= inLength; ++i)
-	{
-		uint32 t = mDocLexicon.Store(inSequence++, inWordSize);
-		ix->mTokens.push_back(t);
-	}
+void M6InputDocument::AddLink(const string& inDatabank, const string& inValue)
+{
+	// TODO map inDatabank to a mnemonic/id
+	string data = inDatabank + ':' + inValue;
+	Index("{db_xref}", eM6StringData, false, data.c_str(), data.length());
 }
 
 void M6InputDocument::Tokenize(M6Lexicon& inLexicon, uint32 inLastStopWord)

@@ -230,8 +230,11 @@ UniProt = {
 		if (ref.rt != null && ref.rt.length > 0) s += "<strong>" + ref.rt + "</strong>";
 		if (ref.rl != null && ref.rl.length > 0) s += ' ' + ref.rl;
 		if (s.length > 0) s += "<br/>";
-	
-		var rx = $(ref.rx.split(/;\s*/)).map(function(index,value) {
+
+		// be very careful here, the rx may contain a ';' inside a DOI specifier e.g.
+		ref.rx = ref.rx.replace(/;\s+/g, '\n').replace(/;$/, '');
+
+		var rx = $(ref.rx.split(/\n/)).map(function(index,value) {
 			var a = value.split(/=/);
 			if (a.length == 2) {
 				var e = a[1];

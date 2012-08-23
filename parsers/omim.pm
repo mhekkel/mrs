@@ -1,0 +1,53 @@
+package M6::Script::omim;
+
+our @ISA = "M6::Script";
+
+sub new
+{
+	my $invocant = shift;
+	my $self = new M6::Script(@_);
+	return bless $self, "M6::Script::omim";
+}
+
+sub parse
+{
+	my ($self, $text) = @_;
+	
+	while ($text =~ m/^\*FIELD\* (\w\w)\n((?:(?:\n|[^*\n].*\n)++|\*(?!FIELD).*\n)+)/mg)
+	{
+		my $key = $1;
+		my $value = $2;
+		
+		if ($key eq 'NO')
+		{
+			$value =~ s/\s+$//;
+			$self->index_unique_string('id', $value);
+			$self->set_attribute('id', $value);
+		}
+		elsif ($key eq 'TI')
+		{
+			$self->index_text('title', $value);
+			$value = $1 if $value =~ m/^(.+);;/;
+			$value =~ s/\s+/ /g;
+			$value = substr($value, 0, 255) if length($value) > 255;
+			$self->set_attribute('title', lc $value);
+		}
+		elsif ($key eq 'CD' or $key eq 'ED')
+		{
+			while ($value =~ m|^(.+?): (\d+)/(\d+)/(\d+)|gm)
+			{
+				my $date = sprintf('%4.4d-%2.2d-%2.2d', $4, $2, $3);
+
+				$self->index_text(lc $key, $1);
+#				$self->index_date(lc $key, $date);
+				$self->index_string(lc($key) . '_date', $date);
+			}
+		}
+		else
+		{
+			$self->index_text('text', $value);
+		}
+	}
+}
+
+1;

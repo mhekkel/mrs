@@ -50,15 +50,14 @@
 						<input type="button" name="similar" value="Find Similar" onclick="document.getElementById('similarForm').submit();" class="submit" />
 					</form>
 				</li>
-				<mrs:if test="${databank.blastable}">
 				<li>
-					<form id="blastForm" method="get" action="blast">
-						<input type="hidden" name="db" value="${db}" />
-						<input type="hidden" name="nr" value="${nr}" />
-						<input type="button" name="blast" value="Blast" onclick="document.getElementById('blastForm').submit();" class="submit" />
+					<form id="blastForm" method="post" action="blast">
+						<input type="hidden" name="query" />
+						<input type="button" name="blast" value="Blast"
+							   disabled="true" class="submit"
+							   onclick="document.getElementById('blastForm').submit();" />
 					</form>
 				</li>
-				</mrs:if>
 				<li>
 					<input value="Download" type="button" class="submit" onclick="window.location='download?db=${db}&amp;nr=${nr}&amp;format=${format}';" />
 				</li>

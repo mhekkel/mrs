@@ -28,6 +28,7 @@ Basic:
 Indexing:
 
 - Replacement for makefiles
+- feed header to parser scripts
 
 Search:
 

@@ -136,7 +136,6 @@ struct M6LineMatcher
 
 void M6Processor::ProcessFile(const string& inFileName, istream& inFileStream)
 {
-	// do we need to strip off a header?
 	M6LineMatcher header(mParser->GetValue("header")),
 				  trailer(mParser->GetValue("trailer")),
 				  firstline(mParser->GetValue("firstdocline")),

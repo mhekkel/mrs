@@ -1470,7 +1470,7 @@ M6Iterator* M6DatabankImpl::Find(const vector<string>& inQueryTerms,
 	float maxD = static_cast<float>(maxDocNr);
 
 	typedef shared_ptr<M6WeightedBasicIndex::M6WeightedIterator> iter_ptr;
-	typedef tr1::tuple<string,iter_ptr,uint32,float> term_type;
+	typedef tr1::tuple<string,iter_ptr,uint32,float,float> term_type;
 	typedef vector<term_type> term_list;
 	term_list terms;
 	bool foundAllTerms = true;
@@ -1492,7 +1492,7 @@ M6Iterator* M6DatabankImpl::Find(const vector<string>& inQueryTerms,
 		if (static_cast<M6WeightedBasicIndex*>(mAllTextIndex.get())->Find(term, *iter))
 		{
 			float idf = log(1.f + maxD / iter->Size());
-			terms.push_back(tr1::make_tuple(term, iter, 1, idf));
+			terms.push_back(tr1::make_tuple(term, iter, 1, kM6MaxWeight * idf, idf));
 		}
 		else
 			foundAllTerms = false;
@@ -1516,6 +1516,8 @@ M6Iterator* M6DatabankImpl::Find(const vector<string>& inQueryTerms,
 	foreach (term_type term, terms)
 	{
 		float wq = tr1::get<3>(term);
+		float idf = tr1::get<4>(term);
+
 		if (100 * wq < firstWq)
 			break;
 
@@ -1540,7 +1542,7 @@ M6Iterator* M6DatabankImpl::Find(const vector<string>& inQueryTerms,
 			if (weight >= f_ins or A[docNr] != 0)
 			{
 				float wd = weight;
-				float sd = wd * wq;
+				float sd = idf * wd * wq;
 				
 				float S = A.Add(docNr, sd);
 				if (Smax < S)

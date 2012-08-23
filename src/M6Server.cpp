@@ -1365,7 +1365,7 @@ void M6Server::SpellCheck(const string& inDatabank, const string& inTerm,
 void M6Server::handle_blast(const zeep::http::request& request, const el::scope& scope, zeep::http::reply& reply)
 {
 	// default parameters
-	string id, db, matrix = "BLOSUM62", expect = "10.0", query;
+	string matrix = "BLOSUM62", expect = "10.0";
 	int wordSize = 0, gapOpen = -1, gapExtend = -1, reportLimit = 250;
 	bool filter = true, gapped = true;
 
@@ -1374,9 +1374,6 @@ void M6Server::handle_blast(const zeep::http::request& request, const el::scope&
 
 	el::scope sub(scope);
 
-	// fetch some parameters, if any
-	db = params.get("db", "sprot").as<string>();
-	
 	vector<el::object> databanks;
 	foreach (auto db, M6Config::Instance().Find("//blast/dbs/db"))
 	{
@@ -1391,8 +1388,13 @@ void M6Server::handle_blast(const zeep::http::request& request, const el::scope&
 		databanks.push_back(databank);
 	}
 		
+	// fetch some parameters, if any
+	string db = params.get("db", "sprot").as<string>();
+	string query = params.get("query", "").as<string>();
+	
 	sub.put("blastdatabanks", el::object(databanks));
 	sub.put("blastdb", db);
+	sub.put("query", query);
 
 	const char* expectRange[] = { "0.001", "0.01", "0.1", "1.0", "10.0", "100.0", "1000.0" };
 	sub.put("expectRange", expectRange, boost::end(expectRange));

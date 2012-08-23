@@ -7,7 +7,7 @@ sub new
 	my $invocant = shift;
 	my $self = new M6::Script(
 		firstdocline => '*RECORD*',
-		trailer => '*END*',
+		trailer => '*THEEND*',
 		@_
 	);
 	return bless $self, "M6::Script::omim";

@@ -47,7 +47,8 @@
 					<form id="similarForm" method="get" action="similar">
 						<input type="hidden" name="db" value="${db}" />
 						<input type="hidden" name="nr" value="${nr}" />
-						<input type="button" name="similar" value="Find Similar" onclick="document.getElementById('similarForm').submit();" class="submit" />
+						<input type="button" name="similar" value="Find Similar"
+							   onclick="document.getElementById('similarForm').submit();" class="submit" />
 					</form>
 				</li>
 				<li>
@@ -59,7 +60,8 @@
 					</form>
 				</li>
 				<li>
-					<input value="Download" type="button" class="submit" onclick="window.location='download?db=${db}&amp;nr=${nr}&amp;format=${format}';" />
+					<input value="Download" type="button" class="submit"
+						   onclick="window.location='download?db=${db}&amp;nr=${nr}&amp;format=${format}';" />
 				</li>
 				<li class="linksource">
 					Data provided by <a href="${databank.url}">${databank.url}</a>

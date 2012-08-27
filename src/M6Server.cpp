@@ -1434,9 +1434,9 @@ void M6Server::handle_blast_results_ajax(const zeep::http::request& request, con
 	string id = params.get("job", "").as<string>();
 	uint32 hitNr = params.get("hit", 0).as<uint32>();
 	
-	ostringstream json;
+	el::object result;
 	
-	M6BlastResultPtr result(M6BlastCache::Instance().JobResult(id));
+	M6BlastResultPtr job(M6BlastCache::Instance().JobResult(id));
 	
 //	// try to fetch the job
 //	CBlastJobPtr job = CBlastJobProcessor::Instance()->Find(id);
@@ -1444,15 +1444,15 @@ void M6Server::handle_blast_results_ajax(const zeep::http::request& request, con
 //	if (job != nullptr)
 //		result = job->Result();
 	
-	if (not result)
-		json << "{\"error\":\"Job expired\"}";
+	if (not job)
+		result["error"] = "Job expired";
 //	else if (job->Status() != bj_Finished)
 //		json << "{\"error\":\"Invalid job status\"}";
 //	else if (result == nullptr)
 //		json << "{\"error\":\"Internal error (no result?)\"}";
 	else if (hitNr > 0)	// we need to return the hsps for this hit
 	{
-		const list<M6Blast::Hit>& hits(result->mHits);
+		const list<M6Blast::Hit>& hits(job->mHits);
 		if (hitNr > hits.size())
 			THROW(("Hitnr out of range"));
 		
@@ -1461,20 +1461,16 @@ void M6Server::handle_blast_results_ajax(const zeep::http::request& request, con
 		
 		const list<M6Blast::Hsp>& hsps(hit->mHsps);
 		
-		json << '[';
+		vector<el::object> jhsps;
 		
-		uint32 nr = 1;
 		foreach (const M6Blast::Hsp& hsp, hsps)
 		{
-			if (nr > 1)
-				json << ',';
-			
 			string queryAlignment = hsp.mQueryAlignment;
 			
 			// calculate the offsets for the graphical representation of this hsp
 	        uint32 qf = hsp.mQueryStart;
 	        uint32 qt = hsp.mQueryEnd;
-	        uint32 ql = result->mQueryLength;
+	        uint32 ql = job->mQueryLength;
 	
 	        uint32 sf = hsp.mTargetStart;
 	        uint32 st = hsp.mTargetEnd;
@@ -1518,39 +1514,41 @@ void M6Server::handle_blast_results_ajax(const zeep::http::request& request, con
 	        if (sl1 > 0 and sl1 + sl2 < ql2)
 	            sl1 = ql2 - sl2;
 
-			json << '{'
-				 << "\"nr\":" << nr << ','
-				 << "\"score\":" << hsp.mScore << ','
-				 << "\"bitScore\":" << hsp.mBitScore << ','
-				 << "\"expect\":" << hsp.mExpect << ','
-				 << "\"queryAlignment\":\"" << queryAlignment << "\","
-				 << "\"queryStart\":" << hsp.mQueryStart << ','
-				 << "\"subjectAlignment\":\"" << hsp.mTargetAlignment << "\","
-				 << "\"subjectStart\":" << hsp.mTargetStart << ','
-				 << "\"midLine\":\"" << hsp.mMidLine << "\","
-				 << "\"identity\":" << hsp.mIdentity << ','
-				 << "\"positive\":" << hsp.mPositive << ','
-				 << "\"gaps\":" << hsp.mGaps << ','
-				 << "\"ql\":[" << ql1 << ',' << ql2 << ',' << ql3 << ',' << ql4 << ']' << ','
-				 << "\"sl\":[" << sl1 << ',' << sl2 << ',' << sl3 << ',' << sl4 << ']'
-				 << '}';
-
-			++nr;
+			el::object h;
+			h["nr"] = jhsps.size() + 1;
+			h["score"] = hsp.mScore;
+			h["bitScore"] = hsp.mBitScore;
+			h["expect"] = hsp.mExpect;
+			h["queryAlignment"] = queryAlignment;
+			h["queryStart"] = hsp.mQueryStart;
+			h["subjectAlignment"] = hsp.mTargetAlignment;
+			h["subjectStart"] = hsp.mTargetStart;
+			h["midLine"] = hsp.mMidLine;
+			h["identity"] = hsp.mIdentity;
+			h["positive"] = hsp.mPositive;
+			h["gaps"] = hsp.mGaps;
+			
+			vector<el::object> qls(4);
+			qls[0] = ql1; qls[1] = ql2; qls[2] = ql3; qls[3] = ql4;
+			h["ql"] = qls;
+			
+			vector<el::object> sls(4);
+			sls[0] = sl1; sls[1] = sl2; sls[2] = sl3; sls[3] = sl4;
+			h["sl"] = sls;
+			
+			jhsps.push_back(h);
 		}
 
-		json << ']';
+		result = jhsps;
 	}
 	else
 	{
-		json << '[';
+		const list<M6Blast::Hit>& hits(job->mHits);
 		
-		uint32 nr = 1;
-		const list<M6Blast::Hit>& hits(result->mHits);
+		vector<el::object> jhits;
+		
 		foreach (const M6Blast::Hit& hit, hits)
 		{
-			if (nr > 1)
-				json << ',';
-			
 			const list<M6Blast::Hsp>& hsps(hit.mHsps);
 			if (hsps.empty())
 				continue;
@@ -1570,49 +1568,45 @@ void M6Server::handle_blast_results_ajax(const zeep::http::request& request, con
 			else
 				coverageColor = 5;
 
-			float queryLength = result->mQueryLength;
+			float queryLength = job->mQueryLength;
 			const int kGraphicWidth = 100;
 
 			coverageStart = uint32(best.mQueryStart * kGraphicWidth / queryLength);
 			coverageLength = uint32(best.mQueryAlignment.length() * kGraphicWidth / queryLength);
 			
-			string title = hit.mDefLine;
-			ba::replace_all(title, "\\", "\\\\");
-			ba::replace_all(title, "\"", "\\\"");
+			el::object h;
+			h["nr"] = jhits.size() + 1;
+			h["doc"] = hit.mID;
+			h["seq"] = "" /* chain ID of zo */;
+			h["desc"] = hit.mDefLine;
+			h["bitScore"] = best.mBitScore;
+			h["expect"] = best.mExpect;
+			h["hsps"] = hsps.size();
 			
-			json << '{'
-				 << "\"nr\":" << nr << ','
-				 << "\"doc\":\"" << hit.mID << "\","
-				 << "\"seq\":\"" << "" /* chain ID of zo */ << "\","
-				 << "\"desc\":\"" << title << "\","
-				 << "\"bitScore\":" << best.mBitScore << ','
-				 << "\"expect\":" << best.mExpect << ','
-				 << "\"hsps\":" << hsps.size() << ','
-				 << "\"coverage\":{"
-					 << "\"start\":" << coverageStart << ','
-					 << "\"length\":" << coverageLength << ',' 
-					 << "\"color\":" << coverageColor
-					 << '}'
-				 << '}';
-
-			++nr;
+			el::object coverage;
+			coverage["start"] = coverageStart;
+			coverage["length"] = coverageLength;
+			coverage["color"] = coverageColor;
+			h["coverage"] = coverage;
+			
+			jhits.push_back(h);
 		}
 
-		json << ']';
+		result = jhits;
 	}
 	
-	reply.set_content(json.str(), "text/javascript");
+	reply.set_content(result.toJSON(), "text/javascript");
 }
 
 ostream& operator<<(ostream& os, M6BlastJobStatus status)
 {
 	switch (status)
 	{
-		case bj_Unknown:	os << '"' << "unknown" << '"'; break;
-		case bj_Queued:		os << '"' << "queued" << '"'; break;
-		case bj_Running:	os << '"' << "running" << '"'; break;
-		case bj_Finished:	os << '"' << "finished" << '"'; break;
-		case bj_Error:		os << '"' << "error" << '"'; break;
+		case bj_Unknown:	os << "unknown"; break;
+		case bj_Queued:		os << "queued"; break;
+		case bj_Running:	os << "running"; break;
+		case bj_Finished:	os << "finished"; break;
+		case bj_Error:		os << "error"; break;
 	}
 	
 	return os;
@@ -1629,9 +1623,8 @@ void M6Server::handle_blast_status_ajax(const zeep::http::request& request, cons
 	if (not ids.empty())
 		ba::split(jobs, ids, ba::is_any_of(";"));
 
-	ostringstream json;
-	json << '[';
-	bool first = true;
+	vector<el::object> jjobs;
+	
 	foreach (const string& id, jobs)
 	{
 		try
@@ -1643,33 +1636,29 @@ void M6Server::handle_blast_status_ajax(const zeep::http::request& request, cons
 			
 			tr1::tie(status, error, hitCount, bestScore) = M6BlastCache::Instance().JobStatus(id);
 			
-			if (not first)
-				json << ',';
-			first = false;
-
+			el::object jjob;
+			jjob["id"] = id;
+			jjob["status"] = boost::lexical_cast<string>(status);
+			
 			switch (status)
 			{
 				case bj_Finished:
-					json << boost::format("{\"id\":\"%1%\",\"status\":%2%,\"hitCount\":%3%,\"bestEValue\":%4%}")
-						% id % status % hitCount % bestScore;
+					jjob["hitCount"] = hitCount;
+					jjob["bestEValue"] = bestScore;
 					break;
 				
 				case bj_Error:
-					json << boost::format("{\"id\":\"%1%\",\"status\":%2%,\"error\":\"%3%\"}")
-						% id % status % error;
-					break;
-				
-				default:
-					json << boost::format("{\"id\":\"%1%\",\"status\":%2%}")
-						% id % status;
+					jjob["error"] = error;
 					break;
 			}
+			
+			jjobs.push_back(jjob);
 		}
 		catch (...) {}
 	}
-	json << ']';
-
-	reply.set_content(json.str(), "text/javascript");
+	
+	el::object json(jjobs);
+	reply.set_content(json.toJSON(), "text/javascript");
 }
 
 void M6Server::handle_blast_submit_ajax(
@@ -1705,6 +1694,9 @@ void M6Server::handle_blast_submit_ajax(
 	ba::replace_all(query, "\r", "\n");
 	istringstream is(query);
 	string qid;
+
+	el::object result;
+	result["clientId"] = id;
 	
 	try
 	{
@@ -1761,36 +1753,18 @@ void M6Server::handle_blast_submit_ajax(
 			gapped, gapOpen, gapExtend, reportLimit);
 	
 		// and answer with the created job ID
-		ostringstream json;
-
-//		switch (job->Status())
-//		{
-//			case bj_Finished:
-//				json << boost::format("{\"clientId\":\"%1%\",\"id\":\"%2%\",\"qid\":\"%3%\",\"status\":%4%,\"hitCount\":%5%,\"bestEValue\":%6%}")
-//					% id % job->ID() % qid % job->Status() % job->HitCount() % job->BestEValue();
-//				break;
-//			
-//			case bj_Error:
-//				json << boost::format("{\"clientId\":\"%1%\",\"id\":\"%2%\",\"qid\":\"%3%\",\"status\":%4%,\"error\":\"%5%\"}")
-//					% id % job->ID() % qid % job->Status() % job->Error();
-//				break;
-//			
-//			default:
-				json << boost::format("{\"clientId\":\"%1%\",\"id\":\"%2%\",\"qid\":\"%3%\",\"status\":%4%}")
-					% id % jobId % qid % bj_Queued;
-//				break;
-//		}
-
-		reply.set_content(json.str(), "text/javascript");
+		result["id"] = jobId;
+		result["qid"] = qid;
+		result["status"] = boost::lexical_cast<string>(bj_Queued);
 	}
 	catch (exception& e)
 	{
-		reply.set_content(
-			(boost::format("{\"clientId\":\"%1%\",\"status\":\"error\",\"error\":\"%2%\"}") % id % e.what()).str(),
-			"text/javascript");
+		result["status"] = boost::lexical_cast<string>(bj_Error);
+		result["error"] = e.what();
 	}
+	
+	reply.set_content(result.toJSON(), "text/javascript");
 }
-
 
 void M6Server::ValidateAuthentication(const zh::request& request)
 {

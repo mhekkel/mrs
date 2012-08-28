@@ -42,6 +42,9 @@ class M6Server : public zh::webapp
 	void			handle_blast_status_ajax(const zh::request& request, const el::scope& scope, zh::reply& reply);
 	void			handle_blast_results_ajax(const zh::request& request, const el::scope& scope, zh::reply& reply);
 
+	void			handle_align(const zh::request& request, const el::scope& scope, zh::reply& reply);
+	void			handle_align_submit_ajax(const zh::request& request, const el::scope& scope, zh::reply& reply);
+
 	void			process_mrs_entry(zx::element* node, const el::scope& scope, boost::filesystem::path dir);
 	void			process_mrs_link(zx::element* node, const el::scope& scope, boost::filesystem::path dir);
 	void			process_mrs_redirect(zx::element* node, const el::scope& scope, boost::filesystem::path dir);

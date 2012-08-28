@@ -146,9 +146,8 @@ M6Server::M6Server(zx::element* inConfig)
 	mount("ajax/blast/status",	boost::bind(&M6Server::handle_blast_status_ajax, this, _1, _2, _3));
 	mount("ajax/blast/result",	boost::bind(&M6Server::handle_blast_results_ajax, this, _1, _2, _3));
 
-	//mount("align",			boost::bind(&M6Server::handle_align, this, _1, _2, _3));
-	//mount("alignJobSubmit",	boost::bind(&M6Server::handle_align_submit_ajax, this, _1, _2, _3));
-	//mount("ajax/align/submit",	boost::bind(&M6Server::handle_align_submit_ajax, this, _1, _2, _3));
+	mount("align",				boost::bind(&M6Server::handle_align, this, _1, _2, _3));
+	mount("ajax/align/submit",	boost::bind(&M6Server::handle_align_submit_ajax, this, _1, _2, _3));
 
 	add_processor("entry",	boost::bind(&M6Server::process_mrs_entry, this, _1, _2, _3));
 	add_processor("link",	boost::bind(&M6Server::process_mrs_link, this, _1, _2, _3));
@@ -1763,6 +1762,94 @@ void M6Server::handle_blast_submit_ajax(
 		result["error"] = e.what();
 	}
 	
+	reply.set_content(result.toJSON(), "text/javascript");
+}
+
+void M6Server::handle_align(const zh::request& request, const el::scope& scope, zh::reply& reply)
+{
+//	zeep::http::parameter_map params;
+//	get_parameters(scope, params);
+//
+//	el::scope sub(scope);
+//
+//	string seqstr = params.get("seqs", "").as<string>();
+//	
+//	ba::replace_all(seqstr, "\r\n", "\n");
+//	ba::replace_all(seqstr, "\r", "\n");
+//	
+//	if (not seqstr.empty())
+//	{
+//		vector<string> seqs;
+//		ba::split(seqs, seqstr, ba::is_any_of(";"));
+//		stringstream fastaStream;
+//		
+//		foreach (string& ts, seqs)
+//		{
+//			vector<string> t;
+//			ba::split(t, ts, ba::is_any_of("/"));
+//			
+//			if (t.size() < 2 or t.size() > 3)
+//				THROW(("Invalid parameters passed for align"));
+//			
+//			CDatabankPtr db = mDbTable[t[0]];
+//			uint32 docNr = db->GetDocumentNr(t[1]);
+//			uint32 seqNr = 0;
+//			if (t.size() == 3)
+//				seqNr = db->GetSequenceNr(docNr, t[2]);
+//			
+//			string seq;
+//			db->GetSequence(docNr, seqNr, seq);
+//			for (uint32 o = 72; o < seq.length(); o += 73)
+//				seq.insert(seq.begin() + o, '\n');
+//			
+//			if (t.size() == 2)
+//				fastaStream << '>' << t[1] << endl << seq << endl;
+//			else
+//				fastaStream << '>' << t[1] << '.' << t[2] << endl << seq << endl;
+//		}
+//		
+//		sub.put("input", el::object(fastaStream.str()));
+//	}
+	
+	create_reply_from_template("align.html", sub, reply);
+}
+
+void M6Server::handle_align_submit_ajax(const zh::request& request, const el::scope& scope, zh::reply& reply)
+{
+	zeep::http::parameter_map params;
+	get_parameters(scope, params);
+	
+	el::object result;
+
+	string fasta = params.get("input", "").as<string>();
+	if (fasta.empty())
+		result["error"] = "No input specified for align";
+	else
+	{
+		try
+		{
+//			RunClustalW(fasta);
+			vector<const char*> args;
+			args.push_back("/usr/bin/clustalo");
+			args.push_back("-i");
+			args.push_back("-");
+			args.push_back(nullptr);
+
+			double maxRunTime = 30;
+			string stdout, stderr;
+			
+			int r = ForkExec(args, maxRunTime, fasta, stdout, stderr);
+
+			result["alignment"] = stdout;
+			if (not stderr.empty())
+				result["error"] = stderr;
+		}
+		catch (exception& e)
+		{
+			result["error"] = e.what();
+		}
+	}
+
 	reply.set_content(result.toJSON(), "text/javascript");
 }
 

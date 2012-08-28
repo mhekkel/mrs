@@ -319,6 +319,8 @@ bool M6PageDataAccess<M6DataPage>::CanStore(const string& inKey) const
 	return mData.mN < kM6EntryCount and Free() >= (inKey.length() + 1 + sizeof(M6DataType));
 }
 
+//	Had to move the next function down since gcc is a single pass compiler?
+//
 //template<class M6DataPage>
 //void M6PageDataAccess<M6DataPage>::BinarySearch(const string& inKey, int32& outIndex, bool& outMatch, M6IndexImpl& inIndex) const
 //{
@@ -1647,6 +1649,7 @@ void M6IBitVectorImpl::Read()
 }
 
 // --------------------------------------------------------------------
+// Next function moved here because of gcc problems
 
 template<class M6DataPage>
 void M6PageDataAccess<M6DataPage>::BinarySearch(const string& inKey, int32& outIndex, bool& outMatch, M6IndexImpl& inIndex) const

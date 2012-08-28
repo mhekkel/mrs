@@ -58,6 +58,7 @@ OBJECTS = \
 	$(OBJDIR)/M6DocStore.o \
 	$(OBJDIR)/M6Document.o \
 	$(OBJDIR)/M6Error.o \
+	$(OBJDIR)/M6Exec.o \
 	$(OBJDIR)/M6File.o \
 	$(OBJDIR)/M6Index.o \
 	$(OBJDIR)/M6Iterator.o \

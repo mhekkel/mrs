@@ -1,3 +1,7 @@
+- aligning (clustal)
+- SOAP services
+- links
+
 Todo
 
 Choices:
@@ -19,8 +23,6 @@ Basic:
 	- Admin page to clear cache
 	- automatic clean cache
 
-- Clustal
-- SOAP services
 - Set up testing framework
 - Status pages
 - Test framework
@@ -32,7 +34,6 @@ Indexing:
 
 Search:
 
-- Score is very low (factor 10?)
 - Too many alternatives
 - optional suggestions dropdown
 - Fix highlighting search terms when search term is a 'string'

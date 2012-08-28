@@ -8,6 +8,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/time.h>
+#include <fcntl.h>
 #endif
 
 #include <boost/filesystem/operations.hpp>
@@ -16,6 +17,7 @@
 #include "M6Error.h"
 
 using namespace std;
+namespace fs = boost::filesystem;
 
 double system_time()
 {

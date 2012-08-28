@@ -16,7 +16,13 @@ class M6Parser
 	void			ParseDocument(M6InputDocument* inDoc);
 	std::string		GetValue(const std::string& inName);
 
+	void			ToFasta(const std::string& inDoc,
+						std::string& outFasta);
+
   private:
+
+	M6ParserImpl*	Impl();
+
 	std::string		mName;
 	M6ParserImplPtr	mImpl;
 };

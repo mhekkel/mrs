@@ -22,6 +22,7 @@
 #include "M6Query.h"
 #include "M6Iterator.h"
 #include "M6Dictionary.h"
+#include "M6Tokenizer.h"
 
 using namespace std;
 namespace fs = boost::filesystem;
@@ -1609,12 +1610,15 @@ M6Iterator* M6DatabankImpl::Find(
 {
 	unique_ptr<M6UnionIterator> result(new M6UnionIterator);
 	
+	string term(inTerm);
+	M6Tokenizer::CaseFold(term);
+	
 	foreach (const M6IndexDesc& desc, mIndices)
 	{
 		if (inIndex != "*" and not ba::iequals(inIndex, desc.mName))
 			continue;
 		
-		M6Iterator* iter = desc.mIndex->Find(inTerm);
+		M6Iterator* iter = desc.mIndex->Find(term);
 		if (iter != nullptr)
 			result->AddIterator(iter);
 	}

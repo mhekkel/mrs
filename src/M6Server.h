@@ -11,6 +11,7 @@ namespace el = zeep::http::el;
 
 class M6Iterator;
 class M6Databank;
+class M6Parser;
 
 struct M6AuthInfo;
 typedef std::vector<M6AuthInfo*> M6AuthInfoList;
@@ -70,6 +71,7 @@ class M6Server : public zh::webapp
 	{
 		M6Databank*	mDatabank;
 		std::string	mID, mName;
+		M6Parser*	mParser;
 	};
 	typedef std::vector<M6LoadedDatabank> M6DbList;
 

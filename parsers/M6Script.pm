@@ -135,6 +135,12 @@ sub version
 	return $self->{version};
 }
 
+sub to_fasta
+{
+	my ($self, $doc) = @_;
+	croak("to_fasta not implemented");
+}
+
 sub index_name
 {
 	my ($self, $index) = @_;

@@ -64,6 +64,9 @@ void M6QueryParser::Match(M6Token inToken)
 
 void M6QueryParser::Parse(vector<string>& outTerms, M6Iterator*& outFilter)
 {
+	outFilter = nullptr;
+	outTerms.clear();
+	
 	mLookahead = GetNextToken();
 	outFilter = ParseQuery();
 	if (mLookahead != eM6TokenEOF)

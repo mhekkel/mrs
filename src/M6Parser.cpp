@@ -43,6 +43,7 @@ struct M6ParserImpl
 
 	void				Parse(M6InputDocument* inDoc);
 	void				GetVersion(string& outVersion);
+	void				ToFasta(const string& inDoc, string& outFasta);
 	
 	// implemented callbacks
 	void				IndexText(const string& inIndex, const char* inText, size_t inLength)
@@ -336,6 +337,42 @@ void M6ParserImpl::Parse(M6InputDocument* inDocument)
 //	mCallback.clear();
 //	mUserData = nullptr;
 //}
+
+void M6ParserImpl::ToFasta(const string& inDocument, string& outFasta)
+{
+	PERL_SET_CONTEXT(mPerl);
+
+	dSP;
+	ENTER;
+	SAVETMPS;
+	PUSHMARK(SP);
+	
+	XPUSHs(SvRV(mParser));
+	XPUSHs(sv_2mortal(newSVpv(inDocument.c_str(), inDocument.length())));
+
+	PUTBACK;
+	
+	int n = call_method("to_fasta", G_SCALAR | G_EVAL);
+
+	SPAGAIN;
+	
+	string errmsg;
+
+	if (SvTRUE(ERRSV))
+		errmsg = string(SvPVX(ERRSV), SvCUR(ERRSV));
+	else if (n == 1 and SvPOK(*SP))
+		outFasta = SvPVX(POPs);
+
+	PUTBACK;
+	FREETMPS;
+	LEAVE;
+	
+	if (errmsg.length())
+		THROW(("Error calling to_fasta: %s", errmsg.c_str()));
+
+	if (n != 1 or outFasta.empty())
+		THROW(("to_fasta method of parser script should return one string"));
+}
 
 M6ParserImpl* M6ParserImpl::GetObject(
 	SV*					inScalar)
@@ -913,20 +950,26 @@ M6Parser::~M6Parser()
 {
 }
 
-void M6Parser::ParseDocument(M6InputDocument* inDoc)
+M6ParserImpl* M6Parser::Impl()
 {
 	// create thread local impl here
 	if (mImpl.get() == nullptr)
 		mImpl.reset(new M6ParserImpl(mName));
 	
-	mImpl->Parse(inDoc);
+	return mImpl.get();
+}
+	
+void M6Parser::ParseDocument(M6InputDocument* inDoc)
+{
+	Impl()->Parse(inDoc);
 }
 
 string M6Parser::GetValue(const string& inName)
 {
-	// create thread local impl here
-	if (mImpl.get() == nullptr)
-		mImpl.reset(new M6ParserImpl(mName));
+	return Impl()->operator[](inName.c_str());
+}
 
-	return mImpl->operator[](inName.c_str());
+void M6Parser::ToFasta(const string& inDoc, string& outFasta)
+{
+	Impl()->ToFasta(inDoc, outFasta);
 }

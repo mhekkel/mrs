@@ -136,4 +136,28 @@ sub parse
 	}
 }
 
+sub to_fasta
+{
+	my ($self, $doc) = @_;
+
+	die("no sequence") unless
+		$doc =~ /SEQUENCE\s+(\d+) AA;\s+\d+ MW;\s+[0-9A-F]{16} CRC64;\n((\s+.+\n)+)\/\//m ;
+	
+	my $len = $1;
+	my $seq = $2;
+	
+	$seq =~ s/\s//g;
+	$seq =~ s|//$||;
+	
+	die (sprintf("invalid SEQUENCE record %d!=%d", length($seq), $len))
+		unless (length($seq) == $len);
+	
+	$seq =~ s/.{72}/$&\n/g;
+
+	die("no ID?") unless $doc =~ m/^ID   (\w+)/;
+	my $id = $1;
+	
+	return ">$id\n$seq\n";
+}
+
 1;

@@ -27,6 +27,8 @@
 #include "M6Builder.h"
 #include "M6MD5.h"
 #include "M6BlastCache.h"
+#include "M6Exec.h"
+#include "M6Parser.h"
 
 using namespace std;
 namespace fs = boost::filesystem;
@@ -1176,14 +1178,20 @@ void M6Server::LoadAllDatabanks()
 			if (zx::element* n = db->find_first("name"))
 				name = n->content();
 			
-			M6LoadedDatabank db =
+			M6Parser* parser = nullptr;
+			zx::element_set config(M6Config::Instance().Find((boost::format("/m6-config/databank[@id='%1%']") % name).str()));
+			if (not config.empty())
+				parser = new M6Parser(config.front()->get_attribute("parser"));
+			
+			M6LoadedDatabank ldb =
 			{
 				new M6Databank(path, eReadOnly),
 				databank,
-				name
+				name,
+				parser
 			};
 
-			mLoadedDatabanks.push_back(db);
+			mLoadedDatabanks.push_back(ldb);
 		}
 		catch (exception& e)
 		{
@@ -1217,7 +1225,19 @@ string M6Server::GetEntry(M6Databank* inDatabank, const string& inFormat, uint32
 	
 	string result = doc->GetText();
 	
-	// TODO: format?
+	if (inFormat == "fasta")
+	{
+		foreach (M6LoadedDatabank& db, mLoadedDatabanks)
+		{
+			if (db.mDatabank != inDatabank or db.mParser == nullptr)
+				continue;
+			
+			string fasta;
+			db.mParser->ToFasta(result, fasta);
+			result = fasta;
+			break;
+		}
+	}
 	
 	return result;
 }
@@ -1767,30 +1787,37 @@ void M6Server::handle_blast_submit_ajax(
 
 void M6Server::handle_align(const zh::request& request, const el::scope& scope, zh::reply& reply)
 {
-//	zeep::http::parameter_map params;
-//	get_parameters(scope, params);
-//
-//	el::scope sub(scope);
-//
-//	string seqstr = params.get("seqs", "").as<string>();
-//	
-//	ba::replace_all(seqstr, "\r\n", "\n");
-//	ba::replace_all(seqstr, "\r", "\n");
-//	
-//	if (not seqstr.empty())
-//	{
-//		vector<string> seqs;
-//		ba::split(seqs, seqstr, ba::is_any_of(";"));
-//		stringstream fastaStream;
-//		
-//		foreach (string& ts, seqs)
-//		{
-//			vector<string> t;
-//			ba::split(t, ts, ba::is_any_of("/"));
-//			
-//			if (t.size() < 2 or t.size() > 3)
-//				THROW(("Invalid parameters passed for align"));
-//			
+	zeep::http::parameter_map params;
+	get_parameters(scope, params);
+
+	el::scope sub(scope);
+
+	string seqstr = params.get("seqs", "").as<string>();
+	
+	ba::replace_all(seqstr, "\r\n", "\n");
+	ba::replace_all(seqstr, "\r", "\n");
+	
+	map<string,shared_ptr<M6Parser>> parsers;
+	
+	if (not seqstr.empty())
+	{
+		vector<string> seqs;
+		ba::split(seqs, seqstr, ba::is_any_of(";"));
+		string fasta;
+		
+		foreach (string& ts, seqs)
+		{
+			vector<string> t;
+			ba::split(t, ts, ba::is_any_of("/"));
+			
+			if (t.size() < 2 or t.size() > 3)
+				THROW(("Invalid parameters passed for align"));
+			
+			M6Databank* mdb = Load(t[0]);
+			if (mdb == nullptr)
+				THROW(("Databank %s not loaded", t[0].c_str()));
+			fasta += GetEntry(mdb, "fasta", "id", t[1]);
+
 //			CDatabankPtr db = mDbTable[t[0]];
 //			uint32 docNr = db->GetDocumentNr(t[1]);
 //			uint32 seqNr = 0;
@@ -1806,10 +1833,10 @@ void M6Server::handle_align(const zh::request& request, const el::scope& scope, 
 //				fastaStream << '>' << t[1] << endl << seq << endl;
 //			else
 //				fastaStream << '>' << t[1] << '.' << t[2] << endl << seq << endl;
-//		}
-//		
-//		sub.put("input", el::object(fastaStream.str()));
-//	}
+		}
+
+		sub.put("input", el::object(fasta));
+	}
 	
 	create_reply_from_template("align.html", sub, reply);
 }
@@ -1828,7 +1855,6 @@ void M6Server::handle_align_submit_ajax(const zh::request& request, const el::sc
 	{
 		try
 		{
-//			RunClustalW(fasta);
 			vector<const char*> args;
 			args.push_back("/usr/bin/clustalo");
 			args.push_back("-i");

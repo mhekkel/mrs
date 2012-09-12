@@ -1,8 +1,7 @@
-- aligning (clustal)
+Todo
+
 - SOAP services
 - links
-
-Todo
 
 Choices:
 
@@ -10,8 +9,6 @@ Choices:
 - near operator, how to implement? new query language?
 - parser language: graphical or text based?
 - configuration: store in xml config file, use sqlite, or both?
-
-
 
 Basic:
 

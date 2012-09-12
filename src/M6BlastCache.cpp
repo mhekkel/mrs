@@ -235,7 +235,7 @@ M6BlastResultPtr M6BlastCache::JobResult(const string& inJobID)
 		io::filtering_stream<io::input> in;
 		fs::ifstream file(mCacheDir / (inJobID + ".xml.bz2"), ios::binary);
 		if (not file.is_open())
-			throw M6Exception("missing blats result file");
+			throw M6Exception("missing blast result file");
 
 		in.push(io::bzip2_decompressor());
 		in.push(file);
@@ -284,6 +284,25 @@ string M6BlastCache::Submit(const string& inDatabank,
 		uint32 length = sqlite3_column_bytes(mSelectByParamsStmt, 0);
 
 		result.assign(text, length);
+		
+		// now resubmit job if cache file is missing
+		if (not fs::exists(mCacheDir / (result + ".xml.bz2")))
+		{
+			sqlite3_reset(mUpdateStatusStmt);
+			
+			string status = "queued";
+			THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(mUpdateStatusStmt, 1, status.c_str(), status.length(), SQLITE_STATIC), mCacheDB);
+			THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(mUpdateStatusStmt, 2, "", 0, SQLITE_STATIC), mCacheDB);
+			THROW_IF_SQLITE3_ERROR(sqlite3_bind_int(mUpdateStatusStmt, 3, 0), mCacheDB);
+			THROW_IF_SQLITE3_ERROR(sqlite3_bind_double(mUpdateStatusStmt, 4, 0), mCacheDB);
+			THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(mUpdateStatusStmt, 5, result.c_str(), result.length(), SQLITE_STATIC), mCacheDB);
+			
+			err = sqlite3_step(mUpdateStatusStmt);
+			if (err != SQLITE_OK and err != SQLITE_ROW and err != SQLITE_DONE)
+				THROW_IF_SQLITE3_ERROR(err, mCacheDB);
+
+			mEmptyCondition.notify_one();
+		}
 	}
 	else
 	{

@@ -8,6 +8,11 @@
 	<rawdir>/data/raw/</rawdir>
 <!--	<scriptdir>/data/parsers</scriptdir>-->
 	<scriptdir>/home/maarten/projects/m6/parsers</scriptdir>
+
+	<!-- Tools section, specify external executables used by M6 -->
+	<tools>
+		<tool name="clustalo">/usr/bin/clustalo</tool>
+	</tools>
 	
 	<blast>
 		<cache-dir>/data/blast-cache/</cache-dir>
@@ -44,6 +49,29 @@
 			<user name="scott">b92ff7d60b994c8a0d2941ad9349e841</user>
 		</realm>
 	</server>
+
+	<server type="search" addr="0.0.0.0" port="18091">
+		<external-address>http://mrs.cmbi.ru.nl/mrsws/search</external-address>
+		<dbs>
+			<db>embl</db>
+			<db>enzyme</db>
+			<db>omim</db>
+			<db>pdbfinder</db>
+			<db>sprot</db>
+			<db>trembl</db>
+			<db>genbank</db>
+			<db>refseq</db>
+			<db>taxonomy</db>
+		</dbs>
+	</server>
+
+<!--	<server type="blast" addr="0.0.0.0" port="18092">-->
+<!--		<external-address>http://mrs.cmbi.ru.nl/mrsws/blast</external-address>-->
+<!--		<dbs>-->
+<!--			<db>sprot</db>-->
+<!--			<db>trembl</db>-->
+<!--		</dbs>-->
+<!--	</server>-->
 
 	<format id="omim">
 		<script src="scripts/omim.js" />

@@ -13,6 +13,7 @@ class M6Iterator;
 
 struct M6IndexInfo
 {
+#pragma message("unique??? data type???")
 	std::string		mName;
 	M6IndexType		mType;
 	uint32			mCount;

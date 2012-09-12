@@ -30,6 +30,9 @@
 #include "M6Exec.h"
 #include "M6Parser.h"
 
+#include "M6WSSearch.h"
+//#include "M6WSBlast.h"
+
 using namespace std;
 namespace fs = boost::filesystem;
 namespace ba = boost::algorithm;
@@ -39,6 +42,222 @@ namespace po = boost::program_options;
 const string kM6ServerNS = "http://mrs.cmbi.ru.nl/mrs-web/ml";
 
 int VERBOSE;
+
+// --------------------------------------------------------------------
+
+M6SearchServer::M6SearchServer(const zx::element* inConfig)
+	: mConfig(inConfig)
+{
+	LoadAllDatabanks();
+}
+
+M6SearchServer::~M6SearchServer()
+{
+}
+
+void M6SearchServer::LoadAllDatabanks()
+{
+	zx::element_set dbs(mConfig->find("dbs/db"));
+	foreach (zx::element* db, dbs)
+	{
+		string databank = db->content();
+
+		zx::element* config = M6Config::Instance().LoadDatabank(databank);
+		if (not config)
+		{
+			if (VERBOSE)
+				cerr << "unknown databank " << databank << endl;
+			continue;
+		}
+		
+		zx::element* file = config->find_first("file");
+		if (file == nullptr)
+		{
+			if (VERBOSE)
+				cerr << "file not specified for databank " << databank << endl;
+			continue;
+		}
+
+		fs::path path = file->content();
+		if (not fs::exists(path))
+		{
+			if (VERBOSE)
+				cerr << "databank " << databank << " not available" << endl;
+			continue;
+		}
+		
+		try
+		{
+			string name = databank;
+			
+			M6Parser* parser = nullptr;
+			zx::element_set config(M6Config::Instance().Find((boost::format("/m6-config/databank[@id='%1%']") % databank).str()));
+			if (not config.empty())
+			{
+				parser = new M6Parser(config.front()->get_attribute("parser"));
+				if (zx::element* n = config.front()->find_first("name"))
+					name = n->content();
+			}
+			
+			M6LoadedDatabank ldb =
+			{
+				new M6Databank(path, eReadOnly),
+				databank,
+				name,
+				parser
+			};
+
+			mLoadedDatabanks.push_back(ldb);
+		}
+		catch (exception& e)
+		{
+			cerr << "Error loading databank " << databank << endl
+				 << " >> " << e.what() << endl;
+		}
+	}
+}
+
+M6Databank* M6SearchServer::Load(const string& inDatabank)
+{
+	M6Databank* result = nullptr;
+
+	foreach (M6LoadedDatabank& db, mLoadedDatabanks)
+	{
+		if (db.mID == inDatabank)
+		{
+			result = db.mDatabank;
+			break;
+		}
+	}
+	
+	return result;
+}
+
+string M6SearchServer::GetEntry(M6Databank* inDatabank, const string& inFormat, uint32 inDocNr)
+{
+	unique_ptr<M6Document> doc(inDatabank->Fetch(inDocNr));
+	if (not doc)
+		THROW(("Unable to fetch document"));
+	
+	string result = doc->GetText();
+	
+	if (inFormat == "fasta")
+	{
+		foreach (M6LoadedDatabank& db, mLoadedDatabanks)
+		{
+			if (db.mDatabank != inDatabank or db.mParser == nullptr)
+				continue;
+			
+			string fasta;
+			db.mParser->ToFasta(result, fasta);
+			result = fasta;
+			break;
+		}
+	}
+	
+	return result;
+}
+
+string M6SearchServer::GetEntry(M6Databank* inDatabank,
+	const string& inFormat, const string& inIndex, const string& inValue)
+{
+	unique_ptr<M6Iterator> iter(inDatabank->Find(inIndex, inValue));
+	uint32 docNr;
+	float rank;
+
+	if (not (iter and iter->Next(docNr, rank)))
+		THROW(("Entry %s not found", inValue.c_str()));
+
+	return GetEntry(inDatabank, inFormat, docNr);
+}
+
+void M6SearchServer::Find(M6Databank* inDatabank, const string& inQuery, bool inAllTermsRequired,
+	uint32 inResultOffset, uint32 inMaxResultCount,
+	vector<el::object>& outHits, uint32& outHitCount, bool& outRanked)
+{
+	if (inDatabank == nullptr)
+		THROW(("Invalid databank"));
+	
+	unique_ptr<M6Iterator> rset;
+	M6Iterator* filter;
+	vector<string> queryTerms;
+	
+	ParseQuery(*inDatabank, inQuery, inAllTermsRequired, queryTerms, filter);
+	if (queryTerms.empty())
+		rset.reset(filter);
+	else
+		rset.reset(inDatabank->Find(queryTerms, filter, inAllTermsRequired, inResultOffset + inMaxResultCount));
+
+	if (not rset or rset->GetCount() == 0)
+		outHitCount = 0;
+	else
+	{
+		outHitCount = rset->GetCount();
+		outRanked = rset->IsRanked();
+	
+		uint32 docNr, nr = 1;
+		
+		float score = 0;
+
+		while (inResultOffset-- > 0 and rset->Next(docNr, score))
+			;
+
+		while (inMaxResultCount-- > 0 and rset->Next(docNr, score))
+		{
+			unique_ptr<M6Document> doc(inDatabank->Fetch(docNr));
+			
+			el::object hit;
+			hit["nr"] = nr;
+			hit["docNr"] = docNr;
+			hit["id"] = doc->GetAttribute("id");
+			hit["title"] = doc->GetAttribute("title");
+			hit["score"] = static_cast<uint16>(score * 100);
+			
+	//				vector<string> linked;
+	//				GetLinkedDbs(db, id, linked);
+	//				if (not linked.empty())
+	//				{
+	//					vector<el::object> links;
+	//					foreach (string& l, linked)
+	//						links.push_back(el::object(l));
+	//					hit["links"] = links;
+	//				}
+			
+			outHits.push_back(hit);
+			++nr;
+		}
+	}		
+}
+
+uint32 M6SearchServer::Count(const string& inDatabank, const string& inQuery)
+{
+	uint32 result = 0;
+	
+	if (inDatabank == "all")		// same as count for all databanks
+	{
+		foreach (M6LoadedDatabank& db, mLoadedDatabanks)
+			result += Count(db.mID, inQuery);
+	}
+	else
+	{
+		unique_ptr<M6Iterator> rset;
+		M6Iterator* filter;
+		vector<string> queryTerms;
+		
+		M6Databank* db = Load(inDatabank);
+		
+		ParseQuery(*db, inQuery, true, queryTerms, filter);
+		if (queryTerms.empty())
+			rset.reset(filter);
+		else
+			rset.reset(db->Find(queryTerms, filter, true, 1));
+		
+		if (rset)
+			result = rset->GetCount();
+	}
+	
+	return result;
+}
 
 // --------------------------------------------------------------------
 
@@ -122,7 +341,7 @@ struct M6Redirect
 
 M6Server::M6Server(zx::element* inConfig)
 	: webapp(kM6ServerNS)
-	, mConfig(inConfig)
+	, M6SearchServer(inConfig)
 {
 	string docroot = "docroot";
 	zx::element* e = mConfig->find_first("docroot");
@@ -155,8 +374,6 @@ M6Server::M6Server(zx::element* inConfig)
 	add_processor("link",	boost::bind(&M6Server::process_mrs_link, this, _1, _2, _3));
 	add_processor("redirect",
 							boost::bind(&M6Server::process_mrs_redirect, this, _1, _2, _3));
-
-	LoadAllDatabanks();
 }
 
 void M6Server::init_scope(el::scope& scope)
@@ -1141,208 +1358,6 @@ void M6Server::create_redirect(const string& databank, uint32 inDocNr,
 
 // --------------------------------------------------------------------
 
-void M6Server::LoadAllDatabanks()
-{
-	zx::element_set dbs(mConfig->find("dbs/db"));
-	foreach (zx::element* db, dbs)
-	{
-		string databank = db->content();
-
-		zx::element* config = M6Config::Instance().LoadDatabank(databank);
-		if (not config)
-		{
-			if (VERBOSE)
-				cerr << "unknown databank " << databank << endl;
-			continue;
-		}
-		
-		zx::element* file = config->find_first("file");
-		if (file == nullptr)
-		{
-			if (VERBOSE)
-				cerr << "file not specified for databank " << databank << endl;
-			continue;
-		}
-
-		fs::path path = file->content();
-		if (not fs::exists(path))
-		{
-			if (VERBOSE)
-				cerr << "databank " << databank << " not available" << endl;
-			continue;
-		}
-		
-		try
-		{
-			string name = databank;
-			if (zx::element* n = db->find_first("name"))
-				name = n->content();
-			
-			M6Parser* parser = nullptr;
-			zx::element_set config(M6Config::Instance().Find((boost::format("/m6-config/databank[@id='%1%']") % name).str()));
-			if (not config.empty())
-				parser = new M6Parser(config.front()->get_attribute("parser"));
-			
-			M6LoadedDatabank ldb =
-			{
-				new M6Databank(path, eReadOnly),
-				databank,
-				name,
-				parser
-			};
-
-			mLoadedDatabanks.push_back(ldb);
-		}
-		catch (exception& e)
-		{
-			cerr << "Error loading databank " << databank << endl
-				 << " >> " << e.what() << endl;
-		}
-	}
-}
-
-M6Databank* M6Server::Load(const string& inDatabank)
-{
-	M6Databank* result = nullptr;
-
-	foreach (M6LoadedDatabank& db, mLoadedDatabanks)
-	{
-		if (db.mID == inDatabank)
-		{
-			result = db.mDatabank;
-			break;
-		}
-	}
-	
-	return result;
-}
-
-string M6Server::GetEntry(M6Databank* inDatabank, const string& inFormat, uint32 inDocNr)
-{
-	unique_ptr<M6Document> doc(inDatabank->Fetch(inDocNr));
-	if (not doc)
-		THROW(("Unable to fetch document"));
-	
-	string result = doc->GetText();
-	
-	if (inFormat == "fasta")
-	{
-		foreach (M6LoadedDatabank& db, mLoadedDatabanks)
-		{
-			if (db.mDatabank != inDatabank or db.mParser == nullptr)
-				continue;
-			
-			string fasta;
-			db.mParser->ToFasta(result, fasta);
-			result = fasta;
-			break;
-		}
-	}
-	
-	return result;
-}
-
-string M6Server::GetEntry(M6Databank* inDatabank,
-	const string& inFormat, const string& inIndex, const string& inValue)
-{
-	unique_ptr<M6Iterator> iter(inDatabank->Find(inIndex, inValue));
-	uint32 docNr;
-	float rank;
-
-	if (not (iter and iter->Next(docNr, rank)))
-		THROW(("Entry %s not found", inValue.c_str()));
-
-	return GetEntry(inDatabank, inFormat, docNr);
-}
-
-void M6Server::Find(M6Databank* inDatabank, const string& inQuery, bool inAllTermsRequired,
-	uint32 inResultOffset, uint32 inMaxResultCount,
-	vector<el::object>& outHits, uint32& outHitCount, bool& outRanked)
-{
-	if (inDatabank == nullptr)
-		THROW(("Invalid databank"));
-	
-	unique_ptr<M6Iterator> rset;
-	M6Iterator* filter;
-	vector<string> queryTerms;
-	
-	ParseQuery(*inDatabank, inQuery, inAllTermsRequired, queryTerms, filter);
-	if (queryTerms.empty())
-		rset.reset(filter);
-	else
-		rset.reset(inDatabank->Find(queryTerms, filter, inAllTermsRequired, inResultOffset + inMaxResultCount));
-
-	if (not rset or rset->GetCount() == 0)
-		outHitCount = 0;
-	else
-	{
-		outHitCount = rset->GetCount();
-		outRanked = rset->IsRanked();
-	
-		uint32 docNr, nr = 1;
-		
-		float score = 0;
-
-		while (inResultOffset-- > 0 and rset->Next(docNr, score))
-			;
-
-		while (inMaxResultCount-- > 0 and rset->Next(docNr, score))
-		{
-			unique_ptr<M6Document> doc(inDatabank->Fetch(docNr));
-			
-			el::object hit;
-			hit["nr"] = nr;
-			hit["docNr"] = docNr;
-			hit["id"] = doc->GetAttribute("id");
-			hit["title"] = doc->GetAttribute("title");
-			hit["score"] = static_cast<uint16>(score * 100);
-			
-	//				vector<string> linked;
-	//				GetLinkedDbs(db, id, linked);
-	//				if (not linked.empty())
-	//				{
-	//					vector<el::object> links;
-	//					foreach (string& l, linked)
-	//						links.push_back(el::object(l));
-	//					hit["links"] = links;
-	//				}
-			
-			outHits.push_back(hit);
-			++nr;
-		}
-	}		
-}
-
-uint32 M6Server::Count(const string& inDatabank, const string& inQuery)
-{
-	uint32 result = 0;
-	
-	if (inDatabank == "all")		// same as count for all databanks
-	{
-		foreach (M6LoadedDatabank& db, mLoadedDatabanks)
-			result += Count(db.mID, inQuery);
-	}
-	else
-	{
-		unique_ptr<M6Iterator> rset;
-		M6Iterator* filter;
-		vector<string> queryTerms;
-		
-		M6Databank* db = Load(inDatabank);
-		
-		ParseQuery(*db, inQuery, true, queryTerms, filter);
-		if (queryTerms.empty())
-			rset.reset(filter);
-		else
-			rset.reset(db->Find(queryTerms, filter, true, 1));
-		
-		if (rset)
-			result = rset->GetCount();
-	}
-	
-	return result;
-}
-
 void M6Server::SpellCheck(const string& inDatabank, const string& inTerm,
 	vector<pair<string,uint16>>& outCorrections)
 {
@@ -1862,13 +1877,13 @@ void M6Server::handle_align_submit_ajax(const zh::request& request, const el::sc
 			args.push_back(nullptr);
 
 			double maxRunTime = 30;
-			string stdout, stderr;
+			string out, err;
 			
-			int r = ForkExec(args, maxRunTime, fasta, stdout, stderr);
+			int r = ForkExec(args, maxRunTime, fasta, out, err);
 
-			result["alignment"] = stdout;
-			if (not stderr.empty())
-				result["error"] = stderr;
+			result["alignment"] = out;
+			if (not err.empty())
+				result["error"] = err;
 		}
 		catch (exception& e)
 		{
@@ -1951,7 +1966,17 @@ void RunMainLoop(uint32 inNrOfThreads)
 		if (VERBOSE)
 			cout << "listening at " << addr << ':' << port << endl;
 		
-		unique_ptr<zeep::http::server> server(new M6Server(config));
+		string service = config->get_attribute("type");
+		unique_ptr<zeep::http::server> server;
+		
+		if (service == "www" or service.empty())
+			server.reset(new M6Server(config));
+		else if (service == "search")
+			server.reset(new M6WSSearch(config));
+//		else if (service == "blast")
+//			server.reset(new M6WSBlast(config));
+		else
+			THROW(("Unknown service %s", service.c_str()));
 
 		server->bind(addr, boost::lexical_cast<uint16>(port));
 		threads.create_thread(boost::bind(&zeep::http::server::run, server.get(), inNrOfThreads));

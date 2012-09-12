@@ -16,7 +16,41 @@ class M6Parser;
 struct M6AuthInfo;
 typedef std::vector<M6AuthInfo*> M6AuthInfoList;
 
-class M6Server : public zh::webapp
+class M6SearchServer
+{
+  public:
+					M6SearchServer(const zx::element* inConfig);
+	virtual			~M6SearchServer();
+
+  protected:
+
+	void			LoadAllDatabanks();
+	M6Databank*		Load(const std::string& inDatabank);
+
+	struct M6LoadedDatabank
+	{
+		M6Databank*	mDatabank;
+		std::string	mID, mName;
+		M6Parser*	mParser;
+	};
+	typedef std::vector<M6LoadedDatabank> M6DbList;
+
+	std::string		GetEntry(M6Databank* inDatabank, const std::string& inFormat, uint32 inDocNr);
+	std::string		GetEntry(M6Databank* inDatabank, const std::string& inFormat,
+						const std::string& inIndex, const std::string& inValue);
+	
+	void			Find(M6Databank* inDatabank,
+						const std::string& inQuery, bool inAllTermsRequired,
+						uint32 inResultOffset, uint32 inMaxResultCount,
+						std::vector<el::object>& outHits, uint32& outHitCount, bool& outRanked);
+
+	uint32			Count(const std::string& inDatabank, const std::string& inQuery);
+
+	const zx::element*	mConfig;
+	M6DbList			mLoadedDatabanks;
+};
+
+class M6Server : public zh::webapp, public M6SearchServer
 {
   public:
 					M6Server(zx::element* inConfig);
@@ -61,33 +95,9 @@ class M6Server : public zh::webapp
 	void			create_link_tags(zx::element* node, boost::regex& expr, const std::string& inDatabank,
 						const std::string& inIndex, const std::string& inID, const std::string& inAnchor);
 
-	void			LoadAllDatabanks();
-	M6Databank*		Load(const std::string& inDatabank);
-
 	void			SpellCheck(const std::string& inDatabank, const std::string& inTerm,
 						std::vector<std::pair<std::string,uint16>>& outCorrections);
 
-	struct M6LoadedDatabank
-	{
-		M6Databank*	mDatabank;
-		std::string	mID, mName;
-		M6Parser*	mParser;
-	};
-	typedef std::vector<M6LoadedDatabank> M6DbList;
-
-	std::string		GetEntry(M6Databank* inDatabank, const std::string& inFormat, uint32 inDocNr);
-	std::string		GetEntry(M6Databank* inDatabank, const std::string& inFormat,
-						const std::string& inIndex, const std::string& inValue);
-	
-	void			Find(M6Databank* inDatabank,
-						const std::string& inQuery, bool inAllTermsRequired,
-						uint32 inResultOffset, uint32 inMaxResultCount,
-						std::vector<el::object>& outHits, uint32& outHitCount, bool& outRanked);
-
-	uint32			Count(const std::string& inDatabank, const std::string& inQuery);
-
-	zx::element*	mConfig;
-	M6DbList		mLoadedDatabanks;
 	M6AuthInfoList	mAuthInfo;
 	boost::mutex	mAuthMutex;
 };

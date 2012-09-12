@@ -644,7 +644,10 @@ BlastResult.prototype.updateResultHsps = function(hit, row) {
 				ctx.fillStyle = '#991F5A';
 				ctx.fillRect(x, 0, x + hsp.ql[2], 4);			x += hsp.ql[2];
 				ctx.fillStyle = '#e58AB8';
-				ctx.fillRect(x, 0, x + hsp.ql[3], 4);
+				ctx.fillRect(x, 0, x + hsp.ql[3], 4);			x += hsp.ql[3];
+				if (x < 150) {
+					ctx.clearRect(x, 0, 150, 4);
+				}
 				
 				x = hsp.sl[0];
 				ctx.fillStyle = '#8AC7E5';
@@ -652,7 +655,10 @@ BlastResult.prototype.updateResultHsps = function(hit, row) {
 				ctx.fillStyle = '#1F7099';
 				ctx.fillRect(x, 4, x + hsp.sl[2], 8);			x += hsp.sl[2];
 				ctx.fillStyle = '#8AC7E5';
-				ctx.fillRect(x, 4, x + hsp.sl[3], 8);
+				ctx.fillRect(x, 4, x + hsp.sl[3], 8);			x += hsp.sl[3];
+				if (x < 150) {
+					ctx.clearRect(x, 4, 150, 8);
+				}
 			}
 		}
 		

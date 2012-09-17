@@ -1303,7 +1303,7 @@ M6DocStore::M6DocStore(const fs::path& inPath, MOpenMode inMode)
 
 M6DocStore::~M6DocStore()
 {
-	M6DocStoreImpl::Lock lock(mImpl);
+//	M6DocStoreImpl::Lock lock(mImpl);
 	delete mImpl;
 }
 

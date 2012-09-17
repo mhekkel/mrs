@@ -250,12 +250,12 @@ void Query(int argc, char* argv[])
 		while (offset-- > 0 and rset->Next(docNr, rank))
 			;
 		
-		while (rset->Next(docNr, rank))
+		while (count-- > 0 and rset->Next(docNr, rank))
 		{
 			unique_ptr<M6Document> doc(db.Fetch(docNr));
 			
 			cout << doc->GetAttribute("id") << "\t"
-				 << boost::format("%1.2f") % rank << "\t"
+				 << boost::format("%1.2f") % (100.0 * rank) << "\t"
 				 << doc->GetAttribute("title") << endl;
 		}
 	}

@@ -379,13 +379,13 @@ UniProt = {
 			}
 			else if (m[2] == "OX") {
 				name.push(UniProt.cell("NCBI Taxonomy ID", m[0].replace(/^OX   NCBI_TaxID=(\d+);/, function(s,v) {
-					return "<a href='entry?db=taxonomy&amp;id=" + v + "'>" + v + "</a>";
+					return "<a href='entry?db=taxonomy&amp;id=" + $(v).text() + "'>" + v + "</a>";
 				})));
 			}
 			else if (m[2] == "OC") {
 				var a = m[0].replace(/^OC   /gm, '').replace(/\.\s*$/mg, '').split(/;\s*/);
 				var b = $.map(a, function(v) {
-					return "<a href='link?db=taxonomy&amp;ix=sn&amp;id=" + v + "'>" + v + "</a>";
+					return "<a href='link?db=taxonomy&amp;ix=sn&amp;id=" + $(v).text() + "'>" + v + "</a>";
 				});
 				name.push(UniProt.cell("Lineage", b.join(", ")));
 			}
@@ -404,8 +404,7 @@ UniProt = {
 			else if (m[2] == 'KW') {
 				var a = m[0].replace(/^KW   /gm, '').replace(/;\s*$/, '').replace(/\.\n/, '').split(/;\s*/);
 				a = $.map(a, function(value) {
-					var v2 = value.replace(/<[^<>]+>/g, '');
-					return "<a href='search?db=sprot&amp;q=kw:\"" + v2 + "\"'>" + value + "</a>";
+					return "<a href='search?db=sprot&amp;q=kw:\"" + $(value).text() + "\"'>" + value + "</a>";
 				});
 				name.push(UniProt.cell("Keywords", a.join(", ")));
 			}

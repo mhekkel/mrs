@@ -3458,7 +3458,7 @@ M6Iterator* M6WeightedBasicIndexImpl::GetIterator(const M6MultiData& inValue)
 		docs.push_back(make_pair(docNr, 1.0f));
 	assert(docs.size() == inValue.mCount);
 	
-	sort(docs.begin(), docs.end(), [](pair<uint32,float>& a, pair<uint32,float>& b) -> bool { return a.first < b.first; });
+	sort(docs.begin(), docs.end(), [](const pair<uint32,float>& a, const pair<uint32,float>& b) -> bool { return a.first < b.first; });
 
 	return new M6VectorIterator(docs);
 }

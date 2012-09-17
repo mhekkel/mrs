@@ -45,6 +45,12 @@ LDFLAGS				+= -g
 OBJDIR				:= $(OBJDIR).dbg
 endif
 
+ifeq ($(PROFILE),1)
+CFLAGS				+= -pg
+LDFLAGS				+= -pg
+OBJDIR				:= $(OBJDIR).Profile
+endif
+
 VPATH += src
 
 OBJECTS = \
@@ -63,6 +69,7 @@ OBJECTS = \
 	$(OBJDIR)/M6Index.o \
 	$(OBJDIR)/M6Iterator.o \
 	$(OBJDIR)/M6Lexicon.o \
+	$(OBJDIR)/M6LinkTable.o \
 	$(OBJDIR)/M6Matrix.o \
 	$(OBJDIR)/M6MD5.o \
 	$(OBJDIR)/M6Parser.o \
@@ -84,6 +91,7 @@ OBJECTS.m6-server = \
 	$(OBJECTS) \
 	$(OBJDIR)/M6BlastCache.o \
 	$(OBJDIR)/M6Server.o \
+	$(OBJDIR)/M6WSSearch.o \
 
 OBJECTS.m6-passwd = \
 	$(OBJECTS) \

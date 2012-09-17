@@ -1877,8 +1877,12 @@ void M6Server::handle_align_submit_ajax(const zh::request& request, const el::sc
 	{
 		try
 		{
+			string clustalo = M6Config::Instance().FindGlobal("/m6-config/tools/tool[@name='clustalo']");
+			if (clustalo.empty())
+				clustalo = "/usr/bin/clustalo";
+			
 			vector<const char*> args;
-			args.push_back("/usr/bin/clustalo");
+			args.push_back(clustalo.c_str());
 			args.push_back("-i");
 			args.push_back("-");
 			args.push_back(nullptr);

@@ -74,7 +74,7 @@ int ForkExec(vector<const char*>& args, double maxRunTime,
 #else
 
 int ForkExec(vector<const char*>& args, double maxRunTime,
-	const string& in, string& out, string& err)
+	const string& stdin, string& stdout, string& stderr)
 {
 	if (args.empty() or args.front() == nullptr)
 		THROW(("No arguments to ForkExec"));
@@ -136,7 +136,7 @@ int ForkExec(vector<const char*>& args, double maxRunTime,
 	
 	close(ifd[0]);
 	
-	if (in.empty())
+	if (stdin.empty())
 		close(ifd[1]);
 	else
 	{
@@ -157,8 +157,8 @@ int ForkExec(vector<const char*>& args, double maxRunTime,
 	
 	bool errDone = false, outDone = false, killed = false;
 	
-	const char* in = in.c_str();
-	size_t l_in = in.length();
+	const char* in = stdin.c_str();
+	size_t l_in = stdin.length();
 	
 	while (not errDone and not outDone)
 	{
@@ -202,7 +202,7 @@ int ForkExec(vector<const char*>& args, double maxRunTime,
 			r = read(efd[0], buffer, sizeof(buffer));
 			
 			if (r > 0)
-				err.append(buffer, r);
+				stderr.append(buffer, r);
 			else if (r == 0 and errno != EAGAIN)
 				errDone = true;
 			else

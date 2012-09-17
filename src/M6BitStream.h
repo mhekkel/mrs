@@ -236,6 +236,11 @@ void CopyBits(M6OBitStream& inBits, const M6OBitStream& inValue);
 void ReadArray(M6IBitStream& inBits, std::vector<uint32>& outArray);
 void WriteArray(M6OBitStream& inBits, const std::vector<uint32>& inArray);
 
+// Specialized version of ReadArray used in creating UNIONs and INTERSECTIONs
+// outArray is actually a bitmap. Returns number of docs read from array
+void ReadArray(M6IBitStream& inBits, std::vector<bool>& outArray,
+	uint32& outCount, uint32& outSet);
+
 // Lower level access to arrays, the CompressSimpleArraySelector
 // writes out the same array as WriteArray, but without the size.
 // So you need to store that value elsewhere.

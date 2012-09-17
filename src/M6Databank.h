@@ -51,7 +51,10 @@ class M6Databank
 	void			DumpIndex(const std::string& inIndex, std::ostream& inStream);
 	
 	void			Store(M6Document* inDocument);
+	void			StoreLink(uint32 inDocNr, const std::string& inDb, const std::string& inID);
+	
 	M6Document*		Fetch(uint32 inDocNr);
+	M6Document*		Fetch(const std::string& inID);
 	
 	// high-level interface
 	M6Iterator*		Find(const std::string& inQuery, bool inAllTermsRequired,
@@ -61,7 +64,8 @@ class M6Databank
 	M6Iterator*		Find(const std::vector<std::string>& inQueryTerms,
 						M6Iterator* inFilter, bool inAllTermsRequired, uint32 inReportLimit);
 	M6Iterator*		Find(const std::string& inIndex, const std::string& inTerm,
-						bool inTermIsPattern = false);
+						M6QueryOperator inOperator = eM6Equals);
+	M6Iterator*		FindPattern(const std::string& inIndex, const std::string& inPattern);
 	M6Iterator*		FindString(const std::string& inIndex, const std::string& inString);
 
 	// Exist returns <documents exist,docnr for a unique match>

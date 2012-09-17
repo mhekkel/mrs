@@ -29,7 +29,7 @@
 #include "M6BlastCache.h"
 #include "M6Exec.h"
 #include "M6Parser.h"
-
+#include "M6LinkTable.h"
 #include "M6WSSearch.h"
 //#include "M6WSBlast.h"
 
@@ -139,19 +139,26 @@ string M6SearchServer::GetEntry(M6Databank* inDatabank, const string& inFormat, 
 	if (not doc)
 		THROW(("Unable to fetch document"));
 	
-	string result = doc->GetText();
+	string result;
 	
-	if (inFormat == "fasta")
+	if (inFormat == "title")
+		result = doc->GetAttribute("title");
+	else
 	{
-		foreach (M6LoadedDatabank& db, mLoadedDatabanks)
+		result = doc->GetText();
+	
+		if (inFormat == "fasta")
 		{
-			if (db.mDatabank != inDatabank or db.mParser == nullptr)
-				continue;
-			
-			string fasta;
-			db.mParser->ToFasta(result, fasta);
-			result = fasta;
-			break;
+			foreach (M6LoadedDatabank& db, mLoadedDatabanks)
+			{
+				if (db.mDatabank != inDatabank or db.mParser == nullptr)
+					continue;
+				
+				string fasta;
+				db.mParser->ToFasta(result, fasta);
+				result = fasta;
+				break;
+			}
 		}
 	}
 	
@@ -171,22 +178,24 @@ string M6SearchServer::GetEntry(M6Databank* inDatabank,
 	return GetEntry(inDatabank, inFormat, docNr);
 }
 
-void M6SearchServer::Find(M6Databank* inDatabank, const string& inQuery, bool inAllTermsRequired,
+void M6SearchServer::Find(const string& inDatabank, const string& inQuery, bool inAllTermsRequired,
 	uint32 inResultOffset, uint32 inMaxResultCount,
 	vector<el::object>& outHits, uint32& outHitCount, bool& outRanked)
 {
-	if (inDatabank == nullptr)
+	M6Databank* databank = Load(inDatabank);
+
+	if (databank == nullptr)
 		THROW(("Invalid databank"));
 	
 	unique_ptr<M6Iterator> rset;
 	M6Iterator* filter;
 	vector<string> queryTerms;
 	
-	ParseQuery(*inDatabank, inQuery, inAllTermsRequired, queryTerms, filter);
+	ParseQuery(*databank, inQuery, inAllTermsRequired, queryTerms, filter);
 	if (queryTerms.empty())
 		rset.reset(filter);
 	else
-		rset.reset(inDatabank->Find(queryTerms, filter, inAllTermsRequired, inResultOffset + inMaxResultCount));
+		rset.reset(databank->Find(queryTerms, filter, inAllTermsRequired, inResultOffset + inMaxResultCount));
 
 	if (not rset or rset->GetCount() == 0)
 		outHitCount = 0;
@@ -204,24 +213,27 @@ void M6SearchServer::Find(M6Databank* inDatabank, const string& inQuery, bool in
 
 		while (inMaxResultCount-- > 0 and rset->Next(docNr, score))
 		{
-			unique_ptr<M6Document> doc(inDatabank->Fetch(docNr));
-			
+			unique_ptr<M6Document> doc(databank->Fetch(docNr));
+			if (not doc)
+				THROW(("Unable to fetch document %d", docNr));
+
+			string id = doc->GetAttribute("id");
+
 			el::object hit;
 			hit["nr"] = nr;
 			hit["docNr"] = docNr;
-			hit["id"] = doc->GetAttribute("id");
+			hit["id"] = id;
 			hit["title"] = doc->GetAttribute("title");
 			hit["score"] = static_cast<uint16>(score * 100);
 			
-	//				vector<string> linked;
-	//				GetLinkedDbs(db, id, linked);
-	//				if (not linked.empty())
-	//				{
-	//					vector<el::object> links;
-	//					foreach (string& l, linked)
-	//						links.push_back(el::object(l));
-	//					hit["links"] = links;
-	//				}
+			vector<string> linked = M6LinkTable::Instance().GetLinkedDbs(inDatabank, id);
+			if (not linked.empty())
+			{
+				vector<el::object> links;
+				foreach (string& l, linked)
+					links.push_back(el::object(l));
+				hit["links"] = links;
+			}
 			
 			outHits.push_back(hit);
 			++nr;
@@ -530,7 +542,7 @@ void M6Server::handle_entry(const zh::request& request, const el::scope& scope, 
 	el::scope sub(scope);
 	sub.put("db", el::object(db));
 	sub.put("nr", el::object(docNr));
-//	sub.put("linkeddbs", el::object(GetLinkedDbs(db)));
+	sub.put("linkeddbs", el::object(M6LinkTable::Instance().GetLinkedDbs(db)));
 	if (not q.empty())
 		sub.put("q", el::object(q));
 	else if (not rq.empty())
@@ -541,15 +553,14 @@ void M6Server::handle_entry(const zh::request& request, const el::scope& scope, 
 	}
 	sub.put("format", el::object(format));
 
-//	vector<string> linked;
-//	GetLinkedDbs(db, id, linked);
-//	if (not linked.empty())
-//	{
-//		vector<el::object> links;
-//		foreach (string& l, linked)
-//			links.push_back(el::object(l));
-//		sub.put("links", el::object(links));
-//	}
+	vector<string> linked = M6LinkTable::Instance().GetLinkedDbs(db, id);
+	if (not linked.empty())
+	{
+		vector<el::object> links;
+		foreach (string& l, linked)
+			links.push_back(el::object(l));
+		sub.put("links", el::object(links));
+	}
 
 	zx::element* dbConfig = M6Config::Instance().LoadDatabank(db);
 //	unique_ptr<M6Document> document(mdb->Fetch(docNr));
@@ -816,7 +827,7 @@ void M6Server::handle_search(const zh::request& request,
 					uint32 c;
 					bool r;
 					
-					Find(db.mDatabank, q, true, 0, 5, hits, c, r);
+					Find(db.mID, q, true, 0, 5, hits, c, r);
 					
 					boost::mutex::scoped_lock lock(m);
 					
@@ -867,18 +878,14 @@ void M6Server::handle_search(const zh::request& request,
 		if (page > 1)
 			resultoffset = (page - 1) * maxresultcount;
 		
-		M6Databank* mdb = Load(db);
-		if (mdb == nullptr)
-			THROW(("Databank %s not loaded", db.c_str()));
-
 		vector<el::object> hits;
 		bool ranked;
 		
-		Find(mdb, q, true, resultoffset, maxresultcount, hits, hitCount, ranked);
+		Find(db, q, true, resultoffset, maxresultcount, hits, hitCount, ranked);
 		if (hitCount == 0)
 		{
 			sub.put("relaxed", el::object(true));
-			Find(mdb, q, false, resultoffset, maxresultcount, hits, hitCount, ranked);
+			Find(db, q, false, resultoffset, maxresultcount, hits, hitCount, ranked);
 		}
 		
 		if (not hits.empty())
@@ -1186,7 +1193,7 @@ void M6Server::process_mrs_link(zx::element* node, const el::scope& scope, fs::p
 			M6Databank* mdb = Load(db);
 			if (mdb != nullptr)
 			{
-				unique_ptr<M6Iterator> rset(mdb->Find(ix, id, false));
+				unique_ptr<M6Iterator> rset(mdb->Find(ix, id));
 				
 				uint32 docNr, docNr2; float rank;
 				if (rset and rset->Next(docNr, rank))

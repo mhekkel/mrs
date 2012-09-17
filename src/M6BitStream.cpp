@@ -778,3 +778,51 @@ void ReadArray(M6IBitStream& inBits, vector<uint32>& outArray)
 		--span;
 	}
 }
+
+void ReadArray(M6IBitStream& inBits, vector<bool>& outArray, uint32& outCount, uint32& outUpdated)
+{
+	uint32 size, result;
+	ReadGamma(inBits, size);
+
+	outCount = size;
+	outUpdated = 0;
+
+	uint32 width = kStartWidth;
+	uint32 span = 0;
+	uint32 current = 0;
+
+	while (size-- > 0)
+	{
+		if (span == 0)
+		{
+			uint32 selector;
+			ReadBinary(inBits, 4, selector);
+			span = kSelectors[selector].span;
+			
+			if (selector == 0)
+				width = kMaxWidth;
+			else
+				width += kSelectors[selector].databits;
+		}
+
+		if (width > 0)
+		{
+			uint32 delta;
+			ReadBinary(inBits, width, delta);
+			current += delta;
+		}
+
+		current += 1;
+
+		if (current >= outArray.size())
+			break;
+
+		if (not outArray[current])
+		{
+			outArray[current] = true;
+			++outUpdated;
+		}
+
+		--span;
+	}
+}

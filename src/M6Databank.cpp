@@ -5,11 +5,14 @@
 #include <iterator>
 
 #include <boost/filesystem.hpp>
+#include <boost/filesystem/fstream.hpp>
 #include <boost/foreach.hpp>
 #define foreach BOOST_FOREACH
 #include <boost/algorithm/string.hpp>
 #include <boost/format.hpp>
 #include <boost/thread/mutex.hpp>
+#include <boost/iostreams/filtering_stream.hpp>
+#include <boost/iostreams/filter/bzip2.hpp>
 
 #include "M6Databank.h"
 #include "M6Document.h"
@@ -27,6 +30,7 @@
 using namespace std;
 namespace fs = boost::filesystem;
 namespace ba = boost::algorithm;
+namespace io = boost::iostreams;
 
 // --------------------------------------------------------------------
 
@@ -87,12 +91,14 @@ class M6DatabankImpl
 	void			CommitBatchImport();
 		
 	void			Store(M6Document* inDocument);
+	void			StoreLink(uint32 inDocNr, const string& inDb, const string& inID);
+
 	M6Document*		Fetch(uint32 inDocNr);
 	M6Iterator*		Find(const string& inQuery, bool inAllTermsRequired, uint32 inReportLimit);
 	M6Iterator*		Find(const vector<string>& inQueryTerms,
 						M6Iterator* inFilter, bool inAllTermsRequired, uint32 inReportLimit);
-	M6Iterator*		Find(const string& inIndex, const string& inTerm,
-						bool inTermIsPattern);
+	M6Iterator*		Find(const string& inIndex, const string& inTerm, M6QueryOperator inOperator);
+	M6Iterator*		FindPattern(const string& inIndex, const string& inPattern);
 	M6Iterator*		FindString(const string& inIndex, const string& inString);
 	tr1::tuple<bool,uint32>
 					Exists(const string& inIndex, const string& inValue);
@@ -134,6 +140,8 @@ class M6DatabankImpl
 	
 	M6Databank&				mDatabank;
 	fs::path				mDbDirectory;
+	fs::ofstream*			mLinkFile;
+	ostream*				mLinkStream;
 	MOpenMode				mMode;
 	M6DocStore*				mStore;
 	M6Dictionary*			mDictionary;
@@ -1174,6 +1182,8 @@ void M6BatchIndexProcessor::Finish(uint32 inDocCount)
 M6DatabankImpl::M6DatabankImpl(M6Databank& inDatabank, const fs::path& inPath, MOpenMode inMode)
 	: mDatabank(inDatabank)
 	, mDbDirectory(inPath)
+	, mLinkFile(nullptr)
+	, mLinkStream(nullptr)
 	, mMode(inMode)
 	, mStore(nullptr)
 	, mDictionary(nullptr)
@@ -1246,6 +1256,9 @@ M6DatabankImpl::~M6DatabankImpl()
 	
 	mStore->Commit();
 	delete mStore;
+
+	delete mLinkStream;
+	delete mLinkFile;
 }
 
 void M6DatabankImpl::GetInfo(M6DatabankInfo& outInfo)
@@ -1374,6 +1387,24 @@ void M6DatabankImpl::Store(M6Document* inDocument)
 		mStoreQueue.Put(doc);
 }
 
+void M6DatabankImpl::StoreLink(uint32 inDocNr, const string& inDb, const string& inID)
+{
+	boost::mutex::scoped_lock lock(mMutex);
+	
+	if (mLinkFile == nullptr)
+	{
+		mLinkFile = new fs::ofstream(mDbDirectory / "links", ios_base::out|ios_base::trunc|ios_base::binary);
+		if (not mLinkFile->is_open())
+			throw runtime_error("could not create link file");
+		io::filtering_stream<io::output>* out = new io::filtering_stream<io::output>();
+		out->push(io::bzip2_compressor());
+		out->push(*mLinkFile);
+		mLinkStream = out;
+	}
+	
+	*mLinkStream << inDocNr << '\t' << inDb << '\t' << inID << endl;
+}
+
 M6Document* M6DatabankImpl::Fetch(uint32 inDocNr)
 {
 	M6Document* result = nullptr;
@@ -1426,7 +1457,7 @@ class M6Accumulator
 					}
 					
 					if (mHitCount > outDocs.size())
-						mHitCount = outDocs.size();
+						mHitCount = static_cast<uint32>(outDocs.size());
 				}
 	
 	uint32		GetHitCount() const					{ return mHitCount; }
@@ -1467,6 +1498,9 @@ M6Iterator* M6DatabankImpl::Find(const string& inQuery, bool inAllTermsRequired,
 M6Iterator* M6DatabankImpl::Find(const vector<string>& inQueryTerms,
 	M6Iterator* inFilter, bool inAllTermsRequired, uint32 inReportLimit)
 {
+	if (inReportLimit == 0 or inQueryTerms.empty())
+		return nullptr;
+
 	uint32 maxDocNr = mStore->NextDocumentNumber();
 	float maxD = static_cast<float>(maxDocNr);
 
@@ -1492,7 +1526,7 @@ M6Iterator* M6DatabankImpl::Find(const vector<string>& inQueryTerms,
 		iter_ptr iter(new M6WeightedBasicIndex::M6WeightedIterator);
 		if (static_cast<M6WeightedBasicIndex*>(mAllTextIndex.get())->Find(term, *iter))
 		{
-			float idf = log(1.f + maxD / iter->Size());
+			float idf = log(1.f + maxD / iter->GetCount());
 			terms.push_back(tr1::make_tuple(term, iter, 1, kM6MaxWeight * idf, idf));
 		}
 		else
@@ -1605,8 +1639,7 @@ M6Iterator* M6DatabankImpl::Find(const vector<string>& inQueryTerms,
 	return result;
 }
 
-M6Iterator* M6DatabankImpl::Find(
-	const string& inIndex, const string& inTerm, bool inTermIsPattern)
+M6Iterator* M6DatabankImpl::Find(const string& inIndex, const string& inTerm, M6QueryOperator inOperator)
 {
 	unique_ptr<M6UnionIterator> result(new M6UnionIterator);
 	
@@ -1618,12 +1651,32 @@ M6Iterator* M6DatabankImpl::Find(
 		if (inIndex != "*" and not ba::iequals(inIndex, desc.mName))
 			continue;
 		
-		M6Iterator* iter = desc.mIndex->Find(term);
+		M6Iterator* iter = desc.mIndex->Find(term, inOperator);
+
 		if (iter != nullptr)
 			result->AddIterator(iter);
 	}
 	
 	return result.release();
+}
+
+M6Iterator* M6DatabankImpl::FindPattern(const string& inIndex, const string& inPattern)
+{
+	string pattern(inPattern);
+	M6Tokenizer::CaseFold(pattern);
+	
+	vector<bool> hits(GetDocStore().NextDocumentNumber() + 1);
+	uint32 count = 0;
+	
+	foreach (const M6IndexDesc& desc, mIndices)
+	{
+		if (inIndex != "*" and not ba::iequals(inIndex, desc.mName))
+			continue;
+
+		desc.mIndex->FindPattern(pattern, hits, count);
+	}
+	
+	return new M6BitmapIterator(hits, count);
 }
 
 M6Iterator* M6DatabankImpl::FindString(const string& inIndex, const string& inString)
@@ -1717,10 +1770,17 @@ void M6DatabankImpl::CommitBatchImport()
 		g.create_thread([&]() { mAllTextIndex->FinishBatchMode(progress); });
 		foreach (M6IndexDesc& desc, mIndices)
 		{
+#if DEBUG
+			if (desc.mIndex->IsInBatchMode())
+				desc.mIndex->FinishBatchMode(progress);
+			else
+				desc.mIndex->Vacuum(progress);
+#else
 			if (desc.mIndex->IsInBatchMode())
 				g.create_thread([&]() { desc.mIndex->FinishBatchMode(progress); });
 			else
 				g.create_thread([&]() { desc.mIndex->Vacuum(progress); });
+#endif
 		}
 
 		g.join_all();
@@ -1833,6 +1893,11 @@ void M6Databank::Store(M6Document* inDocument)
 	mImpl->Store(inDocument);
 }
 
+void M6Databank::StoreLink(uint32 inDocNr, const string& inDb, const string& inID)
+{
+	mImpl->StoreLink(inDocNr, inDb, inID);
+}
+
 M6DocStore& M6Databank::GetDocStore()
 {
 	return mImpl->GetDocStore();
@@ -1841,6 +1906,20 @@ M6DocStore& M6Databank::GetDocStore()
 M6Document* M6Databank::Fetch(uint32 inDocNr)
 {
 	return mImpl->Fetch(inDocNr);
+}
+
+M6Document* M6Databank::Fetch(const string& inDocID)
+{
+	M6Document* result = nullptr;
+	unique_ptr<M6Iterator> iter(mImpl->FindString("id", inDocID));
+	
+	uint32 docNr;
+	float rank;
+	
+	if (iter and iter->Next(docNr, rank))
+		result = Fetch(docNr);
+	
+	return result;
 }
 
 //M6Document* M6Databank::FindDocument(const string& inIndex, const string& inValue)
@@ -1859,20 +1938,24 @@ M6Iterator* M6Databank::Find(const vector<string>& inQueryTerms, M6Iterator* inF
 	return mImpl->Find(inQueryTerms, inFilter, inAllTermsRequired, inReportLimit);
 }
 
-M6Iterator* M6Databank::Find(const string& inIndex, const string& inQuery, bool inTermIsPattern)
+M6Iterator* M6Databank::Find(const string& inIndex, const string& inQuery, M6QueryOperator inOperator)
 {
-	return mImpl->Find(inIndex, inQuery, inTermIsPattern);
+	return mImpl->Find(inIndex, inQuery, inOperator);
+}
+
+M6Iterator* M6Databank::FindPattern(const string& inIndex, const string& inPattern)
+{
+	return mImpl->FindPattern(inIndex, inPattern);
+}
+
+M6Iterator* M6Databank::FindString(const string& inIndex, const string& inString)
+{
+	return mImpl->FindString(inIndex, inString);
 }
 
 tr1::tuple<bool,uint32> M6Databank::Exists(const string& inIndex, const string& inValue)
 {
 	return mImpl->Exists(inIndex, inValue);
-}
-
-M6Iterator* M6Databank::FindString(const string& inIndex,
-	const string& inString)
-{
-	return mImpl->FindString(inIndex, inString);
 }
 
 void M6Databank::SuggestCorrection(const string& inWord, vector<pair<string,uint16>>& outCorrections)

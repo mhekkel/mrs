@@ -39,7 +39,7 @@ class M6SearchServer
 	std::string		GetEntry(M6Databank* inDatabank, const std::string& inFormat,
 						const std::string& inIndex, const std::string& inValue);
 	
-	void			Find(M6Databank* inDatabank,
+	void			Find(const std::string& inDatabank,
 						const std::string& inQuery, bool inAllTermsRequired,
 						uint32 inResultOffset, uint32 inMaxResultCount,
 						std::vector<el::object>& outHits, uint32& outHitCount, bool& outRanked);

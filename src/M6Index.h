@@ -10,12 +10,12 @@
 
 #include "M6File.h"
 #include "M6BitStream.h"
+#include "M6Iterator.h"
 
 struct M6IndexImpl;
 class M6CompressedArray;
 union M6BitVector;
 class M6Progress;
-class M6Iterator;
 class M6Lexicon;
 
 extern const uint32 kM6MaxKeyLength;
@@ -70,6 +70,8 @@ class M6BasicIndex
 
 		M6Iterator*		GetDocuments() const;
 		uint32			GetCount() const;
+		uint32			page() const								{ return mPage; }
+		uint32			keynr() const								{ return mKeyNr; }
 	
 	  private:
 		friend struct M6IndexImpl;
@@ -99,6 +101,8 @@ class M6BasicIndex
 	void			Insert(uint32 inKey, uint32 inValue);
 
 	M6Iterator*		Find(const std::string& inKey);
+	M6Iterator*		Find(const std::string& inKey, M6QueryOperator inOperator);
+	void			FindPattern(const std::string& inPattern, std::vector<bool>& outBitmap, uint32& outCount);
 	M6Iterator*		FindString(const std::string& inString);
 
 	uint32			size() const;
@@ -237,14 +241,15 @@ class M6WeightedBasicIndex : public M6BasicIndex
 		M6WeightedIterator&
 						operator=(const M6WeightedIterator&);
 
-		uint32			Size() const								{ return mSize; }
 		bool			Next(uint32& outDocNr, uint8& outWeight);
+
+		uint32			GetCount() const								{ return mCount; }
 
 	  private:
 		M6IBitStream	mBits;
 		std::vector<uint32>
 						mDocs;
-		uint32			mSize;
+		uint32			mCount;
 		uint8			mWeight;
 	};
 	

@@ -126,6 +126,11 @@ uint32 M6InputDocument::Store()
 	M6DocStore& store(mDatabank.GetDocStore());
 	assert(not mBuffer.empty());
 	mDocNr = store.StoreDocument(&mBuffer[0], mBuffer.size(), mText.length());
+
+	// store the links
+	foreach (auto link, mLinks)
+		mDatabank.StoreLink(mDocNr, link.first, link.second);
+
 	return mDocNr;
 }
 
@@ -234,9 +239,7 @@ void M6InputDocument::Index(const string& inIndex,
 
 void M6InputDocument::AddLink(const string& inDatabank, const string& inValue)
 {
-	// TODO map inDatabank to a mnemonic/id
-	string data = inDatabank + ':' + inValue;
-	Index("{db_xref}", eM6StringData, false, data.c_str(), data.length());
+	mLinks.push_back(make_pair(inDatabank, inValue));
 }
 
 void M6InputDocument::Tokenize(M6Lexicon& inLexicon, uint32 inLastStopWord)

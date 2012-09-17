@@ -48,7 +48,7 @@ sub parse
 			my $n = 0;
 			foreach my $ac (split(m/;\s*/, $value))
 			{
-				$self->index_unique_string('ac', $ac);
+				$self->index_string('ac', $ac);
 				$self->set_attribute('ac', $ac) unless ++$n > 1;
 			}
 		}
@@ -106,7 +106,7 @@ sub parse
 		}
 		elsif ($key eq 'DR')
 		{
-			while ($value =~ m/^(.+?); (.+?);/g)
+			while ($value =~ m/^(.+?); (.+?);/mg)
 			{
 				$self->add_link($1, $2);
 			}

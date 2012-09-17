@@ -225,7 +225,7 @@
 		<name>SwissProt - mini version</name>
 		<info>http://www.uniprot.org/</info>
 		<file>/data/mrs/sprot.m6</file>
-		<source>test/sprot-mini.dat</source>
+		<source>uniprot/sprot-mini.dat</source>
 	</databank>
 	
 	<databank id="trembl" parser="uniprot" format="uniprot">

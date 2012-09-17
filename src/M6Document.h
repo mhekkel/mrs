@@ -108,6 +108,8 @@ class M6InputDocument : public M6Document
 	std::string			mText;
 	std::vector<char>	mBuffer;
 	M6DocAttributes		mAttributes;
+	std::vector<std::pair<std::string,std::string>>
+						mLinks;
 	M6IndexTokenList	mTokens;
 	M6IndexValueList	mValues;
 	M6Lexicon			mDocLexicon;

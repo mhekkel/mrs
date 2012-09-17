@@ -82,6 +82,11 @@ zeep::xml::element_set M6Config::Find(const string& inXPath)
 	return mConfig->find(inXPath);
 }
 
+zeep::xml::element* M6Config::FindFirst(const string& inXPath)
+{
+	return mConfig->find_first(inXPath);
+}
+
 string M6Config::FindGlobal(const string& inXPath)
 {
 	zeep::xml::element* e = mConfig->find_first(inXPath);

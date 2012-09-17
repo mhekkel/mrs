@@ -1,7 +1,9 @@
 Todo
 
-- SOAP services
+- SOAP services (alleen blast nog)
 - links
+- pattern search
+- boolean operator support
 
 Choices:
 
@@ -12,8 +14,6 @@ Choices:
 
 Basic:
 
-- el::object => JSON code
-
 - Blast
 	- store original def line of FastA file to be able to find databank
 	  or create alias system in config?
@@ -22,7 +22,6 @@ Basic:
 
 - Set up testing framework
 - Status pages
-- Test framework
 
 Indexing:
 

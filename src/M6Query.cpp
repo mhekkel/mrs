@@ -152,6 +152,12 @@ M6Iterator* M6QueryParser::ParseTest()
 			break;
 		}
 
+		case eM6TokenPattern:
+			if (mDatabank != nullptr)
+				result.reset(mDatabank->FindPattern("full-text", mTokenizer.GetTokenString()));
+			Match(eM6TokenPattern);
+			break;
+
 		case eM6TokenWord:
 		{
 			string s = mTokenizer.GetTokenString();
@@ -224,14 +230,14 @@ M6Iterator* M6QueryParser::ParseTerm(const string& inIndex)
 
 		case eM6TokenPattern:
 			if (mDatabank != nullptr)
-				result.reset(mDatabank->Find(inIndex, mTokenizer.GetTokenString(), true));
+				result.reset(mDatabank->FindPattern(inIndex, mTokenizer.GetTokenString()));
 			Match(eM6TokenPattern);
 			break;
 		
 		case eM6TokenWord:
 		case eM6TokenNumber:
 			if (mDatabank != nullptr)
-				result.reset(mDatabank->Find(inIndex, mTokenizer.GetTokenString(), false));
+				result.reset(mDatabank->Find(inIndex, mTokenizer.GetTokenString()));
 			Match(mLookahead);
 			break;
 

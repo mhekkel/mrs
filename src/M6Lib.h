@@ -69,6 +69,16 @@ enum M6IndexType : uint32
 	eM6CharWeightedIndex	= 'M6cw'
 };
 
+enum M6QueryOperator
+{
+	eM6Contains,
+	eM6LessThan,
+	eM6LessOrEqual,
+	eM6Equals,
+	eM6GreaterOrEqual,
+	eM6GreaterThan
+};
+
 extern const uint32
 	kM6MaxWeight, kM6WeightBitCount;
 

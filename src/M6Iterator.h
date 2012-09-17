@@ -196,6 +196,7 @@ class M6VectorIterator : public M6Iterator
 					{
 						std::swap(mVector, inVector);
 						mPtr = mVector.begin();
+						mCount = mVector.size();
 						mRanked = true;
 					}
 
@@ -204,6 +205,8 @@ class M6VectorIterator : public M6Iterator
 						std::transform(inVector.begin(), inVector.end(), std::back_inserter(mVector),
 							[](uint32 doc) -> std::pair<uint32,float> { return std::make_pair(doc, 1.0f); });
 						mPtr = mVector.begin();
+						mCount = mVector.size();
+						mRanked = true;
 					}
 
 	virtual bool	Next(uint32& outDoc, float& outRank)
@@ -215,6 +218,41 @@ class M6VectorIterator : public M6Iterator
 							outRank = mPtr->second;
 							++mPtr;
 							result = true;
+						}
+						return result;
+					}
+
+  private:
+	M6Vector		mVector;
+	M6Vector::iterator
+					mPtr;
+};
+
+class M6BitmapIterator : public M6Iterator
+{
+  public:
+	typedef std::vector<bool>	M6Vector;
+
+					M6BitmapIterator(M6Vector& inVector, uint32 inCount)
+					{
+						std::swap(mVector, inVector);
+						mPtr = mVector.begin();
+						mCount = inCount;
+						mRanked = false;
+					}
+
+	virtual bool	Next(uint32& outDoc, float& outRank)
+					{
+						bool result = false;
+						while (mPtr != mVector.end())
+						{
+							if (*mPtr++)
+							{
+								outDoc = static_cast<uint32>(mPtr - mVector.begin() - 1);
+								outRank = 1.0f;
+								result = true;
+								break;
+							}
 						}
 						return result;
 					}

@@ -2688,7 +2688,7 @@ void M6IndexImplT<M6DataType>::Find(const string& inQuery, M6QueryOperator inOpe
 				if (d < 0)
 				{
 					result = true;
-					outCount += AddHits(inData, outBitmap);
+					outCount += this->AddHits(inData, outBitmap);
 				}
 				break;
 
@@ -2696,19 +2696,19 @@ void M6IndexImplT<M6DataType>::Find(const string& inQuery, M6QueryOperator inOpe
 				if (d <= 0)
 				{
 					result = true;
-					outCount += AddHits(inData, outBitmap);
+					outCount += this->AddHits(inData, outBitmap);
 				}
 				break;
 
 			case eM6GreaterOrEqual:
 				if (d >= 0)
-					outCount += AddHits(inData, outBitmap);
+					outCount += this->AddHits(inData, outBitmap);
 				result = true;
 				break;
 
 			case eM6GreaterThan:
 				if (d > 0)
-					outCount += AddHits(inData, outBitmap);
+					outCount += this->AddHits(inData, outBitmap);
 				result = true;
 				break;
 			
@@ -3732,7 +3732,7 @@ void M6LeafPage<M6MultiData>::Dump(int inLevel, BranchPage* inParent)
 	cout << prefix << "leaf page at " << mPageNr << "; N = " << mData->mN << ": [" << endl;
 	for (int i = 0; i < mData->mN; ++i)
 	{
-		M6MultiData& data = GetValue(i);
+		const M6MultiData& data = GetValue(i);
 		
 		M6IBitStream bits(new M6IBitVectorImpl(mIndex, data.mBitVector));
 		vector<uint32> docs;

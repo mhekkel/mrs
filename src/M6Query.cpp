@@ -28,6 +28,7 @@ class M6QueryParser
 	M6Iterator*		ParseTest();
 	M6Iterator*		ParseQualifiedTest(const string& inIndex);
 	M6Iterator*		ParseTerm(const string& inIndex);
+	M6Iterator*		ParseBooleanTerm(const string& inIndex, M6QueryOperator inOperator);
 	M6Iterator*		ParseString();
 
 	M6Token			GetNextToken();
@@ -195,6 +196,30 @@ M6Iterator* M6QueryParser::ParseQualifiedTest(const string& inIndex)
 			result.reset(ParseTerm(inIndex));
 			break;
 		
+		case eM6TokenLessThan:
+			mIsBooleanQuery = true;
+			Match(eM6TokenLessThan);
+			result.reset(ParseBooleanTerm(inIndex, eM6LessThan));
+			break;
+
+		case eM6TokenLessEqual:
+			mIsBooleanQuery = true;
+			Match(eM6TokenLessEqual);
+			result.reset(ParseBooleanTerm(inIndex, eM6LessOrEqual));
+			break;
+
+		case eM6TokenGreaterEqual:
+			mIsBooleanQuery = true;
+			Match(eM6TokenGreaterEqual);
+			result.reset(ParseBooleanTerm(inIndex, eM6GreaterOrEqual));
+			break;
+
+		case eM6TokenGreaterThan:
+			mIsBooleanQuery = true;
+			Match(eM6TokenGreaterThan);
+			result.reset(ParseBooleanTerm(inIndex, eM6GreaterThan));
+			break;
+		
 		default:
 			THROW(("relational operators are unsupported for now"));
 	}
@@ -243,6 +268,47 @@ M6Iterator* M6QueryParser::ParseTerm(const string& inIndex)
 
 		default:
 			Match(eM6TokenWord);
+			break;
+	}
+	
+	return result.release();
+}
+
+M6Iterator* M6QueryParser::ParseBooleanTerm(const string& inIndex, M6QueryOperator inOperator)
+{
+	unique_ptr<M6Iterator> result;
+	
+	switch (mLookahead)
+	{
+		case eM6TokenString:
+		{
+			M6Tokenizer tokenizer(mTokenizer.GetTokenValue(), mTokenizer.GetTokenLength());
+			for (;;)
+			{
+				M6Token token = tokenizer.GetNextWord();
+				if (token == eM6TokenEOF)
+					break;
+					
+				if (token == eM6TokenWord or token == eM6TokenNumber)
+					mQueryTerms.push_back(tokenizer.GetTokenString());
+			}
+
+			if (mDatabank != nullptr)
+				result.reset(mDatabank->Find(inIndex, mTokenizer.GetTokenString(), inOperator));
+
+			Match(eM6TokenString);
+			break;
+		}
+
+		case eM6TokenWord:
+		case eM6TokenNumber:
+			if (mDatabank != nullptr)
+				result.reset(mDatabank->Find(inIndex, mTokenizer.GetTokenString(), inOperator));
+			Match(mLookahead);
+			break;
+
+		default:
+			Match(eM6TokenNumber);
 			break;
 	}
 	

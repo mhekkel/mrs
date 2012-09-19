@@ -2,7 +2,6 @@ Todo
 
 - SOAP services (alleen blast nog)
 - links
-- pattern search
 - boolean operator support
 
 Choices:

@@ -39,6 +39,28 @@ class M6Iterator
 // --------------------------------------------------------------------
 // There are many implementations of M6Iterator:
 
+class M6AllDocIterator : public M6Iterator
+{
+  public:
+					M6AllDocIterator(uint32 inMax) : mCur(1), mMax(inMax) {}
+
+	virtual bool	Next(uint32& outDoc, float& outRank)
+					{
+						outRank = 1.0f;
+						outDoc = mCur++;
+						return mCur <= mMax;
+					}
+
+  private:
+	uint32			mCur, mMax;
+};
+
+class M6NoDocIterator
+{
+  public:
+	virtual bool	Next(uint32&, float&) { return false; }
+};
+
 class M6SingleDocIterator : public M6Iterator
 {
   public:

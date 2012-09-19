@@ -404,8 +404,6 @@ class M6PageDataAccess
 	bool			TooSmall() const				{ return Free() > kM6MinKeySpace; }
 
 	bool			BinarySearch(const string& inKey, int32& outIndex, M6IndexImpl& inIndex) const;
-	void			LowerBound(const string& inPattern, int32& outIndex) const;
-	void			UpperBound(const string& inPattern, int32& outIndex) const;
 
 	string			GetKey(uint32 inIndex) const;
 	M6DataType		GetValue(uint32 inIndex) const;
@@ -821,13 +819,10 @@ struct M6IndexImpl
 	virtual bool	Find(const string& inKey, M6MultiIDLData& outValue)				{ THROW(("Incorrect use of index")); }
 
 	virtual M6Iterator*	Find(const string& inKey) = 0;
-	virtual M6Iterator*	Find(const string& inKey, M6QueryOperator inOperator) = 0;
+	virtual void		Find(const string& inKey, M6QueryOperator inOperator, vector<bool>& outBitmap, uint32& outCount) = 0;
 	virtual void		FindPattern(const string& inPattern, vector<bool>& outBitmap, uint32& outCount) = 0;
 	virtual M6Iterator*	FindString(const string& inString) = 0;
 	
-	void			LowerBound(const string& inPattern, uint32& outPage, uint32& outKeyNr);
-	void			UpperBound(const string& inPattern, uint32& outPage, uint32& outKeyNr);
-
 	uint32			Size() const				{ return mHeader.mSize; }
 	uint32			Depth() const				{ return mHeader.mDepth; }
 	M6IndexType		GetIndexType() const		{ return mIndexType; }
@@ -933,7 +928,7 @@ class M6IndexImplT : public M6IndexImpl
 	virtual bool	Find(const string& inKey, M6DataType& outValue);
 
 	virtual M6Iterator*	Find(const string& inKey);
-	virtual M6Iterator*	Find(const string& inKey, M6QueryOperator inOperator);
+	virtual void		Find(const string& inKey, M6QueryOperator inOperator, vector<bool>& outBitmap, uint32& outCount);
 	virtual void		FindPattern(const string& inPattern, vector<bool>& outBitmap, uint32& outCount);
 	virtual M6Iterator*	FindString(const string& inString);
 
@@ -1021,9 +1016,8 @@ class M6IndexPage : public M6BasicPage
 	
 	virtual bool		IsLeaf() const = 0;
 	
+	virtual void		LowerBound(const string& inKey, uint32& outPage, uint32& outKeyNr) = 0;
 	virtual bool		Find(const string& inKey, M6DataType& outValue) = 0;
-	virtual void		LowerBound(const string& inPattern, uint32& outPage, uint32& outKeyNr) = 0;
-	virtual void		UpperBound(const string& inPattern, uint32& outPage, uint32& outKeyNr) = 0;
 	virtual bool		Insert(string& ioKey, const M6DataType& inValue, uint32& outLink) = 0;
 	virtual bool		Erase(string& ioKey, int32 inIndex, BranchPage* inParent, BranchPage* inLinkPage, uint32 inLinkIndex) = 0;
 
@@ -1073,9 +1067,8 @@ class M6LeafPage : public M6IndexPage<M6DataType>
 
 	virtual bool		IsLeaf() const												{ return true; }
 	
+	virtual void		LowerBound(const string& inKey, uint32& outPage, uint32& outKeyNr);
 	virtual bool		Find(const string& inKey, M6DataType& outValue);
-	virtual void		LowerBound(const string& inPattern, uint32& outPage, uint32& outKeyNr);
-	virtual void		UpperBound(const string& inPattern, uint32& outPage, uint32& outKeyNr);
 	virtual bool		Insert(string& ioKey, const M6DataType& inValue, uint32& outLink);
 	virtual bool		Erase(string& ioKey, int32 inIndex, BranchPage* inParent, BranchPage* inLinkPage, uint32 inLinkIndex);
 
@@ -1132,9 +1125,8 @@ class M6BranchPage : public M6IndexPage<M6DataType>
 
 	virtual bool		IsLeaf() const												{ return false; }
 	
+	virtual void		LowerBound(const string& inKey, uint32& outPage, uint32& outKeyNr);
 	virtual bool		Find(const string& inKey, M6DataType& outValue);
-	virtual void		LowerBound(const string& inPattern, uint32& outPage, uint32& outKeyNr);
-	virtual void		UpperBound(const string& inPattern, uint32& outPage, uint32& outKeyNr);
 	virtual bool		Insert(string& ioKey, const M6DataType& inValue, uint32& outLink);
 	virtual bool		Erase(string& ioKey, int32 inIndex, BranchPage* inParent, BranchPage* inLinkPage, uint32 inLinkIndex);
 
@@ -1164,6 +1156,19 @@ M6LeafPage<M6DataType>::M6LeafPage(M6IndexImpl& inIndexImpl, M6IndexPageData* in
 }
 
 template<class M6DataType>
+void M6LeafPage<M6DataType>::LowerBound(const string& inKey, uint32& outPageNr, uint32& outKeyNr)
+{
+	outPageNr = mPageNr;
+	int32 ix;
+
+	(void)BinarySearch(inKey, ix);
+	if (ix < 0)
+		outKeyNr = 0;
+	else
+		outKeyNr = ix;
+}
+
+template<class M6DataType>
 bool M6LeafPage<M6DataType>::Find(const string& inKey, M6DataType& outValue)
 {
 	int32 ix;
@@ -1176,37 +1181,6 @@ bool M6LeafPage<M6DataType>::Find(const string& inKey, M6DataType& outValue)
 	}
 	
 	return result;
-}
-
-template<class M6DataType>
-void M6LeafPage<M6DataType>::LowerBound(const string& inPattern, uint32& outPageNr, uint32& outKeyNr)
-{
-	outPageNr = mPageNr;
-	
-	int32 ix;
-	
-	mAccess.LowerBound(inPattern, ix);
-	
-	if (ix < 0)
-		outKeyNr = 0;
-	else
-		outKeyNr = ix;
-}
-
-template<class M6DataType>
-void M6LeafPage<M6DataType>::UpperBound(const string& inPattern, uint32& outPageNr, uint32& outKeyNr)
-{
-	outPageNr = mPageNr;
-	int32 ix;
-	
-	mAccess.UpperBound(inPattern, ix);
-	
-	if (ix < 0)
-		outKeyNr = 0;
-	else if (static_cast<uint32>(ix) >= mAccess.GetN())
-		outPageNr = outKeyNr = 0;
-	else
-		outKeyNr = ix;
 }
 
 template<class M6DataType>
@@ -1426,11 +1400,28 @@ void M6LeafPage<M6DataType>::Dump(int inLevel, BranchPage* inParent)
 {
 	string prefix(inLevel * 2, ' ');
 
-	cout << prefix << "leaf page at " << mPageNr << "; N = " << mData->mN << ": [";
+	cout << prefix << "leaf page at " << mPageNr << "; N = " << mData->mN << ": [" << endl;
 	for (int i = 0; i < mData->mN; ++i)
-		cout << GetKey(i) << '(' << GetValue(i) << ')'
-			 << (i + 1 < mData->mN ? ", " : "");
-	cout << "]" << endl;
+	{
+		cout << prefix << "  " << GetKey(i) << '(' << GetValue(i) << ')'
+			 << (i + 1 < mData->mN ? ", " : "") << endl;
+		
+//		M6IBitStream bits(new M6IBitVectorImpl(*this, d.mBitVector));
+//		vector<uint32> docs;
+//		ReadArray(bits, docs);
+//		
+//		os << '[';
+//		bool first = true;
+//		foreach (uint32 doc, docs)
+//		{
+//			if (not first) os << ", ";
+//			first = false;
+//			os << doc;
+//		}
+//			
+//		os << ']';
+	}
+	cout << prefix << "]" << endl;
 
 	if (mData->mLink)
 	{
@@ -1453,6 +1444,23 @@ M6BranchPage<M6DataType>::M6BranchPage(M6IndexImpl& inIndexImpl, M6IndexPageData
 }
 
 template<class M6DataType>
+void M6BranchPage<M6DataType>::LowerBound(const string& inKey, uint32& outPageNr, uint32& outKeyNr)
+{
+	int32 ix;
+
+	BinarySearch(inKey, ix);
+
+	if (ix < 0)
+		outPageNr = mData->mLink;
+	else
+		outPageNr = GetValue(ix);
+	
+	IndexPage* page(mIndex.Load<IndexPage>(outPageNr));
+	page->LowerBound(inKey, outPageNr, outKeyNr);
+	mIndex.Release(page);
+}
+
+template<class M6DataType>
 bool M6BranchPage<M6DataType>::Find(const string& inKey, M6DataType& outValue)
 {
 	int32 ix;
@@ -1470,50 +1478,6 @@ bool M6BranchPage<M6DataType>::Find(const string& inKey, M6DataType& outValue)
 	bool result = page->Find(inKey, outValue);
 	mIndex.Release(page);
 	return result;
-}
-
-template<class M6DataType>
-void M6BranchPage<M6DataType>::LowerBound(const string& inPattern, uint32& outPageNr, uint32& outKeyNr)
-{
-	int32 ix;
-	mAccess.LowerBound(inPattern, ix);
-
-	assert(static_cast<uint32>(ix) <= mAccess.GetN());
-	assert(ix >= 0);
-
-	if (ix == mAccess.GetN() or M6Match(inPattern.c_str(), mAccess.GetKey(ix).c_str()) != eM6NoMatchAndLess)
-		--ix;
-
-	if (ix < 0)
-		outPageNr = mData->mLink;
-	else
-		outPageNr = GetValue(ix);
-	
-	IndexPage* page(mIndex.Load<IndexPage>(outPageNr));
-	page->LowerBound(inPattern, outPageNr, outKeyNr);
-	mIndex.Release(page);
-}
-
-template<class M6DataType>
-void M6BranchPage<M6DataType>::UpperBound(const string& inPattern, uint32& outPageNr, uint32& outKeyNr)
-{
-	int32 ix;
-	mAccess.UpperBound(inPattern, ix);
-
-	assert(ix == mAccess.GetN() or M6Match(inPattern.c_str(), mAccess.GetKey(ix - 1).c_str()) != eM6NoMatchAndGreater);
-
-//	if (ix == mAccess.GetN() or M6Match(inPattern.c_str(), mAccess.GetKey(ix).c_str()) != eM6NoMatchAndGreater)
-		--ix;
-
-	uint32 pageNr;
-	if (ix < 0)
-		pageNr = mData->mLink;
-	else
-		pageNr = GetValue(ix);
-	
-	IndexPage* page(mIndex.Load<IndexPage>(pageNr));
-	page->UpperBound(inPattern, outPageNr, outKeyNr);
-	mIndex.Release(page);
 }
 
 /*
@@ -1923,62 +1887,6 @@ bool M6PageDataAccess<M6DataPage>::BinarySearch(const string& inKey, int32& outI
 		outIndex = R;
 
 	return result;
-}
-
-template<class M6DataPage>
-void M6PageDataAccess<M6DataPage>::LowerBound(const string& inPattern, int32& outIndex) const
-{
-	int32 L = 0, R = mData.mN - 1;
-	while (L <= R)
-	{
-		int32 i = (L + R) / 2;
-
-		const uint8* ko = mData.mKeys + mKeyOffsets[i];
-		const char* k = reinterpret_cast<const char*>(ko + 1);
-
-		switch (M6Match(inPattern.c_str(), k, *ko))
-		{
-			case eM6NoMatchAndLess:
-				L = i + 1;
-				break;
-			
-			case eM6Match:
-			case eM6NoMatchAndEqual:
-			case eM6NoMatchAndGreater:
-				R = i - 1;
-				break;
-		}
-	}
-	
-	outIndex = R + 1;
-}
-
-template<class M6DataPage>
-void M6PageDataAccess<M6DataPage>::UpperBound(const string& inPattern, int32& outIndex) const
-{
-	int32 L = 0, R = mData.mN - 1;
-	while (L <= R)
-	{
-		int32 i = (L + R) / 2;
-
-		const uint8* ko = mData.mKeys + mKeyOffsets[i];
-		const char* k = reinterpret_cast<const char*>(ko + 1);
-
-		switch (M6Match(inPattern.c_str(), k, *ko))
-		{
-			case eM6Match:
-			case eM6NoMatchAndEqual:
-			case eM6NoMatchAndLess:
-				L = i + 1;
-				break;
-			
-			case eM6NoMatchAndGreater:
-				R = i - 1;
-				break;
-		}
-	}
-	
-	outIndex = R + 1;
 }
 
 // --------------------------------------------------------------------
@@ -2721,9 +2629,9 @@ uint32 M6IndexImplT<M6DataType>::AddHits(const M6DataType& inValue, vector<bool>
 {
 	M6IBitStream bits(new M6IBitVectorImpl(*this, inValue.mBitVector));
 	
-	uint32 count, updated;
+	uint32 updated;
 	
-	ReadArray(bits, outBitmap, count, updated);
+	ReadSimpleArray(bits, inValue.mCount, outBitmap, updated);
 	
 	return updated;
 }
@@ -2753,9 +2661,64 @@ M6Iterator* M6IndexImplT<M6DataType>::Find(const string& inKey)
 }
 
 template<class M6DataType>
-M6Iterator* M6IndexImplT<M6DataType>::Find(const string& inKey, M6QueryOperator inOperator)
+void M6IndexImplT<M6DataType>::Find(const string& inQuery, M6QueryOperator inOperator,
+	vector<bool>& outBitmap, uint32& outCount)
 {
-	return nullptr;
+	if (mHeader.mRoot == 0)
+		return;
+	
+	uint32 page = 0, key = 0;
+
+	if (inOperator != eM6LessThan and inOperator != eM6LessOrEqual)
+	{
+		IndexPage* root(Load<IndexPage>(mHeader.mRoot));
+		root->LowerBound(inQuery, page, key);
+		Release(root);
+	}
+
+	Visit([&](const char* inKey, uint32 inKeyLen, const M6DataType& inData) -> bool
+	{
+		bool result = false;
+		
+		int d = this->mIndex.CompareKeys(inKey, inKeyLen, inQuery.c_str(), inQuery.length());
+		
+		switch (inOperator)
+		{
+			case eM6LessThan:
+				if (d < 0)
+				{
+					result = true;
+					outCount += AddHits(inData, outBitmap);
+				}
+				break;
+
+			case eM6LessOrEqual:
+				if (d <= 0)
+				{
+					result = true;
+					outCount += AddHits(inData, outBitmap);
+				}
+				break;
+
+			case eM6GreaterOrEqual:
+				if (d >= 0)
+					outCount += AddHits(inData, outBitmap);
+				result = true;
+				break;
+
+			case eM6GreaterThan:
+				if (d > 0)
+					outCount += AddHits(inData, outBitmap);
+				result = true;
+				break;
+			
+			default:
+				assert(false);
+				break;
+		}
+
+		return result;
+	}, page, key);
 }
 
 template<class M6DataType>
@@ -2764,11 +2727,18 @@ void M6IndexImplT<M6DataType>::FindPattern(const string& inPattern, vector<bool>
 	if (mHeader.mRoot == 0)
 		return;
 	
-	IndexPage* root(Load<IndexPage>(mHeader.mRoot));
-
 	uint32 page, key;
-	
-	root->LowerBound(inPattern, page, key);
+
+	// pattern is a glob pattern
+	string s(inPattern.substr(0, inPattern.find('*')));
+	s = s.substr(0, s.find('?'));
+
+	if (not s.empty())
+	{
+		IndexPage* root(Load<IndexPage>(mHeader.mRoot));
+		root->LowerBound(s, page, key);
+		Release(root);
+	}
 
 	Visit([&](const char* inKey, uint32 inKeyLen, const M6DataType& inData) -> bool
 	{
@@ -3350,9 +3320,10 @@ M6Iterator* M6BasicIndex::Find(const string& inKey)
 	return mImpl->Find(inKey);
 }
 
-M6Iterator* M6BasicIndex::Find(const string& inKey, M6QueryOperator inOperator)
+void M6BasicIndex::Find(const string& inKey, M6QueryOperator inOperator,
+	vector<bool>& outBitmap, uint32& outCount)
 {
-	return mImpl->Find(inKey, inOperator);
+	mImpl->Find(inKey, inOperator, outBitmap, outCount);
 }
 
 void M6BasicIndex::FindPattern(const string& inPattern, vector<bool>& outBitmap, uint32& outCount)
@@ -3751,3 +3722,44 @@ M6BasicIndex* M6BasicIndex::Load(const fs::path& inFile)
 	
 	return index;
 }
+
+
+template<>
+void M6LeafPage<M6MultiData>::Dump(int inLevel, BranchPage* inParent)
+{
+	string prefix(inLevel * 2, ' ');
+
+	cout << prefix << "leaf page at " << mPageNr << "; N = " << mData->mN << ": [" << endl;
+	for (int i = 0; i < mData->mN; ++i)
+	{
+		M6MultiData& data = GetValue(i);
+		
+		M6IBitStream bits(new M6IBitVectorImpl(mIndex, data.mBitVector));
+		vector<uint32> docs;
+		ReadArray(bits, docs);
+
+		assert(docs.size() == data.mCount);
+		
+		cout << prefix << "  " << GetKey(i) << '(' << data.mCount << ')'
+			 << (i + 1 < mData->mN ? ", " : "") << endl;
+		
+		cout << prefix << "   [";
+		bool first = true;
+		foreach (uint32 doc, docs)
+		{
+			if (not first) cout << ", ";
+			first = false;
+			cout << doc;
+		}
+		cout << ']' << endl;
+	}
+	cout << prefix << "]" << endl;
+
+	if (mData->mLink)
+	{
+		LeafPage* next(mIndex.Load<LeafPage>(mData->mLink));
+		cout << prefix << "  " << "link: " << next->GetKey(0) << endl;
+		mIndex.Release(next);
+	}
+}
+

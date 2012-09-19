@@ -265,3 +265,22 @@ BOOST_AUTO_TEST_CASE(test_bit_stream_8)
 
 }
 
+BOOST_AUTO_TEST_CASE(test_bit_stream_9)
+{
+	cout << "testing bitstream 9" << endl;
+
+	uint32 d[] = { 294, 771 };
+
+	vector<uint32> docs(d, d + 2);
+
+	M6OBitStream bits;
+	WriteArray(bits, docs);
+
+	M6IBitStream b2(bits);
+
+	vector<uint32> d2;
+	ReadArray(b2, d2);
+
+	BOOST_CHECK(docs == d2);
+}
+

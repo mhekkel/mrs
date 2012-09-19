@@ -1670,8 +1670,23 @@ M6Iterator* M6DatabankImpl::Find(const string& inIndex, const string& inTerm, M6
 		if (inIndex != "*" and not ba::iequals(inIndex, desc.mName))
 			continue;
 		
-		M6Iterator* iter = desc.mIndex->Find(term, inOperator);
-
+		M6Iterator* iter = nullptr;
+		
+		switch (inOperator)
+		{
+			case eM6Equals:
+			case eM6Contains:		iter = desc.mIndex->Find(term); break;
+			default:
+			{
+				vector<bool> hits(GetDocStore().NextDocumentNumber() + 1);
+				uint32 count = 0;
+				desc.mIndex->Find(term, inOperator, hits, count);
+				if (count > 0)
+					iter = new M6BitmapIterator(hits, count);
+				break;
+			}
+		}
+		
 		if (iter != nullptr)
 			result->AddIterator(iter);
 	}
@@ -1868,8 +1883,12 @@ void M6DatabankImpl::DumpIndex(const string& inIndex, ostream& inStream)
 	if (index == nullptr)
 		THROW(("Index %s not found", inIndex.c_str()));
 	
+#if DEBUG
+	index->Dump();
+#else
 	foreach (const string& key, *index)
 		inStream << key << endl;
+#endif
 }
 
 // --------------------------------------------------------------------

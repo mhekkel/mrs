@@ -247,6 +247,9 @@ void ReadArray(M6IBitStream& inBits, std::vector<bool>& outArray,
 
 void CompressSimpleArraySelector(M6OBitStream& inBits, const std::vector<uint32>& inArray);
 
+void ReadSimpleArray(M6IBitStream& inBits, uint32 inCount,
+	std::vector<bool>& outArray, uint32& outSet);
+
 // To iterate over array elements stored in a bitstream, you can use
 // the M6CompressedArray class. It has a const_iterator for your convenience.
 

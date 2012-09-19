@@ -101,7 +101,7 @@ class M6BasicIndex
 	void			Insert(uint32 inKey, uint32 inValue);
 
 	M6Iterator*		Find(const std::string& inKey);
-	M6Iterator*		Find(const std::string& inKey, M6QueryOperator inOperator);
+	void			Find(const std::string& inKey, M6QueryOperator inOperator, std::vector<bool>& outBitmap, uint32& outCount);
 	void			FindPattern(const std::string& inPattern, std::vector<bool>& outBitmap, uint32& outCount);
 	M6Iterator*		FindString(const std::string& inString);
 

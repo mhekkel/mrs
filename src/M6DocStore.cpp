@@ -852,7 +852,7 @@ M6DocStoreImpl::M6DocStoreImpl(const fs::path& inPath, MOpenMode inMode)
 		mFile.PRead(mHeader, 0);
 		mRoot = Load<M6DocStoreIndexPage>(mHeader.mIndexRoot);
 	}
-	
+
 	assert(mHeader.mSignature == kM6DocStoreSignature);
 //	assert(mHeader.mHeaderSize == sizeof(mHeader));
 }

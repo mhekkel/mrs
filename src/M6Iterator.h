@@ -196,7 +196,7 @@ class M6VectorIterator : public M6Iterator
 					{
 						std::swap(mVector, inVector);
 						mPtr = mVector.begin();
-						mCount = mVector.size();
+						mCount = static_cast<uint32>(mVector.size());
 						mRanked = true;
 					}
 
@@ -205,7 +205,7 @@ class M6VectorIterator : public M6Iterator
 						std::transform(inVector.begin(), inVector.end(), std::back_inserter(mVector),
 							[](uint32 doc) -> std::pair<uint32,float> { return std::make_pair(doc, 1.0f); });
 						mPtr = mVector.begin();
-						mCount = mVector.size();
+						mCount = static_cast<uint32>(mVector.size());
 						mRanked = true;
 					}
 

@@ -426,14 +426,14 @@ uint32 M6Tokenizer::GetNextCharacter()
 {
 	uint32 result = 0;
 	
-	if (mPtr >= mEnd)
-	{
-		// result = 0
-	}
-	else if (mLookaheadLength > 0)
+	if (mLookaheadLength > 0)
 	{
 		--mLookaheadLength;
 		result = mLookahead[mLookaheadLength];
+	}
+	else if (mPtr >= mEnd)
+	{
+		// result = 0
 	}
 	else if ((*mPtr & 0x080) == 0)		// next byte is a valid ASCII character
 	{

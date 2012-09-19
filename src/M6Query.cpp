@@ -167,7 +167,11 @@ M6Iterator* M6QueryParser::ParseTest()
 			if (mLookahead >= eM6TokenColon and mLookahead <= eM6TokenGreaterThan)
 				result.reset(ParseQualifiedTest(s));
 			else
+			{
+				if (mDatabank != nullptr)
+					result.reset(mDatabank->Find("*", s));
 				mQueryTerms.push_back(s);
+			}
 			break;
 		}
 

@@ -152,9 +152,15 @@ M6Iterator* M6UnionIterator::Create(M6Iterator* inA, M6Iterator* inB)
 	else if (inB == nullptr)
 		result = inA;
 	else if (dynamic_cast<M6UnionIterator*>(inA) != nullptr)
+	{
 		static_cast<M6UnionIterator*>(inA)->AddIterator(inB);
+		result = inA;
+	}
 	else if (dynamic_cast<M6UnionIterator*>(inB) != nullptr)
+	{
 		static_cast<M6UnionIterator*>(inB)->AddIterator(inA);
+		result = inB;
+	}
 	else
 		result = new M6UnionIterator(inA, inB);
 	return result;

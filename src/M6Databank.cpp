@@ -1512,9 +1512,6 @@ M6Iterator* M6DatabankImpl::Find(const vector<string>& inQueryTerms,
 	term_list terms;
 	bool foundAllTerms = true;
 	
-//double start = system_time();
-//cerr << "TRACE " << __LINE__ << ' ' << (system_time() - start) << endl;
-//	
 	// collect search terms, their iterator, and sort them based on IDF
 	foreach (const string& term, inQueryTerms)
 	{
@@ -1550,13 +1547,9 @@ M6Iterator* M6DatabankImpl::Find(const vector<string>& inQueryTerms,
 		return get<3>(a) > get<3>(b);
 	});
 
-//cerr << "TRACE " << __LINE__ << ' ' << (system_time() - start) << endl;
-
 	float queryWeight = 0, Smax = 0, firstWq = tr1::get<3>(terms.front());
 	M6Accumulator A(maxDocNr);
 
-//cerr << "TRACE " << __LINE__ << ' ' << (system_time() - start) << endl;
-	
 	foreach (term_type term, terms)
 	{
 		float wq = tr1::get<3>(term);
@@ -1595,8 +1588,6 @@ M6Iterator* M6DatabankImpl::Find(const vector<string>& inQueryTerms,
 		}
 	}
 
-//cerr << "TRACE " << __LINE__ << ' ' << (system_time() - start) << endl;
-		
 	queryWeight = sqrt(queryWeight);
 	
 	vector<uint32> docs;
@@ -1605,8 +1596,6 @@ M6Iterator* M6DatabankImpl::Find(const vector<string>& inQueryTerms,
 		termCount = 0;
 	A.Collect(docs, termCount);
 
-//cerr << "TRACE " << __LINE__ << ' ' << (system_time() - start) << endl;
-	
 	if (inFilter != nullptr)
 	{
 		sort(docs.begin(), docs.end());
@@ -1624,8 +1613,6 @@ M6Iterator* M6DatabankImpl::Find(const vector<string>& inQueryTerms,
 	else
 		best.reserve(count);
 
-//cerr << "TRACE " << __LINE__ << ' ' << (system_time() - start) << endl;
-	
 	foreach (uint32 doc, docs)
 	{
 		float docWeight = mDocWeights[doc];
@@ -1644,14 +1631,10 @@ M6Iterator* M6DatabankImpl::Find(const vector<string>& inQueryTerms,
 		}
 	}
 
-//cerr << "TRACE " << __LINE__ << ' ' << (system_time() - start) << endl;
-	
 	sort_heap(best.begin(), best.end(), compare);
 
 	if (best.size() < inReportLimit)
 		count = static_cast<uint32>(best.size());
-
-//cerr << "TRACE " << __LINE__ << ' ' << (system_time() - start) << endl;
 
 	M6Iterator* result = new M6VectorIterator(best);
 	result->SetCount(count);

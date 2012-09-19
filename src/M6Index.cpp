@@ -2775,30 +2775,10 @@ void M6IndexImplT<M6DataType>::FindPattern(const string& inPattern, vector<bool>
 		M6MatchResult r = M6Match(inPattern.c_str(), inKey, inKeyLen);
 		
 		if (r == eM6Match)
-			outCount += AddHits(inData, outBitmap);
+			outCount += this->AddHits(inData, outBitmap);
 		
 		return r != eM6NoMatchAndGreater;
 	}, page, key);
-
-//
-//
-//
-//	iterator b = At(page, key);
-//	
-//	root->UpperBound(inPattern, page, key);
-//	iterator e = At(page, key);
-//	
-//	Release(root);
-//
-//	for (iterator i = b; i != e; ++i)
-//	{
-//		switch (M6Match(inPattern.c_str(), i->c_str()))
-//		{
-//			case eM6Match:
-//				outCount += AddHits(i.page(), i.keynr(), outBitmap);
-//				break;
-//		}
-//	}
 }
 
 template<class M6DataType>

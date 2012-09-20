@@ -9,7 +9,6 @@ Choices:
 
 - Joined databanks? Aliases?
 - near operator, how to implement? new query language?
-- configuration: store in xml config file, use sqlite, or both?
 
 Basic:
 
@@ -24,7 +23,6 @@ Basic:
 
 Indexing:
 
-- Replacement for makefiles
 - feed header to parser scripts
 
 Search:

@@ -32,8 +32,8 @@ enum M6Token
 	eM6TokenString,			// a quoted string
 	eM6TokenPattern,		// a glob-like pattern
 	eM6TokenDocNr,			// #1234 an explicit document number
-	eM6TokenHyphen,
-	eM6TokenPlus,
+//	eM6TokenHyphen,
+//	eM6TokenPlus,
 	eM6TokenOR,
 	eM6TokenAND,
 	eM6TokenNOT,

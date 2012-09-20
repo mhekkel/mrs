@@ -166,6 +166,30 @@ M6Iterator* M6QueryParser::ParseTest()
 			
 			if (mLookahead >= eM6TokenColon and mLookahead <= eM6TokenGreaterThan)
 				result.reset(ParseQualifiedTest(s));
+			else if (mLookahead == eM6TokenPunctuation)
+			{
+				mQueryTerms.push_back(s);
+				
+				do
+				{
+					Match(eM6TokenPunctuation);
+					
+					if (mLookahead != eM6TokenWord)
+						break;
+					
+					mQueryTerms.push_back(mTokenizer.GetTokenString());
+					s = s + ' ' + mQueryTerms.back();
+				}
+				while (mLookahead == eM6TokenPunctuation);
+				
+				if (mDatabank != nullptr)
+				{
+					if (mQueryTerms.size() > 1)
+						result.reset(mDatabank->FindString("*", s));
+					else
+						result.reset(mDatabank->Find("*", mQueryTerms.front()));
+				}
+			}
 			else
 			{
 				if (mDatabank != nullptr)

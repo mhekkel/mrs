@@ -32,8 +32,8 @@ ostream& operator<<(ostream& os, M6Token inToken)
 		case eM6TokenPunctuation:		os << "punctuation character"; break;
 		case eM6TokenString:			os << "quoted string"; break;
 		case eM6TokenPattern:			os << "glob-pattern (word with * or ?)"; break;
-		case eM6TokenHyphen:			os << "hyphen character"; break;
-		case eM6TokenPlus:				os << "plus character"; break;
+		//case eM6TokenHyphen:			os << "hyphen character"; break;
+		//case eM6TokenPlus:				os << "plus character"; break;
 		case eM6TokenOR:				os << "OR"; break;
 		case eM6TokenAND:				os << "AND"; break;
 		case eM6TokenOpenParenthesis:	os << "'('"; break;
@@ -664,8 +664,8 @@ M6Token M6Tokenizer::GetNextQueryToken()
 				switch (c)
 				{
 					case 0:		result = eM6TokenEOF; break;
-					case '-':	result = eM6TokenHyphen; break;
-					case '+':	result = eM6TokenPlus; break;
+//					case '-':	result = eM6TokenHyphen; break;
+//					case '+':	result = eM6TokenPlus; break;
 					case '(':	result = eM6TokenOpenParenthesis; break;
 					case ')':	result = eM6TokenCloseParenthesis; break;
 					case ':':	result = eM6TokenColon; break;
@@ -691,7 +691,7 @@ M6Token M6Tokenizer::GetNextQueryToken()
 							state = 20;
 						else if (fast::isalnum(c))
 							state = 30;
-						else if (fast::ispunct(c))
+						else if (fast::ispunct(c) or c == '-' or c == '+')
 							result = eM6TokenPunctuation;
 						else
 							state = 60;

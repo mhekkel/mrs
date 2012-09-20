@@ -43,8 +43,8 @@ struct M6TokenTest
 
 	{
 		" 1e+0 1e-1",
-		{ eM6TokenWord, eM6TokenPlus, eM6TokenNumber, eM6TokenWord, eM6TokenHyphen, eM6TokenNumber, eM6TokenEOF },
-		{ "1e", "+", "0", "1e", "-", "1" }
+		{ eM6TokenWord, eM6TokenNumber, eM6TokenWord, eM6TokenNumber, eM6TokenEOF },
+		{ "1e", "0", "1e", "1" }
 	},
 
 //	{ "10a 1e0a", { eM6TokenWord, eM6TokenWord, eM6TokenEOF } },

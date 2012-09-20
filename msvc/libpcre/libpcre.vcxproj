@@ -73,7 +73,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
       <AdditionalOptions> /Zm1000 %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalIncludeDirectories>..\..\../pcre-build;..\..\../pcre-8.13;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..\pcre-build;..\..\../pcre-8.13;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <CompileAs>CompileAsC</CompileAs>
       <ExceptionHandling>
       </ExceptionHandling>

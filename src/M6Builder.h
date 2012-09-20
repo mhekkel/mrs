@@ -19,6 +19,8 @@ class M6Builder
 	
 	void				Build(uint32 inNrOfThreads);
 
+	bool				NeedsUpdate();
+
 	void				IndexDocument(const std::string& inText,
 							std::vector<std::string>& outTerms);
 

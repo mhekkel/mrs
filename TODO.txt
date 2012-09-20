@@ -1,5 +1,7 @@
 Todo
 
+- Query Parser: e.q. 'crambin-like' goes wrong
+
 - SOAP services (alleen blast nog)
 - links
 
@@ -7,7 +9,6 @@ Choices:
 
 - Joined databanks? Aliases?
 - near operator, how to implement? new query language?
-- parser language: graphical or text based?
 - configuration: store in xml config file, use sqlite, or both?
 
 Basic:

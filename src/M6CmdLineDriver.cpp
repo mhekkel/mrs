@@ -17,6 +17,7 @@
 #include "M6Iterator.h"
 #include "M6Document.h"
 #include "M6Blast.h"
+#include "M6Fetch.h"
 
 using namespace std;
 namespace po = boost::program_options;
@@ -176,9 +177,19 @@ void Build(int argc, char* argv[])
 		nrOfThreads = vm["threads"].as<uint32>();
 	if (nrOfThreads < 1)
 		nrOfThreads = 1;
+	
+	if (strcmp(argv[0], "update") == 0 and
+		M6Config::Instance().FindFirst((boost::format("/m6-config/databank[@id='%1%']/fetch") % databank).str()) != nullptr)
+	{
+		M6Fetch(databank);
+	}
 
 	M6Builder builder(databank);
-	builder.Build(nrOfThreads);
+	
+	if (strcmp(argv[0], "build") == 0 or builder.NeedsUpdate())
+		builder.Build(nrOfThreads);
+	else
+		cout << databank << " is up-to-date" << endl;
 }
 
 void Query(int argc, char* argv[])
@@ -487,6 +498,44 @@ void Entry(int argc, char* argv[])
 	cout << doc->GetText() << endl;
 }
 
+void Fetch(int argc, char* argv[])
+{
+	po::options_description desc("m6 fetch [databank]");
+	desc.add_options()
+		("databank,d",	po::value<string>(),	"Databank to build")
+		("config-file,c", po::value<string>(),	"Configuration file")
+		("verbose,v",							"Be verbose")
+		("help,h",								"Display help message")
+		;
+
+	po::positional_options_description p;
+	p.add("databank", 1);
+	
+	po::variables_map vm;
+	po::store(po::command_line_parser(argc, argv).options(desc).positional(p).run(), vm);
+	po::notify(vm);
+
+	if (vm.count("help") or vm.count("databank") == 0)
+	{
+		cout << desc << "\n";
+		exit(1);
+	}
+	
+	if (vm.count("verbose"))
+		VERBOSE = 1;
+	
+	fs::path configFile("config/m6-config.xml");
+	if (vm.count("config-file"))
+		configFile = vm["config-file"].as<string>();
+	
+	if (not fs::exists(configFile))
+		THROW(("Configuration file not found (\"%s\")", configFile.string().c_str()));
+	
+	M6Config::SetConfigFile(configFile);
+
+	M6Fetch(vm["databank"].as<string>());
+}
+
 void Vacuum(int argc, char* argv[])
 {
 	po::options_description desc("m6 vacuum [databank]");
@@ -595,14 +644,26 @@ int main(int argc, char* argv[])
 		{
 			cout << "Usage: m6 command [options]" << endl
 				 << endl
-				 << "  Command can be one of: blast, build, query, info, entry, dump, vacuum, validate" << endl
+				 << "  Command can be one of:" << endl
+				 << endl
+				 << "    blast       Do a blast search" << endl
+				 << "    build       (Re-)build a databank" << endl
+				 << "    dump        Dump index data" << endl
+				 << "    entry       Retrieve and print an entry" << endl
+				 << "    fetch       Fetch/mirror remote data for a databank" << endl
+				 << "    info        Display information and statistics for a databank" << endl
+				 << "    query       Perform a search in a databank" << endl
+				 << "    vacuum      Clean up a databank removing unused data" << endl
+				 << "    validate    Perform a set of validation tests" << endl
+				 << "    update      Same as build, but does a fetch first" << endl
+				 << endl
 				 << "  Use m6 command --help for more info on each command" << endl;
 			exit(1);
 		}
 		
 		if (strcmp(argv[1], "blast") == 0)
 			Blast(argc - 1, argv + 1);
-		else if (strcmp(argv[1], "build") == 0)
+		else if (strcmp(argv[1], "build") == 0 or strcmp(argv[1], "update") == 0)
 			Build(argc - 1, argv + 1);
 		else if (strcmp(argv[1], "query") == 0)
 			Query(argc - 1, argv + 1);
@@ -616,6 +677,8 @@ int main(int argc, char* argv[])
 			Vacuum(argc - 1, argv + 1);
 		else if (strcmp(argv[1], "validate") == 0)
 			Validate(argc - 1, argv + 1);
+		else if (strcmp(argv[1], "fetch") == 0)
+			Fetch(argc - 1, argv + 1);
 		else
 		{
 			cout << "Unknown command " << argv[1] << endl

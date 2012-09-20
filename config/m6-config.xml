@@ -95,15 +95,12 @@
 
 	<databank id="pdbfinder" parser="pdbfinder">
 		<name>PDBFINDER</name>
-<!--		<file>C:\Users\maarten\projects\m6\test\pdbfinder.m6</file> -->
-		<file>/data/mrs/pdbfinder.m6</file>
+		<file>pdbfinder.m6</file>
 		<locale>en_US.UTF-8</locale>
-		
-		<!-- source type can be path, glob or regex -->
-<!--		<source>test/PDBFIND2.TXT.gz</source>-->
-<!--		<source>C:\Users\maarten\projects\m6\test\PDBFIND2.TXT</source> -->
-<!--		<source>C:\Users\maarten\projects\m6\test\pdbfind2-head-2.txt</source>-->
-		<source>pdbfinder/pdbfind2-head.txt</source> 
+		<source>pdbfinder2/PDBFIND.TXT.gz</source>
+		<fetch
+			src="ftp://ftp.cmbi.ru.nl/pub/molbio/data/pdbfinder2/PDBFIND2.TXT.gz"
+			dst="pdbfinder2" />
 	</databank>
 	
 	<!-- omim -->
@@ -212,6 +209,7 @@
 		<info>http://ca.expasy.org/enzyme/</info>
 		<file>/data/mrs/enzyme.m6</file>
 		<source>enzyme/enzyme.dat</source>
+		<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/enzyme/release_with_updates/enzyme.dat" />
 	</databank>
 
 	<databank id="sprot" parser="uniprot" format="uniprot">
@@ -219,6 +217,9 @@
 		<info>http://www.uniprot.org/</info>
 		<file>/data/mrs/sprot.m6</file>
 		<source>uniprot/uniprot_sprot.dat.gz</source>
+		<fetch
+			src="ftp://ftp.ebi.ac.uk/pub/databases/uniprot/current_release/knowledgebase/complete/uniprot_sprot.dat.gz"
+			dst="uniprot" />
 	</databank>
 
 	<databank id="sprotw" parser="uniprot" format="uniprot">
@@ -233,6 +234,9 @@
 		<info>http://www.uniprot.org/</info>
 		<file>/data/mrs/trembl.m6</file>
 		<source>uniprot/uniprot_trembl.dat.gz</source>
+		<fetch
+			src="ftp://ftp.ebi.ac.uk/pub/databases/uniprot/current_release/knowledgebase/complete/uniprot_trembl.dat.gz"
+			dst="uniprot" />
 	</databank>
 	
 	<databank id="genbank" parser="genbank">
@@ -251,6 +255,7 @@
 		<name>Taxonomy</name>
 		<file>/data/mrs/taxonomy.m6</file>
 		<source>taxonomy/taxonomy.dat</source>
+		<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/taxonomy/taxonomy.dat" />
 	</databank>
 
 	<databank id="nlwiki" parser="mediawiki">
@@ -263,4 +268,23 @@
 		<file>/data/mrs/mini-sprot-fasta.m6</file>
 	</databank>
 	
+	<databank id="pdb" parser="pdb">
+		<name>PDB</name>
+		<file>pdb.m6</file>
+		<source>pdb/*/pdb*.ent.gz</source>
+		<fetch
+			recurse="true"
+			src="ftp://ftp.cmbi.ru.nl/pub/molbio/data/pdb/divided/"
+			filter="pdb????.ent.gz" />
+	</databank>
+
+	<databank id="dssp" parser="dssp">
+		<name>DSSP</name>
+		<file>dssp.m6</file>
+		<source>dssp/*.dssp</source>
+		<fetch
+			src="ftp://ftp.cmbi.ru.nl/pub/molbio/data/dssp/"
+			filter="????.dssp" />
+	</databank>
+
 </m6-config>

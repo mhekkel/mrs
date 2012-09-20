@@ -482,3 +482,37 @@ void M6Builder::IndexDocument(const string& inText, vector<string>& outTerms)
 			outTerms.push_back(mLexicon.GetString(token));
 	}
 }
+
+bool M6Builder::NeedsUpdate()
+{
+	bool result = true;
+	
+	zx::element* file = mConfig->find_first("file");
+	if (not file)
+		THROW(("Invalid config-file, file is missing"));
+
+	fs::path path(file->content());
+	
+	if (fs::exists(path))
+	{
+		result = false;
+		
+		vector<fs::path> files;
+
+		Glob(M6Config::Instance().FindGlobal("/m6-config/rawdir"),
+			mConfig->find_first("source"), files);
+		
+		time_t dbTime = fs::last_write_time(path);
+		
+		foreach (fs::path& file, files)
+		{
+			if (fs::last_write_time(file) > dbTime)
+			{
+				result = true;
+				break;
+			}
+		}
+	}
+	
+	return result;
+}

@@ -160,9 +160,10 @@ M6Iterator* M6QueryParser::ParseTest()
 			break;
 
 		case eM6TokenWord:
+		case eM6TokenNumber:
 		{
 			string s = mTokenizer.GetTokenString();
-			Match(eM6TokenWord);
+			Match(mLookahead);
 			
 			if (mLookahead >= eM6TokenColon and mLookahead <= eM6TokenGreaterThan)
 				result.reset(ParseQualifiedTest(s));
@@ -172,13 +173,16 @@ M6Iterator* M6QueryParser::ParseTest()
 				
 				do
 				{
+					string punct = mTokenizer.GetTokenString();
+
 					Match(eM6TokenPunctuation);
 					
-					if (mLookahead != eM6TokenWord)
+					if (mLookahead != eM6TokenWord and mLookahead != eM6TokenNumber)
 						break;
 					
 					mQueryTerms.push_back(mTokenizer.GetTokenString());
-					s = s + ' ' + mQueryTerms.back();
+					s = s + punct + mQueryTerms.back();
+					Match(mLookahead);
 				}
 				while (mLookahead == eM6TokenPunctuation);
 				

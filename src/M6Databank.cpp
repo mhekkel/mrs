@@ -1591,7 +1591,7 @@ M6Iterator* M6DatabankImpl::Find(const vector<string>& inQueryTerms,
 	queryWeight = sqrt(queryWeight);
 	
 	vector<uint32> docs;
-	size_t termCount = inQueryTerms.size();
+	size_t termCount = terms.size();
 	if (not inAllTermsRequired)
 		termCount = 0;
 	A.Collect(docs, termCount);

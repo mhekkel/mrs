@@ -2,6 +2,10 @@ Todo
 
 - Query Parser: e.q. 'crambin-like' goes wrong
 
+- Find Similar takes too long
+
+
+
 - SOAP services (alleen blast nog)
 - links
 

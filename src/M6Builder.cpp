@@ -479,7 +479,10 @@ void M6Builder::IndexDocument(const string& inText, vector<string>& outTerms)
 	foreach (auto& list, doc->GetIndexTokens())
 	{
 		foreach (auto& token, list.mTokens)
-			outTerms.push_back(mLexicon.GetString(token));
+		{
+			if (token != 0)
+				outTerms.push_back(mLexicon.GetString(token));
+		}
 	}
 }
 

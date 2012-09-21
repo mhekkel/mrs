@@ -1547,6 +1547,10 @@ M6Iterator* M6DatabankImpl::Find(const vector<string>& inQueryTerms,
 		return get<3>(a) > get<3>(b);
 	});
 
+	// keep it civil
+	if (terms.size() > 100)
+		terms.erase(terms.begin() + 25, terms.end());
+
 	float queryWeight = 0, Smax = 0, firstWq = tr1::get<3>(terms.front());
 	M6Accumulator A(maxDocNr);
 

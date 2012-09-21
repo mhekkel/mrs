@@ -1,15 +1,8 @@
 Todo
 
-- Query Parser: e.q. 'crambin-like' goes wrong
-
-- Find Similar takes too long
-
-
-
+- crawler
 - SOAP services (alleen blast nog)
 - links
-
-Choices:
 
 - Joined databanks? Aliases?
 - near operator, how to implement? new query language?

@@ -273,9 +273,7 @@
 		<file>pdb.m6</file>
 		<source>pdb/*/pdb*.ent.gz</source>
 		<fetch
-			recurse="true"
-			src="ftp://ftp.cmbi.ru.nl/pub/molbio/data/pdb/divided/"
-			filter="pdb????.ent.gz" />
+			src="ftp://ftp.cmbi.ru.nl/pub/molbio/data/pdb/divided/??/pdb????.ent.gz" />
 	</databank>
 
 	<databank id="dssp" parser="dssp">
@@ -283,8 +281,7 @@
 		<file>dssp.m6</file>
 		<source>dssp/*.dssp</source>
 		<fetch
-			src="ftp://ftp.cmbi.ru.nl/pub/molbio/data/dssp/"
-			filter="1a??.dssp" />
+			src="ftp://ftp.cmbi.ru.nl/pub/molbio/data/dssp/1a??.dssp" />
 	</databank>
 
 </m6-config>

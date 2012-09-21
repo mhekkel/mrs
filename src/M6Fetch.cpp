@@ -3,8 +3,6 @@
 #include <time.h>
 #include <iostream>
 
-#include "curl/curl.h"
-
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/fstream.hpp>
 #include <boost/regex.hpp>
@@ -12,290 +10,296 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/foreach.hpp>
 #define foreach BOOST_FOREACH
+#include <boost/asio.hpp>
+#include <boost/format.hpp>
+#include <boost/lexical_cast.hpp>
+#include <boost/function.hpp>
 
 #include "M6Config.h"
 #include "M6Error.h"
 #include "M6Progress.h"
 #include "M6File.h"
 
-#pragma comment ( lib, "libcurl" )
-
 using namespace std;
 namespace zx = zeep::xml;
 namespace fs = boost::filesystem;
 namespace ba = boost::algorithm;
+namespace at = boost::asio::ip;
 
-class M6Curl
+class M6FTPFetcher
 {
   public:
-	static M6Curl&	Instance();
+						M6FTPFetcher(zx::element* inConfig);
+						~M6FTPFetcher();
 	
-	void			Mirror(zx::element* inConfig);
-	
+	void				Mirror();
+
   private:
-					M6Curl();
-					~M6Curl();
 
-	class M6CurlFetch
-	{
-	  public:
-						M6CurlFetch(zx::element* inConfig);
-						~M6CurlFetch();
-		
-		void			Fetch();
+	void				CollectFiles(fs::path::iterator p, fs::path::iterator e);
 	
-	  private:	
+	void				WaitForResponse(uint32& outStatus, string& outText); 
+	void				SendAndWaitForResponse(const string& inCommand, const string& inParam,
+							uint32& outStatus, string& outText); 
+	void				SendAndWaitForStatus(const string& inCommand, const string& inParam,
+							uint32 inExpectedStatus);
+	uint32				SendAndWait(const string& inCommand, const string& inParam); 
+	
+	void				ListFiles(const string& inPattern,
+							boost::function<void(const string&, size_t, time_t)> inProc);
+	
+	void				Retrieve();
 
-		void			FetchFile(const string& inPath);
-		
-		time_t			FileDate(struct curl_fileinfo* inFInfo);
 
-		long			FileIsComming(struct curl_fileinfo *finfo, int remains);
-		long			FileIsDownloaded();
-		size_t			WriteFile(char *buff, size_t size, size_t nmemb);
+	boost::asio::io_service
+						mIOService;
+	at::tcp::resolver	mResolver;
+	at::tcp::socket		mSocket;
 
-		static long		FileIsCommingCB(struct curl_fileinfo *finfo, M6CurlFetch* self, int remains);
-		static long		FileIsDownloadedCB(M6CurlFetch* self);
-		static size_t	WriteFileCB(char *buff, size_t size, size_t nmemb, M6CurlFetch* self);
-
-		CURL*					mHandle;
-		unique_ptr<M6Progress>	mProgress;
-		unique_ptr<ostream>		mFile;
-		zx::element*			mConfig;
-		fs::path				mDstDir;
-		string					mDir;
-		deque<string>			mDirsToScan;
-		deque<fs::path>			mFilesToFetch;
-		int64					mBytesToFetch;
-	};
+	string				mServer, mUser, mPassword, mPort;
+	string				mReply;
+	fs::path			mPath;
+	vector<fs::path>	mFilesToFetch;
 };
 
-// --------------------------------------------------------------------
-
-M6Curl::M6CurlFetch::M6CurlFetch(zx::element* inConfig)
-	: mHandle(curl_easy_init()), mConfig(inConfig->find_first("fetch"))
+M6FTPFetcher::M6FTPFetcher(zx::element* inConfig)
+	: mResolver(mIOService), mSocket(mIOService)
 {
-	if (mHandle == nullptr)
-		THROW(("Out of memory? curl easy init failed"));
+	zx::element* fetch = inConfig->find_first("fetch");
 
-	if (mConfig == nullptr)
-		THROW(("No fetch information available for databank "));
+#define url_hexdigit		"[[:digit:]a-fA-F]"
+#define url_unreserved		"[-[:alnum:]._~]"
+#define url_pct_encoded		"%" url_hexdigit "{2}"
+#define url_sub_delims		"[!$&'()*+,;=]"
+#define url_userinfo		"(?:((?:" url_unreserved "|" url_pct_encoded "|" url_sub_delims ")+)@)?"
+#define url_host			"(\\[(?:[[:digit:]a-fA-F:]+)\\]|(?:" url_unreserved "|" url_pct_encoded "|" url_sub_delims ")+)"
+#define url_port			"(?::([[:digit:]]+))?"
+#define url_pchar			url_unreserved "|" url_pct_encoded "|" url_sub_delims "|:|@"
+#define url_path			"(?:/((?:" url_pchar "|\\*|\\?|/)*))?"
+	
+	boost::regex re("ftp://" url_userinfo url_host url_port url_path);
 
-	string dst = mConfig->get_attribute("dst");
-	if (dst.empty())
-		dst = inConfig->get_attribute("id");
+	string src = fetch->get_attribute("src");
+	boost::smatch m;
+	if (not boost::regex_match(src, m, re))
+		THROW(("Invalid source url: <%s>", src.c_str()));
 	
-	fs::path rawdir = M6Config::Instance().FindGlobal("/m6-config/rawdir");
-	mDstDir = rawdir / dst;
-	
-	if (not fs::exists(mDstDir))
-		fs::create_directories(mDstDir);
-	else if (not fs::is_directory(mDstDir))
-		THROW(("Destination for fetch should be a directory"));
+	mServer = m[2];
+	mUser = m[1];
+	if (mUser.empty())
+		mUser = "anonymous";
+	mPort = m[3];
+	if (mPort.empty())
+		mPort = "ftp";
+	mPath = fs::path(m[4].str());
 }
 
-M6Curl::M6CurlFetch::~M6CurlFetch()
+M6FTPFetcher::~M6FTPFetcher()
 {
-	curl_easy_cleanup(mHandle);
 }
 
-void M6Curl::M6CurlFetch::Fetch()
+void M6FTPFetcher::Mirror()
 {
-	string src = mConfig->get_attribute("src");
-	
-	mDirsToScan.push_back("");
-	mBytesToFetch = 0;
-	mFilesToFetch.clear();
-	
-	while (not mDirsToScan.empty())
-	{
-		mDir = mDirsToScan.front();
-		mDirsToScan.pop_front();
+	// Get a list of endpoints corresponding to the server name.
+	at::tcp::resolver::query query(mServer, mPort);
+	at::tcp::resolver::iterator endpoint_iterator = mResolver.resolve(query);
+	at::tcp::resolver::iterator end;
 
-		string src = mConfig->get_attribute("src");
-		if (not mDir.empty())
-			src = src + '/' + mDir;
-		
-		curl_easy_setopt(mHandle, CURLOPT_CHUNK_BGN_FUNCTION, (void*)&M6CurlFetch::FileIsCommingCB);
-		curl_easy_setopt(mHandle, CURLOPT_CHUNK_END_FUNCTION, (void*)&M6CurlFetch::FileIsDownloadedCB);
-		curl_easy_setopt(mHandle, CURLOPT_CHUNK_DATA, this);
-		curl_easy_setopt(mHandle, CURLOPT_WRITEFUNCTION, (void*)&M6CurlFetch::WriteFileCB);
-		curl_easy_setopt(mHandle, CURLOPT_WRITEDATA, this);
-	
-		if (mConfig->get_attribute("recurse") == "true" or
-			mConfig->get_attribute("filter").empty() == false)
-		{
-			src = src + "/*";
-		}
-
-		if (VERBOSE)
-			curl_easy_setopt(mHandle, CURLOPT_VERBOSE, 1L);
-		
-		curl_easy_setopt(mHandle, CURLOPT_WILDCARDMATCH, 1L);
-		curl_easy_setopt(mHandle, CURLOPT_URL, src.c_str());
-	
-		CURLcode rc = curl_easy_perform(mHandle);
-		if (rc != CURLE_OK)
-			THROW(("Curl error: %s", curl_easy_strerror(rc)));
+	// Try each endpoint until we successfully establish a connection.
+	boost::system::error_code error = boost::asio::error::host_not_found;
+    while (error && endpoint_iterator != end)
+    {
+		mSocket.close();
+		mSocket.connect(*endpoint_iterator++, error);
 	}
-	
-	if (not mFilesToFetch.empty())
-		mProgress.reset(new M6Progress(mBytesToFetch, "fetching"));
 
-	foreach (fs::path& file, mFilesToFetch)
+	if (error)
+		throw boost::system::system_error(error);
+
+	string text;
+	uint32 status;
+	
+	WaitForResponse(status, text);
+	if (status != 220)
+		THROW(("Failed to connect: %s", text));
+
+	SendAndWaitForResponse("user", mUser, status, text);
+	if (status == 331)
+		SendAndWaitForResponse("pass", mPassword, status, text);
+	if (status != 230)
+		THROW(("Failed to log in: %s", text));
+
+	CollectFiles(mPath.begin(), mPath.end());
+}
+
+void M6FTPFetcher::SendAndWaitForResponse(const string& inCommand, const string& inParam, uint32& outStatus, string& outText)
+{
+	boost::asio::streambuf request;
+	ostream request_stream(&request);
+	request_stream << inCommand << ' ' << inParam << "\r\n";
+	boost::asio::write(mSocket, request);
+
+	WaitForResponse(outStatus, outText);
+}
+
+void M6FTPFetcher::SendAndWaitForStatus(
+	const string& inCommand, const string& inParam, uint32 inExpectedStatus)
+{
+	uint32 status;
+	string text;
+	
+	SendAndWaitForResponse(inCommand, inParam, status, text);
+	if (status != inExpectedStatus)
+		THROW(("Failed to execute cmd %s, result was: %s", inCommand.c_str(), text.c_str()));
+}
+
+uint32 M6FTPFetcher::SendAndWait(const string& inCommand, const string& inParam)
+{
+	uint32 status;
+	SendAndWaitForResponse(inCommand, inParam, status, mReply);
+	return status;
+}
+
+void M6FTPFetcher::WaitForResponse(uint32& outStatus, string& outText)
+{
+	boost::asio::streambuf response;
+	boost::asio::read_until(mSocket, response, "\r\n");
+
+	istream response_stream(&response);
+
+	string line;
+	getline(response_stream, line);
+
+	if (line.length() < 3 or not isdigit(line[0]) or not isdigit(line[1]) or not isdigit(line[2]))
+		THROW(("FTP Server returned unexpected line:\n\"%s\"", line.c_str()));
+
+	outStatus = ((line[0] - '0') * 100) + ((line[1] - '0') * 10) + (line[2] - '0');
+	outText = line;
+
+	if (line.length() >= 4 and line[3] == '-')
 	{
-		fs::path tmpFile(mDstDir / file.branch_path() / (file.filename().string() + ".tmp"));
-		
-		try
+		do
 		{
-			mFile.reset(new fs::ofstream(tmpFile, ios::binary));
-			
-			string src = mConfig->get_attribute("src") + '/' + file.string();
-			
-			curl_easy_setopt(mHandle, CURLOPT_WRITEFUNCTION, (void*)&M6CurlFetch::WriteFileCB);
-			curl_easy_setopt(mHandle, CURLOPT_WRITEDATA, this);
-		
-			if (VERBOSE)
-				curl_easy_setopt(mHandle, CURLOPT_VERBOSE, 1L);
-			
-			curl_easy_setopt(mHandle, CURLOPT_URL, src.c_str());
-		
-			CURLcode rc = curl_easy_perform(mHandle);
-			if (rc != CURLE_OK)
-				THROW(("Curl error: %s", curl_easy_strerror(rc)));
+			boost::asio::read_until(mSocket, response, "\r\n");
+			istream response_stream(&response);
+			getline(response_stream, line);
+			outText = outText + '\n' + line;
 		}
-		catch (...)
-		{
-			mFile.reset(nullptr);
-			boost::system::error_code err;
-			fs::remove(tmpFile, err);
-			
-			throw;
-		}
-		
-		mFile.reset(nullptr);
+		while (line.length() < 3 or line.substr(0, 3) != outText.substr(0, 3));
 	}
+}
+
+void M6FTPFetcher::CollectFiles(fs::path::iterator p, fs::path::iterator end)
+{
+	string s = p->string();
+	bool isPattern = ba::contains(s, "*") or ba::contains(s, "?");
+	++p;
 	
-	mProgress.reset(nullptr);
-}
-
-long M6Curl::M6CurlFetch::FileIsCommingCB(struct curl_fileinfo *finfo,
-	M6CurlFetch* self, int remains)
-{
-	return self->FileIsComming(finfo, remains);
-}
-
-long M6Curl::M6CurlFetch::FileIsDownloadedCB(M6CurlFetch* self)
-{
-	return self->FileIsDownloaded();
-}
-
-size_t M6Curl::M6CurlFetch::WriteFileCB(char *buff, size_t size, size_t nmemb, M6CurlFetch* self)
-{
-	return self->WriteFile(buff, size, nmemb);
-}
-
-time_t M6Curl::M6CurlFetch::FileDate(struct curl_fileinfo* inFInfo)
-{
-	time_t result = inFInfo->time;
-
-	if (result == 0 and inFInfo->strings.time != nullptr)
+	if (p == end)
 	{
-		time_t now = time(nullptr);
-		result = curl_getdate(inFInfo->strings.time, &now);
-
-		if (result <= 0)
+		// we've reached the end of the url
+		// If the file part is a pattern we need to list
+		if (isPattern)
 		{
-			boost::regex re("^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) +(\\d+) +(\\d+)(?::(\\d+))?$");
-			boost::cmatch m;
-			if (boost::regex_match(inFInfo->strings.time, m, re))
+			ListFiles(s, [](const string& inFile, size_t inSize, time_t inTime)
 			{
-				struct tm t;
+				cerr << inFile << endl;
+			});
+		}
+		
+	}
+	else if (isPattern)
+	{
+		THROW(("Unimplemented"));
+	}
+	else
+	{
+		uint32 status;
+		string text;
+
+		SendAndWaitForResponse("cwd", s, status, text);
+
+		if (status == 250)
+			CollectFiles(p, end);
+	}
+}
+
+void M6FTPFetcher::ListFiles(const string& inPattern,
+	boost::function<void(const string&, size_t, time_t)> inProc)
+{
+	uint32 status = SendAndWait("pasv", "");
+	if (status != 227)
+		THROW(("Passive mode failed: %s", mReply.c_str()));
+	
+	boost::regex re("227 Entering Passive Mode \\((\\d+,\\d+,\\d+,\\d+),(\\d+),(\\d+)\\)\\s*");
+	boost::smatch m;
+	if (not boost::regex_match(mReply, m, re))
+		THROW(("Invalid reply for passive command: %s", mReply.c_str()));
+	
+	string address = m[1];
+	ba::replace_all(address, ",", ".");
+	
+	string port = boost::lexical_cast<string>(
+		boost::lexical_cast<uint32>(m[2]) * 256 +
+		boost::lexical_cast<uint32>(m[3]));
+
+	at::tcp::iostream stream;
+	stream.expires_from_now(boost::posix_time::seconds(60));
+	stream.connect(address, port);
+		
+	// Yeah, we have a data connection, now send the List command
+	status = SendAndWait("list", "");
+
+#define list_filetype		"([-dlpscbD])"		// 1
+#define list_permission		"[-rwxtTsS]"
+#define list_statusflags	list_filetype list_permission "{9}"
+								// mon = 3, day = 4, year or hour = 5, minutes = 6
+#define list_date			"(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) +(\\d+) +(\\d+)(?::(\\d+))?"
+								// size = 2, name = 7
+#define list_line			list_statusflags "\\s+\\d+\\s+\\w+\\s+\\w+\\s+"	\
+								"(\\d+)\\s+" list_date " (.+)"
+
+	boost::regex re2(list_line);
+
+	time_t now;
+	gmtime(&now);
+	
+	for (;;)
+	{
+		string line;
+		getline(stream, line);
+		if (line.empty() and stream.eof())
+			break;
+		
+		ba::trim(line);
+		
+		if (boost::regex_match(line, m, re2))
+		{
+			struct tm t;
 #ifdef _MSC_VER
-				gmtime_s(&t, &now);
+			gmtime_s(&t, &now);
 #else
-				gmtime_r(&now, &t);
+			gmtime_r(&now, &t);
 #endif
 
-				string time;
-				if (m[4].str().empty())
-					time = (boost::format("%2.2d %3.3s %4.4d") % m[2] % m[1] % m[3]).str();
-				else
-					time = (boost::format("%2.2d %3.3s %4.4d %2.2d:%2.2d") % m[2] % m[1] % (1900 + t.tm_year) % m[3] % m[4]).str();
+//				string time;
+//				if (m[4].str().empty())
+//					time = (boost::format("%2.2d %3.3s %4.4d") % m[2] % m[1] % m[3]).str();
+//				else
+//					time = (boost::format("%2.2d %3.3s %4.4d %2.2d:%2.2d") % m[2] % m[1] % (1900 + t.tm_year) % m[3] % m[4]).str();
+//
+//				result = curl_getdate(time.c_str(), &now);
+//			}
 
-				result = curl_getdate(time.c_str(), &now);
-			}
+			size_t size = boost::lexical_cast<size_t>(m[2]);
+			string file = m[7];
+			
+			if (inPattern.empty() or M6FilePathNameMatches(file, inPattern))
+				inProc(file, size, 0);
 		}
 	}
-	
-	return result;
 }
 
-long M6Curl::M6CurlFetch::FileIsComming(struct curl_fileinfo *finfo, int remains)
-{
-	long result = CURL_CHUNK_BGN_FUNC_SKIP;
-
-	fs::path file = fs::path(mDir) / finfo->filename;
-	string filter = mConfig->get_attribute("filter");
-	
-	if (finfo->filetype == CURLFILETYPE_DIRECTORY and mConfig->get_attribute("recurse") == "true")
-		mDirsToScan.push_back(mDir + '/' + finfo->filename);
-	else if (finfo->filetype == CURLFILETYPE_FILE and (filter.empty() or M6FilePathNameMatches(file.filename(), filter)))
-	{
-		if (not fs::exists(mDstDir / file) or fs::last_write_time(mDstDir / file) < FileDate(finfo))
-		{
-			mFilesToFetch.push_back(file);
-			mBytesToFetch += finfo->size;
-		}
-	}
-		
-	return result;
-}
-
-long M6Curl::M6CurlFetch::FileIsDownloaded()
-{
-	if (mProgress and mFile)
-	{
-		mProgress.reset(nullptr);
-		mFile.reset(nullptr);
-	}
-	
-	return CURL_CHUNK_END_FUNC_OK;
-}
-
-size_t M6Curl::M6CurlFetch::WriteFile(char *buff, size_t size, size_t nmemb)
-{
-	if (mFile and mProgress)
-	{
-		mFile->write(buff, size * nmemb);
-		mProgress->Consumed(size * nmemb);
-	}
-	return size * nmemb;
-}
-
-// --------------------------------------------------------------------
-
-M6Curl& M6Curl::Instance()
-{
-	static M6Curl sInstance;
-	return sInstance;
-}
-
-M6Curl::M6Curl()
-{
-	curl_global_init(CURL_GLOBAL_ALL);
-}
-
-M6Curl::~M6Curl()
-{
-	curl_global_cleanup();
-}
-
-void M6Curl::Mirror(zx::element* inConfig)
-{
-	M6CurlFetch fetcher(inConfig);
-	fetcher.Fetch();
-}
 
 void M6Fetch(const string& inDatabank)
 {
@@ -303,5 +307,7 @@ void M6Fetch(const string& inDatabank)
 	if (not config)
 		THROW(("Configuration for %s is missing", inDatabank.c_str()));
 
-	M6Curl::Instance().Mirror(config);
+//	M6Curl::Instance().Mirror(config);
+	M6FTPFetcher fetch(config);
+	fetch.Mirror();
 }

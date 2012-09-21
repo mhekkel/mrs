@@ -284,7 +284,7 @@
 		<source>dssp/*.dssp</source>
 		<fetch
 			src="ftp://ftp.cmbi.ru.nl/pub/molbio/data/dssp/"
-			filter="????.dssp" />
+			filter="1a??.dssp" />
 	</databank>
 
 </m6-config>

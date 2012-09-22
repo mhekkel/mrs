@@ -37,6 +37,7 @@ LDFLAGS				+= -L $(HOME)/projects/pcre/lib
 CFLAGS				+= -I $(HOME)/projects/libarchive/include
 LDFLAGS				+= -L $(HOME)/projects/libarchive/lib
 LDFLAGS				+= $(shell $(PERL) -MExtUtils::Embed -e ldopts)
+LDFLAGS				+= $(shell curl-config --libs)
 ifneq ($(DEBUG),1)
 CFLAGS				+= -O3 -DNDEBUG -g
 else
@@ -65,6 +66,7 @@ OBJECTS = \
 	$(OBJDIR)/M6Document.o \
 	$(OBJDIR)/M6Error.o \
 	$(OBJDIR)/M6Exec.o \
+	$(OBJDIR)/M6Fetch.o \
 	$(OBJDIR)/M6File.o \
 	$(OBJDIR)/M6Index.o \
 	$(OBJDIR)/M6Iterator.o \

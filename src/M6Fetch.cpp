@@ -247,6 +247,8 @@ void M6FTPFetcher::CollectFiles(fs::path inLocalDir, fs::path::iterator p, fs::p
 					existing.erase(find(existing.begin(), existing.end(), file), existing.end());
 					if (fs::last_write_time(file) < inTime)
 						needed.push_back(file);
+					else if (VERBOSE)
+						cerr << file << " is up-to-date" << endl;
 				}
 				else
 					needed.push_back(inFile);
@@ -309,7 +311,7 @@ void M6FTPFetcher::ListFiles(const string& inPattern,
 		boost::lexical_cast<uint32>(m[3]));
 
 	at::tcp::iostream stream;
-	stream.expires_from_now(boost::posix_time::seconds(60));
+//	stream.expires_from_now(boost::posix_time::seconds(60));
 	stream.connect(address, port);
 		
 	// Yeah, we have a data connection, now send the List command

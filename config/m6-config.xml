@@ -281,7 +281,7 @@
 		<file>dssp.m6</file>
 		<source>dssp/*.dssp</source>
 		<fetch
-			src="ftp://ftp.cmbi.ru.nl/pub/molbio/data/dssp/1a??.dssp" />
+			src="ftp://ftp.cmbi.ru.nl/pub/molbio/data/dssp/????.dssp" />
 	</databank>
 
 </m6-config>

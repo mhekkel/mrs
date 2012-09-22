@@ -39,7 +39,7 @@ sub parse
 		}
 		elsif ($key eq 'accession')
 		{
-			$self->index_unique_string('accession', $&)
+			$self->index_string('accession', $&)
 				while ($value =~ m/\S+/g);
 		}
 		elsif ($key eq 'version')

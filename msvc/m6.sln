@@ -19,7 +19,6 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libzeep", "libzeep\libzeep.
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "m6-cmd", "m6-cmd\m6-cmd.vcxproj", "{9E5E7747-2076-4E8C-8DCE-71C09ADD1B06}"
 	ProjectSection(ProjectDependencies) = postProject
-		{B1F50018-0DF7-46C1-AADC-4A5CD243566B} = {B1F50018-0DF7-46C1-AADC-4A5CD243566B}
 		{FC2A9881-F33D-4A44-A29D-D7A9F023A0DD} = {FC2A9881-F33D-4A44-A29D-D7A9F023A0DD}
 		{9F2AF684-F2D2-424E-B2FB-16889A658676} = {9F2AF684-F2D2-424E-B2FB-16889A658676}
 		{8DB71094-266D-4B6B-8076-0F58A3944F4B} = {8DB71094-266D-4B6B-8076-0F58A3944F4B}
@@ -46,8 +45,6 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "m6-passwd", "m6-passwd\m6-p
 	ProjectSection(ProjectDependencies) = postProject
 		{FC2A9881-F33D-4A44-A29D-D7A9F023A0DD} = {FC2A9881-F33D-4A44-A29D-D7A9F023A0DD}
 	EndProjectSection
-EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libcurl", "libcurl\libcurl.vcxproj", "{B1F50018-0DF7-46C1-AADC-4A5CD243566B}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -149,18 +146,6 @@ Global
 		{15DB0D9E-9D3F-4C5C-9977-AB63B193423E}.Release|Win32.ActiveCfg = Release|x64
 		{15DB0D9E-9D3F-4C5C-9977-AB63B193423E}.Release|x64.ActiveCfg = Release|x64
 		{15DB0D9E-9D3F-4C5C-9977-AB63B193423E}.Release|x64.Build.0 = Release|x64
-		{B1F50018-0DF7-46C1-AADC-4A5CD243566B}.Debug|Mixed Platforms.ActiveCfg = Debug|Win32
-		{B1F50018-0DF7-46C1-AADC-4A5CD243566B}.Debug|Mixed Platforms.Build.0 = Debug|Win32
-		{B1F50018-0DF7-46C1-AADC-4A5CD243566B}.Debug|Win32.ActiveCfg = Debug|Win32
-		{B1F50018-0DF7-46C1-AADC-4A5CD243566B}.Debug|Win32.Build.0 = Debug|Win32
-		{B1F50018-0DF7-46C1-AADC-4A5CD243566B}.Debug|x64.ActiveCfg = Debug|x64
-		{B1F50018-0DF7-46C1-AADC-4A5CD243566B}.Debug|x64.Build.0 = Debug|x64
-		{B1F50018-0DF7-46C1-AADC-4A5CD243566B}.Release|Mixed Platforms.ActiveCfg = Release|Win32
-		{B1F50018-0DF7-46C1-AADC-4A5CD243566B}.Release|Mixed Platforms.Build.0 = Release|Win32
-		{B1F50018-0DF7-46C1-AADC-4A5CD243566B}.Release|Win32.ActiveCfg = Release|Win32
-		{B1F50018-0DF7-46C1-AADC-4A5CD243566B}.Release|Win32.Build.0 = Release|Win32
-		{B1F50018-0DF7-46C1-AADC-4A5CD243566B}.Release|x64.ActiveCfg = Release|x64
-		{B1F50018-0DF7-46C1-AADC-4A5CD243566B}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

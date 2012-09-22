@@ -26,46 +26,22 @@ namespace fs = boost::filesystem;
 namespace ba = boost::algorithm;
 namespace at = boost::asio::ip;
 
-class M6FTPFetcher
-{
-  public:
-						M6FTPFetcher(zx::element* inConfig);
-						~M6FTPFetcher();
-	
-	void				Mirror();
+// --------------------------------------------------------------------
+// Regular expression to parse directory listings
 
-  private:
+#define list_filetype		"([-dlpscbD])"		// 1
+#define list_permission		"[-rwxtTsS]"
+#define list_statusflags	list_filetype list_permission "{9}"
+								// mon = 3, day = 4, year or hour = 5, minutes = 6
+#define list_date			"(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) +(\\d+) +(\\d+)(?::(\\d+))?"
+								// size = 2, name = 7
+#define list_line			list_statusflags "\\s+\\d+\\s+\\w+\\s+\\w+\\s+"	\
+								"(\\d+)\\s+" list_date " (.+)"
 
-	void				CollectFiles(fs::path::iterator p, fs::path::iterator e);
-	
-	void				WaitForResponse(uint32& outStatus, string& outText); 
-	void				SendAndWaitForResponse(const string& inCommand, const string& inParam,
-							uint32& outStatus, string& outText); 
-	void				SendAndWaitForStatus(const string& inCommand, const string& inParam,
-							uint32 inExpectedStatus);
-	uint32				SendAndWait(const string& inCommand, const string& inParam); 
-	
-	void				ListFiles(const string& inPattern,
-							boost::function<void(const string&, size_t, time_t)> inProc);
-	
-	void				Retrieve();
+const boost::regex kM6LineParserRE(list_line);
 
-
-	boost::asio::io_service
-						mIOService;
-	at::tcp::resolver	mResolver;
-	at::tcp::socket		mSocket;
-
-	string				mServer, mUser, mPassword, mPort;
-	string				mReply;
-	fs::path			mPath;
-	vector<fs::path>	mFilesToFetch;
-};
-
-M6FTPFetcher::M6FTPFetcher(zx::element* inConfig)
-	: mResolver(mIOService), mSocket(mIOService)
-{
-	zx::element* fetch = inConfig->find_first("fetch");
+// --------------------------------------------------------------------
+// Regular expression to parse URL's
 
 #define url_hexdigit		"[[:digit:]a-fA-F]"
 #define url_unreserved		"[-[:alnum:]._~]"
@@ -77,11 +53,54 @@ M6FTPFetcher::M6FTPFetcher(zx::element* inConfig)
 #define url_pchar			url_unreserved "|" url_pct_encoded "|" url_sub_delims "|:|@"
 #define url_path			"(?:/((?:" url_pchar "|\\*|\\?|/)*))?"
 	
-	boost::regex re("ftp://" url_userinfo url_host url_port url_path);
+const boost::regex kM6URLParserRE("ftp://" url_userinfo url_host url_port url_path);
+
+// --------------------------------------------------------------------
+
+class M6FTPFetcher
+{
+  public:
+						M6FTPFetcher(zx::element* inConfig);
+						~M6FTPFetcher();
+	
+	void				Mirror();
+
+  private:
+
+	void				Login();
+
+	void				CollectFiles(fs::path inLocalDir,
+							fs::path::iterator p, fs::path::iterator e);
+	
+	uint32				WaitForReply(); 
+	uint32				SendAndWaitForReply(const string& inCommand, const string& inParam); 
+	
+	void				ListFiles(const string& inPattern,
+							boost::function<void(char inType, const string&, size_t, time_t)> inProc);
+	
+	void				Retrieve();
+
+	void				Error(const char* inError);
+
+	boost::asio::io_service
+						mIOService;
+	at::tcp::resolver	mResolver;
+	at::tcp::socket		mSocket;
+
+	string				mServer, mUser, mPassword, mPort;
+	string				mReply;
+	fs::path			mPath, mDstDir;
+	vector<fs::path>	mFilesToFetch;
+};
+
+M6FTPFetcher::M6FTPFetcher(zx::element* inConfig)
+	: mResolver(mIOService), mSocket(mIOService)
+{
+	zx::element* fetch = inConfig->find_first("fetch");
 
 	string src = fetch->get_attribute("src");
 	boost::smatch m;
-	if (not boost::regex_match(src, m, re))
+	if (not boost::regex_match(src, m, kM6URLParserRE))
 		THROW(("Invalid source url: <%s>", src.c_str()));
 	
 	mServer = m[2];
@@ -92,10 +111,35 @@ M6FTPFetcher::M6FTPFetcher(zx::element* inConfig)
 	if (mPort.empty())
 		mPort = "ftp";
 	mPath = fs::path(m[4].str());
+
+    string dst = fetch->get_attribute("dst");
+    if (dst.empty())
+        dst = inConfig->get_attribute("id");
+
+    fs::path rawdir = M6Config::Instance().FindGlobal("/m6-config/rawdir");
+    mDstDir = rawdir / dst;
+
+    if (fs::exists(mDstDir) and not fs::is_directory(mDstDir))
+        THROW(("Destination for fetch should be a directory"));
 }
 
 M6FTPFetcher::~M6FTPFetcher()
 {
+}
+
+void M6FTPFetcher::Error(const char* inError)
+{
+	THROW(("%s: %s\n(trying to access server %s)",
+		inError, mReply.c_str(), mServer.c_str()));
+}
+
+void M6FTPFetcher::Login()
+{
+	uint32 status = SendAndWaitForReply("user", mUser);
+	if (status == 331)
+		status = SendAndWaitForReply("pass", mPassword);
+	if (status != 230 and status != 202)
+		Error("Error logging in");
 }
 
 void M6FTPFetcher::Mirror()
@@ -116,51 +160,26 @@ void M6FTPFetcher::Mirror()
 	if (error)
 		throw boost::system::system_error(error);
 
-	string text;
-	uint32 status;
-	
-	WaitForResponse(status, text);
+	uint32 status = WaitForReply();
 	if (status != 220)
-		THROW(("Failed to connect: %s", text));
+		Error("Failed to connect");
 
-	SendAndWaitForResponse("user", mUser, status, text);
-	if (status == 331)
-		SendAndWaitForResponse("pass", mPassword, status, text);
-	if (status != 230)
-		THROW(("Failed to log in: %s", text));
+	Login();
 
-	CollectFiles(mPath.begin(), mPath.end());
+	CollectFiles(fs::path(), mPath.begin(), mPath.end());
 }
 
-void M6FTPFetcher::SendAndWaitForResponse(const string& inCommand, const string& inParam, uint32& outStatus, string& outText)
+uint32 M6FTPFetcher::SendAndWaitForReply(const string& inCommand, const string& inParam)
 {
 	boost::asio::streambuf request;
 	ostream request_stream(&request);
 	request_stream << inCommand << ' ' << inParam << "\r\n";
 	boost::asio::write(mSocket, request);
 
-	WaitForResponse(outStatus, outText);
+	return WaitForReply();
 }
 
-void M6FTPFetcher::SendAndWaitForStatus(
-	const string& inCommand, const string& inParam, uint32 inExpectedStatus)
-{
-	uint32 status;
-	string text;
-	
-	SendAndWaitForResponse(inCommand, inParam, status, text);
-	if (status != inExpectedStatus)
-		THROW(("Failed to execute cmd %s, result was: %s", inCommand.c_str(), text.c_str()));
-}
-
-uint32 M6FTPFetcher::SendAndWait(const string& inCommand, const string& inParam)
-{
-	uint32 status;
-	SendAndWaitForResponse(inCommand, inParam, status, mReply);
-	return status;
-}
-
-void M6FTPFetcher::WaitForResponse(uint32& outStatus, string& outText)
+uint32 M6FTPFetcher::WaitForReply()
 {
 	boost::asio::streambuf response;
 	boost::asio::read_until(mSocket, response, "\r\n");
@@ -173,8 +192,8 @@ void M6FTPFetcher::WaitForResponse(uint32& outStatus, string& outText)
 	if (line.length() < 3 or not isdigit(line[0]) or not isdigit(line[1]) or not isdigit(line[2]))
 		THROW(("FTP Server returned unexpected line:\n\"%s\"", line.c_str()));
 
-	outStatus = ((line[0] - '0') * 100) + ((line[1] - '0') * 10) + (line[2] - '0');
-	outText = line;
+	uint32 result = ((line[0] - '0') * 100) + ((line[1] - '0') * 10) + (line[2] - '0');
+	mReply = line;
 
 	if (line.length() >= 4 and line[3] == '-')
 	{
@@ -183,58 +202,104 @@ void M6FTPFetcher::WaitForResponse(uint32& outStatus, string& outText)
 			boost::asio::read_until(mSocket, response, "\r\n");
 			istream response_stream(&response);
 			getline(response_stream, line);
-			outText = outText + '\n' + line;
+			mReply = mReply + '\n' + line;
 		}
-		while (line.length() < 3 or line.substr(0, 3) != outText.substr(0, 3));
+		while (line.length() < 3 or line.substr(0, 3) != mReply.substr(0, 3));
 	}
+
+	return result;
 }
 
-void M6FTPFetcher::CollectFiles(fs::path::iterator p, fs::path::iterator end)
+void M6FTPFetcher::CollectFiles(fs::path inLocalDir, fs::path::iterator p, fs::path::iterator e)
 {
 	string s = p->string();
 	bool isPattern = ba::contains(s, "*") or ba::contains(s, "?");
 	++p;
-	
-	if (p == end)
+
+	vector<string> dirs;
+
+	if (p == e)
 	{
-		// we've reached the end of the url
-		// If the file part is a pattern we need to list
+		fs::path localDir = mDstDir / inLocalDir;
+
+			// we've reached the end of the url
+		if (not fs::exists(localDir))
+			fs::create_directories(localDir);
+
+		// If the file part is a pattern we need to list and perhaps to clean up
 		if (isPattern)
 		{
-			ListFiles(s, [](const string& inFile, size_t inSize, time_t inTime)
+			vector<fs::path> existing, needed;
+
+			fs::directory_iterator end;
+			for (fs::directory_iterator file(localDir); file != end; ++file)
 			{
-				cerr << inFile << endl;
+				if (fs::is_regular_file(*file))
+					existing.push_back(*file);
+			}
+
+			ListFiles(s, [&existing, &needed, &localDir](char inType, const string& inFile, size_t inSize, time_t inTime)
+			{
+				fs::path file = localDir / inFile;
+
+				if (fs::exists(file))
+				{
+					existing.erase(find(existing.begin(), existing.end(), file), existing.end());
+					if (fs::last_write_time(file) < inTime)
+						needed.push_back(file);
+				}
+				else
+					needed.push_back(inFile);
 			});
+			
+			foreach (fs::path file, needed)
+				cerr << "Need to fetch " << file << endl;
+			
+			foreach (fs::path file, existing)
+				cerr << "Need to delete " << file << endl;
 		}
-		
 	}
 	else if (isPattern)
 	{
-		THROW(("Unimplemented"));
+		ListFiles(s, [&dirs, &s](char inType, const string& inFile, size_t inSize, time_t inTime)
+		{
+			if (inType == 'd')
+				dirs.push_back(inFile);
+		});
 	}
 	else
+		dirs.push_back(s);
+
+	foreach (const string& dir, dirs)
 	{
-		uint32 status;
-		string text;
-
-		SendAndWaitForResponse("cwd", s, status, text);
-
-		if (status == 250)
-			CollectFiles(p, end);
+		uint32 status = SendAndWaitForReply("cwd", dir);
+		if (status != 250)
+			Error((string("Error changing directory to ") + dir).c_str());
+		
+		fs::path localDir(inLocalDir);
+		if (not inLocalDir.empty())
+			localDir /= dir;
+		else if (isPattern)
+			localDir = dir;
+		
+		CollectFiles(localDir, p, e);
+		status = SendAndWaitForReply("cdup", "");
+		if (status != 200 and status != 250)
+			Error("Error changing directory");
 	}
 }
 
 void M6FTPFetcher::ListFiles(const string& inPattern,
-	boost::function<void(const string&, size_t, time_t)> inProc)
+	boost::function<void(char, const string&, size_t, time_t)> inProc)
 {
-	uint32 status = SendAndWait("pasv", "");
+	uint32 status = SendAndWaitForReply("pasv", "");
 	if (status != 227)
-		THROW(("Passive mode failed: %s", mReply.c_str()));
+		Error("Passive mode failed");
 	
 	boost::regex re("227 Entering Passive Mode \\((\\d+,\\d+,\\d+,\\d+),(\\d+),(\\d+)\\)\\s*");
 	boost::smatch m;
 	if (not boost::regex_match(mReply, m, re))
-		THROW(("Invalid reply for passive command: %s", mReply.c_str()));
+		Error("Invalid reply for passive command");
 	
 	string address = m[1];
 	ba::replace_all(address, ",", ".");
@@ -248,18 +313,8 @@ void M6FTPFetcher::ListFiles(const string& inPattern,
 	stream.connect(address, port);
 		
 	// Yeah, we have a data connection, now send the List command
-	status = SendAndWait("list", "");
+	status = SendAndWaitForReply("list", "");
 
-#define list_filetype		"([-dlpscbD])"		// 1
-#define list_permission		"[-rwxtTsS]"
-#define list_statusflags	list_filetype list_permission "{9}"
-								// mon = 3, day = 4, year or hour = 5, minutes = 6
-#define list_date			"(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) +(\\d+) +(\\d+)(?::(\\d+))?"
-								// size = 2, name = 7
-#define list_line			list_statusflags "\\s+\\d+\\s+\\w+\\s+\\w+\\s+"	\
-								"(\\d+)\\s+" list_date " (.+)"
-
-	boost::regex re2(list_line);
 
 	time_t now;
 	gmtime(&now);
@@ -273,7 +328,7 @@ void M6FTPFetcher::ListFiles(const string& inPattern,
 		
 		ba::trim(line);
 		
-		if (boost::regex_match(line, m, re2))
+		if (boost::regex_match(line, m, kM6LineParserRE))
 		{
 			struct tm t;
 #ifdef _MSC_VER
@@ -295,11 +350,15 @@ void M6FTPFetcher::ListFiles(const string& inPattern,
 			string file = m[7];
 			
 			if (inPattern.empty() or M6FilePathNameMatches(file, inPattern))
-				inProc(file, size, 0);
+				inProc(line[0], file, size, 0);
 		}
 	}
+	
+	if (status < 200)
+		status = WaitForReply();
+	if (status != 226)
+		Error("Error listing");
 }
-
 
 void M6Fetch(const string& inDatabank)
 {

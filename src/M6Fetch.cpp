@@ -40,6 +40,8 @@ namespace at = boost::asio::ip;
 
 const boost::regex kM6LineParserRE(list_line);
 
+const char* kM6Months[] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
+
 // --------------------------------------------------------------------
 // Regular expression to parse URL's
 
@@ -332,27 +334,35 @@ void M6FTPFetcher::ListFiles(const string& inPattern,
 		
 		if (boost::regex_match(line, m, kM6LineParserRE))
 		{
-			struct tm t;
+			struct tm t = {}, n;
 #ifdef _MSC_VER
-			gmtime_s(&t, &now);
+			gmtime_s(&n, &now);
 #else
-			gmtime_r(&now, &t);
+			gmtime_r(&now, &n);
 #endif
+			
+			t.tm_mday = boost::lexical_cast<int>(m[4]);
+			for (t.tm_mon = 0; t.tm_mon < 12; ++t.tm_mon)
+			{
+				if (ba::iequals(kM6Months[t.tm_mon], m[3].str()))
+					break;
+			}
 
-//				string time;
-//				if (m[4].str().empty())
-//					time = (boost::format("%2.2d %3.3s %4.4d") % m[2] % m[1] % m[3]).str();
-//				else
-//					time = (boost::format("%2.2d %3.3s %4.4d %2.2d:%2.2d") % m[2] % m[1] % (1900 + t.tm_year) % m[3] % m[4]).str();
-//
-//				result = curl_getdate(time.c_str(), &now);
-//			}
-
-			size_t size = boost::lexical_cast<size_t>(m[2]);
+			if (m[6].str().empty())
+				t.tm_year = boost::lexical_cast<int>(m[5]) - 1900;
+			else
+			{
+				t.tm_year = n.tm_year;
+				t.tm_hour = boost::lexical_cast<int>(m[5]);
+				t.tm_min = boost::lexical_cast<int>(m[6]);
+			}
+			
 			string file = m[7];
+			size_t size = boost::lexical_cast<size_t>(m[2]);
+			time_t time = mktime(&t);
 			
 			if (inPattern.empty() or M6FilePathNameMatches(file, inPattern))
-				inProc(line[0], file, size, 0);
+				inProc(line[0], file, size, time);
 		}
 	}
 	

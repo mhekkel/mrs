@@ -92,7 +92,15 @@ class M6FTPFetcher
 	string				mServer, mUser, mPassword, mPort;
 	string				mReply;
 	fs::path			mPath, mDstDir;
-	vector<fs::path>	mFilesToFetch;
+
+	struct FileToFetch
+	{
+		fs::path		local, remote;
+		size_t			size;
+		time_t			time;
+	};
+
+	vector<FileToFetch>	mFilesToFetch;
 };
 
 M6FTPFetcher::M6FTPFetcher(zx::element* inConfig)
@@ -212,7 +220,7 @@ uint32 M6FTPFetcher::WaitForReply()
 	return result;
 }
 
-void M6FTPFetcher::CollectFiles(fs::path inLocalDir, fs::path::iterator p, fs::path::iterator e)
+void M6FTPFetcher::CollectFiles(fs::path inLocalDir, fs::path inRemoteDir, fs::path::iterator p, fs::path::iterator e)
 {
 	string s = p->string();
 	bool isPattern = ba::contains(s, "*") or ba::contains(s, "?");
@@ -231,7 +239,7 @@ void M6FTPFetcher::CollectFiles(fs::path inLocalDir, fs::path::iterator p, fs::p
 		// If the file part is a pattern we need to list and perhaps to clean up
 		if (isPattern)
 		{
-			vector<fs::path> existing, needed;
+			vector<fs::path> existing;
 
 			fs::directory_iterator end;
 			for (fs::directory_iterator file(localDir); file != end; ++file)
@@ -240,24 +248,37 @@ void M6FTPFetcher::CollectFiles(fs::path inLocalDir, fs::path::iterator p, fs::p
 					existing.push_back(*file);
 			}
 
-			ListFiles(s, [&existing, &needed, &localDir](char inType, const string& inFile, size_t inSize, time_t inTime)
+			ListFiles(s, [this, &existing, &localDir](char inType, const string& inFile, size_t inSize, time_t inTime)
 			{
 				fs::path file = localDir / inFile;
+
+//				if (inType == 'l')
+//				{
+//					file.filename() = 
+//				}
+//				else if (inType != '-')
+//					continue;
 
 				if (fs::exists(file))
 				{
 					existing.erase(find(existing.begin(), existing.end(), file), existing.end());
-					if (fs::last_write_time(file) < inTime)
-						needed.push_back(file);
-					else if (VERBOSE)
-						cerr << file << " is up-to-date" << endl;
+
+					if (fs::last_write_time(file) >= inTime)
+					{
+						if (VERBOSE)
+							cerr << file << " is up-to-date" << endl;
+						continue;
+					}
 				}
-				else
-					needed.push_back(inFile);
+
+				FileToFetch need = { file, inRemoteDir / inFile, inSize, inTime };
+				this->mFilesToFetch.push_back(need);
 			});
 			
 			foreach (fs::path file, needed)
+			{
 				cerr << "Need to fetch " << file << endl;
+			}
 			
 			foreach (fs::path file, existing)
 				cerr << "Need to delete " << file << endl;

@@ -273,6 +273,7 @@
 		<file>pdb.m6</file>
 		<source>pdb/*/pdb*.ent.gz</source>
 		<fetch
+			delete="true"
 			src="ftp://ftp.cmbi.ru.nl/pub/molbio/data/pdb/divided/??/pdb????.ent.gz" />
 	</databank>
 
@@ -281,6 +282,7 @@
 		<file>dssp.m6</file>
 		<source>dssp/*.dssp</source>
 		<fetch
+			delete="true"
 			src="ftp://ftp.cmbi.ru.nl/pub/molbio/data/dssp/????.dssp" />
 	</databank>
 

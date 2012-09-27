@@ -1,3 +1,7 @@
+// FTP Mirror code
+//
+//	TODO: unescape percentage escaped characters in URL
+
 #include "M6Lib.h"
 
 #include <time.h>
@@ -65,6 +69,7 @@ class M6FTPFetcher
 						M6FTPFetcher(zx::element* inConfig);
 						~M6FTPFetcher();
 	
+	bool				IsOutOfDate();
 	void				Mirror();
 
   private:
@@ -140,6 +145,28 @@ M6FTPFetcher::M6FTPFetcher(zx::element* inConfig)
         THROW(("Destination for fetch should be a directory"));
     
     mDelete = fetch->get_attribute("delete") == "true";
+
+	// Get a list of endpoints corresponding to the server name.
+	at::tcp::resolver::query query(mServer, mPort);
+	at::tcp::resolver::iterator endpoint_iterator = mResolver.resolve(query);
+	at::tcp::resolver::iterator end;
+
+	// Try each endpoint until we successfully establish a connection.
+	boost::system::error_code error = boost::asio::error::host_not_found;
+    while (error && endpoint_iterator != end)
+    {
+		mSocket.close();
+		mSocket.connect(*endpoint_iterator++, error);
+	}
+
+	if (error)
+		throw boost::system::system_error(error);
+
+	uint32 status = WaitForReply();
+	if (status != 220)
+		Error("Failed to connect");
+
+	Login();
 }
 
 M6FTPFetcher::~M6FTPFetcher()
@@ -179,28 +206,6 @@ fs::path M6FTPFetcher::GetPWD()
 
 void M6FTPFetcher::Mirror()
 {
-	// Get a list of endpoints corresponding to the server name.
-	at::tcp::resolver::query query(mServer, mPort);
-	at::tcp::resolver::iterator endpoint_iterator = mResolver.resolve(query);
-	at::tcp::resolver::iterator end;
-
-	// Try each endpoint until we successfully establish a connection.
-	boost::system::error_code error = boost::asio::error::host_not_found;
-    while (error && endpoint_iterator != end)
-    {
-		mSocket.close();
-		mSocket.connect(*endpoint_iterator++, error);
-	}
-
-	if (error)
-		throw boost::system::system_error(error);
-
-	uint32 status = WaitForReply();
-	if (status != 220)
-		Error("Failed to connect");
-
-	Login();
-
 	int64 bytesToFetch = CollectFiles(fs::path(), GetPWD(), mPath.begin(), mPath.end());
 
 	if (not mFilesToFetch.empty())
@@ -228,6 +233,11 @@ void M6FTPFetcher::Mirror()
 			fs::remove(del);
 		}
 	}
+}
+
+bool M6FTPFetcher::IsOutOfDate()
+{
+	return CollectFiles(fs::path(), GetPWD(), mPath.begin(), mPath.end()) > 0;
 }
 
 uint32 M6FTPFetcher::SendAndWaitForReply(const string& inCommand, const string& inParam)
@@ -391,7 +401,6 @@ void M6FTPFetcher::ListFiles(const string& inPattern,
 	// Yeah, we have a data connection, now send the List command
 	status = SendAndWaitForReply("list", "");
 
-
 	time_t now;
 	time(&now);
 	
@@ -524,7 +533,7 @@ void M6FTPFetcher::FetchFile(fs::path inRemote, fs::path inLocal, time_t inTime,
 		fs::remove(inLocal);
 	
 	fs::rename(local, inLocal);
-	if (inTime != 0)
+	if (inTime > 0)
 	{
 		fs::last_write_time(inLocal, inTime, error);
 		if (error)
@@ -540,4 +549,14 @@ void M6Fetch(const string& inDatabank)
 
 	M6FTPFetcher fetch(config);
 	fetch.Mirror();
+}
+
+bool M6FetchNeeded(const string& inDatabank)
+{
+	zx::element* config = M6Config::Instance().LoadDatabank(inDatabank);
+	if (not config)
+		THROW(("Configuration for %s is missing", inDatabank.c_str()));
+
+	M6FTPFetcher fetch(config);
+	fetch.IsOutOfDate();
 }

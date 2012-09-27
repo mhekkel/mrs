@@ -57,6 +57,8 @@ M6SearchServer::~M6SearchServer()
 
 void M6SearchServer::LoadAllDatabanks()
 {
+	fs::path mrsDir(M6Config::Instance().FindGlobal("/m6-config/mrsdir"));
+	
 	zx::element_set dbs(mConfig->find("dbs/db"));
 	foreach (zx::element* db, dbs)
 	{
@@ -79,6 +81,9 @@ void M6SearchServer::LoadAllDatabanks()
 		}
 
 		fs::path path = file->content();
+		if (not path.is_complete())
+			path = mrsDir / path;
+		
 		if (not fs::exists(path))
 		{
 			if (VERBOSE)

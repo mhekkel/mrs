@@ -25,10 +25,17 @@ Status = {
 		}
 	
 		if (Status.viewing != null) {
-			document.getElementById(Status.viewing).style.display = 'none';
+			var o = document.getElementById(Status.viewing);
+			if (o != null)
+				o.style.display = 'none';
 		}
-		Status.viewing = view;
-		document.getElementById(Status.viewing).style.display = '';
+		
+		var o = document.getElementById(view);
+		if (o != null)
+		{
+			Status.viewing = view;
+			o.style.display = '';
+		}
 		
 		if (Status.timeout != null) {
 			clearTimeout(Status.timeout);

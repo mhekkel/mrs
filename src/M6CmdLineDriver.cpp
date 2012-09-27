@@ -9,6 +9,7 @@
 #include <boost/foreach.hpp>
 #define foreach BOOST_FOREACH
 //#include <boost/timer/timer.hpp>
+#include <boost/tr1/tuple.hpp>
 
 #include "M6Builder.h"
 #include "M6Databank.h"
@@ -22,20 +23,250 @@
 using namespace std;
 namespace po = boost::program_options;
 namespace fs = boost::filesystem;
+namespace zx = zeep::xml;
 
 int VERBOSE;
 
-void Blast(int argc, char* const argv[])
+// --------------------------------------------------------------------
+// abstract base class driver
+
+class M6CmdLineDriver
 {
-//	boost::timer::auto_cpu_timer t;
+  public:
+	virtual			~M6CmdLineDriver() {}
 
-	string matrix("BLOSUM62"), program = "blastp", query;
-	int32 gapOpen = -1, gapExtend = -1, wordSize = 0,
-		threads = boost::thread::hardware_concurrency(), reportLimit = 250;
-	bool filter = true, gapped = true;
-	double expect = 10;
+	static void		Exec(int argc, char* const argv[]);
 
-	po::options_description desc("m6 blast");
+  protected:
+
+					M6CmdLineDriver();
+
+	virtual void	AddOptions(po::options_description& desc,
+						unique_ptr<po::positional_options_description>& p);
+	virtual bool	Validate(po::variables_map& vm);
+	virtual void	Exec(const string& inCommand, po::variables_map& vm) = 0;
+
+	tr1::tuple<zx::element*,fs::path>
+					GetDatabank(const string& inDatabank);
+};
+
+// --------------------------------------------------------------------
+// implementations
+
+class M6BlastDriver : public M6CmdLineDriver
+{
+  public:
+					M6BlastDriver() {};
+
+	virtual void	AddOptions(po::options_description& desc,
+						unique_ptr<po::positional_options_description>& p);
+	virtual bool	Validate(po::variables_map& vm);
+	virtual void	Exec(const string& inCommand, po::variables_map& vm);
+};
+
+class M6BuildDriver : public M6CmdLineDriver
+{
+  public:
+					M6BuildDriver() {};
+
+	virtual void	Exec(const string& inCommand, po::variables_map& vm);
+};
+
+class M6QueryDriver : public M6CmdLineDriver
+{
+  public:
+					M6QueryDriver() {};
+
+	virtual void	AddOptions(po::options_description& desc,
+						unique_ptr<po::positional_options_description>& p);
+	virtual bool	Validate(po::variables_map& vm);
+	virtual void	Exec(const string& inCommand, po::variables_map& vm);
+};
+
+class M6InfoDriver : public M6CmdLineDriver
+{
+  public:
+					M6InfoDriver() {};
+
+	virtual void	Exec(const string& inCommand, po::variables_map& vm);
+};
+
+class M6EntryDriver : public M6CmdLineDriver
+{
+  public:
+					M6EntryDriver() {};
+
+	virtual void	AddOptions(po::options_description& desc,
+						unique_ptr<po::positional_options_description>& p);
+	virtual bool	Validate(po::variables_map& vm);
+	virtual void	Exec(const string& inCommand, po::variables_map& vm);
+};
+
+class M6DumpDriver : public M6CmdLineDriver
+{
+  public:
+					M6DumpDriver() {};
+
+	virtual void	AddOptions(po::options_description& desc,
+						unique_ptr<po::positional_options_description>& p);
+	virtual bool	Validate(po::variables_map& vm);
+	virtual void	Exec(const string& inCommand, po::variables_map& vm);
+};
+
+class M6VacuumDriver : public M6CmdLineDriver
+{
+  public:
+					M6VacuumDriver() {};
+
+	virtual void	AddOptions(po::options_description& desc,
+						unique_ptr<po::positional_options_description>& p);
+	virtual bool	Validate(po::variables_map& vm);
+	virtual void	Exec(const string& inCommand, po::variables_map& vm);
+};
+
+class M6ValidateDriver : public M6CmdLineDriver
+{
+  public:
+					M6ValidateDriver() {};
+
+	virtual void	AddOptions(po::options_description& desc,
+						unique_ptr<po::positional_options_description>& p);
+	virtual bool	Validate(po::variables_map& vm);
+	virtual void	Exec(const string& inCommand, po::variables_map& vm);
+};
+
+class M6FetchDriver : public M6CmdLineDriver
+{
+  public:
+					M6FetchDriver() {};
+
+	virtual void	AddOptions(po::options_description& desc,
+						unique_ptr<po::positional_options_description>& p);
+	virtual bool	Validate(po::variables_map& vm);
+	virtual void	Exec(const string& inCommand, po::variables_map& vm);
+};
+
+// --------------------------------------------------------------------
+// Code for base class driver
+
+M6CmdLineDriver::M6CmdLineDriver()
+{
+}
+
+void M6CmdLineDriver::Exec(int argc, char* const argv[])
+{
+	unique_ptr<M6CmdLineDriver> driver;
+	
+	if (strcmp(argv[1], "blast") == 0)
+		driver.reset(new M6BlastDriver());
+	else if (strcmp(argv[1], "build") == 0 or strcmp(argv[1], "update") == 0)
+		driver.reset(new M6BuildDriver());
+	else if (strcmp(argv[1], "query") == 0)
+		driver.reset(new M6QueryDriver());
+	else if (strcmp(argv[1], "info") == 0)
+		driver.reset(new M6InfoDriver());
+	else if (strcmp(argv[1], "entry") == 0)
+		driver.reset(new M6EntryDriver());
+	else if (strcmp(argv[1], "dump") == 0)
+		driver.reset(new M6DumpDriver());
+//	else if (strcmp(argv[1], "vacuum") == 0)
+//		driver.reset(new M6VacuumDriver());
+//	else if (strcmp(argv[1], "validate") == 0)
+//		driver.reset(new M6ValidateDriver());
+//	else if (strcmp(argv[1], "fetch") == 0)
+//		driver.reset(new M6FetchDriver());
+	else
+	{
+		cout << "Unknown command " << argv[1] << endl
+			 << "Supported commands are build, query and info" << endl;
+		exit(1);
+	}
+
+	po::options_description desc(string("m6 ") + argv[1]);
+	po::variables_map vm;
+	unique_ptr<po::positional_options_description> p;
+
+	driver->AddOptions(desc, p);
+	
+	if (p)
+		po::store(po::command_line_parser(argc - 1, argv + 1).options(desc).positional(*p).run(), vm);
+	else
+		po::store(po::command_line_parser(argc - 1, argv + 1).options(desc).run(), vm);
+	
+	po::notify(vm);
+
+	if (not driver->Validate(vm))
+	{
+		cout << desc << "\n";
+		exit(1);
+	}		
+	
+	driver->Exec(argv[1], vm);
+}
+
+void M6CmdLineDriver::AddOptions(po::options_description& desc,
+	unique_ptr<po::positional_options_description>& p)
+{
+	desc.add_options()	
+		("databank,d",	po::value<string>(),	"Databank to build")
+		("config-file,c", po::value<string>(),	"Configuration file")
+		("verbose,v",							"Be verbose")
+		("threads,a", po::value<uint32>(),		"Nr of threads/pipelines")
+		("help,h",								"Display help message")
+		;
+
+	p.reset(new po::positional_options_description());
+	p->add("databank", 1);
+}
+
+bool M6CmdLineDriver::Validate(po::variables_map& vm)
+{
+	bool result = false;
+	
+	if (vm.count("help") == 0 and vm.count("databank") > 0)
+	{
+		fs::path configFile("config/m6-config.xml");
+		if (vm.count("config-file"))
+			configFile = vm["config-file"].as<string>();
+		
+		if (not fs::exists(configFile))
+			THROW(("Configuration file not found (\"%s\")", configFile.string().c_str()));
+		
+		M6Config::SetConfigFile(configFile);
+
+		result = true;
+	}
+	
+	return result;
+}
+
+tr1::tuple<zx::element*,fs::path>
+M6CmdLineDriver::GetDatabank(const string& inDatabank)
+{
+	zx::element* config = M6Config::Instance().LoadDatabank(inDatabank);
+	if (not config)
+		THROW(("Configuration for %s is missing", inDatabank.c_str()));
+
+	zeep::xml::element* file = config->find_first("file");
+	if (not file)
+		THROW(("Invalid config-file, file element is missing for databank %s", inDatabank.c_str()));
+
+	fs::path path = file->content();
+	if (not path.has_root_path())
+	{
+		fs::path mrsdir(M6Config::Instance().FindGlobal("/m6-config/mrsdir"));
+		path = mrsdir / path;
+	}
+	
+	return tr1::make_tuple(config, path);
+}
+
+// --------------------------------------------------------------------
+//	blast
+
+void M6BlastDriver::AddOptions(po::options_description& desc,
+	unique_ptr<po::positional_options_description>& p)
+{
 	desc.add_options()
 		("query,i",			po::value<string>(),	"File containing query in FastA format")
 		("program,p",		po::value<string>(),	"Blast program (only supported program is blastp for now...)")
@@ -52,20 +283,25 @@ void Blast(int argc, char* const argv[])
 		("expect,e",		po::value<double>(),	"Expectation value, default is 10.0")
 		("threads,a",		po::value<int32>(),		"Nr of threads")
 		//("write-fasta",								"Write output as FastaA")
+		("verbose,v",								"Be verbose")
+		("config-file,c",	po::value<string>(),	"Configuration file")
 		("help,h",									"Display help message")
 		;
+}
 
-	po::variables_map vm;
-//		po::store(po::command_line_parser(argc, argv).options(desc).positional(p).run(), vm);
-	po::store(po::command_line_parser(argc, argv).options(desc).run(), vm);
-	po::notify(vm);
+bool M6BlastDriver::Validate(po::variables_map& vm)
+{
+	return M6CmdLineDriver::Validate(vm) and vm.count("query") != 0;
+}
 
-	if (vm.count("help") or vm.count("databank") == 0 or vm.count("query") == 0)
-	{
-		cout << desc << "\n";
-		exit(1);
-	}
-	
+void M6BlastDriver::Exec(const string& inCommand, po::variables_map& vm)
+{
+	string matrix("BLOSUM62"), program = "blastp", query;
+	int32 gapOpen = -1, gapExtend = -1, wordSize = 0,
+		threads = boost::thread::hardware_concurrency(), reportLimit = 250;
+	bool filter = true, gapped = true;
+	double expect = 10;
+
 	fs::path queryFile(vm["query"].as<string>());
 	if (not fs::exists(queryFile))
 		throw M6Exception("Query file does not exist");
@@ -132,43 +368,12 @@ void Blast(int argc, char* const argv[])
 	}
 }
 
-void Build(int argc, char* argv[])
+// --------------------------------------------------------------------
+//	build
+
+void M6BuildDriver::Exec(const string& inCommand, po::variables_map& vm)
 {
-	po::options_description desc("m6 build [databank]");
-	desc.add_options()
-		("databank,d",	po::value<string>(),	"Databank to build")
-		("config-file,c", po::value<string>(),	"Configuration file")
-		("verbose,v",							"Be verbose")
-		("threads,a", po::value<uint32>(),		"Nr of threads/pipelines")
-		("help,h",								"Display help message")
-		;
-
-	po::positional_options_description p;
-	p.add("databank", 1);
-	
-	po::variables_map vm;
-	po::store(po::command_line_parser(argc, argv).options(desc).positional(p).run(), vm);
-	po::notify(vm);
-
-	if (vm.count("help") or vm.count("databank") == 0)
-	{
-		cout << desc << "\n";
-		exit(1);
-	}
-	
-	if (vm.count("verbose"))
-		VERBOSE = 1;
-	
 	string databank = vm["databank"].as<string>();
-
-	fs::path configFile("config/m6-config.xml");
-	if (vm.count("config-file"))
-		configFile = vm["config-file"].as<string>();
-	
-	if (not fs::exists(configFile))
-		THROW(("Configuration file not found (\"%s\")", configFile.string().c_str()));
-	
-	M6Config::SetConfigFile(configFile);
 
 	uint32 nrOfThreads = boost::thread::hardware_concurrency();
 	if (nrOfThreads > 4)
@@ -178,7 +383,7 @@ void Build(int argc, char* argv[])
 	if (nrOfThreads < 1)
 		nrOfThreads = 1;
 	
-	if (strcmp(argv[0], "update") == 0 and
+	if (inCommand == "update" and
 		M6Config::Instance().FindFirst((boost::format("/m6-config/databank[@id='%1%']/fetch") % databank).str()) != nullptr)
 	{
 		M6Fetch(databank);
@@ -186,60 +391,38 @@ void Build(int argc, char* argv[])
 
 	M6Builder builder(databank);
 	
-	if (strcmp(argv[0], "build") == 0 or builder.NeedsUpdate())
+	if (inCommand == "build" or builder.NeedsUpdate())
 		builder.Build(nrOfThreads);
 	else
 		cout << databank << " is up-to-date" << endl;
 }
 
-void Query(int argc, char* argv[])
+// --------------------------------------------------------------------
+//	query
+
+void M6QueryDriver::AddOptions(po::options_description& desc,
+	unique_ptr<po::positional_options_description>& p)
 {
-	po::options_description desc("m6 query [databank] [query]");
+	M6CmdLineDriver::AddOptions(desc, p);
 	desc.add_options()
-		("databank,d",	po::value<string>(),	"Databank to build")
 		("query,q", po::value<string>(),		"Query term")
-		("config-file,c", po::value<string>(),	"Configuration file")
 		("count", po::value<uint32>(),			"Result count (default = 10)")
 		("offset", po::value<uint32>(),			"Result offset (default = 0)")
-		("verbose,v",							"Be verbose")
-		("help,h",								"Display help message")
 		;
 
-	po::positional_options_description p;
-	p.add("databank", 1);
-	p.add("query", 2);
-	
-	po::variables_map vm;
-	po::store(po::command_line_parser(argc, argv).options(desc).positional(p).run(), vm);
-	po::notify(vm);
+	p->add("query", 2);
+}
 
-	if (vm.count("help") or vm.count("databank") == 0 or vm.count("query") == 0)
-	{
-		cout << desc << "\n";
-		exit(1);
-	}
-	
-	if (vm.count("verbose"))
-		VERBOSE = 1;
-	
-	string databank = vm["databank"].as<string>();
+bool M6QueryDriver::Validate(po::variables_map& vm)
+{
+	return M6CmdLineDriver::Validate(vm) and vm.count("query");
+}
 
-	fs::path configFile("config/m6-config.xml");
-	if (vm.count("config-file"))
-		configFile = vm["config-file"].as<string>();
-	
-	if (not fs::exists(configFile))
-		THROW(("Configuration file not found (\"%s\")", configFile.string().c_str()));
-	
-	M6Config::SetConfigFile(configFile);
-
-	zeep::xml::element* config = M6Config::Instance().LoadDatabank(databank);
-	if (not config)
-		THROW(("Configuration for %s is missing", databank.c_str()));
-
-	zeep::xml::element* file = config->find_first("file");
-	if (not file)
-		THROW(("Invalid config-file, file is missing"));
+void M6QueryDriver::Exec(const string& inCommand, po::variables_map& vm)
+{
+	zx::element* config;
+	fs::path path;
+	tr1::tie(config, path) = GetDatabank(vm["databank"].as<string>());
 
 	uint32 count = 10;
 	if (vm.count("count"))
@@ -248,7 +431,6 @@ void Query(int argc, char* argv[])
 	if (vm.count("offset"))
 		offset = vm["offset"].as<uint32>();
 
-	fs::path path = file->content();
 	M6Databank db(path.string(), eReadOnly);
 	unique_ptr<M6Iterator> rset(db.Find(vm["query"].as<string>(), true, offset + count));
 	
@@ -272,52 +454,15 @@ void Query(int argc, char* argv[])
 	}
 }
 
-void Info(int argc, char* argv[])
+// --------------------------------------------------------------------
+//	info
+
+void M6InfoDriver::Exec(const string& inCommand, po::variables_map& vm)
 {
-	po::options_description desc("m6 info [databank]");
-	desc.add_options()
-		("databank,d",	po::value<string>(),	"Databank to build")
-		("config-file,c", po::value<string>(),	"Configuration file")
-		("verbose,v",							"Be verbose")
-		("help,h",								"Display help message")
-		;
+	zx::element* config;
+	fs::path path;
+	tr1::tie(config, path) = GetDatabank(vm["databank"].as<string>());
 
-	po::positional_options_description p;
-	p.add("databank", 1);
-	
-	po::variables_map vm;
-	po::store(po::command_line_parser(argc, argv).options(desc).positional(p).run(), vm);
-	po::notify(vm);
-
-	if (vm.count("help") or vm.count("databank") == 0)
-	{
-		cout << desc << "\n";
-		exit(1);
-	}
-	
-	if (vm.count("verbose"))
-		VERBOSE = 1;
-	
-	string databank = vm["databank"].as<string>();
-
-	fs::path configFile("config/m6-config.xml");
-	if (vm.count("config-file"))
-		configFile = vm["config-file"].as<string>();
-	
-	if (not fs::exists(configFile))
-		THROW(("Configuration file not found (\"%s\")", configFile.string().c_str()));
-	
-	M6Config::SetConfigFile(configFile);
-
-	zeep::xml::element* config = M6Config::Instance().LoadDatabank(databank);
-	if (not config)
-		THROW(("Configuration for %s is missing", databank.c_str()));
-
-	zeep::xml::element* file = config->find_first("file");
-	if (not file)
-		THROW(("Invalid config-file, file is missing"));
-
-	fs::path path = file->content();
 	M6Databank db(path.string(), eReadOnly);
 	
 	M6DatabankInfo info;
@@ -378,110 +523,61 @@ void Info(int argc, char* argv[])
 			 << formatNr(ix.mFileSize, 14) << endl;
 }
 
-void Dump(int argc, char* argv[])
+// --------------------------------------------------------------------
+//	dump
+
+void M6DumpDriver::AddOptions(po::options_description& desc,
+	unique_ptr<po::positional_options_description>& p)
 {
-	po::options_description desc("m6 dump [databank]");
 	desc.add_options()
-		("databank,d",	po::value<string>(),	"Databank to build")
-		("config-file,c", po::value<string>(),	"Configuration file")
 		("index,i", po::value<string>(),		"Index to dump")
-		("verbose,v",							"Be verbose")
-		("help,h",								"Display help message")
 		;
 
-	po::positional_options_description p;
-	p.add("databank", 1);
-	
-	po::variables_map vm;
-	po::store(po::command_line_parser(argc, argv).options(desc).positional(p).run(), vm);
-	po::notify(vm);
+	M6CmdLineDriver::AddOptions(desc, p);
 
-	if (vm.count("help") or vm.count("databank") == 0)
-	{
-		cout << desc << "\n";
-		exit(1);
-	}
-	
-	if (vm.count("verbose"))
-		VERBOSE = 1;
-	
-	string databank = vm["databank"].as<string>();
-
-	fs::path configFile("config/m6-config.xml");
-	if (vm.count("config-file"))
-		configFile = vm["config-file"].as<string>();
-	
-	if (not fs::exists(configFile))
-		THROW(("Configuration file not found (\"%s\")", configFile.string().c_str()));
-	
-	M6Config::SetConfigFile(configFile);
-
-	zeep::xml::element* config = M6Config::Instance().LoadDatabank(databank);
-	if (not config)
-		THROW(("Configuration for %s is missing", databank.c_str()));
-
-	zeep::xml::element* file = config->find_first("file");
-	if (not file)
-		THROW(("Invalid config-file, file is missing"));
-
-	fs::path path = file->content();
-	M6Databank db(path.string(), eReadOnly);
-	
-	if (vm.count("index"))
-	{
-		db.DumpIndex(vm["index"].as<string>(), cout);
-	}
-	
+	p->add("query", 2);
 }
 
-void Entry(int argc, char* argv[])
+bool M6DumpDriver::Validate(po::variables_map& vm)
 {
-	po::options_description desc("m6 entry [databank] [id]");
+	return M6CmdLineDriver::Validate(vm) and vm.count("index");
+}
+
+void M6DumpDriver::Exec(const string& inCommand, po::variables_map& vm)
+{
+	zx::element* config;
+	fs::path path;
+	tr1::tie(config, path) = GetDatabank(vm["databank"].as<string>());
+	M6Databank db(path.string(), eReadOnly);
+	
+	db.DumpIndex(vm["index"].as<string>(), cout);
+}
+
+// --------------------------------------------------------------------
+//	entry
+
+void M6EntryDriver::AddOptions(po::options_description& desc,
+	unique_ptr<po::positional_options_description>& p)
+{
 	desc.add_options()
-		("databank,d",	po::value<string>(),	"Databank to build")
-		("config-file,c", po::value<string>(),	"Configuration file")
 		("entry,e", po::value<string>(),		"Entry ID to display")
-		("verbose,v",							"Be verbose")
-		("help,h",								"Display help message")
 		;
 
-	po::positional_options_description p;
-	p.add("databank", 1);
-	p.add("entry", 2);
-	
-	po::variables_map vm;
-	po::store(po::command_line_parser(argc, argv).options(desc).positional(p).run(), vm);
-	po::notify(vm);
+	M6CmdLineDriver::AddOptions(desc, p);
 
-	if (vm.count("help") or vm.count("databank") == 0 or vm.count("entry") == 0)
-	{
-		cout << desc << "\n";
-		exit(1);
-	}
-	
-	if (vm.count("verbose"))
-		VERBOSE = 1;
-	
-	string databank = vm["databank"].as<string>();
+	p->add("entry", 2);
+}
 
-	fs::path configFile("config/m6-config.xml");
-	if (vm.count("config-file"))
-		configFile = vm["config-file"].as<string>();
-	
-	if (not fs::exists(configFile))
-		THROW(("Configuration file not found (\"%s\")", configFile.string().c_str()));
-	
-	M6Config::SetConfigFile(configFile);
+bool M6EntryDriver::Validate(po::variables_map& vm)
+{
+	return M6CmdLineDriver::Validate(vm) and vm.count("entry");
+}
 
-	zeep::xml::element* config = M6Config::Instance().LoadDatabank(databank);
-	if (not config)
-		THROW(("Configuration for %s is missing", databank.c_str()));
-
-	zeep::xml::element* file = config->find_first("file");
-	if (not file)
-		THROW(("Invalid config-file, file is missing"));
-
-	fs::path path = file->content();
+void M6EntryDriver::Exec(const string& inCommand, po::variables_map& vm)
+{
+	zx::element* config;
+	fs::path path;
+	tr1::tie(config, path) = GetDatabank(vm["databank"].as<string>());
 	M6Databank db(path.string(), eReadOnly);
 	
 	unique_ptr<M6Iterator> iter(db.Find("id", vm["entry"].as<string>()));
@@ -498,143 +594,143 @@ void Entry(int argc, char* argv[])
 	cout << doc->GetText() << endl;
 }
 
-void Fetch(int argc, char* argv[])
-{
-	po::options_description desc("m6 fetch [databank]");
-	desc.add_options()
-		("databank,d",	po::value<string>(),	"Databank to build")
-		("config-file,c", po::value<string>(),	"Configuration file")
-		("verbose,v",							"Be verbose")
-		("help,h",								"Display help message")
-		;
-
-	po::positional_options_description p;
-	p.add("databank", 1);
-	
-	po::variables_map vm;
-	po::store(po::command_line_parser(argc, argv).options(desc).positional(p).run(), vm);
-	po::notify(vm);
-
-	if (vm.count("help") or vm.count("databank") == 0)
-	{
-		cout << desc << "\n";
-		exit(1);
-	}
-	
-	if (vm.count("verbose"))
-		VERBOSE = 1;
-	
-	fs::path configFile("config/m6-config.xml");
-	if (vm.count("config-file"))
-		configFile = vm["config-file"].as<string>();
-	
-	if (not fs::exists(configFile))
-		THROW(("Configuration file not found (\"%s\")", configFile.string().c_str()));
-	
-	M6Config::SetConfigFile(configFile);
-
-	M6Fetch(vm["databank"].as<string>());
-}
-
-void Vacuum(int argc, char* argv[])
-{
-	po::options_description desc("m6 vacuum [databank]");
-	desc.add_options()
-		("databank,d",	po::value<string>(),	"Databank to build")
-		("config-file,c", po::value<string>(),	"Configuration file")
-		("verbose,v",							"Be verbose")
-		("help,h",								"Display help message")
-		;
-
-	po::positional_options_description p;
-	p.add("databank", 1);
-	
-	po::variables_map vm;
-	po::store(po::command_line_parser(argc, argv).options(desc).positional(p).run(), vm);
-	po::notify(vm);
-
-	if (vm.count("help") or vm.count("databank") == 0)
-	{
-		cout << desc << "\n";
-		exit(1);
-	}
-	
-	if (vm.count("verbose"))
-		VERBOSE = 1;
-	
-	string databank = vm["databank"].as<string>();
-
-	fs::path configFile("config/m6-config.xml");
-	if (vm.count("config-file"))
-		configFile = vm["config-file"].as<string>();
-	
-	if (not fs::exists(configFile))
-		THROW(("Configuration file not found (\"%s\")", configFile.string().c_str()));
-	
-	M6Config::SetConfigFile(configFile);
-
-	zeep::xml::element* config = M6Config::Instance().LoadDatabank(databank);
-	if (not config)
-		THROW(("Configuration for %s is missing", databank.c_str()));
-
-	zeep::xml::element* file = config->find_first("file");
-	if (not file)
-		THROW(("Invalid config-file, file is missing"));
-
-	fs::path path = file->content();
-	M6Databank db(path.string(), eReadWrite);
-	db.Vacuum();
-}
-
-void Validate(int argc, char* argv[])
-{
-	po::options_description desc("m6 validate [databank]");
-	desc.add_options()
-		("databank,d",	po::value<string>(),	"Databank to build")
-		("config-file,c", po::value<string>(),	"Configuration file")
-		("verbose,v",							"Be verbose")
-		("help,h",								"Display help message")
-		;
-
-	po::positional_options_description p;
-	p.add("databank", 1);
-	
-	po::variables_map vm;
-	po::store(po::command_line_parser(argc, argv).options(desc).positional(p).run(), vm);
-	po::notify(vm);
-
-	if (vm.count("help") or vm.count("databank") == 0)
-	{
-		cout << desc << "\n";
-		exit(1);
-	}
-	
-	if (vm.count("verbose"))
-		VERBOSE = 1;
-	
-	string databank = vm["databank"].as<string>();
-
-	fs::path configFile("config/m6-config.xml");
-	if (vm.count("config-file"))
-		configFile = vm["config-file"].as<string>();
-	
-	if (not fs::exists(configFile))
-		THROW(("Configuration file not found (\"%s\")", configFile.string().c_str()));
-	
-	M6Config::SetConfigFile(configFile);
-
-	zeep::xml::element* config = M6Config::Instance().LoadDatabank(databank);
-	if (not config)
-		THROW(("Configuration for %s is missing", databank.c_str()));
-
-	zeep::xml::element* file = config->find_first("file");
-	if (not file)
-		THROW(("Invalid config-file, file is missing"));
-
-	fs::path path = file->content();
-	M6Databank db(path.string(), eReadOnly);
-	db.Validate();
-}
+//void Fetch(int argc, char* argv[])
+//{
+//	po::options_description desc("m6 fetch [databank]");
+//	desc.add_options()
+//		("databank,d",	po::value<string>(),	"Databank to build")
+//		("config-file,c", po::value<string>(),	"Configuration file")
+//		("verbose,v",							"Be verbose")
+//		("help,h",								"Display help message")
+//		;
+//
+//	po::positional_options_description p;
+//	p.add("databank", 1);
+//	
+//	po::variables_map vm;
+//	po::store(po::command_line_parser(argc, argv).options(desc).positional(p).run(), vm);
+//	po::notify(vm);
+//
+//	if (vm.count("help") or vm.count("databank") == 0)
+//	{
+//		cout << desc << "\n";
+//		exit(1);
+//	}
+//	
+//	if (vm.count("verbose"))
+//		VERBOSE = 1;
+//	
+//	fs::path configFile("config/m6-config.xml");
+//	if (vm.count("config-file"))
+//		configFile = vm["config-file"].as<string>();
+//	
+//	if (not fs::exists(configFile))
+//		THROW(("Configuration file not found (\"%s\")", configFile.string().c_str()));
+//	
+//	M6Config::SetConfigFile(configFile);
+//
+//	M6Fetch(vm["databank"].as<string>());
+//}
+//
+//void Vacuum(int argc, char* argv[])
+//{
+//	po::options_description desc("m6 vacuum [databank]");
+//	desc.add_options()
+//		("databank,d",	po::value<string>(),	"Databank to build")
+//		("config-file,c", po::value<string>(),	"Configuration file")
+//		("verbose,v",							"Be verbose")
+//		("help,h",								"Display help message")
+//		;
+//
+//	po::positional_options_description p;
+//	p.add("databank", 1);
+//	
+//	po::variables_map vm;
+//	po::store(po::command_line_parser(argc, argv).options(desc).positional(p).run(), vm);
+//	po::notify(vm);
+//
+//	if (vm.count("help") or vm.count("databank") == 0)
+//	{
+//		cout << desc << "\n";
+//		exit(1);
+//	}
+//	
+//	if (vm.count("verbose"))
+//		VERBOSE = 1;
+//	
+//	string databank = vm["databank"].as<string>();
+//
+//	fs::path configFile("config/m6-config.xml");
+//	if (vm.count("config-file"))
+//		configFile = vm["config-file"].as<string>();
+//	
+//	if (not fs::exists(configFile))
+//		THROW(("Configuration file not found (\"%s\")", configFile.string().c_str()));
+//	
+//	M6Config::SetConfigFile(configFile);
+//
+//	zeep::xml::element* config = M6Config::Instance().LoadDatabank(databank);
+//	if (not config)
+//		THROW(("Configuration for %s is missing", databank.c_str()));
+//
+//	zeep::xml::element* file = config->find_first("file");
+//	if (not file)
+//		THROW(("Invalid config-file, file is missing"));
+//
+//	fs::path path = file->content();
+//	M6Databank db(path.string(), eReadWrite);
+//	db.Vacuum();
+//}
+//
+//void Validate(int argc, char* argv[])
+//{
+//	po::options_description desc("m6 validate [databank]");
+//	desc.add_options()
+//		("databank,d",	po::value<string>(),	"Databank to build")
+//		("config-file,c", po::value<string>(),	"Configuration file")
+//		("verbose,v",							"Be verbose")
+//		("help,h",								"Display help message")
+//		;
+//
+//	po::positional_options_description p;
+//	p.add("databank", 1);
+//	
+//	po::variables_map vm;
+//	po::store(po::command_line_parser(argc, argv).options(desc).positional(p).run(), vm);
+//	po::notify(vm);
+//
+//	if (vm.count("help") or vm.count("databank") == 0)
+//	{
+//		cout << desc << "\n";
+//		exit(1);
+//	}
+//	
+//	if (vm.count("verbose"))
+//		VERBOSE = 1;
+//	
+//	string databank = vm["databank"].as<string>();
+//
+//	fs::path configFile("config/m6-config.xml");
+//	if (vm.count("config-file"))
+//		configFile = vm["config-file"].as<string>();
+//	
+//	if (not fs::exists(configFile))
+//		THROW(("Configuration file not found (\"%s\")", configFile.string().c_str()));
+//	
+//	M6Config::SetConfigFile(configFile);
+//
+//	zeep::xml::element* config = M6Config::Instance().LoadDatabank(databank);
+//	if (not config)
+//		THROW(("Configuration for %s is missing", databank.c_str()));
+//
+//	zeep::xml::element* file = config->find_first("file");
+//	if (not file)
+//		THROW(("Invalid config-file, file is missing"));
+//
+//	fs::path path = file->content();
+//	M6Databank db(path.string(), eReadOnly);
+//	db.Validate();
+//}
 
 int main(int argc, char* argv[])
 {
@@ -661,30 +757,7 @@ int main(int argc, char* argv[])
 			exit(1);
 		}
 		
-		if (strcmp(argv[1], "blast") == 0)
-			Blast(argc - 1, argv + 1);
-		else if (strcmp(argv[1], "build") == 0 or strcmp(argv[1], "update") == 0)
-			Build(argc - 1, argv + 1);
-		else if (strcmp(argv[1], "query") == 0)
-			Query(argc - 1, argv + 1);
-		else if (strcmp(argv[1], "info") == 0)
-			Info(argc - 1, argv + 1);
-		else if (strcmp(argv[1], "entry") == 0)
-			Entry(argc - 1, argv + 1);
-		else if (strcmp(argv[1], "dump") == 0)
-			Dump(argc - 1, argv + 1);
-		else if (strcmp(argv[1], "vacuum") == 0)
-			Vacuum(argc - 1, argv + 1);
-		else if (strcmp(argv[1], "validate") == 0)
-			Validate(argc - 1, argv + 1);
-		else if (strcmp(argv[1], "fetch") == 0)
-			Fetch(argc - 1, argv + 1);
-		else
-		{
-			cout << "Unknown command " << argv[1] << endl
-				 << "Supported commands are build, query and info" << endl;
-			exit(1);
-		}
+		M6CmdLineDriver::Exec(argc, argv);
 	}
 	catch (exception& e)
 	{

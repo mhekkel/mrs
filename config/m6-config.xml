@@ -286,4 +286,13 @@
 			src="ftp://ftp.cmbi.ru.nl/pub/molbio/data/dssp/????.dssp" />
 	</databank>
 
+	<databank id="m-dssp" parser="dssp">
+		<name>Mini DSSP</name>
+		<file>m-dssp.m6</file>
+		<source>dssp-mini/*.dssp</source>
+		<fetch
+			delete="true"
+			src="ftp://ftp.cmbi.ru.nl/pub/molbio/data/dssp/1c??.dssp" />
+	</databank>
+
 </m6-config>

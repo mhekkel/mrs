@@ -21,12 +21,13 @@ sub parse
 
 		last if (substr($line, 0, 1) eq ' ');
 		
-		if ($line =~ /^HEADER(.+?)\d\d-[A-Z]{3}-\d\d\s+(.{4})/o)
+		if ($line =~ /^HEADER/o)
 		{
-			$title = $1;
-			$title =~ s/\s+$//;
+			$title = substr($line, 10, 40);
+			my $id = substr($line, 62, 4);
 
-			$self->set_attribute('id', $2);
+			$self->index_unique_string('id', $id);
+			$self->set_attribute('id', $id);
 		}
 		elsif ($line =~ /^COMPND.*?(?:MOLECULE: )?(?: |\d )(.+)/mo)
 		{

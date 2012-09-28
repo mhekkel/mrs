@@ -424,10 +424,17 @@ void M6Builder::Build(uint32 inNrOfThreads)
 
 	zx::element* file = mConfig->find_first("file");
 	if (not file)
-		THROW(("Invalid config-file, file is missing"));
+		THROW(("Invalid config-file, file element is missing for databank %s", mConfig->get_attribute("id").c_str()));
 
-	fs::path path(file->content());
+	fs::path path = file->content();
+	if (not path.has_root_path())
+	{
+		fs::path mrsdir(M6Config::Instance().FindGlobal("/m6-config/mrsdir"));
+		path = mrsdir / path;
+	}
 	
+	fs::path dstPath(path);
+
 	if (fs::exists(path))
 	{
 		boost::uuids::random_generator gen;
@@ -456,10 +463,10 @@ void M6Builder::Build(uint32 inNrOfThreads)
 		mDatabank = nullptr;
 		
 		// if we created a temporary db
-		if (path.string() != file->content())
+		if (path != dstPath)
 		{
-			fs::remove_all(file->content());
-			fs::rename(path, file->content());
+			fs::remove_all(dstPath);
+			fs::rename(path, dstPath);
 		}
 		
 		cout << "done" << endl;

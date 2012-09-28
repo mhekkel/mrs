@@ -81,7 +81,7 @@ void M6SearchServer::LoadAllDatabanks()
 		}
 
 		fs::path path = file->content();
-		if (not path.is_complete())
+		if (not path.has_root_path())
 			path = mrsDir / path;
 		
 		if (not fs::exists(path))

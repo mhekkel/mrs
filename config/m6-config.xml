@@ -93,6 +93,10 @@
 		<link regex="(?&lt;=^PARENT ID                 : )(\d+)" ix="id" id="$1" />
 	</format>
 
+	<datafilters>
+		<datafilter ext="*.ags" filter="gene2xml -bT" />
+	</datafilters>
+
 	<databank id="pdbfinder" parser="pdbfinder">
 		<name>PDBFINDER</name>
 		<file>pdbfinder.m6</file>
@@ -303,5 +307,15 @@
 			delete="true"
 			src="ftp://ftp.cmbi.ru.nl/pub/molbio/data/dssp/1c??.dssp" />
 	</databank>
+
+	<databank id="gene" parser="gene">
+		<name>Entrez Gene</name>
+		<file>gene.m6</file>
+		<source>gene/All_Data.ags.gz</source>
+		<fetch
+			src="ftp://ftp.ncbi.nlm.nih.gov/gene/DATA/ASN_BINARY/All_Data.ags.gz" />
+	</databank>
+
+
 
 </m6-config>

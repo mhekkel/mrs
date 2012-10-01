@@ -10,7 +10,7 @@ class M6Process
 {
   public:
 	
-				M6Process(std::vector<const char*>& args);
+				M6Process(const std::vector<const char*>& args);
 				~M6Process();
 
     bool		filter(const char*& begin_in, const char* end_in,

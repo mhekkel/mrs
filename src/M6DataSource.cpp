@@ -235,15 +235,15 @@ struct M6FilterDataSourceImpl : public M6DataSourceImpl
 	struct filter_impl : public M6Process
 	{
 	    typedef char char_type;
-					filter_impl(const string& inFilterCommand)
-						: M6Process(inFilterCommand) {}
+					filter_impl(const vector<const char*>& args)
+						: M6Process(args) {}
 	};
 	
 	struct filter : boost::iostreams::symmetric_filter<filter_impl>
 	{
-					filter(const string& inFilterCommand,
+					filter(const vector<const char*>& args,
 						int buffer_size = boost::iostreams::default_device_buffer_size)
-						: symmetric_filter(buffer_size, inFilterCommand) {}
+						: symmetric_filter(buffer_size, args) {}
 	};
 	
 	struct device : public io::source
@@ -280,7 +280,11 @@ struct M6FilterDataSourceImpl : public M6DataSourceImpl
 							result = new M6DataSource::M6DataFile;
 							result->mFilename = mFile.filename().string();
 							
-							result->mStream.push(filter("gene2xml -bT"));
+							vector<const char*> args;
+							args.push_back("gene2xml");
+							args.push_back("-bT");
+							
+							result->mStream.push(filter(args));
 
 							if (mFile.extension() == ".gz")
 								result->mStream.push(io::gzip_decompressor());

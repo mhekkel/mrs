@@ -75,7 +75,7 @@ int ForkExec(vector<const char*>& args, double maxRunTime,
 
 struct M6ProcessImpl
 {
-				M6ProcessImpl(vector<const char*>& args);
+				M6ProcessImpl(const vector<const char*>& args);
 				~M6ProcessImpl();
 
     bool		filter(const char*& begin_in, const char* end_in,
@@ -89,7 +89,7 @@ struct M6ProcessImpl
 	HANDLE		mIFD[2], mOFD[2], mEFD[2];
 };
 
-M6ProcessImpl::M6ProcessImpl(vector<const char*>& args)
+M6ProcessImpl::M6ProcessImpl(const vector<const char*>& args)
 	: mEof(false), mProc(nullptr), mThread(nullptr)
 {
 	foreach (const char* arg, args)
@@ -384,7 +384,7 @@ int ForkExec(vector<const char*>& args, double maxRunTime,
 
 struct M6ProcessImpl
 {
-				M6ProcessImpl(const string& inCommand);
+				M6ProcessImpl(const vector<const char*>& args);
 				~M6ProcessImpl();
 
     bool		filter(const char*& begin_in, const char* end_in,
@@ -397,7 +397,7 @@ struct M6ProcessImpl
 	int			mPID, mIFD, mOFD, mEFD;
 };
 
-M6ProcessImpl::M6ProcessImpl(vector<const char*>& args)
+M6ProcessImpl::M6ProcessImpl(const vector<const char*>& args)
 	: mArgs(args), mEof(false), mPID(-1)
 {
 }
@@ -552,7 +552,7 @@ void M6ProcessImpl::close()
 
 #endif
 
-M6Process::M6Process(vector<const char*>& args)
+M6Process::M6Process(const vector<const char*>& args)
 	: mImpl(new M6ProcessImpl(args))
 {
 }

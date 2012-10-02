@@ -1,5 +1,7 @@
 #include "M6Lib.h"
 
+#include <iostream>
+
 #if defined(_MSC_VER)
 #include <Windows.h>
 #include <time.h>
@@ -388,12 +390,12 @@ struct M6ProcessImpl
 	int			mOFD;
 	boost::thread
 				mThread;
-	string		mCommmand;
+	string		mCommand;
 	istream&	mRawData;
 };
 
 M6ProcessImpl::M6ProcessImpl(const string& inCommand, istream& inRawData)
-	: mRefCount(1), mOFD(-1), mCommmand(inCommand), mRawData(inRawData)
+	: mRefCount(1), mOFD(-1), mCommand(inCommand), mRawData(inRawData)
 {
 }
 
@@ -433,7 +435,7 @@ streamsize M6ProcessImpl::read(char* s, streamsize n)
 		{
 			try
 			{
-				vector<string> argss = po::unix_split(mCommmand);
+				vector<string> argss = po::split_unix(this->mCommand);
 				vector<const char*> args;
 				foreach (string& arg, argss)
 					args.push_back(arg.c_str());
@@ -525,7 +527,7 @@ streamsize M6ProcessImpl::read(char* s, streamsize n)
 			}
 			catch (exception& e)
 			{
-				cerr << "Process " << mCommand << " Failed: " << e.what() << endl;
+				cerr << "Process " << this->mCommand << " Failed: " << e.what() << endl;
 				exit(1);
 			}
 		});

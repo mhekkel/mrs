@@ -308,7 +308,7 @@
 		<name>Entrez Gene</name>
 		<file>gene.m6</file>
 		<source>gene/All_Data.ags.gz</source>
-		<filter>gene2xml -bT</filter>
+		<filter>/usr/bin/gene2xml -bT</filter>
 		<fetch
 			src="ftp://ftp.ncbi.nlm.nih.gov/gene/DATA/ASN_BINARY/All_Data.ags.gz" />
 	</databank>

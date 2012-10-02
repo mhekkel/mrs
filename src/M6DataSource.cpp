@@ -225,85 +225,31 @@ M6ArchiveDataSourceImpl::~M6ArchiveDataSourceImpl()
 
 // --------------------------------------------------------------------
 
-struct M6FilterDataSourceImpl : public M6DataSourceImpl
-{
-					M6FilterDataSourceImpl(const fs::path& inFile, M6Progress& inProgress)
-						: M6DataSourceImpl(inProgress), mFile(inFile) {}
-
-	static bool		CanFilter(const fs::path& inFile)
-					{
-						return
-							M6FilePathNameMatches(inFile.filename(), "*.ags.gz") or
-							M6FilePathNameMatches(inFile.filename(), "*.ags");
-					}
-
-	virtual M6DataSource::M6DataFile*	Next()
-					{
-						M6DataSource::M6DataFile* result = nullptr;
-						if (not mFile.empty())
-						{
-							result = new M6DataSource::M6DataFile;
-							result->mFilename = mFile.filename().string();
-							
-							vector<const char*> args;
-							args.push_back("C:\\Users\\maarten\\bin\\gene2xml.exe");
-							args.push_back("-bT");
-							args.push_back("-cT");
-							args.push_back("-i");
-							args.push_back("C:\\data\\raw\\gene\\All_Data.ags.gz");
-//							args.push_back("/usr/bin/tee");
-//							args.push_back("tee.log");
-							
-							result->mStream.push(M6Process(args));
-
-//							if (mFile.extension() == ".gz")
-//								result->mStream.push(io::gzip_decompressor());
-//							else if (mFile.extension() == ".bz2")
-//								result->mStream.push(io::bzip2_decompressor());
-//							
-//							result->mStream.push(device(mFile, mProgress));
-							
-							mProgress.Message(mFile.filename().string());
-							mFile.clear();
-						}
-						return result;
-					}
-
-	fs::path		mFile;
-};
-
-// --------------------------------------------------------------------
-
 M6DataSourceImpl* M6DataSourceImpl::Create(const fs::path& inFile, M6Progress& inProgress)
 {
 	M6DataSourceImpl* result = nullptr;
 
-	if (M6FilterDataSourceImpl::CanFilter(inFile))
-		result = new M6FilterDataSourceImpl(inFile, inProgress);
+	const uint32 kBufferSize = 4096;
+	
+	struct archive* archive = archive_read_new();
+	
+	if (archive == nullptr)
+		THROW(("Failed to initialize libarchive"));
+	
+	int err = archive_read_support_compression_all(archive);
+
+	if (err == ARCHIVE_OK)
+		err = archive_read_support_format_all(archive);
+	
+	if (err == ARCHIVE_OK)
+		err = archive_read_open_filename(archive, inFile.string().c_str(), kBufferSize);
+	
+	if (err == ARCHIVE_OK)	// a supported archive
+		result = new M6ArchiveDataSourceImpl(archive, inProgress);
 	else
 	{
-		const uint32 kBufferSize = 4096;
-		
-		struct archive* archive = archive_read_new();
-		
-		if (archive == nullptr)
-			THROW(("Failed to initialize libarchive"));
-		
-		int err = archive_read_support_compression_all(archive);
-	
-		if (err == ARCHIVE_OK)
-			err = archive_read_support_format_all(archive);
-		
-		if (err == ARCHIVE_OK)
-			err = archive_read_open_filename(archive, inFile.string().c_str(), kBufferSize);
-		
-		if (err == ARCHIVE_OK)	// a supported archive
-			result = new M6ArchiveDataSourceImpl(archive, inProgress);
-		else
-		{
-			archive_read_finish(archive);
-			result = new M6PlainTextDataSourceImpl(inFile, inProgress);
-		}
+		archive_read_finish(archive);
+		result = new M6PlainTextDataSourceImpl(inFile, inProgress);
 	}
 	
 	return result;

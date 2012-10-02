@@ -20,8 +20,6 @@ sub parse
 {
 	my ($self, $text) = @_;
 
-print STDERR "\n\n$text\n\n";
-
 	my ($doc, $title, $last_id, $lookahead, $xml_header);
 	my ($date_created, $date_updated, $date_discontinued);
 	my ($date_kind, %date);

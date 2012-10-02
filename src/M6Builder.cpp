@@ -12,6 +12,7 @@
 #include <boost/filesystem/fstream.hpp>
 #include <boost/iostreams/device/back_inserter.hpp>
 #include <boost/iostreams/filtering_stream.hpp>
+#include <boost/iostreams/filtering_streambuf.hpp>
 #include <boost/iostreams/copy.hpp>
 #include <boost/format.hpp>
 #include <boost/foreach.hpp>
@@ -37,6 +38,7 @@
 #include "M6DataSource.h"
 #include "M6Queue.h"
 #include "M6Config.h"
+#include "M6Exec.h"
 #include "M6Parser.h"
 
 using namespace std;
@@ -136,6 +138,13 @@ struct M6LineMatcher
 
 void M6Processor::ProcessFile(const string& inFileName, istream& inFileStream)
 {
+	io::filtering_stream<io::input> in;
+
+	if (mConfig->find_first("filter"))
+		in.push(M6Process(mConfig->find_first("filter")->content(), inFileStream));
+	else
+		in.push(inFileStream);
+	
 	M6LineMatcher header(mParser->GetValue("header")),
 				  trailer(mParser->GetValue("trailer")),
 				  firstline(mParser->GetValue("firstdocline")),
@@ -150,11 +159,11 @@ void M6Processor::ProcessFile(const string& inFileName, istream& inFileStream)
 	
 	while (state != eTail)
 	{
-		getline(inFileStream, line);
+		getline(in, line);
 		if (ba::ends_with(line, "\r"))
 			line.erase(line.end() - 1);
 
-		if (line.empty() and inFileStream.eof())
+		if (line.empty() and in.eof())
 		{
 			if (not document.empty())
 				PutDocument(document);

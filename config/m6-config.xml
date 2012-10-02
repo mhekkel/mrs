@@ -307,7 +307,8 @@
 	<databank id="gene" parser="gene">
 		<name>Entrez Gene</name>
 		<file>gene.m6</file>
-		<source filter="gene2xml -bT -cT -i {}">gene/All_Data.ags.gz</source>
+		<source>gene/All_Data.ags.gz</source>
+		<filter>gene2xml -bT</filter>
 		<fetch
 			src="ftp://ftp.ncbi.nlm.nih.gov/gene/DATA/ASN_BINARY/All_Data.ags.gz" />
 	</databank>

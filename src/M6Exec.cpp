@@ -14,12 +14,16 @@
 #include <boost/filesystem/operations.hpp>
 #include <boost/foreach.hpp>
 #define foreach BOOST_FOREACH
+#include <boost/thread.hpp>
+#include <boost/thread/condition.hpp>
+#include <boost/program_options/parsers.hpp>
 
 #include "M6Exec.h"
 #include "M6Error.h"
 
 using namespace std;
 namespace fs = boost::filesystem;
+namespace po = boost::program_options;
 
 double system_time()
 {
@@ -75,48 +79,38 @@ int ForkExec(vector<const char*>& args, double maxRunTime,
 
 struct M6ProcessImpl
 {
-				M6ProcessImpl(const vector<const char*>& args);
+					M6ProcessImpl(const string& inCommand, istream& inRawData);
 
-	void		Reference();
-	void		Release();
+	void			Reference();
+	void			Release();
 
-    streamsize	read(char* s, streamsize n);
+    streamsize		read(char* s, streamsize n);
   
-	string		mCommand;
-	bool		mEof;
-	HANDLE		mProc, mThread;
-
-	HANDLE		mOFD[2];
+	HANDLE			mOFD[2];
 
   private:
-				~M6ProcessImpl();
+					~M6ProcessImpl();
 
-	int32		mRefCount;
+	void			init();
+
+	boost::thread	mThread;
+	int32			mRefCount;
+	string			mCommand;
+	istream&		mRawData;
 };
 
-M6ProcessImpl::M6ProcessImpl(const vector<const char*>& args)
-	: mEof(false), mProc(nullptr), mThread(nullptr), mRefCount(0)
+M6ProcessImpl::M6ProcessImpl(const string& inCommand, istream& inRawData)
+	: mRefCount(1), mCommand(inCommand), mRawData(inRawData)
 {
-	foreach (const char* arg, args)
-	{
-		if (mCommand.empty() == false)
-			mCommand += ' ';
-		mCommand += arg;
-	}
-	
 	mOFD[0] = mOFD[1] = nullptr;
 }
 
 M6ProcessImpl::~M6ProcessImpl()
 {
-	if (mOFD[0] != nullptr)
-		::CloseHandle(mOFD[0]);
-	
-	if (mProc != nullptr)
+	if (mThread.joinable())
 	{
-		::CloseHandle(mProc);
-		::CloseHandle(mThread);
-		mProc = mThread = nullptr;
+		mThread.interrupt();
+		mThread.join();
 	}
 }
 
@@ -133,32 +127,76 @@ void M6ProcessImpl::Release()
 
 streamsize M6ProcessImpl::read(char* s, streamsize n)
 {
-	if (mProc == nullptr and mEof == false)
+	if (mOFD[0] == nullptr)
 	{
-		SECURITY_ATTRIBUTES sa = { sizeof(SECURITY_ATTRIBUTES) };
-		sa.bInheritHandle = true;
-	
-		::CreatePipe(&mOFD[0], &mOFD[1], &sa, 0);
-		::SetHandleInformation(mOFD[0], HANDLE_FLAG_INHERIT, 0); 
-	
-		//DWORD mode = PIPE_NOWAIT;
-		//::SetNamedPipeHandleState(mIFD[1], &mode, nullptr, nullptr);
-	
-		STARTUPINFOA si = { sizeof(STARTUPINFOA) };
-		si.dwFlags = STARTF_USESHOWWINDOW | STARTF_USESTDHANDLES;
-//		si.hStdInput = mIFD[0];
-		si.hStdOutput = mOFD[1];
-//		si.hStdError = mEFD[1];
-	
-		PROCESS_INFORMATION pi;
-		if (not ::CreateProcessA(nullptr, const_cast<char*>(mCommand.c_str()), nullptr, nullptr, true,
-				CREATE_NEW_PROCESS_GROUP, nullptr, /*const_cast<char*>(cwd.c_str())*/ nullptr, &si, &pi))
+		boost::mutex m;
+		boost::condition c;
+		boost::mutex::scoped_lock lock(m);
+		
+		mThread = boost::thread([this, &c]()
 		{
-			THROW(("Failed to launch %s (%d)", mCommand.c_str(), GetLastError()));
-		}
-	
-		mProc = pi.hProcess;
-		mThread = pi.hThread;
+			try
+			{
+				SECURITY_ATTRIBUTES sa = { sizeof(SECURITY_ATTRIBUTES) };
+				sa.bInheritHandle = true;
+				
+				HANDLE ifd[2];
+				
+				::CreatePipe(&ifd[0], &ifd[1], &sa, 0);
+				::SetHandleInformation(ifd[1], HANDLE_FLAG_INHERIT, 0); 
+			
+				::CreatePipe(&mOFD[0], &mOFD[1], &sa, 0);
+				::SetHandleInformation(mOFD[0], HANDLE_FLAG_INHERIT, 0); 
+			
+				STARTUPINFOA si = { sizeof(STARTUPINFOA) };
+				si.dwFlags = STARTF_USESHOWWINDOW | STARTF_USESTDHANDLES;
+				si.hStdInput = ifd[0];
+				si.hStdOutput = mOFD[1];
+		//		si.hStdError = mEFD[1];
+			
+				PROCESS_INFORMATION pi;
+				if (not ::CreateProcessA(nullptr, const_cast<char*>(mCommand.c_str()), nullptr, nullptr, true,
+						CREATE_NEW_PROCESS_GROUP, nullptr, /*const_cast<char*>(cwd.c_str())*/ nullptr, &si, &pi))
+				{
+					THROW(("Failed to launch %s (%d)", mCommand.c_str(), GetLastError()));
+				}
+			
+				c.notify_one();
+			
+				for (;;)
+				{
+					char buffer[4096];
+					mRawData.read(buffer, sizeof(buffer));
+					if (mRawData.gcount() > 0)
+					{
+						DWORD rr;
+						if (not ::WriteFile(ifd[1], buffer, mRawData.gcount(), &rr, nullptr))
+							THROW(("WriteFile failed: %d", GetLastError()));
+						continue;
+					}
+					
+					if (mRawData.eof())
+					{
+						::CloseHandle(ifd[1]);
+						break;
+					}
+				}
+				
+				::CloseHandle(mOFD[0]);
+				if (pi.hProcess != nullptr)
+				{
+					::CloseHandle(pi.hProcess);
+					::CloseHandle(pi.hThread);
+				}
+			}
+			catch (exception& e)
+			{
+				cerr << "Process " << mCommand << " Failed: " << e.what() << endl;
+				exit(1);
+			}
+		});
+
+		c.wait(lock);
 	}
 
 	DWORD rr;
@@ -336,36 +374,40 @@ int ForkExec(vector<const char*>& args, double maxRunTime,
 
 struct M6ProcessImpl
 {
-				M6ProcessImpl(const vector<const char*>& args);
+				M6ProcessImpl(const string& inCommand, istream& inRawData);
 
 	void		Reference();
 	void		Release();
 
 	streamsize	read(char* s, streamsize n);
-	void		close();
-
-	bool		ready() { return mPID != -1; }
-	void		init();
-  
-	vector<const char*>
-				mArgs;
-	bool		mEOF;
-	int			mPID, mIFD, mOFD;
 
   private:
 				~M6ProcessImpl();
+
 	int32		mRefCount;
+	int			mOFD;
+	boost::thread
+				mThread;
+	string		mCommmand;
+	istream&	mRawData;
 };
 
-M6ProcessImpl::M6ProcessImpl(const vector<const char*>& args)
-	: mArgs(args), mEOF(false), mPID(-1), mIFD(-1), mOFD(-1), mRefCount(1)
+M6ProcessImpl::M6ProcessImpl(const string& inCommand, istream& inRawData)
+	: mRefCount(1), mOFD(-1), mCommmand(inCommand), mRawData(inRawData)
 {
 }
 
 M6ProcessImpl::~M6ProcessImpl()
 {
 	assert(mRefCount == 0);
-	close();
+	if (mOFD != -1)
+		::close(mOFD);
+	
+	if (mThread.joinable())
+	{
+		mThread.interrupt();
+		mThread.join();
+	}
 }
 
 void M6ProcessImpl::Reference()
@@ -379,85 +421,125 @@ void M6ProcessImpl::Release()
 		delete this;
 }
 
-void M6ProcessImpl::init()
-{
-	if (mArgs.empty() or mArgs.front() == nullptr)
-		THROW(("No arguments to ForkExec"));
-
-	if (mArgs.back() != nullptr)
-		mArgs.push_back(nullptr);
-	
-	if (not fs::exists(mArgs.front()))
-		THROW(("The executable '%s' does not seem to exist", mArgs.front()));
-		
-	if (VERBOSE)
-		cerr << "Starting executable " << mArgs.front() << endl;
-
-	// ready to roll
-	double startTime = system_time();
-
-	int ofd[2], err;
-	
-	err = pipe(ofd); if (err < 0) THROW(("Pipe error: %s", strerror(errno)));
-	
-	mPID = fork();
-	
-	if (mPID == -1)
-	{
-		::close(ofd[0]);
-		::close(ofd[1]);
-		
-		THROW(("fork failed: %s", strerror(errno)));
-	}
-	
-	if (mPID == 0)	// the child
-	{
-		setpgid(0, 0);		// detach from the process group, create new
-
-		signal(SIGCHLD, SIG_IGN);	// block child died signals
-
-		dup2(ofd[1], STDOUT_FILENO);
-		::close(ofd[0]);
-		::close(ofd[1]);
-
-		const char* env[] = { nullptr };
-		(void)execve(mArgs.front(), const_cast<char* const*>(&mArgs[0]), const_cast<char* const*>(env));
-		exit(-1);
-	}
-
-	::close(ofd[1]);
-	mOFD = ofd[0];
-}
-
 streamsize M6ProcessImpl::read(char* s, streamsize n)
 {
-	return read(mOFD, s, n);
-}
-
-void M6ProcessImpl::close()
-{
-	if (mOFD >= 0)
-		::close(mOFD);
-	
-	mOFD = -1;
-	
-	if (mPID > 0)
+	if (mOFD == -1)
 	{
-		int status = 0;
-		waitpid(mPID, &status, 0);
+		boost::mutex m;
+		boost::condition c;
+		boost::mutex::scoped_lock lock(m);
 		
-		int result = -1;
-		if (WIFEXITED(status))
-			result = WEXITSTATUS(status);
+		mThread = boost::thread([this, &c]()
+		{
+			try
+			{
+				vector<string> argss = po::unix_split(mCommmand);
+				vector<const char*> args;
+				foreach (string& arg, argss)
+					args.push_back(arg.c_str());
+				
+				if (args.empty() or args.front() == nullptr)
+					THROW(("No arguments to ForkExec"));
+		
+				if (args.back() != nullptr)
+					args.push_back(nullptr);
+				
+				if (not fs::exists(args.front()))
+					THROW(("The executable '%s' does not seem to exist", args.front()));
+					
+				if (VERBOSE)
+					cerr << "Starting executable " << args.front() << endl;
+			
+				// ready to roll
+				double startTime = system_time();
+			
+				int ifd[2], ofd[2], err;
+				
+				err = pipe(ifd); if (err < 0) THROW(("Pipe error: %s", strerror(errno)));
+				err = pipe(ofd); if (err < 0) THROW(("Pipe error: %s", strerror(errno)));
+				
+				int pid = fork();
+				
+				if (pid == -1)
+				{
+					::close(ifd[0]);
+					::close(ifd[1]);
+					::close(ofd[0]);
+					::close(ofd[1]);
+					
+					THROW(("fork failed: %s", strerror(errno)));
+				}
+				
+				if (pid == 0)	// the child
+				{
+					setpgid(0, 0);		// detach from the process group, create new
+			
+					signal(SIGCHLD, SIG_IGN);	// block child died signals
+			
+					dup2(ifd[0], STDIN_FILENO);
+					::close(ifd[0]);
+					::close(ifd[1]);
+			
+					dup2(ofd[1], STDOUT_FILENO);
+					::close(ofd[0]);
+					::close(ofd[1]);
+			
+					const char* env[] = { nullptr };
+					(void)execve(args.front(), const_cast<char* const*>(&args[0]), const_cast<char* const*>(env));
+					exit(-1);
+				}
+			
+				::close(ofd[1]);
+				mOFD = ofd[0];
+				
+				c.notify_one();
+				
+				for (;;)
+				{
+					char buffer[4096];
+					mRawData.read(buffer, sizeof(buffer));
+					if (mRawData.gcount() > 0)
+					{
+						int r = ::write(ifd[1], buffer, mRawData.gcount());
+						if (r <= 0)
+							THROW(("WriteFile failed: %s", strerror(errno)));
+						continue;
+					}
+					
+					if (mRawData.eof())
+					{
+						::close(ifd[1]);
+						break;
+					}
+				}
+				
+				if (pid > 0)
+				{
+					int status = 0;
+					waitpid(pid, &status, 0);
+					
+					int result = -1;
+					if (WIFEXITED(status))
+						result = WEXITSTATUS(status);
+				}
+			}
+			catch (exception& e)
+			{
+				cerr << "Process " << mCommand << " Failed: " << e.what() << endl;
+				exit(1);
+			}
+		});
 
-		mPID = -1;
+		c.wait(lock);
 	}
+			
+	return ::read(mOFD, s, n);
 }
 
 #endif
 
-M6Process::M6Process(const vector<const char*>& args)
-	: mImpl(new M6ProcessImpl(args))
+M6Process::M6Process(const string& inCommand, istream& inRawData)
+	: mImpl(new M6ProcessImpl(inCommand, inRawData))
 {
 }
 

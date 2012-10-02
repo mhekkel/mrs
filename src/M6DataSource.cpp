@@ -236,32 +236,6 @@ struct M6FilterDataSourceImpl : public M6DataSourceImpl
 							M6FilePathNameMatches(inFile.filename(), "*.ags.gz") or
 							M6FilePathNameMatches(inFile.filename(), "*.ags");
 					}
-		
-	struct device : public io::source
-	{
-		typedef char			char_type;
-		typedef io::source_tag	category;
-	
-						device(const fs::path inFile, M6Progress& inProgress)
-							: mFile(inFile, eReadOnly), mProgress(inProgress) {}
-
-		streamsize		read(char* s, streamsize n)
-						{
-							if (n > mFile.Size() - mFile.Tell())
-								n = mFile.Size() - mFile.Tell();
-							if (n > 0)
-							{
-								mFile.Read(s, n);
-								mProgress.Consumed(n);
-							}
-							else
-								n = -1;
-							return n;
-						}
-	
-		M6File			mFile;
-		M6Progress&		mProgress;
-	};
 
 	virtual M6DataSource::M6DataFile*	Next()
 					{
@@ -272,19 +246,22 @@ struct M6FilterDataSourceImpl : public M6DataSourceImpl
 							result->mFilename = mFile.filename().string();
 							
 							vector<const char*> args;
-							args.push_back("/usr/bin/gene2xml");
+							args.push_back("C:\\Users\\maarten\\bin\\gene2xml.exe");
 							args.push_back("-bT");
+							args.push_back("-cT");
+							args.push_back("-i");
+							args.push_back("C:\\data\\raw\\gene\\All_Data.ags.gz");
 //							args.push_back("/usr/bin/tee");
 //							args.push_back("tee.log");
 							
 							result->mStream.push(M6Process(args));
 
-							if (mFile.extension() == ".gz")
-								result->mStream.push(io::gzip_decompressor());
-							else if (mFile.extension() == ".bz2")
-								result->mStream.push(io::bzip2_decompressor());
-							
-							result->mStream.push(device(mFile, mProgress));
+//							if (mFile.extension() == ".gz")
+//								result->mStream.push(io::gzip_decompressor());
+//							else if (mFile.extension() == ".bz2")
+//								result->mStream.push(io::bzip2_decompressor());
+//							
+//							result->mStream.push(device(mFile, mProgress));
 							
 							mProgress.Message(mFile.filename().string());
 							mFile.clear();

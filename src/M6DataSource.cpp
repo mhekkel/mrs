@@ -230,22 +230,13 @@ struct M6FilterDataSourceImpl : public M6DataSourceImpl
 					M6FilterDataSourceImpl(const fs::path& inFile, M6Progress& inProgress)
 						: M6DataSourceImpl(inProgress), mFile(inFile) {}
 
-	static bool		CanFilter(const fs::path& inFile)	{ return M6FilePathNameMatches(inFile.filename(), "*.ags.gz"); }
+	static bool		CanFilter(const fs::path& inFile)
+					{
+						return
+							M6FilePathNameMatches(inFile.filename(), "*.ags.gz") or
+							M6FilePathNameMatches(inFile.filename(), "*.ags");
+					}
 		
-	struct filter_impl : public M6Process
-	{
-	    typedef char char_type;
-					filter_impl(const vector<const char*>& args)
-						: M6Process(args) {}
-	};
-	
-	struct filter : boost::iostreams::symmetric_filter<filter_impl>
-	{
-					filter(const vector<const char*>& args,
-						int buffer_size = boost::iostreams::default_device_buffer_size)
-						: symmetric_filter(buffer_size, args) {}
-	};
-	
 	struct device : public io::source
 	{
 		typedef char			char_type;
@@ -281,10 +272,12 @@ struct M6FilterDataSourceImpl : public M6DataSourceImpl
 							result->mFilename = mFile.filename().string();
 							
 							vector<const char*> args;
-							args.push_back("gene2xml");
+							args.push_back("/usr/bin/gene2xml");
 							args.push_back("-bT");
+//							args.push_back("/usr/bin/tee");
+//							args.push_back("tee.log");
 							
-							result->mStream.push(filter(args));
+							result->mStream.push(M6Process(args));
 
 							if (mFile.extension() == ".gz")
 								result->mStream.push(io::gzip_decompressor());

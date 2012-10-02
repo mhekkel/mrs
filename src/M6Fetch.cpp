@@ -321,7 +321,7 @@ int64 M6FTPFetcher::CollectFiles(fs::path inLocalDir, fs::path inRemoteDir, fs::
 				if (fs::last_write_time(file) >= inTime)
 				{
 					if (VERBOSE)
-						cerr << file << " is up-to-date" << endl;
+						cerr << file << " is up-to-date " << endl;
 					fetch = false;
 				}
 			}

@@ -385,168 +385,164 @@ int ForkExec(vector<const char*>& args, double maxRunTime,
 struct M6ProcessImpl
 {
 				M6ProcessImpl(const vector<const char*>& args);
-				~M6ProcessImpl();
 
-    bool		filter(const char*& begin_in, const char* end_in,
-	                 char*& begin_out, char* end_out, bool flush);
-    void		close();
+	void		Reference();
+	void		Release();
+
+	streamsize	WriteOutputBuffer(const char* s, streamsize n);
+	streamsize	ReadInputBuffer(char* s, streamsize n);
+	void		close();
+
+	bool		ready() { return mPID != -1; }
+	void		init();
   
 	vector<const char*>
 				mArgs;
-	bool		mEof;
-	int			mPID, mIFD, mOFD, mEFD;
+	bool		mEOF;
+	int			mPID, mIFD, mOFD;
+
+  private:
+				~M6ProcessImpl();
+	int32		mRefCount;
 };
 
 M6ProcessImpl::M6ProcessImpl(const vector<const char*>& args)
-	: mArgs(args), mEof(false), mPID(-1)
+	: mArgs(args), mEOF(false), mPID(-1), mIFD(-1), mOFD(-1), mRefCount(1)
 {
 }
 
 M6ProcessImpl::~M6ProcessImpl()
 {
+	assert(mRefCount == 0);
 	close();
 }
 
-bool M6ProcessImpl::filter(const char*& begin_in, const char* end_in, char*& begin_out, char* end_out, bool flush)
+void M6ProcessImpl::Reference()
 {
+	++mRefCount;
+}
+
+void M6ProcessImpl::Release()
+{
+	if (--mRefCount == 0)
+		delete this;
+}
+
+void M6ProcessImpl::init()
+{
+	if (mArgs.empty() or mArgs.front() == nullptr)
+		THROW(("No arguments to ForkExec"));
+
+	if (mArgs.back() != nullptr)
+		mArgs.push_back(nullptr);
+	
+	if (not fs::exists(mArgs.front()))
+		THROW(("The executable '%s' does not seem to exist", mArgs.front()));
+		
+	if (VERBOSE)
+		cerr << "Starting executable " << mArgs.front() << endl;
+
+	// ready to roll
+	double startTime = system_time();
+
+	int ifd[2], ofd[2], efd[2], err;
+	
+	err = pipe(ifd); if (err < 0) THROW(("Pipe error: %s", strerror(errno)));
+	err = pipe(ofd); if (err < 0) THROW(("Pipe error: %s", strerror(errno)));
+	
+	mPID = fork();
+	
 	if (mPID == -1)
 	{
-		if (mArgs.empty() or mArgs.front() == nullptr)
-			THROW(("No arguments to ForkExec"));
-	
-		if (mArgs.back() != nullptr)
-			mArgs.push_back(nullptr);
+		::close(ifd[0]);
+		::close(ifd[1]);
+		::close(ofd[0]);
+		::close(ofd[1]);
 		
-		if (not fs::exists(mArgs.front()))
-			THROW(("The executable '%s' does not seem to exist", mArgs.front()));
+		THROW(("fork failed: %s", strerror(errno)));
+	}
 	
-		// ready to roll
-		double startTime = system_time();
-	
-		int ifd[2], ofd[2], efd[2], err;
-		
-		err = pipe(ifd); if (err < 0) THROW(("Pipe error: %s", strerror(errno)));
-		err = pipe(ofd); if (err < 0) THROW(("Pipe error: %s", strerror(errno)));
-		err = pipe(efd); if (err < 0) THROW(("Pipe error: %s", strerror(errno)));
-		
-		int pid = fork();
-		
-		if (pid == -1)
-		{
-			close(ifd[0]);
-			close(ifd[1]);
-			close(ofd[0]);
-			close(ofd[1]);
-			close(efd[0]);
-			close(efd[1]);
-			
-			THROW(("fork failed: %s", strerror(errno)));
-		}
-		
-		if (pid == 0)	// the child
-		{
-			setpgid(0, 0);		// detach from the process group, create new
-	
-			signal(SIGCHLD, SIG_IGN);	// block child died signals
-	
-			dup2(ifd[0], STDIN_FILENO);
-			close(ifd[0]);
-			close(ifd[1]);
-	
-			dup2(ofd[1], STDOUT_FILENO);
-			close(ofd[0]);
-			close(ofd[1]);
-							
-			dup2(efd[1], STDERR_FILENO);
-			close(efd[0]);
-			close(efd[1]);
-	
-			const char* env[] = { nullptr };
-			(void)execve(mArgs.front(), const_cast<char* const*>(&mArgs[0]), const_cast<char* const*>(env));
-			exit(-1);
-		}
+	if (mPID == 0)	// the child
+	{
+		setpgid(0, 0);		// detach from the process group, create new
 
-		// make stdout and stderr non-blocking
-		int flags;
-		
-		close(ifd[0]);
-		flags = fcntl(ifd[1], F_GETFL, 0);
-		fcntl(ifd[1], F_SETFL, flags | O_NONBLOCK);
-	
-		close(ofd[1]);
-		flags = fcntl(ofd[0], F_GETFL, 0);
-		fcntl(ofd[0], F_SETFL, flags | O_NONBLOCK);
-		
-		close(efd[1]);
-		flags = fcntl(efd[0], F_GETFL, 0);
-		fcntl(efd[0], F_SETFL, flags | O_NONBLOCK);
-		
-		mIFD = ifd[1];
-		mOFD = ofd[0];
-		mEFD = efd[0];
+		signal(SIGCHLD, SIG_IGN);	// block child died signals
+
+		dup2(ifd[0], STDIN_FILENO);
+		::close(ifd[0]);
+		::close(ifd[1]);
+
+		dup2(ofd[1], STDOUT_FILENO);
+		::close(ofd[0]);
+		::close(ofd[1]);
+
+		const char* env[] = { nullptr };
+		(void)execve(mArgs.front(), const_cast<char* const*>(&mArgs[0]), const_cast<char* const*>(env));
+		exit(-1);
 	}
 
-	if (begin_in < end_in)
-	{
-		int r = write(mIFD, begin_in, end_in - begin_in);
-		if (r > 0)
-			begin_in += r;
-		else if (r < 0 and errno != EAGAIN)
-			THROW(("Error writing to command %s", mArgs.front()));
-	}
+	// make stdout and stderr non-blocking
+	int flags;
 	
-	if (flush and begin_in == end_in)
-	{
-		close(mIFD);
-		mIFD = -1;
-	}
-	
-	if (mOFD >= 0)
-	{
-		int r = read(mOFD, begin_out, end_out - begin_out);
-		
-		if (r == 0 or errno != EAGAIN)
-		{
-			close(mOFD);
-			mOFD = -1;
-		}
-	}
+	::close(ifd[0]);
+	flags = fcntl(ifd[1], F_GETFL, 0);
+	fcntl(ifd[1], F_SETFL, flags | O_NONBLOCK);
 
-	if (mEFD >= 0)
+	::close(ofd[1]);
+	flags = fcntl(ofd[0], F_GETFL, 0);
+	fcntl(ofd[0], F_SETFL, flags | O_NONBLOCK);
+	
+	mIFD = ifd[1];
+	mOFD = ofd[0];
+}
+
+streamsize M6ProcessImpl::WriteOutputBuffer(const char* s, streamsize n)
+{
+	if (not ready())
+		init();
+	
+	streamsize r = 0;
+	if (mIFD >= 0 and n > 0)
+		r = write(mIFD, s, n);
+	return r;
+}
+
+streamsize M6ProcessImpl::ReadInputBuffer(char* s, streamsize n)
+{
+	streamsize r = read(mOFD, s, n);
+
+	if (r == 0)
+		mEOF = true;
+	else if (r == -1)
 	{
-		char buffer[1024];
-		
-		int r = read(mEFD, buffer, sizeof(buffer));
-		
-		if (r == 0 or errno != EAGAIN)
-		{
-			close(mEFD);
-			mEFD = -1;
-		}
+		if (errno == EAGAIN)
+			r = 0;
+		else
+			THROW(("Error reading from command %s (%s)", mArgs.front(), strerror(errno)));
 	}
 	
-	return (mEFD == -1 and mOFD == -1);
+	return r;
 }
 
 void M6ProcessImpl::close()
 {
 	if (mIFD >= 0)
-		close(mIFD);
+		::close(mIFD);
 	if (mOFD >= 0)
-		close(mOFD);
-	if (mEFD >= 0)
-		close(mEFD);
+		::close(mOFD);
 	
-	mIFD = mOFD = mEFD = -1;
+	mIFD = mOFD = -1;
 	
 	if (mPID > 0)
 	{
 		int status = 0;
-		waitpid(pid, &status, 0);
+		waitpid(mPID, &status, 0);
 		
 		int result = -1;
 		if (WIFEXITED(status))
 			result = WEXITSTATUS(status);
+
+		mPID = -1;
 	}
 }
 
@@ -554,22 +550,69 @@ void M6ProcessImpl::close()
 
 M6Process::M6Process(const vector<const char*>& args)
 	: mImpl(new M6ProcessImpl(args))
+	, mOutputBufferPtr(mOutputBuffer)
+	, mOutputBufferEnd(mOutputBuffer)
+	, mInputBufferPtr(mInputBuffer)
+	, mInputBufferEnd(mInputBuffer)
 {
 }
 
 M6Process::~M6Process()
 {
-	delete mImpl;
+	mImpl->Release();
 }
 
-bool M6Process::filter(const char*& begin_in, const char* end_in,
-     char*& begin_out, char* end_out, bool flush)
+M6Process::M6Process(const M6Process& rhs)
+	: mImpl(rhs.mImpl)
 {
-	return mImpl->filter(begin_in, end_in, begin_out, end_out, flush);
+	mImpl->Reference();
+	
+	memcpy(mInputBuffer, rhs.mInputBuffer, sizeof(mInputBuffer));
+	memcpy(mOutputBuffer, rhs.mOutputBuffer, sizeof(mOutputBuffer));
+	
+	mInputBufferPtr = mInputBuffer + (rhs.mInputBufferPtr - rhs.mInputBuffer);
+	mInputBufferEnd = mInputBuffer + (rhs.mInputBufferEnd - rhs.mInputBuffer);
+	mOutputBufferPtr = mOutputBuffer + (rhs.mOutputBufferPtr - rhs.mOutputBuffer);
+	mOutputBufferEnd = mOutputBuffer + (rhs.mOutputBufferEnd - rhs.mOutputBuffer);
 }
 
-void M6Process::close()
+M6Process& M6Process::operator=(const M6Process& rhs)
 {
-	mImpl->close();
+	if (this != &rhs)
+	{
+		mImpl->Release();
+		mImpl = rhs.mImpl;
+		mImpl->Reference();
+		
+		memcpy(mInputBuffer, rhs.mInputBuffer, sizeof(mInputBuffer));
+		memcpy(mOutputBuffer, rhs.mOutputBuffer, sizeof(mOutputBuffer));
+		
+		mInputBufferPtr = mInputBuffer + (rhs.mInputBufferPtr - rhs.mInputBuffer);
+		mInputBufferEnd = mInputBuffer + (rhs.mInputBufferEnd - rhs.mInputBuffer);
+		mOutputBufferPtr = mOutputBuffer + (rhs.mOutputBufferPtr - rhs.mOutputBuffer);
+		mOutputBufferEnd = mOutputBuffer + (rhs.mOutputBufferEnd - rhs.mOutputBuffer);
+	}
+	
+	return *this;
 }
 
+streamsize M6Process::WriteOutputBuffer()
+{
+	streamsize r = 0;
+	if (mOutputBufferEnd > mOutputBufferPtr)
+	{
+		r = mImpl->WriteOutputBuffer(mOutputBufferPtr, mOutputBufferEnd - mOutputBufferPtr);
+		if (r > 0)
+			mOutputBufferPtr += r;
+	}
+	return r;
+}
+
+streamsize M6Process::ReadInputBuffer(char* s, streamsize n)
+{
+//	return mImpl->ReadInputBuffer(s, n);
+
+	streamsize r = mImpl->ReadInputBuffer(s, n);
+	cerr << "r: " << r << endl << string(s, n) << endl;
+	return r;
+}

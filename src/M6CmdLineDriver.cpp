@@ -192,6 +192,9 @@ void M6CmdLineDriver::Exec(int argc, char* const argv[])
 		exit(1);
 	}		
 	
+	if (vm.count("verbose"))
+		VERBOSE = 1;
+	
 	driver->Exec(argv[1], vm);
 }
 

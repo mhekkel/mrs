@@ -555,14 +555,27 @@ M6Token M6Tokenizer::GetNextWord()
 	M6Token result = eM6TokenNone;
 
 	mTokenLength = 0;
-	uint32 token[kMaxTokenLength];
+	uint32 token[kMaxTokenLength + 1];
 	uint32* t = token;
 	bool hasCombiningMarks = false;
 		
 	int state = 10;
-	while (result == eM6TokenNone and mTokenLength < kMaxTokenLength)
+	while (result == eM6TokenNone)
 	{
 		uint32 c = GetNextCharacter();
+
+		// this tokens exceeds the max token length... to not overflow the buffer and return
+		// a undefined token.
+		if (t == token + kMaxTokenLength)
+		{
+			result = eM6TokenUndefined;
+
+			while (not (c == 0 or fast::ispunct(c) or fast::isspace(c)))
+				c = GetNextCharacter();
+
+			break;
+		}
+
 		*t++ = c;
 		
 		switch (state)

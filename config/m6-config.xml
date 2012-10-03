@@ -46,6 +46,7 @@
 			<db>taxonomy</db>
 			<db>go</db>
 			<db>interpro</db>
+			<db>pdb</db>
 		</dbs>
 		<realm name="M6 Administrator">
 			<user name="scott">b92ff7d60b994c8a0d2941ad9349e841</user>
@@ -96,7 +97,9 @@
 	</format>
 	
 	<format id="interpro">
-		<script src="scripts/interpro.js" />
+<!--		<script src="scripts/interpro.js" />-->
+		<link regex='&lt;db_xref db="SWISSPROT" dbkey="(.+?)"/&gt;' ix="ac" id="$1" db="sprot" />
+		<link regex='&lt;db_xref db="PDB" dbkey="(.+?)"/&gt;' ix="id" id="$1" db="pdb" />
 	</format>
 
 	<databank id="pdbfinder" parser="pdbfinder">

@@ -16,9 +16,9 @@ function loadXMLDoc(dname)
 Format.toHtml = function(text)
 {
 	$.get("scripts/interpro.xslt", function(xslt) {
-		var xsltProcessor=new XSLTProcessor();
-		xsltProcessor.importStylesheet(xslt);
-		
+	
+		text = text.replace(/&amp;/, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+	
 		var xmlDoc;
 		if (window.DOMParser)
 		{
@@ -31,25 +31,22 @@ Format.toHtml = function(text)
 			xmlDoc.async = false;
 			xmlDoc.loadXML(text);
 		}
-
-		var result = xsltProcessor.transformToFragment(xmlDoc, document);
-
-		document.getElementById("entrytext").appendChild(result);
 		
-	});
-	
-/*
-	var xsl = loadXMLDoc("scripts/interpro.xslt");
-	var xsltProcessor=new XSLTProcessor();
-	xsltProcessor.importStylesheet(xsl);
-	var resultDocument = xsltProcessor.transformToFragment($(text),document);
-	$('<div id="entrytext"/>').append(resultDocument);
-
-			document.getElementById("entrytext").appendChild(resultDocument);
+		var result;
+		if (window.ActiveXObject)
+		{
+			result = xmlDoc.transformNode(xslt);
 		}
+		// code for Mozilla, Firefox, Opera, etc.
+		else
+		{
+			var xsltProcessor=new XSLTProcessor();
+			xsltProcessor.importStylesheet(xslt);
+			result = xsltProcessor.transformToFragment(xmlDoc, document);
+		}
+		
+		$("#entryhtml").replaceWith(result);
 	});
 
-	text = $('<pre/>').html(text);
-*/
 	return $('<div id="entrytext"/>').html(text);
 }

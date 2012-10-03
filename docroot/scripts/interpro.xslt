@@ -1,4 +1,4 @@
-<xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:mrs='http://mrs.cmbi.ru.nl/mrs-web/ml' version="1.0">
+<xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform" version="1.0">
 	<xsl:template match="dbinfo">
 		<tr>
 			<td><span style="text-transform:lowercase;"><xsl:value-of select="@dbname"/></span></td>

@@ -275,7 +275,7 @@ uint32 M6FTPFetcher::WaitForReply()
 			getline(response_stream, line);
 			mReply = mReply + '\n' + line;
 		}
-		while (line.length() < 3 or line.substr(0, 3) != mReply.substr(0, 3));
+		while (line.length() < 4 or (line.substr(0, 3) == mReply.substr(0, 3) and line[3] == '-'));
 	}
 
 	return result;
@@ -382,7 +382,7 @@ void M6FTPFetcher::ListFiles(const string& inPattern,
 	if (status != 227)
 		Error("Passive mode failed");
 	
-	boost::regex re("227 Entering Passive Mode \\((\\d+,\\d+,\\d+,\\d+),(\\d+),(\\d+)\\)\\s*");
+	boost::regex re("227 Entering Passive Mode \\((\\d+,\\d+,\\d+,\\d+),(\\d+),(\\d+)\\).*");
 	boost::smatch m;
 	if (not boost::regex_match(mReply, m, re))
 		Error("Invalid reply for passive command");
@@ -475,7 +475,7 @@ void M6FTPFetcher::FetchFile(fs::path inRemote, fs::path inLocal, time_t inTime,
 	if (status != 227)
 		Error("Passive mode failed");
 	
-	boost::regex re("227 Entering Passive Mode \\((\\d+,\\d+,\\d+,\\d+),(\\d+),(\\d+)\\)\\s*");
+	boost::regex re("227 Entering Passive Mode \\((\\d+,\\d+,\\d+,\\d+),(\\d+),(\\d+)\\).*");
 	boost::smatch m;
 	if (not boost::regex_match(mReply, m, re))
 		Error("Invalid reply for passive command");

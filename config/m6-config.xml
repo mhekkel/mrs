@@ -44,6 +44,8 @@
 			<db>genbank</db>
 			<db>refseq</db>
 			<db>taxonomy</db>
+			<db>go</db>
+			<db>interpro</db>
 		</dbs>
 		<realm name="M6 Administrator">
 			<user name="scott">b92ff7d60b994c8a0d2941ad9349e841</user>
@@ -91,6 +93,10 @@
 
 	<format id="taxonomy">
 		<link regex="(?&lt;=^PARENT ID                 : )(\d+)" ix="id" id="$1" />
+	</format>
+	
+	<format id="interpro">
+		<script src="scripts/interpro.js" />
 	</format>
 
 	<databank id="pdbfinder" parser="pdbfinder">
@@ -264,10 +270,6 @@
 		<source>nlwiki/nlwiki-latest-pages-articles.xml.bz2</source>
 	</databank>
 
-	<databank id="mini-sprot-fasta">
-		<file>/data/mrs/mini-sprot-fasta.m6</file>
-	</databank>
-	
 	<databank id="pdb" parser="pdb">
 		<name>PDB</name>
 		<file>pdb.m6</file>
@@ -295,15 +297,6 @@
 			src="ftp://ftp.cmbi.ru.nl/pub/molbio/data/hssp/????.hssp.bz2" />
 	</databank>
 
-	<databank id="m-dssp" parser="dssp">
-		<name>Mini DSSP</name>
-		<file>m-dssp.m6</file>
-		<source>dssp-mini/*.dssp</source>
-		<fetch
-			delete="true"
-			src="ftp://ftp.cmbi.ru.nl/pub/molbio/data/dssp/1c??.dssp" />
-	</databank>
-
 	<databank id="gene" parser="gene">
 		<name>Entrez Gene</name>
 		<file>gene.m6</file>
@@ -311,6 +304,30 @@
 		<filter>/usr/bin/gene2xml -bT</filter>
 		<fetch
 			src="ftp://ftp.ncbi.nlm.nih.gov/gene/DATA/ASN_BINARY/All_Data.ags.gz" />
+	</databank>
+
+	<databank id="go" parser="go">
+		<name>GO</name>
+		<file>go.m6</file>
+		<source>go/gene_ontology.obo</source>
+		<fetch
+			src="ftp://ftp.geneontology.org/pub/go/ontology/gene_ontology.obo" />
+	</databank>
+
+<!--	<databank id="goa" parser="goa">-->
+<!--		<name>GOA</name>-->
+<!--		<file>goa.m6</file>-->
+<!--		<source>goa/gene_association.goa_uniprot.gz</source>-->
+<!--		<fetch-->
+<!--			src="ftp://ftp.ebi.ac.uk//pub/databases/GO/goa/UNIPROT/gene_association.goa_uniprot.gz" />-->
+<!--	</databank>-->
+
+	<databank id="interpro" parser="interpro" format="interpro">
+		<name>Interpro</name>
+		<file>interpro.m6</file>
+		<source>interpro/interpro.xml.gz</source>
+		<fetch
+			src="ftp://ftp.ebi.ac.uk/pub/databases/interpro/interpro.xml.gz" />
 	</databank>
 
 </m6-config>

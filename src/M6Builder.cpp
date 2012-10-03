@@ -159,7 +159,9 @@ void M6Processor::ProcessFile(const string& inFileName, istream& inFileStream)
 	
 	while (state != eTail)
 	{
+		line.clear();
 		getline(in, line);
+
 		if (ba::ends_with(line, "\r"))
 			line.erase(line.end() - 1);
 

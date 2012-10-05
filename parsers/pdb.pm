@@ -1,5 +1,8 @@
 package M6::Script::pdb;
 
+use strict;
+use warnings;
+
 our @ISA = "M6::Script";
 
 sub new
@@ -9,11 +12,36 @@ sub new
 	return bless $self, "M6::Script::pdb";
 }
 
+sub GetTitle
+{
+	my ($header, $compound, $title) = @_;
+	
+	my $desc;
+		
+	if ($title and $title ne '')
+	{
+		$desc = "$title ($header)";
+	}
+	else
+	{
+		$desc = $header;
+	}
+
+	if ($compound and $compound ne '')
+	{
+		$desc .= "; $compound";
+	}	
+	
+	$desc =~ s/ {2,}/ /g;
+	
+	return $desc;
+}
+
 sub parse
 {
 	my ($self, $text) = @_;
 
-	my ($state, %seq, $sequence, $seq_chain_id, $header, $compound, $title, $model_count, %ligands);
+	my ($state, %seq, $sequence, $seq_chain_id, $header, $title, $compound, $model_count, %ligands);
 
 	while ($text =~ m/^.+$/mg)
 	{
@@ -121,37 +149,37 @@ sub parse
 				}
 				elsif ($fld eq 'SEQRES')
 				{
-					my $chain_id = substr($line, 11, 1);
-					my $s = substr($line, 19, 52);
-					
-					if (defined $seq_chain_id and
-						defined $chain_id and
-						$chain_id ne $seq_chain_id and
-						defined $sequence)
-					{
-						if (length($sequence) > 2) {
-							$seq{$seq_chain_id} = $sequence;
-						}
-						$sequence = undef;
-					}
-
-					$seq_chain_id = $chain_id;
-					
-					foreach my $aa (split(m/\s+/, $s))
-					{
-						if (length($aa) == 3)
-						{
-							$sequence = "" unless defined $sequence;
-							if (defined $aa_map{$aa})
-							{
-								$sequence .= $aa_map{$aa};
-							}
-							else
-							{
-								$sequence .= 'X';		# unknown, avoid gaps
-							}
-						}
-					}
+#					my $chain_id = substr($line, 11, 1);
+#					my $s = substr($line, 19, 52);
+#					
+#					if (defined $seq_chain_id and
+#						defined $chain_id and
+#						$chain_id ne $seq_chain_id and
+#						defined $sequence)
+#					{
+#						if (length($sequence) > 2) {
+#							$seq{$seq_chain_id} = $sequence;
+#						}
+#						$sequence = undef;
+#					}
+#
+#					$seq_chain_id = $chain_id;
+#					
+#					foreach my $aa (split(m/\s+/, $s))
+#					{
+#						if (length($aa) == 3)
+#						{
+#							$sequence = "" unless defined $sequence;
+#							if (defined $aa_map{$aa})
+#							{
+#								$sequence .= $aa_map{$aa};
+#							}
+#							else
+#							{
+#								$sequence .= 'X';		# unknown, avoid gaps
+#							}
+#						}
+#					}
 				}
 				elsif ($line =~ /^\S+\s+(.*)/o)
 				{
@@ -161,7 +189,6 @@ sub parse
 		}
 		elsif ($state == 2)
 		{
-			$doc .= $line;
 			chomp($line);
 			
 			my $fld = substr($line, 0, 6);
@@ -176,7 +203,10 @@ sub parse
 	}
 
 	$self->index_number('models', $model_count) if defined $model_count;
-	$self->set_attribute('title', &GetTitle($header, $title, $compound));
+	
+	$title = &GetTitle($header, $title, $compound);
+	$title = substr($title, 0, 255) if length($title) > 255;
+	$self->set_attribute('title', $title);
 
 	foreach my $ligand (keys %ligands)
 	{

@@ -543,56 +543,55 @@ void M6Dictionary::Create(M6BasicIndex& inIndex, uint32 inDocCount,
 	uint16 df[kMaxStringLength];	// document frequency
 	
 	M6HashTable ht;
-	uint32 i = 0, p, q, nr = 0;
+	uint32 i = 0, p, q = 0, nr = 0;
 
-	for (M6BasicIndex::iterator iter = inIndex.begin(); iter != inIndex.end(); ++iter)
+//	for (M6BasicIndex::iterator iter = inIndex.begin(); iter != inIndex.end(); ++iter)
+	inIndex.VisitKeys([&](const char* inKey, uint32 inKeyLength, uint32 inCount) -> bool
 	{
 		if (++nr % 10000 == 0)
 			inProgress.Progress(nr);
 
-		uint32 dfI = iter.GetCount();
-		if (dfI < kM6MinWordOccurrence)
-			continue;
-		
-		string s = *iter;
-		q = static_cast<uint32>(s.length());
-		if (q < kM6MinWordLength)
-			continue;
-		
-		// calculate the document frequency for this term
-		if (dfI > numeric_limits<uint16>::max())
-			dfI = numeric_limits<uint16>::max();
-		
-		for (p = 0; s[p] == s0[p]; ++p)
-			;
-		
-		if (uint8(s[p]) < uint8(s0[p]))
-			THROW(("error, strings are unsorted: '%s' >= '%s'", s.c_str(), s0));
-		
-		while (i > p)
+		if (inCount >= kM6MinWordOccurrence and inKeyLength >= kM6MinWordLength)
 		{
-			M6Transition new_trans = {};
-
-			new_trans.b.dest = ht.Lookup(larval_state[i], l_state_len[i], automaton);
-			new_trans.b.term = is_terminal[i];
-			new_trans.b.df = df[i];
-			new_trans.b.attr = s0[--i];
+			// calculate the document frequency for this term
+			if (inCount > numeric_limits<uint16>::max())
+				inCount = numeric_limits<uint16>::max();
 			
-			larval_state[i][l_state_len[i]++] = new_trans;
+			string s(inKey, inKeyLength);
+			
+			for (p = 0; s[p] == s0[p]; ++p)
+				;
+			
+			if (uint8(s[p]) < uint8(s0[p]))
+				THROW(("error, strings are unsorted: '%s' >= '%s'", s.c_str(), s0));
+			
+			while (i > p)
+			{
+				M6Transition new_trans = {};
+	
+				new_trans.b.dest = ht.Lookup(larval_state[i], l_state_len[i], automaton);
+				new_trans.b.term = is_terminal[i];
+				new_trans.b.df = df[i];
+				new_trans.b.attr = s0[--i];
+				
+				larval_state[i][l_state_len[i]++] = new_trans;
+			}
+			
+			while (i < q)
+			{
+				s0[i] = s[i];
+				is_terminal[++i] = 0;
+				df[i] = 0;
+				l_state_len[i] = 0;
+			}
+			
+			s0[q] = 0;
+			is_terminal[q] = 1;
+			df[q] = static_cast<uint16>(inCount);
 		}
-		
-		while (i < q)
-		{
-			s0[i] = s[i];
-			is_terminal[++i] = 0;
-			df[i] = 0;
-			l_state_len[i] = 0;
-		}
-		
-		s0[q] = 0;
-		is_terminal[q] = 1;
-		df[q] = static_cast<uint16>(dfI);
-	}
+
+		return true;
+	});
 	
 	while (i > 0)
 	{

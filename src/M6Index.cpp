@@ -197,6 +197,11 @@ ostream& operator<<(ostream& os, const M6MultiIDLData& d)
 	return os;
 }
 
+template<typename T>	uint32 M6CountData(const T& inData);
+template<>				uint32 M6CountData(const uint32& inData)			{ return 1; }
+template<>				uint32 M6CountData(const M6MultiData& inData)		{ return inData.mCount; }
+template<>				uint32 M6CountData(const M6MultiIDLData& inData)	{ return inData.mCount; }
+
 template<>
 struct M6IndexPageDataTraits<eM6IndexMultiIDLLeafPage>
 {
@@ -838,6 +843,8 @@ struct M6IndexImpl
 						return mIndex.CompareKeys(inKeyA.c_str(), inKeyA.length(), inKeyB.c_str(), inKeyB.length());
 					}
 
+	virtual void	VisitKeys(M6BasicIndex::KeyVisitor inVisitor) = 0;
+
 	virtual void	Validate() = 0;
 	virtual void	Dump() = 0;
 
@@ -955,6 +962,8 @@ class M6IndexImplT : public M6IndexImpl
 		uint32		key;
 		M6DataType	data;
 	};
+
+	virtual void	VisitKeys(M6BasicIndex::KeyVisitor inVisitor);
 	
   protected:
 	virtual M6BasicPage*	CreateLeafPage(M6IndexPageData* inData, uint32 inPageNr);
@@ -3146,6 +3155,41 @@ void M6IndexImplT<M6DataType>::Visit(Visitor inVisitor, uint32 inPage, uint32 in
 }
 
 template<class M6DataType>
+void M6IndexImplT<M6DataType>::VisitKeys(M6BasicIndex::KeyVisitor inVisitor)
+{
+	LeafPage* page = static_cast<LeafPage*>(GetFirstLeafPage());
+	
+	uint32 keyNr = 0;
+	while (page != nullptr)
+	{
+		const char* key;
+		uint32 keyLen;
+		const M6DataType* data;
+		
+		if (keyNr == page->GetN())
+		{
+			if (page->GetLink() == 0)
+				break;
+			
+			LeafPage* next = Load<LeafPage>(page->GetLink());
+			Release(page);
+			page = next;
+			keyNr = 0;
+			continue;
+		}
+		
+		tr1::tie(key, keyLen, data) = page->Peek(keyNr);
+		++keyNr;
+		
+		if (not inVisitor(key, keyLen, M6CountData(*data)))
+			break;
+	}
+	
+	if (page != nullptr)
+		Release(page);
+}
+
+template<class M6DataType>
 void M6IndexImplT<M6DataType>::Validate()
 {
 	try
@@ -3290,6 +3334,11 @@ M6BasicIndex::iterator M6BasicIndex::begin() const
 M6BasicIndex::iterator M6BasicIndex::end() const
 {
 	return mImpl->End();
+}
+
+void M6BasicIndex::VisitKeys(KeyVisitor inVisitor)
+{
+	mImpl->VisitKeys(inVisitor);
 }
 
 void M6BasicIndex::Insert(const string& key, uint32 value)

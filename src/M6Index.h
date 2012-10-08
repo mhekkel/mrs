@@ -93,6 +93,9 @@ class M6BasicIndex
 	iterator		lower_bound(const std::string& inKey) const;
 	iterator		upper_bound(const std::string& inKey) const;
 	
+	typedef boost::function<bool(const char* inKey, uint32 inKeyLength, uint32 inCount)>	KeyVisitor;
+	void			VisitKeys(KeyVisitor inVisitor);
+	
 	void			Insert(const std::string& inKey, uint32 inValue);
 	void			Erase(const std::string& inKey);
 	bool			Find(const std::string& inKey, uint32& outValue);

@@ -89,6 +89,7 @@ class M6Processor
 	M6FileQueue		mFileQueue;
 	M6DocQueue		mDocQueue;
 	bool			mUseDocQueue;
+	string			mDbHeader;
 };
 
 // --------------------------------------------------------------------
@@ -146,13 +147,14 @@ void M6Processor::ProcessFile(const string& inFileName, istream& inFileStream)
 		in.push(inFileStream);
 	
 	M6LineMatcher header(mParser->GetValue("header")),
+				  lastheaderline(mParser->GetValue("lastheaderline")),
 				  trailer(mParser->GetValue("trailer")),
 				  firstline(mParser->GetValue("firstdocline")),
 				  lastline(mParser->GetValue("lastdocline"));
 				  
 	enum State { eHeader, eStart, eDoc, eTail } state = eHeader;
 	
-	if (not header)
+	if (not header and not lastheaderline)
 		state = eStart;
 
 	string document, line;
@@ -175,9 +177,15 @@ void M6Processor::ProcessFile(const string& inFileName, istream& inFileStream)
 		switch (state)
 		{
 			case eHeader:
-				if (header.Match(line))
+				mDbHeader += line + '\n';
+				if (lastheaderline)
+				{
+					if (lastheaderline.Match(line))
+						state = eStart;
+				}
+				else if (header and header.Match(line))
 					break;
-				// fall through
+				// else fall through
 			
 			case eStart:
 				if (not firstline or firstline.Match(line))
@@ -227,9 +235,18 @@ void M6Processor::ProcessFile(M6Progress& inProgress)
 		if (path.empty())
 			break;
 		
-		M6DataSource data(path, inProgress);
-		for (M6DataSource::iterator i = data.begin(); i != data.end(); ++i)
-			ProcessFile(i->mFilename, i->mStream);
+		try
+		{
+			M6DataSource data(path, inProgress);
+			for (M6DataSource::iterator i = data.begin(); i != data.end(); ++i)
+				ProcessFile(i->mFilename, i->mStream);
+		}
+		catch (exception& e)
+		{
+			cerr << endl
+				 << "Error processsing " << path << endl
+				 << e.what() << endl;
+		}
 	}
 	
 	mFileQueue.Put(fs::path());
@@ -239,7 +256,7 @@ void M6Processor::ProcessDocument(const string& inDoc)
 {
 	M6InputDocument* doc = new M6InputDocument(mDatabank, inDoc);
 	
-	mParser->ParseDocument(doc);
+	mParser->ParseDocument(doc, mDbHeader);
 	
 	doc->Tokenize(mLexicon, 0);
 	doc->Compress();
@@ -251,7 +268,7 @@ M6InputDocument* M6Processor::IndexDocument(const string& inDoc)
 {
 	M6InputDocument* doc = new M6InputDocument(mDatabank, inDoc);
 	
-	mParser->ParseDocument(doc);
+	mParser->ParseDocument(doc, mDbHeader);
 	
 	doc->Tokenize(mLexicon, 0);
 	return doc;
@@ -313,7 +330,7 @@ void M6Processor::ProcessDocument()
 
 		M6InputDocument* doc = new M6InputDocument(mDatabank, text);
 		
-		mParser->ParseDocument(doc);
+		mParser->ParseDocument(doc, mDbHeader);
 		
 		doc->Tokenize(*tsLexicon, 0);
 		doc->Compress();
@@ -464,11 +481,13 @@ void M6Builder::Build(uint32 inNrOfThreads)
 		vector<fs::path> files;
 		int64 rawBytes = Glob(M6Config::Instance().FindGlobal("/m6-config/rawdir"),
 			mConfig->find_first("source"), files);
-		M6Progress progress(rawBytes + 1, "parsing");
-	
-		M6Processor processor(*mDatabank, mLexicon, mConfig);
-		processor.Process(files, progress, inNrOfThreads);
-		progress.Consumed(1);
+		
+		{
+			M6Progress progress(rawBytes + 1, "parsing");
+		
+			M6Processor processor(*mDatabank, mLexicon, mConfig);
+			processor.Process(files, progress, inNrOfThreads);
+		}
 	
 		mDatabank->CommitBatchImport();
 		

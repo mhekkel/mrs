@@ -47,6 +47,8 @@
 			<db>go</db>
 			<db>interpro</db>
 			<db>pdb</db>
+			<db>dssp</db>
+			<db>hssp</db>
 		</dbs>
 		<realm name="M6 Administrator">
 			<user name="scott">b92ff7d60b994c8a0d2941ad9349e841</user>
@@ -129,13 +131,6 @@
 		<source>omim/mini-omim.dat</source>
 	</databank>
 	
-	<databank id="test-embl" parser="embl">
-		<name>EMBL</name>
-		<info>http://www.ebi.ac.uk/embl/index.html</info>
-		<file>/data/mrs/embl.m6</file>
-		<source>embl/cum*.dat.gz</source>
-	</databank>
-
 	<databank id="embl" parser="embl">
 		<name>EMBL</name>
 		<info>http://www.ebi.ac.uk/embl/index.html</info>
@@ -250,18 +245,21 @@
 	
 	<databank id="genbank" parser="genbank">
 		<name>Genbank</name>
+		<info>http://www.ncbi.nlm.nih.gov/genbank/</info>
 		<file>/data/mrs/genbank.m6</file>
 		<source>genbank/*.seq.gz</source>
 	</databank>
 
 	<databank id="refseq" parser="genbank">
 		<name>Refseq</name>
+		<info>http://www.ncbi.nlm.nih.gov/RefSeq/</info>
 		<file>/data/mrs/refseq.m6</file>
 		<source>refseq_release/*gpff.gz;refseq_release/*gbff.gz</source>
 	</databank>
 
 	<databank id="taxonomy" parser="taxonomy" format="taxonomy">
 		<name>Taxonomy</name>
+		<info>http://www.ncbi.nlm.nih.gov/entrez/query.fcgi?db=Taxonomy</info>
 		<file>/data/mrs/taxonomy.m6</file>
 		<source>taxonomy/taxonomy.dat</source>
 		<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/taxonomy/taxonomy.dat" />
@@ -275,6 +273,7 @@
 
 	<databank id="pdb" parser="pdb">
 		<name>PDB</name>
+		<info>http://www.rcsb.org/pdb/</info>
 		<file>pdb.m6</file>
 		<source>pdb/*/pdb*.ent.gz</source>
 		<fetch
@@ -284,6 +283,7 @@
 
 	<databank id="dssp" parser="dssp">
 		<name>DSSP</name>
+		<info>http://www.cmbi.ru.nl/dssp.html</info>
 		<file>dssp.m6</file>
 		<source>dssp/*.dssp</source>
 		<fetch
@@ -293,6 +293,7 @@
 
 	<databank id="hssp" parser="hssp">
 		<name>HSSP</name>
+		<info>http://www.cmbi.ru.nl/hssp</info>
 		<file>hssp.m6</file>
 		<source>hssp/*.hssp.bz2</source>
 		<fetch
@@ -302,6 +303,7 @@
 
 	<databank id="gene" parser="gene">
 		<name>Entrez Gene</name>
+		<info>http://www.ncbi.nlm.nih.gov/entrez/query.fcgi?db=gene</info>
 		<file>gene.m6</file>
 		<source>gene/All_Data.ags.gz</source>
 		<filter>/usr/bin/gene2xml -bT</filter>
@@ -311,6 +313,7 @@
 
 	<databank id="go" parser="go">
 		<name>GO</name>
+		<info>http://www.geneontology.org/</info>
 		<file>go.m6</file>
 		<source>go/gene_ontology.obo</source>
 		<fetch
@@ -327,6 +330,7 @@
 
 	<databank id="interpro" parser="interpro" format="interpro">
 		<name>Interpro</name>
+		<info>http://www.ebi.ac.uk/interpro/</info>
 		<file>interpro.m6</file>
 		<source>interpro/interpro.xml.gz</source>
 		<fetch

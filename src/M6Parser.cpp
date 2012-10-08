@@ -206,61 +206,9 @@ M6ParserImpl::~M6ParserImpl()
 	perl_free(mPerl);
 }
 
-void M6ParserImpl::Parse(M6InputDocument* inDocument)
+void M6ParserImpl::Parse(M6InputDocument* inDocument, const string& inDbHeader)
 {
 	mDocument = inDocument;
-	
-//	// load index info, if not done already
-//	if (mCaseSensitiveIndices.empty())
-//	{
-//		SV** sv = hv_fetch(mParserHash, "indices", 7, 0);
-//		if (sv != nullptr)
-//		{
-//			HV* hv = nullptr;
-//		
-//			if (SvTYPE(*sv) == SVt_PVHV)
-//				hv = (HV*)*sv;
-//			else if (SvROK(*sv))
-//			{
-//				SV* rv = SvRV(*sv);
-//				if (SvTYPE(rv) == SVt_PVHV)
-//					hv = (HV*)rv;
-//			}
-//			
-//			if (hv != nullptr)
-//			{
-//				uint32 n = hv_iterinit(hv);
-//				
-//				while (n-- > 0)
-//				{
-//					STRLEN len;
-//					
-//					HE* he = hv_iternext(hv);
-//					
-//					if (he == nullptr)
-//						break;
-//					
-//					string id = HePV(he, len);
-//					
-//					SV* v = HeVAL(he);
-//					if (v != nullptr)
-//					{
-//						if (SvRV(v))
-//							v = SvRV(v);
-//						
-//						if (SvTYPE(v) == SVt_PVHV)
-//						{
-//							HV* hash = (HV*)v;
-//							
-//							sv = hv_fetch(hash, "casesensitive", 13, 0);
-//							if (sv != nullptr and SvIOK(*sv) and SvIVX(*sv) != 0)
-//								mCaseSensitiveIndices.insert(id);
-//						}
-//					}
-//				}
-//			}
-//		}
-//	}
 	
 	const string& text = mDocument->Peek();
 
@@ -273,6 +221,8 @@ void M6ParserImpl::Parse(M6InputDocument* inDocument)
 	
 	XPUSHs(SvRV(mParser));
 	XPUSHs(sv_2mortal(newSVpv(text.c_str(), text.length())));
+	if (not inDbHeader.empty())
+		XPUSHs(sv_2mortal(newSVpv(inDbHeader.c_str(), inDbHeader.length())));
 
 	PUTBACK;
 	
@@ -959,9 +909,9 @@ M6ParserImpl* M6Parser::Impl()
 	return mImpl.get();
 }
 	
-void M6Parser::ParseDocument(M6InputDocument* inDoc)
+void M6Parser::ParseDocument(M6InputDocument* inDoc, const string& inDbHeader)
 {
-	Impl()->Parse(inDoc);
+	Impl()->Parse(inDoc, inDbHeader);
 }
 
 string M6Parser::GetValue(const string& inName)

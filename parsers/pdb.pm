@@ -29,6 +29,7 @@ sub parse
 			$header = $text;
 			
 			my $id = substr($line, 62, 4);
+			$self->set_attribute('id', $id);
 			$self->index_unique_string('id', $id);
 			$self->add_link('dssp', $id);
 			$self->add_link('hssp', $id);
@@ -117,7 +118,7 @@ sub parse
 	$self->index_number('models', $model_count) if defined $model_count;
 
 	$header = "$title ($header)" if (length($title) > 0);
-	$header .= "; $compound" if (length($compound) > 0);
+	$header .= "; $compound" if (defined $compound and length($compound) > 0);
 	$header = substr($header, 0, 255) if (length($header) > 255);
 	$header =~ s/ {2,}/ /g;
 	$self->set_attribute('title', $header);

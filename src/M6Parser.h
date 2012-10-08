@@ -13,7 +13,8 @@ class M6Parser
 					M6Parser(const std::string& inName);
 					~M6Parser();
 
-	void			ParseDocument(M6InputDocument* inDoc);
+	void			ParseDocument(M6InputDocument* inDoc,
+						const std::string& inDbHeader);
 	std::string		GetValue(const std::string& inName);
 
 	void			ToFasta(const std::string& inDoc,

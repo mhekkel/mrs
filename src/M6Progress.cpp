@@ -156,6 +156,8 @@ M6Progress::~M6Progress()
 {
 	if (mImpl->mThread.joinable())
 	{
+		mImpl->mConsumed = mImpl->mMax;
+		
 		mImpl->mThread.interrupt();
 		mImpl->mThread.join();
 	}

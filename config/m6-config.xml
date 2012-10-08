@@ -337,4 +337,13 @@
 			src="ftp://ftp.ebi.ac.uk/pub/databases/interpro/interpro.xml.gz" />
 	</databank>
 
+	<databank id="oxford" parser="oxford">
+		<name>Oxford Human Mouse grid</name>
+		<info>http://www.informatics.jax.org/</info>
+		<file>oxford.m6</file>
+		<source>oxford/HMD_Human3.rpt</source>
+		<fetch
+			src="ftp://ftp.informatics.jax.org/pub/reports/HMD_Human3.rpt" />
+	</databank>
+
 </m6-config>

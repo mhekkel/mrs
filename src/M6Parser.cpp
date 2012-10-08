@@ -41,7 +41,7 @@ struct M6ParserImpl
 						M6ParserImpl(const string& inScriptName);
 						~M6ParserImpl();
 
-	void				Parse(M6InputDocument* inDoc);
+	void				Parse(M6InputDocument* inDoc, const string& inDbHeader);
 	void				GetVersion(string& outVersion);
 	void				ToFasta(const string& inDoc, string& outFasta);
 	
@@ -59,6 +59,8 @@ struct M6ParserImpl
 							{ mDocument->AddLink(inDatabank, inValue); }
 	void				SetAttribute(const string& inField, const char* inValue, size_t inLength)
 							{ mDocument->SetAttribute(inField, inValue, inLength); }
+	void				SetDocument(const char* inText, size_t inLength)
+							{ mDocument->SetText(string(inText, inLength)); }
 
 	// Perl interface routines
 	static const char*	kM6ScriptType;
@@ -618,6 +620,36 @@ XS(_M6_Script_set_attribute)
 	XSRETURN(0);
 }
 
+XS(_M6_Script_set_document)
+{
+	dXSARGS;
+	
+	if (items != 2)
+		croak("Usage: M6::Script::set_document(self, text);");
+	
+	M6ParserImpl* proxy = M6ParserImpl::GetObject(ST(0));
+	if (proxy == nullptr)
+		croak("Error, M6::Script object is not specified");
+	
+	const char* ptr;
+	STRLEN len;
+	
+	ptr = SvPV(ST(1), len);
+	if (ptr == nullptr)
+		croak("Error, no text defined in call to set_document");
+	
+	try
+	{
+		proxy->SetDocument(ptr, len);
+	}
+	catch (exception& e)
+	{
+		croak(e.what());
+	}
+	
+	XSRETURN(0);
+}
+
 XS(_M6_Script_index_text)
 {
 	dXSARGS;
@@ -875,6 +907,8 @@ void xs_init(pTHX)
 	newXS(const_cast<char*>("M6::Script::CLEAR"), _M6_Script_CLEAR, file);
 
 	newXS(const_cast<char*>("M6::Script::set_attribute"), _M6_Script_set_attribute, file);
+	newXS(const_cast<char*>("M6::Script::set_document"), _M6_Script_set_document, file);
+
 	newXS(const_cast<char*>("M6::Script::index_text"), _M6_Script_index_text, file);
 	newXS(const_cast<char*>("M6::Script::index_string"), _M6_Script_index_string, file);
 	newXS(const_cast<char*>("M6::Script::index_unique_string"), _M6_Script_index_unique_string, file);

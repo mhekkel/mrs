@@ -736,6 +736,11 @@ M6Token M6Tokenizer::GetNextQueryToken()
 			case 20:				
 				if (fast::isalpha(c))	
 					state = 30;
+				else if (c == '?' or c == '*')
+				{
+					isPattern = true;
+					state = 30;
+				}
 				else if (not fast::isdigit(c))
 				{
 					Retract(*--t);

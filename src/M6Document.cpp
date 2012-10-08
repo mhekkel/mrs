@@ -347,41 +347,45 @@ string M6OutputDocument::GetAttribute(const string& inName)
 {
 	M6DocStore& store(mDatabank.GetDocStore());
 	
-	uint8 attrNr = store.RegisterAttribute(inName);
-	
-	// set-up the decompression machine
-	io::zlib_params params;
-	params.noheader = true;
-	params.calculate_crc = true;
-	
-	io::zlib_decompressor z_stream(params);
-	
-	io::filtering_stream<io::input> is;
-	is.push(z_stream);
-	store.OpenDataStream(mDocNr, mDocPage, mDocSize, is);
-	
 	string result;
 	
-	for (;;)
+	uint8 attrNr = store.RegisterAttribute(inName);
+	if (attrNr == 0 and inName == "id")
+		result = boost::lexical_cast<string>(mDocNr);
+	else
 	{
-		char c;
-		is.read(&c, 1);
-
-		if (c == 0)
-			break;
-
-		uint8 l;
-		is.read(reinterpret_cast<char*>(&l), 1);
+		// set-up the decompression machine
+		io::zlib_params params;
+		params.noheader = true;
+		params.calculate_crc = true;
 		
-		if (c == attrNr)
+		io::zlib_decompressor z_stream(params);
+		
+		io::filtering_stream<io::input> is;
+		is.push(z_stream);
+		store.OpenDataStream(mDocNr, mDocPage, mDocSize, is);
+		
+		for (;;)
 		{
-			vector<char> buffer(l);
-			is.read(&buffer[0], l);
-			result.assign(&buffer[0], l);
-			break;
+			char c;
+			is.read(&c, 1);
+	
+			if (c == 0)
+				break;
+	
+			uint8 l;
+			is.read(reinterpret_cast<char*>(&l), 1);
+			
+			if (c == attrNr)
+			{
+				vector<char> buffer(l);
+				is.read(&buffer[0], l);
+				result.assign(&buffer[0], l);
+				break;
+			}
+			
+			is.ignore(l);
 		}
-		
-		is.ignore(l);
 	}
 	
 	return result;

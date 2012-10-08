@@ -295,6 +295,7 @@ class M6DocStoreImpl
 	};
 
 	M6File					mFile;
+	MOpenMode				mMode;
 	boost::mutex			mMutex;
 	M6DocStoreHdr			mHeader;
 	M6DocStoreIndexPagePtr	mRoot;
@@ -832,6 +833,7 @@ streamsize M6DocSource::read(char* s, streamsize n)
 
 M6DocStoreImpl::M6DocStoreImpl(const fs::path& inPath, MOpenMode inMode)
 	: mFile(inPath, inMode)
+	, mMode(inMode)
 	, mDirty(false)
 	, mAutoCommit(true)
 {
@@ -890,7 +892,7 @@ uint8 M6DocStoreImpl::RegisterAttribute(const string& inName)
 		++n;
 	}
 	
-	if (result == 0)
+	if (result == 0 and mMode == eReadWrite)
 	{
 		if (l + 1 > mHeader.mAttributeOffset)
 			THROW(("No space left for new attribute (%s)", inName.c_str()));

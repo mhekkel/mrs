@@ -2727,7 +2727,7 @@ void M6IndexImplT<M6DataType>::FindPattern(const string& inPattern, vector<bool>
 	if (mHeader.mRoot == 0)
 		return;
 	
-	uint32 page, key;
+	uint32 page = 0, key = 0;
 
 	// pattern is a glob pattern
 	string s(inPattern.substr(0, inPattern.find('*')));

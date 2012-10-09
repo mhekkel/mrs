@@ -36,5 +36,5 @@ Format.toHtml = function(text) {
 			}
 		});
 	
-	return $('<div id="entrytext"/>').html(txt);
+	return $('<div/>').html(txt);
 }

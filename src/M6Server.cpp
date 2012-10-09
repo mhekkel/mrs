@@ -985,6 +985,7 @@ void M6Server::handle_link(const zh::request& request, const el::scope& scope, z
 	ix = params.get("ix", "").as<string>();
 	q = params.get("q", "").as<string>();
 
+	M6Tokenizer::CaseFold(db);
 	M6Tokenizer::CaseFold(id);
 
 	create_redirect(db, ix, id, q, false, request, reply);

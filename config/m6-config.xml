@@ -99,7 +99,7 @@
 	</format>
 	
 	<format id="interpro">
-<!--		<script src="scripts/interpro.js" />-->
+		<script src="scripts/interpro.js" />
 		<link regex='&lt;db_xref db="SWISSPROT" dbkey="(.+?)"/&gt;' ix="ac" id="$1" db="sprot" />
 		<link regex='&lt;db_xref db="PDB" dbkey="(.+?)"/&gt;' ix="id" id="$1" db="pdb" />
 	</format>

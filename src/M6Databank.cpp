@@ -1723,13 +1723,16 @@ M6Iterator* M6DatabankImpl::FindString(const string& inIndex, const string& inSt
 tr1::tuple<bool,uint32> M6DatabankImpl::Exists(const string& inIndex, const string& inValue)
 {
 	unique_ptr<M6UnionIterator> iter(new M6UnionIterator);
+
+	string value(inValue);
+	M6Tokenizer::CaseFold(value);
 	
 	foreach (const M6IndexDesc& desc, mIndices)
 	{
 		if (inIndex != "*" and not ba::iequals(inIndex, desc.mName))
 			continue;
 		
-		M6Iterator* sub = desc.mIndex->Find(inValue);
+		M6Iterator* sub = desc.mIndex->Find(value);
 		if (sub != nullptr)
 			iter->AddIterator(sub);
 	}

@@ -1,4 +1,4 @@
-<xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform" version="1.0">
+<xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:fn="http://www.w3.org/2005/xpath-functions" version="1.0">
 	<xsl:template match="dbinfo">
 		<tr>
 			<td><span style="text-transform:lowercase;"><xsl:value-of select="@dbname"/></span></td>
@@ -19,7 +19,11 @@
 		<table cellspacing="0" cellpadding="0">
 			<xsl:for-each select="classification">
 				<tr>
-					<td class="label"><xsl:value-of select="@id"/></td>
+					<td class="label">
+						<a><xsl:attribute name="href">link?db=go&amp;ix=id&amp;id=<xsl:value-of select="substring(@id, 4)"/></xsl:attribute>
+							<xsl:value-of select="@id"/>
+						</a>
+					</td>
 					<td><xsl:value-of select="category"/></td>
 					<td><xsl:value-of select="description"/></td>
 				</tr>
@@ -50,11 +54,12 @@
 			<table cellspacing="0" cellpadding="0" width="100%">
 				<tr>
 					<td class="label" width="20%"><xsl:value-of select="db_xref/@db"/></td>
-					<xsl:variable name="key"><xsl:value-of select="db_xref/@dbkey"/></xsl:variable>
-<!--					<td><a href="http://www.ncbi.nlm.nih.gov/entrez/utils/qmap.cgi?uid={$key}&amp;form=6&amp;db=m&amp;Dopt=r">
-						<xsl:value-of select="db_xref/@dbkey"/></a></td>
--->
-					<td>#PUBMED#<xsl:value-of select="db_xref/@dbkey"/></td>
+					<td>
+						<a>
+							<xsl:attribute name="href">http://www.ncbi.nlm.nih.gov/entrez/query.fcgi?db=pubmed;cmd=search;term=<xsl:value-of select="db_xref/@dbkey"/></xsl:attribute>
+							<xsl:value-of select="db_xref/@dbkey"/>
+						</a>
+					</td>
 				</tr>
 			</table>
 		</xsl:for-each>
@@ -64,7 +69,12 @@
 		<table cellspacing="0" cellpadding="0">
 			<xsl:for-each select="rel_ref">
 				<tr>
-					<td>#INTERPRO#<xsl:value-of select="@ipr_ref"/></td>
+					<td>
+						<a>
+							<xsl:attribute name="href">link?db=interpro&amp;ix=id&amp;id=<xsl:value-of select="@ipr_ref"/></xsl:attribute>
+							Interpro <xsl:value-of select="@ipr_ref"/>
+						</a>
+					</td>
 				</tr>
 			</xsl:for-each>
 		</table>
@@ -88,7 +98,12 @@
 			<xsl:for-each select="db_xref">
 				<tr>
 					<td><xsl:value-of select="@db"/></td>
-					<td>[db_xref: <xsl:value-of select="@db"/>:<xsl:value-of select="@dbkey"/>]</td>
+					<td>
+						<a>
+							<xsl:attribute name="href">link?db=<xsl:value-of select="@db"/>;id=<xsl:value-of select="@dbkey"/></xsl:attribute>
+							<xsl:value-of select="@dbkey"/>
+						</a>
+					</td>
 				</tr>
 			</xsl:for-each>
 		</table>
@@ -99,7 +114,12 @@
 			<xsl:for-each select="db_xref">
 				<tr>
 					<td><xsl:value-of select="@db"/></td>
-					<td><span style="text-transform:uppercase">[db_xref: <xsl:value-of select="@db"/>:<xsl:value-of select="@dbkey"/>]</span></td>
+					<td>
+						<a>
+							<xsl:attribute name="href">link?db=<xsl:value-of select="@db"/>&amp;ix=id&amp;id=<xsl:value-of select="@dbkey"/></xsl:attribute>
+							<span style="text-transform:uppercase"><xsl:value-of select="@dbkey"/></span>
+						</a>
+					</td>
 				</tr>
 			</xsl:for-each>
 		</table>
@@ -116,9 +136,19 @@
 		</table>
 	</xsl:template>
 	
-	<xsl:template match="db_xref">[db_xref: <xsl:value-of select="@db"/>:<xsl:value-of select="@dbkey"/>]</xsl:template>
+	<xsl:template match="db_xref">
+		<a>
+			<xsl:attribute name="href">link?db=<xsl:value-of select="@db"/>;id=<xsl:value-of select="@dbkey"/></xsl:attribute>
+			<xsl:value-of select="@db"/>:<xsl:value-of select="@dbkey"/>
+		</a>
+	</xsl:template>
 	
-	<xsl:template match="cite">[cite: <xsl:value-of select="@idref"/>]</xsl:template>
+	<xsl:template match="cite">
+		<a>
+			<xsl:attribute name="href">http://www.ncbi.nlm.nih.gov/entrez/query.fcgi?db=pubmed&amp;cmd=search&amp;term=<xsl:value-of select="substring(@idref, 4)"/></xsl:attribute>
+			<xsl:value-of select="@idref"/>
+		</a>
+	</xsl:template>
 	
 	<xsl:template match="interpro">
 		<table class="list" cellspacing="0" cellpadding="0" width="100%">

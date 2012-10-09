@@ -5,19 +5,50 @@ var Format = {
 	toFasta: null,
 	
 	init: function() {
-		if (Format.toHtml != null) {
-			var html = Format.toHtml($("#entrytext").html());
-			if (html != null) {
-				html.prop("id", "entryhtml");
-
-				$("#entry").prepend(html);
-				$("#entrytext").hide();
-				$("#formatSelector").prop("disabled", false);
-				$("#formatSelector option[value='entry']").prop("disabled", false);
-				$("#formatSelector option").each(function() {
-					$(this).prop("selected", $(this).prop("value") == "entry");
-				});
+		var html = null;
+	
+		if (Format.xslt != null) {
+			var text = $("#entrytext").text();
+			var xslt = Format.loadXMLDoc("scripts/" + Format.xslt);
+		
+			var result;
+			if (window.ActiveXObject) // Internet Explorer
+			{
+				var xmlDoc = new ActiveXObject("Microsoft.XMLDOM");
+				xmlDoc.async = false;
+				xmlDoc.loadXML(text);
+				result = xmlDoc.transformNode(xslt);
+				/* result is a string in IE, strip off the xml declaration
+				   or else $.append will fail... */
+				result = result.replace(/^<\?xml.+?>/, "");
 			}
+			else
+			{
+				var parser = new DOMParser();
+				var xmlDoc = parser.parseFromString(text, "text/xml");
+				var xsltProcessor = new XSLTProcessor();
+				xsltProcessor.importStylesheet(xslt);
+				result = xsltProcessor.transformToFragment(xmlDoc, document);
+			}
+		
+			var div = $("<div/>").append(result);
+			html = $('<div id="entryhtml"/>').append(div.html());
+		}
+		
+		if (html == null && Format.toHtml != null) {
+			html = Format.toHtml($("#entrytext").html());
+		}
+
+		if (html != null) {
+			html.prop("id", "entryhtml");
+
+			$("#entry").prepend(html);
+			$("#entrytext").hide();
+			$("#formatSelector").prop("disabled", false);
+			$("#formatSelector option[value='entry']").prop("disabled", false);
+			$("#formatSelector option").each(function() {
+				$(this).prop("selected", $(this).prop("value") == "entry");
+			});
 		}
 		
 		if (Format.toFastA != null) {
@@ -60,6 +91,15 @@ var Format = {
 					break;
 			}
 		});
+	},
+	
+	loadXMLDoc: function(dname)
+	{
+		var xhttp =
+			window.XMLHttpRequest ? new XMLHttpRequest() : new ActiveXObject("Microsoft.XMLHTTP");
+		xhttp.open("GET", dname, false);
+		xhttp.send("");
+		return xhttp.responseXML;
 	}
 };
 

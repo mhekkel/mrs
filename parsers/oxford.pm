@@ -41,7 +41,8 @@ sub parse
 	}
 	
 	my @offsets = @{$self->{offsets}};
-	my @data = ( 0 );
+	my $id = $self->next_sequence_nr;
+	my @data = ( $id );
 
 	for (my $n = 0; $n < 10; ++$n)
 	{
@@ -67,6 +68,8 @@ sub parse
 		elsif ($n == 9) { $self->index_text('data', $v); }
 	}
 
+	$self->set_attribute('id', $id);
+	$self->index_unique_string('id', $id);
 	$self->set_attribute('title', "Human: $data[1]; Mouse: $data[5]");
 	$self->set_document(join("\t", @data));
 }

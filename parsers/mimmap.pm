@@ -22,8 +22,8 @@ sub parse
 	
 	# $text contains only one line
 
-print STDERR $text;
-
+	chomp($text);
+	
 	# convert genemap to mimmap
 	
 	my @data = split(m/\|/, $text);
@@ -66,7 +66,8 @@ EOF
 	$year += 1900;
 	$year += 100 if $year < 1970;
 
-	$self->index_date('date', sprintf("%4.4d-%2.2d-%2.2d", $year, $mon, $day));
+#	$self->index_date('date', sprintf("%4.4d-%2.2d-%2.2d", $year, $mon, $day));
+	$self->index_string('date', sprintf("%4.4d-%2.2d-%2.2d", $year, $mon, $day));
 	
 	$self->index_string('code', $data[0])				if defined $data[0];
 	$self->index_string('location', $data[4])			if defined $data[4];
@@ -80,7 +81,7 @@ EOF
 	$self->index_text('mouse', $data[16])			if defined $data[16];
 	$self->index_text('refs', $data[17])				if defined $data[17];
 
-	$self->set_attribute('title', $data[9]);
+	$self->set_attribute('title', "$data[7] $data[9]");
 	$self->set_document($doc);
 }
 

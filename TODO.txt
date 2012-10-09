@@ -2,6 +2,8 @@ Todo
 
 - SOAP services (alleen blast nog)
 - links
+- date index
+- number index improvement?
 
 - Joined databanks? Aliases?
 - near operator, how to implement? new query language?

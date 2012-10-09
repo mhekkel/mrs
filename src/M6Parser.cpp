@@ -584,6 +584,25 @@ XS(_M6_Script_CLEAR)
 	XSRETURN(0);
 }
 
+XS(_M6_Script_next_sequence_nr)
+{
+	dXSARGS;
+	
+	if (items != 1)
+		croak("Usage: M6::Script::next_sequence_nr(self);");
+	
+	M6ParserImpl* proxy = M6ParserImpl::GetObject(ST(0));
+	if (proxy == nullptr)
+		croak("Error, M6::Script object is not specified");
+	
+	static boost::mutex m;
+	boost::mutex::scoped_lock lock(m);
+	static uint32 counter = 1;
+	ST(0) = newSViv(counter++);
+	
+	XSRETURN(1);
+}
+
 XS(_M6_Script_set_attribute)
 {
 	dXSARGS;
@@ -905,6 +924,8 @@ void xs_init(pTHX)
 	newXS(const_cast<char*>("M6::Script::FETCH"), _M6_Script_FETCH, file);
 	newXS(const_cast<char*>("M6::Script::STORE"), _M6_Script_STORE, file);
 	newXS(const_cast<char*>("M6::Script::CLEAR"), _M6_Script_CLEAR, file);
+
+	newXS(const_cast<char*>("M6::Script::next_sequence_nr"), _M6_Script_next_sequence_nr, file);
 
 	newXS(const_cast<char*>("M6::Script::set_attribute"), _M6_Script_set_attribute, file);
 	newXS(const_cast<char*>("M6::Script::set_document"), _M6_Script_set_document, file);

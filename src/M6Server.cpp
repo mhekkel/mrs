@@ -126,9 +126,12 @@ M6Databank* M6SearchServer::Load(const string& inDatabank)
 {
 	M6Databank* result = nullptr;
 
+	string databank(inDatabank);
+	M6Tokenizer::CaseFold(databank);
+
 	foreach (M6LoadedDatabank& db, mLoadedDatabanks)
 	{
-		if (db.mID == inDatabank)
+		if (db.mID == databank)
 		{
 			result = db.mDatabank;
 			break;

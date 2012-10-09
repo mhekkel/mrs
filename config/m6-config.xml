@@ -350,4 +350,12 @@
 			src="ftp://ftp.informatics.jax.org/pub/reports/HMD_Human3.rpt" />
 	</databank>
 
+	<databank id="mimmap" parser="mimmap">
+		<name>Mimmap, our view on genemap from OMIM</name>
+		<file>mimmap.m6</file>
+		<source>omim/genemap</source>
+		<fetch
+			src="ftp://ftp.ncbi.nih.gov/repository/OMIM/ARCHIVE/genemap" />
+	</databank>
+
 </m6-config>

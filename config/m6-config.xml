@@ -49,6 +49,7 @@
 			<db>pdb</db>
 			<db>dssp</db>
 			<db>hssp</db>
+			<db>gene</db>
 		</dbs>
 		<realm name="M6 Administrator">
 			<user name="scott">b92ff7d60b994c8a0d2941ad9349e841</user>
@@ -100,8 +101,10 @@
 	
 	<format id="interpro">
 		<script src="scripts/interpro.js" />
-		<link regex='&lt;db_xref db="SWISSPROT" dbkey="(.+?)"/&gt;' ix="ac" id="$1" db="sprot" />
-		<link regex='&lt;db_xref db="PDB" dbkey="(.+?)"/&gt;' ix="id" id="$1" db="pdb" />
+	</format>
+
+	<format id="gene">
+		<script src="scripts/gene.js" />
 	</format>
 
 	<databank id="pdbfinder" parser="pdbfinder">
@@ -121,6 +124,7 @@
 		<file>/data/mrs/omim.m6</file>
 		<locale>en_US.UTF-8</locale>
 		<source>omim/omim.dat.gz</source>
+		<fetch src="ftp://ftp.ncbi.nih.gov/repository/OMIM/ARCHIVE/omim.txt.Z"/>
 	</databank>
 	
 	<databank id="mini-omim" parser="omim" format="omim">
@@ -301,7 +305,7 @@
 			src="ftp://ftp.cmbi.ru.nl/pub/molbio/data/hssp/????.hssp.bz2" />
 	</databank>
 
-	<databank id="gene" parser="gene">
+	<databank id="gene" parser="gene" format="gene">
 		<name>Entrez Gene</name>
 		<info>http://www.ncbi.nlm.nih.gov/entrez/query.fcgi?db=gene</info>
 		<file>gene.m6</file>

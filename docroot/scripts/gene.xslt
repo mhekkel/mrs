@@ -606,7 +606,7 @@
 	</xsl:template>	
 	
 	<xsl:template match="/">
-		<xsl:apply-templates select="Entrezgene-Set/Entrezgene"/>
+		<xsl:apply-templates select="Entrezgene"/>
 	</xsl:template>
 
 </xsl:stylesheet>

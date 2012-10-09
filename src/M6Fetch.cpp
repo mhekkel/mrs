@@ -268,6 +268,8 @@ uint32 M6FTPFetcher::WaitForReply()
 
 	if (line.length() >= 4 and line[3] == '-')
 	{
+		string test(line.substr(0, 3) + ' ');
+
 		do
 		{
 			boost::asio::read_until(mSocket, response, "\r\n");
@@ -275,7 +277,7 @@ uint32 M6FTPFetcher::WaitForReply()
 			getline(response_stream, line);
 			mReply = mReply + '\n' + line;
 		}
-		while (line.length() < 4 or (line.substr(0, 3) == mReply.substr(0, 3) and line[3] == '-'));
+		while (not ba::starts_with(line, test));
 	}
 
 	return result;

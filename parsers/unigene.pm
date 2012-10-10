@@ -31,13 +31,15 @@ sub parse
 
 			if ($fld eq 'ID' and $value =~ /(^\S+)/)
 			{
-				$id = $1;
+				my $id = $1;
 				$self->index_unique_string('id', $id);
 				$self->set_attribute('id', $id);
 			}
 			else
 			{
-				$self->set_attribute('title', $value) if $fld eq 'TITLE';
+				$self->set_attribute('title', substr($value, 0, 255))
+					if $fld eq 'TITLE';
+
 				$self->index_text(lc($fld), $value);
 			}
 		}

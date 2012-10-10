@@ -50,6 +50,11 @@
 			<db>dssp</db>
 			<db>hssp</db>
 			<db>gene</db>
+			<db>pfama</db>
+			<db>pfamb</db>
+			<db>pfamseed</db>
+			<db>prints</db>
+			<db>prosite</db>
 		</dbs>
 		<realm name="M6 Administrator">
 			<user name="scott">b92ff7d60b994c8a0d2941ad9349e841</user>
@@ -108,7 +113,6 @@
 	</format>
 
 	<format id="stockholm">
-		<script src="scripts/uniprot.js" />
 		<link regex="^(?:#=GF DR\s+PFAMA;\s)(\S+)(?=;)" db="pfama" ix="id" id="$1" />
 		<link regex="^(?:#=GF DR\s+PFAMB;\s)(\S+)(?=;)" db="pfamb" ix="id" id="$1" />
 		<link regex="^(?:#=GF DR\s+PDB;\s)(\S+)(?=;)" db="pdb" ix="id" id="$1" />
@@ -117,7 +121,7 @@
 		<link regex="^(?:#=GS .+?AC )([0-9A-Z]+)" db="uniprot" ix="ac" id="$1" />
 		<link regex="^(?:#=GS .+?DR PDB; )([0-9A-Z]{4})" db="pdb" ix="id" id="$1" />
 	</format>
-
+	
 	<databank id="pdbfinder" parser="pdbfinder">
 		<name>PDBFINDER</name>
 		<file>pdbfinder.m6</file>
@@ -375,8 +379,7 @@
 		<file>dbest.m6</file>
 		<info>http://www.ncbi.nlm.nih.gov/dbEST/</info>
 		<source>dbest/dbEST.reports.*</source>
-		<fetch
-			src="ftp://ftp.ncbi.nih.gov/repository/dbEST/dbEST.reports.*.gz" />
+		<fetch delete="true" src="ftp://ftp.ncbi.nih.gov/repository/dbEST/dbEST.reports.*.gz" />
 	</databank>
 
 	<databank id="sprot-fa" parser="fasta">
@@ -420,7 +423,7 @@
 		<file>prints.m6</file>
 		<info>http://bioinf.man.ac.uk/dbbrowser/PRINTS/</info>
 		<source>prints/prints*.dat.gz</source>
-		<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/prints/prints*.dat.gz" />
+		<fetch delete="true" src="ftp://ftp.ebi.ac.uk/pub/databases/prints/prints*.dat.gz" />
 	</databank>
 
 	<databank id="prosite" parser="prosite">
@@ -443,8 +446,8 @@
 		<name>REBASE</name>
 		<file>rebase.m6</file>
 		<info>http://rebase.neb.com/rebase/rebase.html</info>
-		<source>rebase/bairoch.*</source>
-		<fetch src="ftp://ftp.neb.com/pub/rebase/*" />
+		<source>rebase/bairoch.txt</source>
+		<fetch delete="true" src="ftp://ftp.neb.com/pub/rebase/bairoch.*" />
 	</databank>
 
 	<databank id="unigene" parser="unigene">

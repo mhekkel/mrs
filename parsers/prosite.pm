@@ -32,8 +32,7 @@ sub parse
 
 			if ($fld eq 'ID' and $value =~ /^([A-Z0-9_]+); ([A-Z]+)/o)
 			{
-				die "Double ID: $id <=> $1\n" if defined $id;
-				$id = $1;
+				my $id = $1;
 				die "ID too short" unless length($id);
 				$self->set_attribute('id', $id);
 				$self->index_unique_string('id', $id);

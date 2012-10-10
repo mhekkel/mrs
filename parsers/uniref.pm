@@ -50,9 +50,9 @@ sub parse
 			if ($name eq 'UniProtKB ID') {
 				$self->index_string('member', $value);
 			}
-			else {
-				warn "Unknown dbReference type: $name\n";
-			}
+#			else {
+#				warn "Unknown dbReference type: $name\n";
+#			}
 		}
 		elsif ($line =~ m|<sequence|) {
 			my $seq = '';

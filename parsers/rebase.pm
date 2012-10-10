@@ -35,7 +35,10 @@ sub parse
 			
 			if ($fld eq 'ID') {
 				$self->set_attribute('id', $value);
-				$self->index_unique_string('id', $value);
+# Guess what... id is not unique in REBASE... There
+# are about 41 duplicate records in version 210..
+#				$self->index_unique_string('id', $value);
+				$self->index_string('id', $value);
 			}
 			elsif ($fld eq 'OS') {  # organism field
 				$self->index_text('os', $value);

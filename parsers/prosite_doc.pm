@@ -36,7 +36,7 @@ sub parse
 		}
 		else
 		{
-			$self->IndexText('text', $line);
+			$self->index_text('text', $line);
 		}
 	}
 }

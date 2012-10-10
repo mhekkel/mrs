@@ -416,9 +416,14 @@ int64 M6Builder::Glob(boost::filesystem::path inRawDir,
 
 	string source = inSource->content();
 	ba::trim(source);
-	source = (inRawDir / source).make_preferred().string();
-	
+
 	fs::path dir = fs::path(source).parent_path();
+	if (not dir.has_root_path())
+	{
+		dir = (inRawDir / dir).make_preferred();
+		source = (inRawDir / fs::path(source)).make_preferred().string();
+	}
+
 	while (not dir.empty() and (ba::contains(dir.filename().string(), "?") or ba::contains(dir.filename().string(), "*")))
 		dir = dir.parent_path();
 

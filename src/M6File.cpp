@@ -433,7 +433,9 @@ bool Match(const char* inPattern, const char* inName)
 				else
 					return false;
 			default:
-				if (tolower(*inName) == tolower(op))
+				if ((*inName == '/' and op == '\\') or
+					(*inName == '\\' and op == '/') or
+					tolower(*inName) == tolower(op))
 				{
 					++inName;
 					++inPattern;

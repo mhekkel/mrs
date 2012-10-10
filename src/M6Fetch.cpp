@@ -135,6 +135,18 @@ M6FTPFetcher::M6FTPFetcher(zx::element* inConfig)
 	mPath = fs::path(m[4].str());
 
     string dst = fetch->get_attribute("dst");
+    if (dst.empty() and inConfig->find_first("source") != nullptr)
+    {
+		string source = inConfig->find_first("source")->content();
+    	if (not source.empty())
+    	{
+    		fs::path sd(source);
+			do { sd = sd.parent_path(); } while (not sd.empty() and sd.filename().string().find_first_of("*?") != string::npos);
+    		if (not sd.empty())
+    			dst = sd.string();
+    	}
+    }
+    
     if (dst.empty())
         dst = inConfig->get_attribute("id");
 
@@ -403,6 +415,11 @@ void M6FTPFetcher::ListFiles(const string& inPattern,
 	// Yeah, we have a data connection, now send the List command
 	status = SendAndWaitForReply("list", "");
 
+	if (status < 200)
+		status = WaitForReply();
+	if (status != 226)
+		Error("Error listing");
+
 	time_t now;
 	time(&now);
 	
@@ -455,11 +472,6 @@ void M6FTPFetcher::ListFiles(const string& inPattern,
 				inProc(line[0], file, size, time);
 		}
 	}
-	
-	if (status < 200)
-		status = WaitForReply();
-	if (status != 226)
-		Error("Error listing");
 }
 
 void M6FTPFetcher::FetchFile(fs::path inRemote, fs::path inLocal, time_t inTime, M6Progress& inProgress)

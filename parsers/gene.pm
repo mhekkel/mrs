@@ -43,11 +43,11 @@ sub parse
 				$self->index_date("${k}d", $date);
 			}
 			
-			$self->set_attribute('title', $title);
 			last;
 		}
 		elsif ($line =~ m|^<Gene-track_geneid>(\d+)</Gene-track_geneid>|)
 		{
+			$self->set_attribute('id', $1);
 			$self->index_unique_string('id', $1);
 		}
 		elsif ($line =~ m/<Gene-track_(create|update|discontinue)-date>/)
@@ -62,19 +62,21 @@ sub parse
 		{
 			my ($key, $text) = ($1, $2);
 			
-			$self->index_text('text', $2);
+			$self->index_text('text', $text);
 			
 			if ($key eq 'Prot-ref_name_E')
 			{
 				if (defined $title) {
-					$title = "$title; $2";
+					$title = "$title; $text";
 				}
 				else {
-					$title = $2;
+					$title = $text;
 				}
 			}
 		}
 	}
+	
+	$self->set_attribute('title', $title) if defined $title;
 }
 
 1;

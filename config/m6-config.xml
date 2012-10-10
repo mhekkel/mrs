@@ -299,7 +299,7 @@
 		<name>HSSP</name>
 		<info>http://www.cmbi.ru.nl/hssp</info>
 		<file>hssp.m6</file>
-		<source>hssp/*.hssp.bz2</source>
+		<source>hssp/?cr?.hssp.bz2</source>
 		<fetch
 			delete="true"
 			src="ftp://ftp.cmbi.ru.nl/pub/molbio/data/hssp/????.hssp.bz2" />
@@ -356,6 +356,47 @@
 		<source>omim/genemap</source>
 		<fetch
 			src="ftp://ftp.ncbi.nih.gov/repository/OMIM/ARCHIVE/genemap" />
+	</databank>
+	
+	<databank id="dbest" parser="dbest">
+		<name>dbEST</name>
+		<file>dbest.m6</file>
+		<source>dbest/dbEST.reports.*</source>
+		<fetch
+			src="ftp://ftp.ncbi.nih.gov/repository/dbEST/dbEST.reports.*.gz" />
+	</databank>
+
+	<databank id="sprot-fa" parser="fasta">
+		<name>SwissProt-FastA</name>
+		<file>sprot-fa.m6</file>
+		<source>/data/fasta/sprot.fa</source>
+	</databank>
+
+	<databank id="medline" parser="medline">
+		<name>Medline/PubMed</name>
+		<file>medline.m6</file>
+		<source>medline/medline*</source>
+	</databank>
+
+	<databank id="pfama" parser="pfam">
+		<name>Pfam-A</name>
+		<file>pfama.m6</file>
+		<source>pfam/Pfam-A.full.gz</source>
+		<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/Pfam/Pfam-A.full.gz" />
+	</databank>
+
+	<databank id="pfamb" parser="pfam">
+		<name>Pfam-B</name>
+		<file>pfamb.m6</file>
+		<source>pfam/Pfam-B.gz</source>
+		<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/Pfam/Pfam-B.gz" />
+	</databank>
+
+	<databank id="pfams" parser="pfam">
+		<name>Pfam-Seed</name>
+		<file>pfams.m6</file>
+		<source>pfam/Pfam-A.seed.gz</source>
+		<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/Pfam/Pfam-A.seed.gz" />
 	</databank>
 
 </m6-config>

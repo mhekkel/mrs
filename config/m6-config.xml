@@ -361,6 +361,7 @@
 	<databank id="dbest" parser="dbest">
 		<name>dbEST</name>
 		<file>dbest.m6</file>
+		<info>http://www.ncbi.nlm.nih.gov/dbEST/</info>
 		<source>dbest/dbEST.reports.*</source>
 		<fetch
 			src="ftp://ftp.ncbi.nih.gov/repository/dbEST/dbEST.reports.*.gz" />
@@ -381,6 +382,7 @@
 	<databank id="pfama" parser="pfam">
 		<name>Pfam-A</name>
 		<file>pfama.m6</file>
+		<info>http://pfam.sanger.ac.uk/</info>
 		<source>pfam/Pfam-A.full.gz</source>
 		<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/Pfam/Pfam-A.full.gz" />
 	</databank>
@@ -388,13 +390,15 @@
 	<databank id="pfamb" parser="pfam">
 		<name>Pfam-B</name>
 		<file>pfamb.m6</file>
+		<info>http://pfam.sanger.ac.uk/</info>
 		<source>pfam/Pfam-B.gz</source>
 		<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/Pfam/Pfam-B.gz" />
 	</databank>
 
-	<databank id="pfams" parser="pfam">
+	<databank id="pfamseed" parser="pfam">
 		<name>Pfam-Seed</name>
-		<file>pfams.m6</file>
+		<file>pfamseed.m6</file>
+		<info>http://pfam.sanger.ac.uk/</info>
 		<source>pfam/Pfam-A.seed.gz</source>
 		<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/Pfam/Pfam-A.seed.gz" />
 	</databank>

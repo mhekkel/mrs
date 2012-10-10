@@ -9,7 +9,7 @@ sub new
 {
 	my $invocant = shift;
 	my $self = new M6::Script(
-		firstdocline => qr/^gc; /,
+		firstdocline => qr/^gc; .+/,
 		@_
 	);
 	return bless $self, "M6::Script::prints";

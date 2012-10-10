@@ -431,4 +431,52 @@
 		<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/prosite/prosite*.dat" />
 	</databank>
 
+	<databank id="prosite_doc" parser="prosite_doc">
+		<name>Prosite Documentation</name>
+		<file>prosite_doc.m6</file>
+		<info>http://www.expasy.org/prosite/</info>
+		<source>prosite/prosite*.doc</source>
+		<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/prosite/prosite*.doc" />
+	</databank>
+
+	<databank id="rebase" parser="rebase">
+		<name>REBASE</name>
+		<file>rebase.m6</file>
+		<info>http://rebase.neb.com/rebase/rebase.html</info>
+		<source>rebase/bairoch.*</source>
+		<fetch src="ftp://ftp.neb.com/pub/rebase/*" />
+	</databank>
+
+	<databank id="unigene" parser="unigene">
+		<name>Unigene</name>
+		<file>unigene.m6</file>
+		<info>http://www.ncbi.nlm.nih.gov/entrez/query.fcgi?db=unigene</info>
+		<source>unigene/*/*.data.gz</source>
+		<fetch src="ftp://ftp.ncbi.nih.gov/repository/UniGene/*/*.data.gz" />
+	</databank>
+
+	<databank id="uniref50" parser="uniref">
+		<name>UniRef 50</name>
+		<file>uniref50.m6</file>
+		<info>http://www.uniprot.org/help/uniref</info>
+		<source>uniref50/uniref50.xml.gz</source>
+		<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/uniprot/current_release/uniref/uniref50/*" />
+	</databank>
+
+	<databank id="uniref90" parser="uniref">
+		<name>UniRef 90</name>
+		<file>uniref90.m6</file>
+		<info>http://www.uniprot.org/help/uniref</info>
+		<source>uniref90/uniref90.xml.gz</source>
+		<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/uniprot/current_release/uniref/uniref90/*" />
+	</databank>
+
+	<databank id="uniref100" parser="uniref">
+		<name>UniRef 100</name>
+		<file>uniref100.m6</file>
+		<info>http://www.uniprot.org/help/uniref</info>
+		<source>uniref100/uniref100.xml.gz</source>
+		<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/uniprot/current_release/uniref/uniref100/*" />
+	</databank>
+
 </m6-config>

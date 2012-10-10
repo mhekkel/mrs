@@ -107,6 +107,17 @@
 		<script src="scripts/gene.js" />
 	</format>
 
+	<format id="stockholm">
+		<script src="scripts/uniprot.js" />
+		<link regex="^(?:#=GF DR\s+PFAMA;\s)(\S+)(?=;)" db="pfama" ix="id" id="$1" />
+		<link regex="^(?:#=GF DR\s+PFAMB;\s)(\S+)(?=;)" db="pfamb" ix="id" id="$1" />
+		<link regex="^(?:#=GF DR\s+PDB;\s)(\S+)(?=;)" db="pdb" ix="id" id="$1" />
+		<link regex="^(?:#=GF DR\s+PROSITE;\s)(\S+)(?=;)" db="prosite" ix="id" id="$1" />
+		<link regex="^(?:#=GF DR\s+INTERPRO;\s)(\S+)(?=;)" db="interpro" ix="id" id="$1" />
+		<link regex="^(?:#=GS .+?AC )([0-9A-Z]+)" db="uniprot" ix="ac" id="$1" />
+		<link regex="^(?:#=GS .+?DR PDB; )([0-9A-Z]{4})" db="pdb" ix="id" id="$1" />
+	</format>
+
 	<databank id="pdbfinder" parser="pdbfinder">
 		<name>PDBFINDER</name>
 		<file>pdbfinder.m6</file>
@@ -380,7 +391,7 @@
 		<source>medline/medline*</source>
 	</databank>
 
-	<databank id="pfama" parser="pfam">
+	<databank id="pfama" parser="pfam" format="stockholm">
 		<name>Pfam-A</name>
 		<file>pfama.m6</file>
 		<info>http://pfam.sanger.ac.uk/</info>
@@ -388,7 +399,7 @@
 		<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/Pfam/Pfam-A.full.gz" />
 	</databank>
 
-	<databank id="pfamb" parser="pfam">
+	<databank id="pfamb" parser="pfam" format="stockholm">
 		<name>Pfam-B</name>
 		<file>pfamb.m6</file>
 		<info>http://pfam.sanger.ac.uk/</info>
@@ -396,7 +407,7 @@
 		<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/Pfam/Pfam-B.gz" />
 	</databank>
 
-	<databank id="pfamseed" parser="pfam">
+	<databank id="pfamseed" parser="pfam" format="stockholm">
 		<name>Pfam-Seed</name>
 		<file>pfamseed.m6</file>
 		<info>http://pfam.sanger.ac.uk/</info>

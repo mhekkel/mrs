@@ -423,4 +423,12 @@
 		<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/prints/prints*.dat.gz" />
 	</databank>
 
+	<databank id="prosite" parser="prosite">
+		<name>Prosite</name>
+		<file>prosite.m6</file>
+		<info>http://www.expasy.org/prosite/</info>
+		<source>prosite/prosite*.dat</source>
+		<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/prosite/prosite*.dat" />
+	</databank>
+
 </m6-config>

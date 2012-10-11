@@ -165,7 +165,7 @@ struct M6ArchiveDataSourceImpl : public M6DataSourceImpl
 	
 						device(struct archive* inArchive, struct archive_entry* inEntry,
 								M6Progress& inProgress)
-							: mArchive(inArchive), mEntry(inEntry), mProgress(inProgress)
+							: mArchive(inArchive), mEntry(inEntry), mProgress(inProgress), mLastPosition(0)
 						{
 						}
 
@@ -180,7 +180,11 @@ struct M6ArchiveDataSourceImpl : public M6DataSourceImpl
 							}
 							
 							if (result >= 0)
-								mProgress.Progress(archive_position_compressed(mArchive));
+							{
+								int64 p = archive_position_compressed(mArchive);
+								mProgress.Consumed(p - mLastPosition);
+								mLastPosition = p;
+							}
 
 							return result;
 						}
@@ -189,6 +193,7 @@ struct M6ArchiveDataSourceImpl : public M6DataSourceImpl
 		struct archive_entry*
 						mEntry;
 		M6Progress&		mProgress;
+		int64			mLastPosition;
 	};
 
 	virtual M6DataFile*	Next()

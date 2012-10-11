@@ -80,7 +80,11 @@ void M6InputDocument::SetAttribute(const string& inName, const char* inText, siz
 		THROW(("Attribute names are limited to 255 characters"));
 	
 	if (inSize > 255)
-		THROW(("Attribute values are limited to 255 characters"));
+	{
+		if (VERBOSE)
+			cerr << "Attribute values are limited to 255 characters" << endl;
+		inSize = 255;
+	}
 
 	string attribute(inText, inSize);
 	ba::trim(attribute);

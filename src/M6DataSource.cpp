@@ -197,18 +197,24 @@ struct M6ArchiveDataSourceImpl : public M6DataSourceImpl
 
 						if (mArchive != nullptr)
 						{
-							archive_entry* entry;
-							int err = archive_read_next_header(mArchive, &entry);
-							if (err == ARCHIVE_OK)
+							for (;;)
 							{
+								archive_entry* entry;
+								if (archive_read_next_header(mArchive, &entry) != ARCHIVE_OK)
+									THROW((archive_error_string(mArchive)));
+								
+								// skip over non files
+								if (archive_entry_filetype(entry) != AE_IFREG)
+									continue;
+								
 								result = new M6DataFile;
 								const char* path = archive_entry_pathname(entry);
 								result->mFilename = path;
 								result->mStream.push(device(mArchive, entry, mProgress));
 								mProgress.Message(path);
+								
+								break;
 							}
-							else if (err != ARCHIVE_OK)
-								THROW((archive_error_string(mArchive)));
 						}
 						
 						return result;
@@ -248,6 +254,9 @@ M6DataSourceImpl* M6DataSourceImpl::Create(const fs::path& inFile, M6Progress& i
 		result = new M6ArchiveDataSourceImpl(archive, inProgress);
 	else
 	{
+		if (VERBOSE)
+			cerr << archive_error_string(archive) << endl;
+
 		archive_read_finish(archive);
 		result = new M6PlainTextDataSourceImpl(inFile, inProgress);
 	}

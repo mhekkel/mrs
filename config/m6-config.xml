@@ -500,7 +500,7 @@
 		<name>PubMed Central</name>
 		<file>pmc.m6</file>
 		<info>http://www.pubmedcentral.nih.gov/</info>
-		<source>pmc/articles*.tar.gz</source>
+		<source>pmc/articles*.tar</source>
 <!--		<source>pmc/articles/*/*.nxml</source>-->
 		<fetch src="ftp://rsync.ncbi.nih.gov/pub/pmc/articles*.tar.gz" />
 	</databank>

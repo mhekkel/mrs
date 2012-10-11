@@ -122,6 +122,20 @@
 		<link regex="^(?:#=GS .+?DR PDB; )([0-9A-Z]{4})" db="pdb" ix="id" id="$1" />
 	</format>
 	
+	<parser id="pmc" chunk="/article">
+		<index name='id'		type="string"	xpath='/article/front/article-meta/article-id[@pub-id-type="pmc"]'
+			   attr="true"		unique="true" />
+		<index name='pmid'		type="string"	xpath='/article/front/article-meta/article-id[@pub-id-type="pmid"]' />
+		<index name='doi'		type="string"	xpath='/article/front/article-meta/article-id[@pub-id-type="doi"]' />
+		<index name='subject'	type="text"		xpath='/article/front/article-meta/article-categories/subj-group[@subj-group-type="heading"]/subject' />
+		<index name='title'		type="text"		xpath='/article/front/article-meta/title-group/article-title'
+			   attr="true"	/>
+		<index name='authors'	type="text"		xpath='/article/front/article-meta/contrib-group/contrib/name/*' />
+		<index name='aff'		type="text"		xpath='/article/front/article-meta/aff' />
+		<index name='abstract'	type="text"		xpath='/article/front/article-meta/abstract' />
+		<index name='body'		type="text"		xpath='/article/body' />
+	</parser>
+
 	<databank id="pdbfinder" parser="pdbfinder">
 		<name>PDBFINDER</name>
 		<file>pdbfinder.m6</file>
@@ -480,6 +494,15 @@
 		<info>http://www.uniprot.org/help/uniref</info>
 		<source>uniref100/uniref100.xml.gz</source>
 		<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/uniprot/current_release/uniref/uniref100/*" />
+	</databank>
+
+	<databank id="pmc" parser="pmc">
+		<name>PubMed Central</name>
+		<file>pmc.m6</file>
+		<info>http://www.pubmedcentral.nih.gov/</info>
+		<source>pmc/articles*.tar.gz</source>
+<!--		<source>pmc/articles/*/*.nxml</source>-->
+		<fetch src="ftp://rsync.ncbi.nih.gov/pub/pmc/articles*.tar.gz" />
 	</databank>
 
 </m6-config>

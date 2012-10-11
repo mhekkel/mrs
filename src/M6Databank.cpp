@@ -1077,7 +1077,14 @@ void M6BatchIndexProcessor::IndexValue(const string& inIndexName,
 			default:			THROW(("Runtime error, unexpected index type"));
 		}
 		
-		index->Insert(inValue, inDocNr);
+		try
+		{
+			index->Insert(inValue, inDocNr);
+		}
+		catch (M6DuplicateKeyException& e)
+		{
+			cerr << endl << inValue << ": " << e.what() << endl;
+		}
 	}
 	else if (inValue.length() <= kM6MaxKeyLength)
 	{

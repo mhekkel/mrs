@@ -28,6 +28,8 @@
 #include <boost/pool/pool.hpp>
 #include <boost/thread/tss.hpp>
 
+#include <zeep/xml/xpath.hpp>
+
 #include "M6DocStore.h"
 #include "M6Error.h"
 #include "M6Databank.h"
@@ -70,6 +72,9 @@ class M6Processor
   private:
 	void			ProcessFile(const string& inFileName, istream& inFileStream);
 
+	void			ParseFile(const string& inFileName, istream& inFileStream);
+	void			ParseXML(const string& inFileName, istream& inFileStream);
+
 	void			ProcessFile(M6Progress& inProgress);
 	void			ProcessDocument();
 	void			ProcessDocument(const string& inDoc);
@@ -82,10 +87,20 @@ class M6Processor
 							ProcessDocument(inDoc);
 					}
 
+	struct XMLIndex
+	{
+		string		name;
+		zx::xpath	xpath;
+		bool		unique;
+		M6DataType	type;
+		bool		attr;
+	};
+	
 	M6Databank&		mDatabank;
 	M6Lexicon&		mLexicon;
 	zx::element*	mConfig;
 	M6Parser*		mParser;
+	vector<XMLIndex>mXMLIndexInfo;
 	M6FileQueue		mFileQueue;
 	M6DocQueue		mDocQueue;
 	bool			mUseDocQueue;
@@ -101,7 +116,33 @@ M6Processor::M6Processor(M6Databank& inDatabank, M6Lexicon& inLexicon,
 	string parser = mConfig->get_attribute("parser");
 	if (parser.empty())
 		THROW(("Missing parser attribute"));
-	mParser = new M6Parser(parser);
+	
+	// see if this is an XML parser
+	zx::element* p = M6Config::Instance().FindFirst((boost::format("/m6-config/parser[@id='%1%']") % parser).str());
+	if (p == nullptr)
+		mParser = new M6Parser(parser);
+	else
+	{
+		foreach (zx::element* ix, p->find("index"))
+		{
+			string tt = ix->get_attribute("type");
+			M6DataType type = eM6TextData;
+			if (tt == "string")
+				type = eM6StringData;
+			else if (tt == "number")
+				type = eM6NumberData;
+			
+			XMLIndex info = {
+				ix->get_attribute("name"),
+				ix->get_attribute("xpath"),
+				ix->get_attribute("unique") == "true",
+				type,
+				ix->get_attribute("attr") == "true"
+			};
+			
+			mXMLIndexInfo.push_back(info);
+		}
+	}
 }
 
 M6Processor::~M6Processor()
@@ -145,7 +186,39 @@ void M6Processor::ProcessFile(const string& inFileName, istream& inFileStream)
 		in.push(M6Process(mConfig->find_first("filter")->content(), inFileStream));
 	else
 		in.push(inFileStream);
+
+	if (mParser != nullptr)
+		ParseFile(inFileName, in);
+	else
+		ParseXML(inFileName, in);
+}
+
+void M6Processor::ParseXML(const string& inFileName, istream& inFileStream)
+{
+	// simple case first, just parse the entire document
 	
+	zx::document xml(inFileStream);
+	unique_ptr<M6InputDocument> doc(new M6InputDocument(mDatabank, boost::lexical_cast<string>(xml)));
+	
+	foreach (XMLIndex& ix, mXMLIndexInfo)
+	{
+		foreach (zx::element* e, xml.find(ix.xpath))
+		{
+			string text = e->str();
+			doc->Index(ix.name, ix.type, ix.unique, text.c_str(), text.length());
+			if (ix.attr)
+				doc->SetAttribute(ix.name, text.c_str(), text.length());
+		}
+	}
+
+	doc->Tokenize(mLexicon, 0);
+	doc->Compress();
+	
+	mDatabank.Store(doc.release());
+}
+
+void M6Processor::ParseFile(const string& inFileName, istream& inFileStream)
+{
 	M6LineMatcher header(mParser->GetValue("header")),
 				  lastheaderline(mParser->GetValue("lastheaderline")),
 				  trailer(mParser->GetValue("trailer")),
@@ -162,12 +235,12 @@ void M6Processor::ProcessFile(const string& inFileName, istream& inFileStream)
 	while (state != eTail)
 	{
 		line.clear();
-		getline(in, line);
+		getline(inFileStream, line);
 
 		if (ba::ends_with(line, "\r"))
 			line.erase(line.end() - 1);
 
-		if (line.empty() and in.eof())
+		if (line.empty() and inFileStream.eof())
 		{
 			if (not document.empty())
 				PutDocument(document);

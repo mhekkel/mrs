@@ -18,6 +18,13 @@ union M6BitVector;
 class M6Progress;
 class M6Lexicon;
 
+class M6DuplicateKeyException : public std::exception
+{
+  public:
+						M6DuplicateKeyException() {}
+	virtual const char*	what() const throw()	{ return "duplicate key"; } 
+};
+
 extern const uint32 kM6MaxKeyLength;
 
 class M6BasicIndex

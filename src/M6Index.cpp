@@ -1200,7 +1200,7 @@ bool M6LeafPage<M6DataType>::Insert(string& ioKey, const M6DataType& inValue, ui
 	int32 ix;
 	
 	if (BinarySearch(ioKey, ix))
-		THROW(("Attempt to insert duplicate key (%s)", ioKey.c_str()));
+		throw M6DuplicateKeyException();
 //		SetValue(ix, inValue);	// simply update the value (we're a unique index)
 	else if (CanStore(ioKey))
 		InsertKeyValue(ioKey, inValue, ix + 1);

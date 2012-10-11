@@ -55,6 +55,9 @@
 			<db>pfamseed</db>
 			<db>prints</db>
 			<db>prosite</db>
+			<db>prosite_doc</db>
+			<db>rebase</db>
+			<db>unigene</db>
 		</dbs>
 		<realm name="M6 Administrator">
 			<user name="scott">b92ff7d60b994c8a0d2941ad9349e841</user>
@@ -124,7 +127,7 @@
 	
 	<parser id="pmc" chunk="/article">
 		<index name='id'		type="string"	xpath='/article/front/article-meta/article-id[@pub-id-type="pmc"]'
-			   attr="true"		unique="true" />
+			   attr="true"		/> <!-- really, in pmc id is not unique...  unique="true"  -->
 		<index name='pmid'		type="string"	xpath='/article/front/article-meta/article-id[@pub-id-type="pmid"]' />
 		<index name='doi'		type="string"	xpath='/article/front/article-meta/article-id[@pub-id-type="doi"]' />
 		<index name='subject'	type="text"		xpath='/article/front/article-meta/article-categories/subj-group[@subj-group-type="heading"]/subject' />
@@ -500,7 +503,7 @@
 		<name>PubMed Central</name>
 		<file>pmc.m6</file>
 		<info>http://www.pubmedcentral.nih.gov/</info>
-		<source>pmc/articles*.tar</source>
+		<source>pmc/articles*.tar.gz</source>
 <!--		<source>pmc/articles/*/*.nxml</source>-->
 		<fetch src="ftp://rsync.ncbi.nih.gov/pub/pmc/articles*.tar.gz" />
 	</databank>

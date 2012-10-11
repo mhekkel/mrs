@@ -1,5 +1,7 @@
 #include "M6Lib.h"
 
+#include <iostream>
+
 #define LIBARCHIVE_STATIC
 #include <archive.h>
 #include <archive_entry.h>
@@ -165,7 +167,8 @@ struct M6ArchiveDataSourceImpl : public M6DataSourceImpl
 	
 						device(struct archive* inArchive, struct archive_entry* inEntry,
 								M6Progress& inProgress)
-							: mArchive(inArchive), mEntry(inEntry), mProgress(inProgress), mLastPosition(0)
+							: mArchive(inArchive), mEntry(inEntry), mProgress(inProgress)
+							, mLastPosition(archive_position_compressed(mArchive))
 						{
 						}
 

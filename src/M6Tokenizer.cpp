@@ -527,10 +527,12 @@ void M6Tokenizer::Decompose(uint32 inUnicode)
 	}
 	else
 	{
-		assert(c2 != 0);
-		
-		mLookahead[mLookaheadLength] = c2;
-		++mLookaheadLength;
+		if (c2 != 0)
+		{
+			mLookahead[mLookaheadLength] = c2;
+			++mLookaheadLength;
+		}
+
 		Decompose(c1);
 	}
 }

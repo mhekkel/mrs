@@ -208,7 +208,15 @@ struct M6ArchiveDataSourceImpl : public M6DataSourceImpl
 							for (;;)
 							{
 								archive_entry* entry;
-								if (archive_read_next_header(mArchive, &entry) != ARCHIVE_OK)
+								int err = archive_read_next_header(mArchive, &entry);
+								if (err == ARCHIVE_EOF)
+								{
+									archive_read_finish(mArchive);
+									mArchive = nullptr;
+									break;
+								}
+								
+								if (err != ARCHIVE_OK)
 									THROW((archive_error_string(mArchive)));
 								
 								// skip over non files

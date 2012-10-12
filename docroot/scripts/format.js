@@ -20,7 +20,9 @@ var Format = {
 				result = xmlDoc.transformNode(xslt);
 				/* result is a string in IE, strip off the xml declaration
 				   or else $.append will fail... */
-				result = result.replace(/^<\?xml.+?>/, "");
+				result = result.replace(/^<\?xml.+?>/, "")
+				               .replace(/^\s*<\!.+?>/g, "")
+				               .replace(/^\s*<\?.+?\?>/g, "");
 			}
 			else
 			{

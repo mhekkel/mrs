@@ -187,10 +187,19 @@ void M6Processor::ProcessFile(const string& inFileName, istream& inFileStream)
 	else
 		in.push(inFileStream);
 
-	if (mParser != nullptr)
-		ParseFile(inFileName, in);
-	else
-		ParseXML(inFileName, in);
+	try
+	{
+		if (mParser != nullptr)
+			ParseFile(inFileName, in);
+		else
+			ParseXML(inFileName, in);
+	}
+	catch (exception& e)
+	{
+		cerr << endl
+			 << "Error parsing file " << inFileName << endl
+			 << e.what() << endl;
+	}
 }
 
 void M6Processor::ParseXML(const string& inFileName, istream& inFileStream)

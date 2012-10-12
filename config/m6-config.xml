@@ -144,6 +144,21 @@
 		<index name='body'		type="text"		xpath='/article/body' />
 	</parser>
 
+	<parser id="interpro-xml" chunk="/interprodb/interpro">
+		<index name='id'		type="string"	xpath='@id'		   attr="true"		unique="true" />
+		<index name='title'		type="text"		xpath='name'	   attr="true"	/>
+		<index name='type'		type="string"	xpath='@type' />
+		<index name='name'		type="string"	xpath='@short_name' />
+
+		<!-- Everything else (all nodes that are not 'name') -->
+		<index name='attr'		type="text"		xpath='*[name() != "name"]' />
+
+		<!-- All attributes -->
+		<index name='text'		type="text"		xpath='.//@*' />
+		
+		<link xpath="db_xref" db="@db" id="@dbkey" />
+	</parser>
+
 	<databank id="pdbfinder" parser="pdbfinder">
 		<name>PDBFINDER</name>
 		<file>pdbfinder.m6</file>
@@ -378,6 +393,15 @@
 			src="ftp://ftp.ebi.ac.uk/pub/databases/interpro/interpro.xml.gz" />
 	</databank>
 
+	<databank id="interpro-xml" parser="interpro-xml" format="interpro">
+		<name>Interpro</name>
+		<info>http://www.ebi.ac.uk/interpro/</info>
+		<file>interpro-xml.m6</file>
+		<source>interpro/interpro.xml.gz</source>
+		<fetch
+			src="ftp://ftp.ebi.ac.uk/pub/databases/interpro/interpro.xml.gz" />
+	</databank>
+
 	<databank id="oxford" parser="oxford">
 		<name>Oxford Human Mouse grid</name>
 		<info>http://www.informatics.jax.org/</info>
@@ -508,7 +532,7 @@
 		<name>PubMed Central</name>
 		<file>pmc.m6</file>
 		<info>http://www.pubmedcentral.nih.gov/</info>
-		<source>pmc/articles*.tar</source> 
+		<source>pmc/articles*.tar</source>
 <!--		<source>pmc/*/*.nxml</source>-->
 		<fetch src="ftp://rsync.ncbi.nih.gov/pub/pmc/articles*.tar.gz" />
 	</databank>

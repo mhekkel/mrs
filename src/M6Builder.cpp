@@ -29,6 +29,7 @@
 #include <boost/thread/tss.hpp>
 
 #include <zeep/xml/xpath.hpp>
+#include <zeep/xml/writer.hpp>
 
 #include "M6DocStore.h"
 #include "M6Error.h"
@@ -101,6 +102,7 @@ class M6Processor
 	zx::element*	mConfig;
 	M6Parser*		mParser;
 	vector<XMLIndex>mXMLIndexInfo;
+	string			mChunkXPath;
 	M6FileQueue		mFileQueue;
 	M6DocQueue		mDocQueue;
 	bool			mUseDocQueue;
@@ -123,6 +125,10 @@ M6Processor::M6Processor(M6Databank& inDatabank, M6Lexicon& inLexicon,
 		mParser = new M6Parser(parser);
 	else
 	{
+		mChunkXPath = p->get_attribute("chunk");
+		if (mChunkXPath.empty())
+			THROW(("Missing chunk XPath attribute in XML parser"));
+		
 		foreach (zx::element* ix, p->find("index"))
 		{
 			string tt = ix->get_attribute("type");
@@ -205,25 +211,34 @@ void M6Processor::ProcessFile(const string& inFileName, istream& inFileStream)
 void M6Processor::ParseXML(const string& inFileName, istream& inFileStream)
 {
 	// simple case first, just parse the entire document
-	
-	zx::document xml(inFileStream);
-	unique_ptr<M6InputDocument> doc(new M6InputDocument(mDatabank, boost::lexical_cast<string>(xml)));
-	
-	foreach (XMLIndex& ix, mXMLIndexInfo)
-	{
-		foreach (zx::element* e, xml.find(ix.xpath))
-		{
-			string text = e->str();
-			doc->Index(ix.name, ix.type, ix.unique, text.c_str(), text.length());
-			if (ix.attr)
-				doc->SetAttribute(ix.name, text.c_str(), text.length());
-		}
-	}
 
-	doc->Tokenize(mLexicon, 0);
-	doc->Compress();
-	
-	mDatabank.Store(doc.release());
+	zx::process_document_elements(inFileStream, mChunkXPath, [&] (zx::node* root, zx::element* xml) -> bool
+	{
+		stringstream text;
+		zx::writer w(text);
+		xml->write(w);
+		
+		unique_ptr<M6InputDocument> doc(new M6InputDocument(mDatabank, text.str()));
+		
+		foreach (XMLIndex& ix, mXMLIndexInfo)
+		{
+			foreach (zx::node* n, ix.xpath.evaluate<zx::node>(*xml))
+			{
+				string text = n->str();
+				
+				doc->Index(ix.name, ix.type, ix.unique, text.c_str(), text.length());
+				if (ix.attr)
+					doc->SetAttribute(ix.name, text.c_str(), text.length());
+			}
+		}
+		
+		doc->Tokenize(mLexicon, 0);
+		doc->Compress();
+		
+		mDatabank.Store(doc.release());
+		
+		return true;
+	});
 }
 
 void M6Processor::ParseFile(const string& inFileName, istream& inFileStream)

@@ -522,6 +522,9 @@ void M6Tokenizer::Decompose(uint32 inUnicode)
 	
 	if (c1 == 0 or c1 == inUnicode)
 	{
+		if (mLookaheadLength == sizeof(mLookahead) / sizeof(uint32))
+			THROW(("Lookahead buffer overflow"));
+		
 		mLookahead[mLookaheadLength] = inUnicode;
 		++mLookaheadLength;
 	}
@@ -529,6 +532,9 @@ void M6Tokenizer::Decompose(uint32 inUnicode)
 	{
 		if (c2 != 0)
 		{
+			if (mLookaheadLength == sizeof(mLookahead) / sizeof(uint32))
+				THROW(("Lookahead buffer overflow"));
+
 			mLookahead[mLookaheadLength] = c2;
 			++mLookaheadLength;
 		}
@@ -547,7 +553,12 @@ inline void M6Tokenizer::WriteUTF8(uint32 inString[], size_t inLength)
 {
 	char* t = mTokenText;
 	for (int i = 0; i < inLength; ++i)
+	{
+		if (t + 6 > mTokenText + kTokenBufferLength)
+			THROW(("Token buffer overflow"));
+	
 		t = ::WriteUTF8(inString[i], t);
+	}
 	
 	mTokenLength = static_cast<uint32>(t - mTokenText);
 }
@@ -568,7 +579,7 @@ M6Token M6Tokenizer::GetNextWord()
 
 		// this tokens exceeds the max token length... to not overflow the buffer and return
 		// a undefined token.
-		if (t == token + kMaxTokenLength)
+		if (t >= token + kMaxTokenLength)
 		{
 			result = eM6TokenUndefined;
 

@@ -58,7 +58,7 @@ class M6Tokenizer
 {
   public:
 
-	static const uint32 kMaxTokenLength = 255;
+	static const uint32 kMaxTokenLength = 255, kTokenBufferLength = 4 * kMaxTokenLength + 32;
 
 					M6Tokenizer(const std::string& inData);
 					M6Tokenizer(const char* inData, size_t inLength);
@@ -85,10 +85,10 @@ class M6Tokenizer
 	static void		Reorder(uint32 inString[], size_t inLength);
 	void			WriteUTF8(uint32 inString[], size_t inLength);
 
-	char			mTokenText[kMaxTokenLength];	// private buffer
+	char			mTokenText[kTokenBufferLength];	// private buffer
 	uint32			mTokenLength;
 	
-	uint32			mLookahead[10];
+	uint32			mLookahead[32];
 	uint32			mLookaheadLength;
 
 	const uint8*	mPtr;

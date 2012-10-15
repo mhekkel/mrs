@@ -88,14 +88,12 @@
 <!--		</dbs>-->
 <!--	</server>-->
 
-	<format id="omim">
-		<script src="scripts/omim.js" />
+	<format id="omim" script="scripts/omim.js">
 		<link regex="(?&lt;=\()(?:[^();]+?; )?(\d{6})(?:\.(\d{4}))?(?=\))"
 			db="omim" ix="id" id="$1" anchor="$2" />
 	</format>
 	
-	<format id="uniprot">
-		<script src="scripts/uniprot.js" />
+	<format id="uniprot" script="scripts/uniprot.js">
 		<link regex="(?&lt;=DR   EMBL; )(\S+)(?=;)" db="embl" ix="id" id="$1" />
 		<link regex="(?&lt;=DR   PDB; )(\S+)(?=;)" db="pdb" ix="id" id="$1" />
 	</format>
@@ -108,17 +106,9 @@
 		<link regex="(?&lt;=^PARENT ID                 : )(\d+)" ix="id" id="$1" />
 	</format>
 	
-	<format id="interpro">
-		<script src="scripts/interpro.js" />
-	</format>
-
-	<format id="gene">
-		<script src="scripts/gene.js" />
-	</format>
-
-	<format id="pmc">
-		<script src="scripts/pmc.js" />
-	</format>
+	<format id="interpro" stylesheet="interpro.xslt" />
+	<format id="gene" stylesheet="gene.xslt" />
+	<format id="pmc" stylesheet="ViewNLM-v2.3.xsl" />
 
 	<format id="stockholm">
 		<link regex="^(?:#=GF DR\s+PFAMA;\s)(\S+)(?=;)" db="pfama" ix="id" id="$1" />
@@ -144,7 +134,7 @@
 		<index name='body'		type="text"		xpath='/article/body' />
 	</parser>
 
-	<parser id="interpro-xml" chunk="/interprodb/interpro">
+	<parser id="interpro" chunk="/interprodb/interpro">
 		<index name='id'		type="string"	xpath='@id'		   attr="true"		unique="true" />
 		<index name='title'		type="text"		xpath='name'	   attr="true"	/>
 		<index name='type'		type="string"	xpath='@type' />
@@ -393,15 +383,6 @@
 			src="ftp://ftp.ebi.ac.uk/pub/databases/interpro/interpro.xml.gz" />
 	</databank>
 
-	<databank id="interpro-xml" parser="interpro-xml" format="interpro">
-		<name>Interpro</name>
-		<info>http://www.ebi.ac.uk/interpro/</info>
-		<file>interpro-xml.m6</file>
-		<source>interpro/interpro.xml.gz</source>
-		<fetch
-			src="ftp://ftp.ebi.ac.uk/pub/databases/interpro/interpro.xml.gz" />
-	</databank>
-
 	<databank id="oxford" parser="oxford">
 		<name>Oxford Human Mouse grid</name>
 		<info>http://www.informatics.jax.org/</info>
@@ -532,9 +513,8 @@
 		<name>PubMed Central</name>
 		<file>pmc.m6</file>
 		<info>http://www.pubmedcentral.nih.gov/</info>
-		<source>pmc/articles*.tar</source>
-<!--		<source>pmc/*/*.nxml</source>-->
-		<fetch src="ftp://rsync.ncbi.nih.gov/pub/pmc/articles*.tar.gz" />
+		<source>pmc/articles*.tar.gz</source>
+		<fetch src="ftp://ftp.ncbi.nih.gov/pub/pmc/articles*.tar.gz" />
 	</databank>
 
 </m6-config>

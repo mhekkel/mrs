@@ -601,36 +601,36 @@ void M6Server::handle_entry(const zh::request& request, const el::scope& scope, 
 	{
 		zx::element* format = M6Config::Instance().LoadFormat(db);
 		
-		if (zx::element* script = format->find_first("script"))
+		if (format != nullptr)
 		{
-			string src = script->get_attribute("src");
-			if (src.empty())
-				sub["formatScript"] = script->content();
-			else
-				sub["formatSrc"] = src;
-		}
-
-		process_xml(root, sub, "/");	
-
-		zx::element_set links(format->find("link"));
-		foreach (zx::element* link, links)
-		{
-			try
-			{
-				string ldb = link->get_attribute("db");
-				string id = link->get_attribute("id");
-				string ix = link->get_attribute("ix");
-				string anchor = link->get_attribute("anchor");
-				if (ldb.empty())
-					ldb = db;
-				if (id.empty())
-					continue;
-				boost::regex re(link->get_attribute("regex"));
-				create_link_tags(root, re, ldb, ix, id, anchor);
-			}
-			catch (...) {}
+			sub["formatXSLT"] = format->get_attribute("stylesheet");
+			sub["formatScript"] = format->get_attribute("script");
 		}
 	
+		process_xml(root, sub, "/");
+		
+		if (format != nullptr)
+		{
+			zx::element_set links(format->find("link"));
+			foreach (zx::element* link, links)
+			{
+				try
+				{
+					string ldb = link->get_attribute("db");
+					string id = link->get_attribute("id");
+					string ix = link->get_attribute("ix");
+					string anchor = link->get_attribute("anchor");
+					if (ldb.empty())
+						ldb = db;
+					if (id.empty())
+						continue;
+					boost::regex re(link->get_attribute("regex"));
+					create_link_tags(root, re, ldb, ix, id, anchor);
+				}
+				catch (...) {}
+			}
+		}
+		
 		if (not q.empty())
 		{
 			try

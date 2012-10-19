@@ -142,6 +142,7 @@ class M6DatabankImpl
 	fs::path				mDbDirectory;
 	fs::ofstream*			mLinkFile;
 	ostream*				mLinkStream;
+	fs::ofstream*			mFastaFile;
 	MOpenMode				mMode;
 	M6DocStore*				mStore;
 	M6Dictionary*			mDictionary;
@@ -1191,6 +1192,7 @@ M6DatabankImpl::M6DatabankImpl(M6Databank& inDatabank, const fs::path& inPath, M
 	, mDbDirectory(inPath)
 	, mLinkFile(nullptr)
 	, mLinkStream(nullptr)
+	, mFastaFile(nullptr)
 	, mMode(inMode)
 	, mStore(nullptr)
 	, mDictionary(nullptr)
@@ -1266,6 +1268,7 @@ M6DatabankImpl::~M6DatabankImpl()
 
 	delete mLinkStream;
 	delete mLinkFile;
+	delete mFastaFile;
 }
 
 void M6DatabankImpl::GetInfo(M6DatabankInfo& outInfo)
@@ -1352,6 +1355,19 @@ void M6DatabankImpl::StoreThread()
 			break;
 		
 		doc->Store();
+
+		const string& fasta = doc->GetFasta();
+		if (not fasta.empty())
+		{
+			if (mFastaFile == nullptr)
+			{
+				mFastaFile = new fs::ofstream(mDbDirectory / "fasta", ios_base::out|ios_base::trunc|ios_base::binary);
+				if (not mFastaFile->is_open())
+					throw runtime_error("could not create link file");
+			}
+			*mFastaFile << fasta;
+		}
+		
 		mIndexQueue.Put(doc);
 	}
 	

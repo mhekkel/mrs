@@ -20,14 +20,20 @@
 		
 		<dbs>
 			<db id="sprot" name="SwissProt">
-				<file>/data/fasta/uniprot_sprot.fasta</file>
+				<file>sprot.m6/fasta</file>
 			</db>
 			<db id="trembl" name="TrEMBL">
-				<file>/data/fasta/uniprot_trembl.fasta</file>
+				<file>trembl.m6/fasta</file>
 			</db>
 			<db id="uniprot" name="UniProt (SwissProt + TrEMBL)">
-				<file>/data/fasta/uniprot_sprot.fasta</file>
-				<file>/data/fasta/uniprot_trembl.fasta</file>
+				<file>sprot.m6/fasta</file>
+				<file>trembl.m6/fasta</file>
+			</db>
+			<db id="pdb" name="PDB">
+				<file>pdb.m6/fasta</file>
+			</db>
+			<db id="pdb-mini" name="PDB mini">
+				<file>pdb-mini.m6/fasta</file>
 			</db>
 		</dbs>
 	</blast>
@@ -47,6 +53,7 @@
 			<db>go</db>
 			<db>interpro</db>
 			<db>pdb</db>
+			<db>pdb-mini</db>
 			<db>dssp</db>
 			<db>hssp</db>
 			<db>gene</db>
@@ -80,13 +87,15 @@
 		</dbs>
 	</server>
 
-<!--	<server type="blast" addr="0.0.0.0" port="18092">-->
+	<server type="blast" addr="0.0.0.0" port="18092">
 <!--		<external-address>http://mrs.cmbi.ru.nl/mrsws/blast</external-address>-->
-<!--		<dbs>-->
-<!--			<db>sprot</db>-->
-<!--			<db>trembl</db>-->
-<!--		</dbs>-->
-<!--	</server>-->
+		<external-address>http://localhost:18092/mrsws_blast</external-address>
+		<dbs>
+			<db>sprot</db>
+			<db>trembl</db>
+			<db>uniprot</db>
+		</dbs>
+	</server>
 
 	<format id="omim" script="scripts/omim.js">
 		<link regex="(?&lt;=\()(?:[^();]+?; )?(\d{6})(?:\.(\d{4}))?(?=\))"
@@ -262,7 +271,7 @@
 		<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/enzyme/release_with_updates/enzyme.dat" />
 	</databank>
 
-	<databank id="sprot" parser="uniprot" format="uniprot">
+	<databank id="sprot" parser="uniprot" format="uniprot" blast="true">
 		<name>SwissProt</name>
 		<info>http://www.uniprot.org/</info>
 		<file>/data/mrs/sprot.m6</file>
@@ -279,7 +288,7 @@
 		<source>uniprot/sprot-mini.dat</source>
 	</databank>
 	
-	<databank id="trembl" parser="uniprot" format="uniprot">
+	<databank id="trembl" parser="uniprot" format="uniprot" blast="true">
 		<name>TrEMBL</name>
 		<info>http://www.uniprot.org/</info>
 		<file>/data/mrs/trembl.m6</file>
@@ -317,11 +326,21 @@
 		<source>nlwiki/nlwiki-latest-pages-articles.xml.bz2</source>
 	</databank>
 
-	<databank id="pdb" parser="pdb">
+	<databank id="pdb" parser="pdb" blast="true">
 		<name>PDB</name>
 		<info>http://www.rcsb.org/pdb/</info>
 		<file>pdb.m6</file>
 		<source>pdb/*/pdb*.ent.gz</source>
+		<fetch
+			delete="true"
+			src="ftp://ftp.cmbi.ru.nl/pub/molbio/data/pdb/divided/??/pdb????.ent.gz" />
+	</databank>
+
+	<databank id="pdb-mini" parser="pdb" blast="true">
+		<name>PDB mini</name>
+		<info>http://www.rcsb.org/pdb/</info>
+		<file>pdb-mini.m6</file>
+		<source>pdb/cr/pdb*.ent.gz</source>
 		<fetch
 			delete="true"
 			src="ftp://ftp.cmbi.ru.nl/pub/molbio/data/pdb/divided/??/pdb????.ent.gz" />

@@ -1346,6 +1346,8 @@ void BlastQuery<WORDSIZE>::Report(Result& outResult)
 			h.mAccession = m[3];
 			h.mID = m[4];
 		}
+		else if (m[1] == "pdb")
+			h.mID = m[3] + '.' + m[4];
 		else if (m[2] != "")
 			h.mID = m[2];
 		else
@@ -1373,9 +1375,9 @@ void BlastQuery<WORDSIZE>::Report(Result& outResult)
 				p.mQueryAlignment += r;
 				p.mTargetAlignment += *t == '-' ? '-' : kResidues[*t];
 				
-				if (*t == 22 or *qf == 22)
+				if (*t == 22 or r == '-')
 				{
-					if (*qf == 22)
+					if (r == '-')
 						--qu;
 					p.mGaps += 1;
 					p.mMidLine += ' ';

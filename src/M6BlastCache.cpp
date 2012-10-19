@@ -426,8 +426,18 @@ void M6BlastCache::ExecuteJob(const string& inJobID)
 			int gapextend = sqlite3_column_int(mFetchParamsStmt, 8);
 			
 			vector<fs::path> files;
-			foreach (auto file, M6Config::Instance().Find((boost::format("//blast/dbs/db[@id='%1%']/file") % db).str()))
-				files.push_back(file->content());
+			foreach (auto file, M6Config::Instance().Find((boost::format("/m6-config/blast/dbs/db[@id='%1%']/file") % db).str()))
+			{
+				fs::path path(file->content());
+				
+				if (not path.has_root_path())
+				{
+					fs::path mrsdir(M6Config::Instance().FindGlobal("/m6-config/mrsdir"));
+					path = mrsdir / path;
+				}
+				
+				files.push_back(path);
+			}
 			
 			M6BlastResultPtr result(M6Blast::Search(files, query, "blastp",
 				matrix, wordsize, expect, filter, gapped, gapopen, gapextend, 250));

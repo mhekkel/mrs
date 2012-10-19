@@ -1,7 +1,5 @@
 Todo
 
-- !!! - lijst weergave, doortellen van nummers?
-      - Number of hits for boolean queries...
 - SOAP services (alleen blast nog)
 - links
 - date index

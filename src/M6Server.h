@@ -31,6 +31,7 @@ class M6SearchServer
 	{
 		M6Databank*	mDatabank;
 		std::string	mID, mName;
+		bool		mBlast;
 		M6Parser*	mParser;
 	};
 	typedef std::vector<M6LoadedDatabank> M6DbList;

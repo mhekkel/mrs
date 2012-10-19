@@ -106,6 +106,8 @@ class M6Processor
 	M6FileQueue		mFileQueue;
 	M6DocQueue		mDocQueue;
 	bool			mUseDocQueue;
+	bool			mWriteFasta;
+	fs::ofstream	mFastaFile;
 	string			mDbHeader;
 };
 
@@ -149,6 +151,8 @@ M6Processor::M6Processor(M6Databank& inDatabank, M6Lexicon& inLexicon,
 			mXMLIndexInfo.push_back(info);
 		}
 	}
+	
+	mWriteFasta = mConfig->get_attribute("blast") == "true";
 }
 
 M6Processor::~M6Processor()
@@ -354,6 +358,13 @@ void M6Processor::ProcessDocument(const string& inDoc)
 	M6InputDocument* doc = new M6InputDocument(mDatabank, inDoc);
 	
 	mParser->ParseDocument(doc, mDbHeader);
+	if (mWriteFasta)
+	{
+		string fasta;
+		mParser->ToFasta(inDoc, doc->GetAttribute("id"), doc->GetAttribute("title"), fasta);
+		if (not fasta.empty())
+			doc->SetFasta(fasta);
+	}
 	
 	doc->Tokenize(mLexicon, 0);
 	doc->Compress();
@@ -428,11 +439,17 @@ void M6Processor::ProcessDocument()
 		M6InputDocument* doc = new M6InputDocument(mDatabank, text);
 		
 		mParser->ParseDocument(doc, mDbHeader);
+		if (mWriteFasta)
+		{
+			string fasta;
+			mParser->ToFasta(text, doc->GetAttribute("id"), doc->GetAttribute("title"), fasta);
+			if (not fasta.empty())
+				doc->SetFasta(fasta);
+		}
 		
 		doc->Tokenize(*tsLexicon, 0);
 		doc->Compress();
 		docs.push_back(doc);
-//		ProcessDocument(text);
 	}
 	
 	assert(docs.empty());

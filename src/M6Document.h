@@ -67,9 +67,11 @@ class M6InputDocument : public M6Document
 							const std::string& inText);
 
 	void				SetText(const std::string& inText);
-
 	virtual std::string	GetText();
-	const std::string&	Peek() const						{ return mText; }
+	const std::string&	Peek() const							{ return mText; }
+
+	void				SetFasta(const std::string& inFasta)	{ mFasta = inFasta; }
+	const std::string&	GetFasta() const						{ return mFasta; }
 	
 	virtual std::string	GetAttribute(const std::string& inName);
 	
@@ -106,6 +108,7 @@ class M6InputDocument : public M6Document
 							M6DataType inDataType);
 
 	std::string			mText;
+	std::string			mFasta;
 	std::vector<char>	mBuffer;
 	M6DocAttributes		mAttributes;
 	std::vector<std::pair<std::string,std::string>>

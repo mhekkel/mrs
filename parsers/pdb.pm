@@ -5,6 +5,31 @@ use warnings;
 
 our @ISA = "M6::Script";
 
+our %aa_map = (
+	'ALA'	=>	'A',
+	'ARG'	=>	'R',
+	'ASN'	=>	'N',
+	'ASP'	=>	'D',
+	'CYS'	=>	'C',
+	'GLN'	=>	'Q',
+	'GLU'	=>	'E',
+	'GLY'	=>	'G',
+	'HIS'	=>	'H',
+	'ILE'	=>	'I',
+	'LEU'	=>	'L',
+	'LYS'	=>	'K',
+	'MET'	=>	'M',
+	'PHE'	=>	'F',
+	'PRO'	=>	'P',
+	'SER'	=>	'S',
+	'THR'	=>	'T',
+	'TRP'	=>	'W',
+	'TYR'	=>	'Y',
+	'VAL'	=>	'V',
+	'GLX'	=>	'Z',
+	'ASX'	=>	'B',
+);
+
 sub new
 {
 	my $invocant = shift;
@@ -16,7 +41,7 @@ sub parse
 {
 	my ($self, $text) = @_;
 
-	my (%seq, $sequence, $seq_chain_id, $header, $title, $compound, $model_count, %ligands);
+	my ($header, $title, $compound, $model_count, %ligands);
 
 	open(my $h, "<", \$text);
 
@@ -128,12 +153,41 @@ sub parse
 		$ligand =~ s/^\s*(\S+)\s*$/$1/;
 		$self->index_string("ligand", $ligand);
 	}
+}
 
-#	foreach my $ch (sort keys %seq)
-#	{
-#		$self->AddSequence($seq{$ch}, $ch);
-#		delete $seq{$ch};
-#	}
+sub to_fasta
+{
+	my ($self, $text, $id, $title) = @_;
+
+	my %seq;
+
+	while ($text =~ m/^SEQRES (?:  \d| \d\d|\d\d\d) (.)(?:    \d|   \d\d| \d\d\d|\d\d\d\d)  (.+)/mg)
+	{
+		my ($chainId, $r) = ($1, $2);
+
+		$seq{$chainId} = '' unless defined $seq{$chainId};
+		
+		foreach my $res (split(m/ /, $r))
+		{
+			next unless length($res) == 3;
+			my $aa = $aa_map{$res};
+			$aa = 'X' unless defined $aa;
+			$seq{$chainId} .= $aa;
+		}
+	}
+
+	my $result = '';
+	
+	foreach my $seq (keys %seq)
+	{
+		my $s = $seq{$seq};
+		next unless length($s) > 0;
+
+		$s =~ s/(.{72})/$&\n/g;
+		$result .= ">pdb|$id|$seq $title\n$s\n";
+	}
+	
+	return $result;
 }
 
 1;

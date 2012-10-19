@@ -31,7 +31,7 @@
 #include "M6Parser.h"
 #include "M6LinkTable.h"
 #include "M6WSSearch.h"
-//#include "M6WSBlast.h"
+#include "M6WSBlast.h"
 
 using namespace std;
 namespace fs = boost::filesystem;
@@ -94,12 +94,14 @@ void M6SearchServer::LoadAllDatabanks()
 		try
 		{
 			string name = databank;
+			bool blast = false;
 			
 			M6Parser* parser = nullptr;
 			zx::element_set config(M6Config::Instance().Find((boost::format("/m6-config/databank[@id='%1%']") % databank).str()));
 			if (not config.empty())
 			{
 				parser = new M6Parser(config.front()->get_attribute("parser"));
+				blast = config.front()->get_attribute("blast") == "true";
 				if (zx::element* n = config.front()->find_first("name"))
 					name = n->content();
 			}
@@ -109,6 +111,7 @@ void M6SearchServer::LoadAllDatabanks()
 				new M6Databank(path, eReadOnly),
 				databank,
 				name,
+				blast,
 				parser
 			};
 
@@ -163,7 +166,8 @@ string M6SearchServer::GetEntry(M6Databank* inDatabank, const string& inFormat, 
 					continue;
 				
 				string fasta;
-				db.mParser->ToFasta(result, fasta);
+				db.mParser->ToFasta(result, doc->GetAttribute("id"), 
+					doc->GetAttribute("title"), fasta);
 				result = fasta;
 				break;
 			}
@@ -217,7 +221,7 @@ void M6SearchServer::Find(const string& inDatabank, const string& inQuery, bool 
 		float score = 0;
 
 		while (inResultOffset-- > 0 and rset->Next(docNr, score))
-			;
+			++nr;
 
 		while (inMaxResultCount-- > 0 and rset->Next(docNr, score))
 		{
@@ -246,6 +250,9 @@ void M6SearchServer::Find(const string& inDatabank, const string& inQuery, bool 
 			outHits.push_back(hit);
 			++nr;
 		}
+		
+		if (inMaxResultCount == 0)
+			outHitCount = nr - 1;
 	}		
 }
 
@@ -1425,17 +1432,15 @@ void M6Server::handle_blast(const zeep::http::request& request, const el::scope&
 	el::scope sub(scope);
 
 	vector<el::object> databanks;
-	foreach (auto db, M6Config::Instance().Find("//blast/dbs/db"))
+	foreach (M6LoadedDatabank& db, mLoadedDatabanks)
 	{
-		el::object databank;
-		databank["id"] = db->get_attribute("id");
-		
-		string name = db->get_attribute("name");
-		if (name.empty())
-			name = db->get_attribute("id");
-		
-		databank["name"] = name;
-		databanks.push_back(databank);
+		if (db.mBlast)
+		{
+			el::object databank;
+			databank["id"] = db.mID;
+			databank["name"] = db.mName;
+			databanks.push_back(databank);
+		}
 	}
 		
 	// fetch some parameters, if any
@@ -1993,8 +1998,8 @@ void RunMainLoop(uint32 inNrOfThreads)
 			server.reset(new M6Server(config));
 		else if (service == "search")
 			server.reset(new M6WSSearch(config));
-//		else if (service == "blast")
-//			server.reset(new M6WSBlast(config));
+		else if (service == "blast")
+			server.reset(new M6WSBlast(config));
 		else
 			THROW(("Unknown service %s", service.c_str()));
 

@@ -18,6 +18,7 @@ class M6Parser
 	std::string		GetValue(const std::string& inName);
 
 	void			ToFasta(const std::string& inDoc,
+						const std::string& inID, const std::string& inTitle,
 						std::string& outFasta);
 
   private:

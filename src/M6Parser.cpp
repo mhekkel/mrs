@@ -43,7 +43,8 @@ struct M6ParserImpl
 
 	void				Parse(M6InputDocument* inDoc, const string& inDbHeader);
 	void				GetVersion(string& outVersion);
-	void				ToFasta(const string& inDoc, string& outFasta);
+	void				ToFasta(const string& inDoc, const string& inID,
+							const string& inTitle, string& outFasta);
 	
 	// implemented callbacks
 	void				IndexText(const string& inIndex, const char* inText, size_t inLength)
@@ -290,8 +291,11 @@ void M6ParserImpl::Parse(M6InputDocument* inDocument, const string& inDbHeader)
 //	mUserData = nullptr;
 //}
 
-void M6ParserImpl::ToFasta(const string& inDocument, string& outFasta)
+void M6ParserImpl::ToFasta(const string& inDocument, const string& inID,
+	const string& inTitle, string& outFasta)
 {
+	outFasta.clear();
+	
 	PERL_SET_CONTEXT(mPerl);
 
 	dSP;
@@ -301,6 +305,8 @@ void M6ParserImpl::ToFasta(const string& inDocument, string& outFasta)
 	
 	XPUSHs(SvRV(mParser));
 	XPUSHs(sv_2mortal(newSVpv(inDocument.c_str(), inDocument.length())));
+	XPUSHs(sv_2mortal(newSVpv(inID.c_str(), inID.length())));
+	XPUSHs(sv_2mortal(newSVpv(inTitle.c_str(), inTitle.length())));
 
 	PUTBACK;
 	
@@ -321,9 +327,9 @@ void M6ParserImpl::ToFasta(const string& inDocument, string& outFasta)
 	
 	if (errmsg.length())
 		THROW(("Error calling to_fasta: %s", errmsg.c_str()));
-
-	if (n != 1 or outFasta.empty())
-		THROW(("to_fasta method of parser script should return one string"));
+//
+//	if (n != 1 or outFasta.empty())
+//		THROW(("to_fasta method of parser script should return one string"));
 }
 
 M6ParserImpl* M6ParserImpl::GetObject(
@@ -974,7 +980,8 @@ string M6Parser::GetValue(const string& inName)
 	return Impl()->operator[](inName.c_str());
 }
 
-void M6Parser::ToFasta(const string& inDoc, string& outFasta)
+void M6Parser::ToFasta(const string& inDoc, const string& inID,
+	const string& inTitle, string& outFasta)
 {
-	Impl()->ToFasta(inDoc, outFasta);
+	Impl()->ToFasta(inDoc, inID, inTitle, outFasta);
 }

@@ -20,9 +20,7 @@ var Format = {
 				result = xmlDoc.transformNode(xslt);
 				/* result is a string in IE, strip off the xml declaration
 				   or else $.append will fail... */
-				result = result.replace(/^<\?xml.+?>/, "")
-				               .replace(/^\s*<\!.+?>/g, "")
-				               .replace(/^\s*<\?.+?\?>/g, "");
+				result = result.replace(/^<\?xml.+?>/, "").replace(/^\s+<[!?][^>]+>/g);
 			}
 			else
 			{
@@ -101,7 +99,27 @@ var Format = {
 			window.XMLHttpRequest ? new XMLHttpRequest() : new ActiveXObject("Microsoft.XMLHTTP");
 		xhttp.open("GET", dname, false);
 		xhttp.send("");
-		return xhttp.responseXML;
+		
+		var result = null;
+		
+		if (xhttp.responseXML != null)
+			result = xhttp.responseXML;
+		else if (xhttp.responseText != null)
+		{
+			if (window.ActiveXObject) // Internet Explorer
+			{
+				result = new ActiveXObject("Microsoft.XMLDOM");
+				result.async = false;
+				result.loadXML(xhttp.responseText);
+			}
+			else
+			{
+				var parser = new DOMParser();
+				result = parser.parseFromString(xhttp.responseText, "text/xml");
+			}
+		}
+		
+		return result;
 	}
 };
 

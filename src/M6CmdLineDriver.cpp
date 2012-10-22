@@ -312,14 +312,31 @@ void M6BlastDriver::Exec(const string& inCommand, po::variables_map& vm)
 		query += line + '\n';
 	}
 
+	fs::path mrsDir(M6Config::Instance().FindGlobal("/m6-config/mrsdir"));
+
 	vector<fs::path> databanks;
 	vector<string> dbs(vm["databank"].as<vector<string>>());
-	foreach (const string& p, dbs)
+	string dbdesc;
+	
+	foreach (const string& db, dbs)
 	{
-		fs::path db(p);
-		if (not fs::exists(db))
-			throw M6Exception("Databank %s does not exist", p.c_str());
-		databanks.push_back(db);
+		if (not dbdesc.empty())
+			dbdesc += ' ';
+		dbdesc += db;
+		
+		zx::element_set dbc(M6Config::Instance().Find(
+			(boost::format("/m6-config/blast/dbs/db[@id='%1%']/file") % db).str()));
+		foreach (const zx::element* f, dbc)
+		{
+			fs::path db(f->content());
+
+			if (not db.has_root_directory())
+				db = mrsDir / db;
+
+			if (not fs::exists(db))
+				throw M6Exception("Databank %s does not exist", f->content().c_str());
+			databanks.push_back(db);
+		}
 	}
 	
 	if (vm.count("program"))		program = vm["program"].as<string>();
@@ -349,6 +366,8 @@ void M6BlastDriver::Exec(const string& inCommand, po::variables_map& vm)
 	{
 		M6Blast::Result* r = M6Blast::Search(databanks, query, program, matrix,
 			wordSize, expect, filter, gapped, gapOpen, gapExtend, reportLimit, threads);
+			
+		r->mDb = dbdesc;
 	
 		if (vm.count("output") and vm["output"].as<string>() != "stdout")
 		{

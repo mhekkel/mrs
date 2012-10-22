@@ -138,7 +138,7 @@ sub parse
 
 sub to_fasta
 {
-	my ($self, $doc, $id, $title) = @_;
+	my ($self, $doc, $db, $id, $title) = @_;
 
 	die("no sequence") unless
 		$doc =~ /SEQUENCE\s+(\d+) AA;\s+\d+ MW;\s+[0-9A-F]{16} CRC64;\n((\s+.+\n)+)\/\//m ;
@@ -154,10 +154,7 @@ sub to_fasta
 	
 	$seq =~ s/.{72}/$&\n/g;
 
-	die("no AC?") unless $doc =~ m/^AC   (\w+)/m ;
-	my $ac = $1;
-	
-	return ">sp|$ac|$id $title\n$seq\n";
+	return ">gnl|$db|$id $title\n$seq\n";
 }
 
 1;

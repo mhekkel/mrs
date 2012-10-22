@@ -475,7 +475,7 @@ BlastResult.prototype.updateResultList2 = function(resultList) {
 		
 		// select checkbox
 		var cell = row.insertCell(row.cells.length);
-		cell.appendChild(GlobalSelection.createCheckbox(this.job.db, hit.doc, hit.seq));
+		cell.appendChild(GlobalSelection.createCheckbox(hit.db, hit.doc, hit.seq));
 
 		// Nr
 		cell = row.insertCell(row.cells.length);
@@ -485,7 +485,7 @@ BlastResult.prototype.updateResultList2 = function(resultList) {
 		// ID
 		cell = row.insertCell(row.cells.length);
 		cell.innerHTML =
-			"<a href='link?db=" + escape(this.job.db) + "&amp;ix=id&amp;id=" + escape(hit.doc) + "' onclick='doStopPropagation(event);'>" +
+			"<a href='link?db=" + escape(hit.db) + "&amp;ix=id&amp;id=" + escape(hit.doc) + "' onclick='doStopPropagation(event);'>" +
 			hit.doc + "</a>";
 		if (hit.seq.length > 0) {
 			cell.innerHTML += '.' + hit.seq;

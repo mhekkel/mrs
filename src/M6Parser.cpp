@@ -43,7 +43,7 @@ struct M6ParserImpl
 
 	void				Parse(M6InputDocument* inDoc, const string& inDbHeader);
 	void				GetVersion(string& outVersion);
-	void				ToFasta(const string& inDoc, const string& inID,
+	void				ToFasta(const string& inDoc, const string& inDb, const string& inID,
 							const string& inTitle, string& outFasta);
 	
 	// implemented callbacks
@@ -291,7 +291,7 @@ void M6ParserImpl::Parse(M6InputDocument* inDocument, const string& inDbHeader)
 //	mUserData = nullptr;
 //}
 
-void M6ParserImpl::ToFasta(const string& inDocument, const string& inID,
+void M6ParserImpl::ToFasta(const string& inDocument, const string& inDb, const string& inID,
 	const string& inTitle, string& outFasta)
 {
 	outFasta.clear();
@@ -305,6 +305,7 @@ void M6ParserImpl::ToFasta(const string& inDocument, const string& inID,
 	
 	XPUSHs(SvRV(mParser));
 	XPUSHs(sv_2mortal(newSVpv(inDocument.c_str(), inDocument.length())));
+	XPUSHs(sv_2mortal(newSVpv(inDb.c_str(), inDb.length())));
 	XPUSHs(sv_2mortal(newSVpv(inID.c_str(), inID.length())));
 	XPUSHs(sv_2mortal(newSVpv(inTitle.c_str(), inTitle.length())));
 
@@ -980,8 +981,8 @@ string M6Parser::GetValue(const string& inName)
 	return Impl()->operator[](inName.c_str());
 }
 
-void M6Parser::ToFasta(const string& inDoc, const string& inID,
+void M6Parser::ToFasta(const string& inDoc, const string& inDb, const string& inID,
 	const string& inTitle, string& outFasta)
 {
-	Impl()->ToFasta(inDoc, inID, inTitle, outFasta);
+	Impl()->ToFasta(inDoc, inDb, inID, inTitle, outFasta);
 }

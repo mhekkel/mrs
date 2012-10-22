@@ -63,10 +63,6 @@ inline bool is_gap(char aa)
 sequence encode(const std::string& s);
 std::string decode(const sequence& s);
 
-// regular expression for FastA formatted files
-boost::regex
-	kFastARE("^>(\\w+)((?:\\|([^| ]*))?(?:\\|([^| ]+))?(?:\\|([^| ]+))?(?:\\|([^| ]+))?)(?: (.+))\n?");
-
 const uint32
 	kAACount				= 22,	// 20 + B and Z
 	kResCount				= 23,	// includes X
@@ -1327,33 +1323,27 @@ void BlastQuery<WORDSIZE>::Report(Result& outResult)
 	outResult.mStats.mLambda = mMatrix.GappedLambda();
 	outResult.mStats.mEntropy = mMatrix.GappedEntropy();
 
+	boost::regex
+		kDefLineParser("^>gnl\\|([^| ]*)\\|([^| ]*)(?:\\|([^| ]*))?(?: (.+))\n?");
+
 	foreach (HitPtr hit, mHits)
 	{
+		boost::smatch m;
+		if (not boost::regex_match(hit->mDefLine, m, kDefLineParser, boost::match_not_dot_newline))
+			throw M6Exception("Invalid defline: %s", hit->mDefLine.c_str());
+
 		Hit h;
 		h.mHitNr = static_cast<uint32>(outResult.mHits.size() + 1);
-		boost::smatch m;
-		h.mDefLine = hit->mDefLine;
+		h.mDefLine = hit->mDefLine.substr(1);
 //		h.mLength = static_cast<uint32>(hit->mTarget.length());
 		h.mSequence.reserve(hit->mTarget.length());
 		transform(hit->mTarget.begin(), hit->mTarget.end(),
 			back_inserter(h.mSequence), [](uint8 r) -> char { return kResidues[r]; });
 
-		if (not boost::regex_match(h.mDefLine, m, kFastARE, boost::match_not_dot_newline))
-			throw M6Exception("Invalid defline: %s", h.mDefLine.c_str());
-
-		if (m[1] == "sp" or m[1] == "tr")
-		{
-			h.mAccession = m[3];
-			h.mID = m[4];
-		}
-		else if (m[1] == "pdb")
-			h.mID = m[3] + '.' + m[4];
-		else if (m[2] != "")
-			h.mID = m[2];
-		else
-			h.mID = m[1];
-
-		h.mDefLine = m[7];
+		h.mDb = m[1];
+		h.mID = m[2];
+		h.mChain = m[3];
+		h.mTitle = m[4];
 
 		foreach (HspData& hsp, hit->mHsps)
 		{
@@ -1906,30 +1896,37 @@ Result* Search(const vector<fs::path>& inDatabanks,
 
 	string query(inQuery), queryID("query"), queryDef;
 
-	if (ba::starts_with(inQuery, ">"))
-	{
-		boost::smatch m;
-		if (regex_search(inQuery, m, kFastARE, boost::match_not_dot_newline))
-		{
-			queryID = m[4];
-			if (queryID.empty())
-				queryID = m[2];
-			queryDef = m[7];
-			query = m.suffix();
-		}
-		else
-		{
-			queryID = inQuery.substr(1, inQuery.find('\n') - 1);
-			query = inQuery.substr(queryID.length() + 2, string::npos);
+	// regular expression for FastA formatted files
+	boost::regex
+		kFastARE("^>([^| ]+(?:\\|[^| \n\r\t]*)*)(?: (.+))?\n");
 
-			string::size_type s = queryID.find(' ');
-			if (s != string::npos)
-			{
-				queryDef = queryID.substr(s + 1);
-				queryID.erase(s, string::npos);
-			}
-		}
+	boost::smatch m;
+	if (regex_search(inQuery, m, kFastARE, boost::match_not_dot_newline))
+	{
+		queryID = m[1];
+		queryDef = m[2];
+		query = m.suffix();
 	}
+
+	string q;
+	q.reserve(query.length());
+	
+	foreach (char r, query)
+	{
+		if (isspace(r))
+			continue;
+		
+		if (r == '>')	// next query, we only take the first
+			break;
+		
+		uint8 nr = ResidueNr(r);
+
+		if (nr > 22)
+			THROW(("Query contains invalid characters"));
+
+		q += r;
+	}
+	query = q;
 
 	int64 totalLength = accumulate(inDatabanks.begin(), inDatabanks.end(), 0LL,
 		[](int64 l, const fs::path& p) -> int64 { return l + fs::file_size(p); });
@@ -2013,11 +2010,14 @@ void operator&(xml::writer& w, const Hit& inHit)
 {
 	w.start_element("Hit");
 	w.element("Hit_num", boost::lexical_cast<string>(inHit.mHitNr));
-	w.element("Hit_id", inHit.mID);
+	if (inHit.mChain.empty())
+		w.element("Hit_id", inHit.mID);
+	else
+		w.element("Hit_id", inHit.mID + ':' + inHit.mChain);
 	if (not inHit.mDefLine.empty())
 		w.element("Hit_def", inHit.mDefLine);
-	if (not inHit.mAccession.empty())
-		w.element("Hit_accession", inHit.mAccession);
+	//if (not inHit.mAccession.empty())
+	//	w.element("Hit_accession", inHit.mAccession);
 	w.element("Hit_len", boost::lexical_cast<string>(inHit.mSequence.length()));
 	w.start_element("Hit_hsps");
 	for_each(inHit.mHsps.begin(), inHit.mHsps.end(), [&](const Hsp& hsp) {

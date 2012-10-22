@@ -166,7 +166,7 @@ string M6SearchServer::GetEntry(M6Databank* inDatabank, const string& inFormat, 
 					continue;
 				
 				string fasta;
-				db.mParser->ToFasta(result, doc->GetAttribute("id"), 
+				db.mParser->ToFasta(result, db.mID, doc->GetAttribute("id"), 
 					doc->GetAttribute("title"), fasta);
 				result = fasta;
 				break;
@@ -1631,9 +1631,10 @@ void M6Server::handle_blast_results_ajax(const zeep::http::request& request, con
 			
 			el::object h;
 			h["nr"] = jhits.size() + 1;
+			h["db"] = hit.mDb;
 			h["doc"] = hit.mID;
-			h["seq"] = "" /* chain ID of zo */;
-			h["desc"] = hit.mDefLine;
+			h["seq"] = hit.mChain;
+			h["desc"] = hit.mTitle;
 			h["bitScore"] = best.mBitScore;
 			h["expect"] = best.mExpect;
 			h["hsps"] = hsps.size();

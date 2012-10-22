@@ -53,8 +53,10 @@ struct Hsp
 struct Hit
 {
 	uint32			mHitNr;
+	std::string		mDb;
 	std::string		mID;
-	std::string		mAccession;
+	std::string		mChain;
+	std::string		mTitle;
 	std::string		mDefLine;
 	std::string		mSequence;
 	std::list<Hsp>	mHsps;
@@ -63,8 +65,10 @@ struct Hit
 	void			serialize(Archive& ar, const unsigned int version)
 					{
 						ar & boost::serialization::make_nvp("nr", mHitNr)
+						   & boost::serialization::make_nvp("db", mDb)
 						   & boost::serialization::make_nvp("id", mID)
-						   & boost::serialization::make_nvp("acc", mAccession)
+						   //& boost::serialization::make_nvp("acc", mAccession)
+						   & boost::serialization::make_nvp("chain", mChain)
 						   & boost::serialization::make_nvp("def", mDefLine)
 						   & boost::serialization::make_nvp("seq", mSequence)
 						   & boost::serialization::make_nvp("hsp", mHsps)

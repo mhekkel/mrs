@@ -19,10 +19,6 @@ Basic:
 - Set up testing framework
 - Status pages
 
-Indexing:
-
-- feed header to parser scripts
-
 Search:
 
 - Too many alternatives

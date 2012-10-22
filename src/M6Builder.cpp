@@ -361,7 +361,8 @@ void M6Processor::ProcessDocument(const string& inDoc)
 	if (mWriteFasta)
 	{
 		string fasta;
-		mParser->ToFasta(inDoc, doc->GetAttribute("id"), doc->GetAttribute("title"), fasta);
+		mParser->ToFasta(inDoc, mConfig->get_attribute("id"),
+			doc->GetAttribute("id"), doc->GetAttribute("title"), fasta);
 		if (not fasta.empty())
 			doc->SetFasta(fasta);
 	}
@@ -442,7 +443,8 @@ void M6Processor::ProcessDocument()
 		if (mWriteFasta)
 		{
 			string fasta;
-			mParser->ToFasta(text, doc->GetAttribute("id"), doc->GetAttribute("title"), fasta);
+			mParser->ToFasta(text, mConfig->get_attribute("id"),
+				doc->GetAttribute("id"), doc->GetAttribute("title"), fasta);
 			if (not fasta.empty())
 				doc->SetFasta(fasta);
 		}

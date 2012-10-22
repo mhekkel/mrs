@@ -157,7 +157,7 @@ sub parse
 
 sub to_fasta
 {
-	my ($self, $text, $id, $title) = @_;
+	my ($self, $text, $db, $id, $title) = @_;
 
 	my %seq;
 
@@ -177,6 +177,7 @@ sub to_fasta
 	}
 
 	my $result = '';
+	$title = '' unless $title;
 	
 	foreach my $seq (keys %seq)
 	{
@@ -184,7 +185,7 @@ sub to_fasta
 		next unless length($s) > 0;
 
 		$s =~ s/(.{72})/$&\n/g;
-		$result .= ">pdb|$id|$seq $title\n$s\n";
+		$result .= ">gnl|$db|$id|$seq $title\n$s\n";
 	}
 	
 	return $result;

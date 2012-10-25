@@ -437,7 +437,7 @@ void M6QueryDriver::Exec(const string& inCommand, po::variables_map& vm)
 	fs::path path;
 	tr1::tie(config, path) = GetDatabank(vm["databank"].as<string>());
 
-	M6Databank db(path.string(), eReadOnly);
+	M6Databank db(path.string());
 
 	uint32 count = 10;
 	if (vm.count("count"))
@@ -477,7 +477,7 @@ void M6InfoDriver::Exec(const string& inCommand, po::variables_map& vm)
 	fs::path path;
 	tr1::tie(config, path) = GetDatabank(vm["databank"].as<string>());
 
-	M6Databank db(path.string(), eReadOnly);
+	M6Databank db(path.string());
 	
 	M6DatabankInfo info;
 	db.GetInfo(info);
@@ -563,7 +563,7 @@ void M6DumpDriver::Exec(const string& inCommand, po::variables_map& vm)
 	fs::path path;
 	tr1::tie(config, path) = GetDatabank(vm["databank"].as<string>());
 
-	M6Databank db(path.string(), eReadOnly);
+	M6Databank db(path.string());
 	
 	db.DumpIndex(vm["index"].as<string>(), cout);
 }
@@ -594,7 +594,7 @@ void M6EntryDriver::Exec(const string& inCommand, po::variables_map& vm)
 	fs::path path;
 	tr1::tie(config, path) = GetDatabank(vm["databank"].as<string>());
 
-	M6Databank db(path.string(), eReadOnly);
+	M6Databank db(path.string());
 	
 	unique_ptr<M6Iterator> iter(db.Find("id", vm["entry"].as<string>()));
 	uint32 docNr;
@@ -641,7 +641,7 @@ void M6ValidateDriver::Exec(const string& inCommand, po::variables_map& vm)
 	fs::path path;
 	tr1::tie(config, path) = GetDatabank(vm["databank"].as<string>());
 
-	M6Databank db(path.string(), eReadOnly);
+	M6Databank db(path.string());
 
 	db.Validate();
 }

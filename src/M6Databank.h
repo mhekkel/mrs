@@ -26,18 +26,25 @@ struct M6DatabankInfo
 	uint32			mDocCount;
 	int64			mRawTextSize;
 	int64			mDataStoreSize;
+	int64			mTotalSize;
+	std::string		mVersion;
+	std::string		mLastUpdate;
+	boost::filesystem::path
+					mDbDirectory;
 	M6IndexInfoList	mIndexInfo;
 };
 
 class M6Databank
 {
   public:
-					M6Databank(const boost::filesystem::path& inPath,
-						MOpenMode inMode);
+					// constructor that creates a read only object from an 
+					// existing databank.
+					M6Databank(const boost::filesystem::path& inPath, MOpenMode inMode = eReadOnly);
 	virtual			~M6Databank();
 
 	static M6Databank*
-					CreateNew(const boost::filesystem::path& inPath);
+					CreateNew(const boost::filesystem::path& inPath,
+						const std::string& inVersion);
 
 	void			GetInfo(M6DatabankInfo& outInfo);
 
@@ -82,8 +89,11 @@ class M6Databank
 	
 	uint32			size() const;
 	uint32			GetMaxDocNr() const;
-
+	
   private:
+					// private constructor to create a new databank
+					M6Databank(const boost::filesystem::path& inPath,
+						const std::string& inVersion);
 
 	M6DatabankImpl*	mImpl;
 };

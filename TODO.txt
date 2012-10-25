@@ -1,6 +1,8 @@
 Todo
 
-- SOAP services (alleen blast nog)
+- UUID aanmaken
+
+- SOAP services (alleen clustal nog)
 - links
 - date index
 - number index improvement?

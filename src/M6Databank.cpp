@@ -3,6 +3,7 @@
 #include <set>
 #include <iostream>
 #include <iterator>
+#include <numeric>
 
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
@@ -13,6 +14,8 @@
 #include <boost/thread/mutex.hpp>
 #include <boost/iostreams/filtering_stream.hpp>
 #include <boost/iostreams/filter/bzip2.hpp>
+#include <boost/date_time/gregorian/gregorian.hpp>
+#include <boost/date_time/local_time/local_time.hpp>
 
 #include "M6Databank.h"
 #include "M6Document.h"
@@ -82,7 +85,10 @@ class M6DatabankImpl
   public:
 	typedef M6Queue<M6InputDocument*>	M6DocQueue;
 
-					M6DatabankImpl(M6Databank& inDatabank, const fs::path& inPath, MOpenMode inMode);
+					M6DatabankImpl(M6Databank& inDatabank, const fs::path& inPath,
+						MOpenMode inMode);
+					M6DatabankImpl(M6Databank& inDatabank, const fs::path& inPath,
+						const string& inVersion);
 	virtual			~M6DatabankImpl();
 
 	void			GetInfo(M6DatabankInfo& outInfo);
@@ -140,6 +146,7 @@ class M6DatabankImpl
 	
 	M6Databank&				mDatabank;
 	fs::path				mDbDirectory;
+	string					mVersion;
 	fs::ofstream*			mLinkFile;
 	ostream*				mLinkStream;
 	fs::ofstream*			mFastaFile;
@@ -1198,62 +1205,91 @@ M6DatabankImpl::M6DatabankImpl(M6Databank& inDatabank, const fs::path& inPath, M
 	, mDictionary(nullptr)
 	, mBatch(nullptr)
 {
-	if (not fs::exists(mDbDirectory) and inMode == eReadWrite)
-	{
-		fs::create_directory(mDbDirectory);
-		fs::create_directory(mDbDirectory / "tmp");
-		
-		mStore = new M6DocStore(mDbDirectory / "data", eReadWrite);
-		mAllTextIndex.reset(new M6SimpleWeightedIndex(mDbDirectory / "full-text.index", eReadWrite));
-	}
-	else if (not fs::is_directory(mDbDirectory))
+	if (not fs::is_directory(mDbDirectory))
 		THROW(("databank path is invalid (%s)", inPath.string().c_str()));
-	else
+
+	mStore = new M6DocStore(mDbDirectory / "data", mMode);
+	mAllTextIndex.reset(new M6SimpleWeightedIndex(mDbDirectory / "full-text.index", mMode));
+	
+	if (fs::exists(mDbDirectory / "full-text.weights"))
 	{
-		mStore = new M6DocStore(mDbDirectory / "data", inMode);
-		mAllTextIndex.reset(new M6SimpleWeightedIndex(mDbDirectory / "full-text.index", inMode));
-		
-		if (fs::exists(mDbDirectory / "full-text.weights"))
+		try
 		{
-			try
+			uint32 maxDocNr = mStore->NextDocumentNumber();
+			mDocWeights.assign(maxDocNr, 0);
+			
+			M6File file(mDbDirectory / "full-text.weights", mMode);
+			if (file.Size() == sizeof(float) * maxDocNr)
 			{
-				uint32 maxDocNr = mStore->NextDocumentNumber();
-				mDocWeights.assign(maxDocNr, 0);
-				
-				M6File file(mDbDirectory / "full-text.weights", eReadOnly);
-				if (file.Size() == sizeof(float) * maxDocNr)
-				{
-					file.Read(&mDocWeights[0], sizeof(float) * maxDocNr);
-					lock_memory(&mDocWeights[0], sizeof(float) * maxDocNr);
-				}
-				else
-					mDocWeights.clear();
+				file.Read(&mDocWeights[0], sizeof(float) * maxDocNr);
+				lock_memory(&mDocWeights[0], sizeof(float) * maxDocNr);
 			}
-			catch (...)
-			{
+			else
 				mDocWeights.clear();
-			}
 		}
-
-		fs::directory_iterator end;
-		for (fs::directory_iterator ix(mDbDirectory); ix != end; ++ix)
+		catch (...)
 		{
-			if (ix->path().extension().string() != ".index")
-				continue;
-
-			string name = ix->path().stem().string();
-			M6BasicIndexPtr index(M6BasicIndex::Load(ix->path()));
-			mIndices.push_back(M6IndexDesc(name, index->GetIndexType(), index));
+			mDocWeights.clear();
 		}
-		
-		if (mDocWeights.empty())
-			RecalculateDocumentWeights();
-
-		fs::path dict(mDbDirectory / "full-text.dict");
-		if (not fs::exists(dict))
-			CreateDictionary();
-		mDictionary = new M6Dictionary(dict);
 	}
+
+	fs::directory_iterator end;
+	for (fs::directory_iterator ix(mDbDirectory); ix != end; ++ix)
+	{
+		if (ix->path().extension().string() != ".index")
+			continue;
+
+		string name = ix->path().stem().string();
+		M6BasicIndexPtr index(M6BasicIndex::Load(ix->path()));
+		mIndices.push_back(M6IndexDesc(name, index->GetIndexType(), index));
+	}
+	
+	if (mDocWeights.empty())
+		RecalculateDocumentWeights();
+
+	fs::path dict(mDbDirectory / "full-text.dict");
+	if (not fs::exists(dict))
+		CreateDictionary();
+	mDictionary = new M6Dictionary(dict);
+	
+	// read version info, if it exists...
+	if (fs::exists(mDbDirectory / "version.txt"))
+	{
+		fs::ifstream versionFile(mDbDirectory / "version.txt");
+		getline(versionFile, mVersion);
+	}
+	
+	if (mVersion.empty())
+	{
+		using namespace boost::gregorian;
+		using namespace boost::posix_time;
+		
+		ptime t = from_time_t(fs::last_write_time(mDbDirectory));
+		mVersion = to_iso_extended_string(t.date());
+	}
+}
+
+M6DatabankImpl::M6DatabankImpl(M6Databank& inDatabank, const fs::path& inPath, 
+		const string& inVersion)
+	: mDatabank(inDatabank)
+	, mDbDirectory(inPath)
+	, mVersion(inVersion)
+	, mLinkFile(nullptr)
+	, mLinkStream(nullptr)
+	, mFastaFile(nullptr)
+	, mMode(eReadWrite)
+	, mStore(nullptr)
+	, mDictionary(nullptr)
+	, mBatch(nullptr)
+{
+	if (fs::exists(inPath))
+		fs::remove_all(inPath);
+	
+	fs::create_directory(mDbDirectory);
+	fs::create_directory(mDbDirectory / "tmp");
+		
+	mStore = new M6DocStore(mDbDirectory / "data", eReadWrite);
+	mAllTextIndex.reset(new M6SimpleWeightedIndex(mDbDirectory / "full-text.index", eReadWrite));
 }
 
 M6DatabankImpl::~M6DatabankImpl()
@@ -1283,6 +1319,28 @@ void M6DatabankImpl::GetInfo(M6DatabankInfo& outInfo)
 		M6IndexInfo info = { desc.mName, desc.mType, desc.mIndex->size(), fs::file_size(path) };
 		outInfo.mIndexInfo.push_back(info);
 	}
+	
+	outInfo.mTotalSize = accumulate(fs::directory_iterator(mDbDirectory), fs::directory_iterator(),
+		0LL, [](int64 v, fs::directory_entry f) -> int64 { return v + fs::file_size(f); });
+
+	outInfo.mVersion = mVersion;
+
+	using namespace boost::gregorian;
+	using namespace boost::posix_time;
+	using namespace boost::local_time;
+	
+	ptime lastUpdateP(from_time_t(fs::last_write_time(mDbDirectory / "data")));
+	time_zone_ptr zone(new posix_time_zone("GMT"));
+	local_date_time lastUpdate(lastUpdateP, zone);
+
+	local_time_facet* facet(new local_time_facet("%Y-%m-%d %H:%M %z"));
+
+	stringstream s;
+	s.imbue(locale(cout.getloc(), facet));
+	s << lastUpdate;
+	outInfo.mLastUpdate = s.str();
+	
+	outInfo.mDbDirectory = mDbDirectory;
 }
 
 M6BasicIndexPtr M6DatabankImpl::GetIndex(const string& inName)
@@ -1911,6 +1969,11 @@ M6Databank::M6Databank(const fs::path& inPath, MOpenMode inMode)
 {
 }
 
+M6Databank::M6Databank(const fs::path& inPath, const string& inVersion)
+	: mImpl(new M6DatabankImpl(*this, inPath, inVersion))
+{
+}
+
 M6Databank::~M6Databank()
 {
 	delete mImpl;
@@ -1921,12 +1984,12 @@ void M6Databank::GetInfo(M6DatabankInfo& outInfo)
 	mImpl->GetInfo(outInfo);
 }
 
-M6Databank* M6Databank::CreateNew(const fs::path& inPath)
+M6Databank* M6Databank::CreateNew(const fs::path& inPath, const string& inVersion)
 {
 	if (fs::exists(inPath))
 		fs::remove_all(inPath);
 
-	return new M6Databank(inPath, eReadWrite);
+	return new M6Databank(inPath, inVersion);
 }
 
 void M6Databank::StartBatchImport(M6Lexicon& inLexicon)

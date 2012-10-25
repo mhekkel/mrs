@@ -39,9 +39,9 @@
 				<td style="text-align:right;"><mrs:number n="${databank.count}"/></td>
 			</tr>
 			<tr>
-				<td>Script</td>
+				<td>Parser</td>
 				<td style="text-align:right;">
-					<a href="script?script=${databank.script}">${databank.script}</a>
+					<a href="script?script=${databank.parser}">${databank.parser}</a>
 				</td>
 			</tr>
 			<tr>
@@ -89,13 +89,14 @@
 		<mrs:if test="${databank.indices}">
 			<table class="list" cellspacing="0" cellpadding="0">
 				<caption>Indices for ${databank.id} (${databank.name})</caption>
-				<tr><th>id</th><th>description</th><th>kind</th><th>count</th></tr>
+				<tr><th>id</th><th>description</th><th>kind</th><th>count</th><th>file size</th></tr>
 				<mrs:iterate var="i" collection="${databank.indices}">
 					<tr>
 						<td><a href="browse?db=${databank.id}&amp;ix=${i.id}">${i.id}</a></td>
 						<td><a href="browse?db=${databank.id}&amp;ix=${i.id}">${i.description}</a></td>
 						<td>${i.type}</td>
 						<td style="text-align:right"><mrs:number n="${i.count}"/></td>
+						<td style="text-align:right;"><mrs:number n="${i.size}"/></td>
 					</tr>
 				</mrs:iterate>
 			</table>

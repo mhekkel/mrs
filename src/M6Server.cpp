@@ -1,6 +1,7 @@
 #include "M6Lib.h"
 
 #include <iostream>
+#include <numeric>
 
 #include <boost/bind.hpp>
 #include <boost/tr1/cmath.hpp>
@@ -396,6 +397,9 @@ M6Server::M6Server(zx::element* inConfig)
 
 	mount("align",				boost::bind(&M6Server::handle_align, this, _1, _2, _3));
 	mount("ajax/align/submit",	boost::bind(&M6Server::handle_align_submit_ajax, this, _1, _2, _3));
+	
+	mount("status",			boost::bind(&M6Server::handle_status, this, _1, _2, _3));
+	mount("info",			boost::bind(&M6Server::handle_info, this, _1, _2, _3));
 
 	add_processor("entry",	boost::bind(&M6Server::process_mrs_entry, this, _1, _2, _3));
 	add_processor("link",	boost::bind(&M6Server::process_mrs_link, this, _1, _2, _3));
@@ -1919,6 +1923,123 @@ void M6Server::handle_align_submit_ajax(const zh::request& request, const el::sc
 
 	reply.set_content(result.toJSON(), "text/javascript");
 }
+
+// --------------------------------------------------------------------
+
+void M6Server::handle_status(const zh::request& request, const el::scope& scope, zh::reply& reply)
+{
+	zeep::http::parameter_map params;
+	get_parameters(scope, params);
+
+	el::scope sub(scope);
+
+	vector<el::object> databanks;
+	foreach (M6LoadedDatabank& db, mLoadedDatabanks)
+	{
+		el::object databank;
+		databank["id"] = db.mID;
+		databank["name"] = db.mName;
+		
+		M6DatabankInfo info;
+		db.mDatabank->GetInfo(info);
+		databank["entries"] = info.mDocCount;
+		databank["version"] = info.mVersion;
+		databank["buildDate"] = info.mLastUpdate;
+		databank["size"] = info.mTotalSize;
+		databanks.push_back(databank);
+	}
+	sub.put("databanks", el::object(databanks));
+
+	create_reply_from_template("status.html", sub, reply);
+}
+
+void M6Server::handle_info(const zh::request& request, const el::scope& scope, zh::reply& reply)
+{
+	zeep::http::parameter_map params;
+	get_parameters(scope, params);
+
+	el::scope sub(scope);
+
+	string db = params.get("db", "").as<string>();
+	if (db.empty())
+		THROW(("No databank specified"));
+	
+	foreach (M6LoadedDatabank& ldb, mLoadedDatabanks)
+	{
+		if (ldb.mID != db)
+			continue;
+
+		zx::element* dbConfig = M6Config::Instance().LoadDatabank(db);
+		if (dbConfig == nullptr)
+			THROW(("weird error"));
+
+		M6DatabankInfo info;
+		ldb.mDatabank->GetInfo(info);
+		
+		el::object databank;
+		databank["id"] = ldb.mID;
+		databank["name"] = ldb.mName;
+		databank["count"] = info.mDocCount;
+		databank["version"] = info.mVersion;
+		databank["buildDate"] = info.mLastUpdate;
+		databank["size"] = info.mTotalSize;
+		databank["parser"] = dbConfig->get_attribute("parser");
+		
+		if (zx::element* info = dbConfig->find_first("info"))
+			databank["url"] = info->content();
+
+		el::object file;
+		file["id"] = ldb.mID;
+		file["path"] = info.mDbDirectory.string();
+		file["version"] = info.mVersion;
+		file["fileSize"] = info.mTotalSize;
+		file["entries"] = info.mDocCount;
+		file["rawDataSize"] = info.mRawTextSize;
+		file["buildDate"] = info.mLastUpdate;
+
+		vector<el::object> files;
+		files.push_back(file);
+		databank["files"] = el::object(files);
+
+		vector<el::object> indices;
+		foreach (M6IndexInfo& iinfo, info.mIndexInfo)
+		{
+			el::object index;
+			
+			index["id"] = iinfo.mName;
+			
+			string desc = iinfo.mName;
+			// fetch description from mParser
+			index["description"] = desc;
+			
+			switch (iinfo.mType)
+			{
+				case eM6CharIndex:			index["type"] = "unique string"; break;
+				case eM6NumberIndex:		index["type"] = "unique number"; break;
+//				case eM6DateIndex:			index["type"] = "date"; break;
+				case eM6CharMultiIndex:		index["type"] = "string"; break;
+				case eM6NumberMultiIndex:	index["type"] = "number"; break;
+//				case eM6DateMultiIndex:		index["type"] = "date"; break;
+				case eM6CharMultiIDLIndex:	index["type"] = "string"; break;
+				case eM6CharWeightedIndex:	index["type"] = "full text"; break;
+			}
+			
+			index["count"] = iinfo.mCount;
+			index["size"] = iinfo.mFileSize;
+			
+			indices.push_back(index);
+		}
+		
+		databank["indices"] = el::object(indices);
+		
+		sub.put("databank", databank);
+		break;
+	}
+
+	create_reply_from_template("info.html", sub, reply);
+}
+
+// --------------------------------------------------------------------
 
 void M6Server::ValidateAuthentication(const zh::request& request)
 {

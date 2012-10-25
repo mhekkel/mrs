@@ -596,7 +596,9 @@ void M6Builder::Build(uint32 inNrOfThreads)
 
 	try
 	{
-		mDatabank = M6Databank::CreateNew(path.string());
+		string version;
+		
+		mDatabank = M6Databank::CreateNew(path.string(), version);
 		mDatabank->StartBatchImport(mLexicon);
 		
 		vector<fs::path> files;

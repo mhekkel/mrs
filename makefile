@@ -93,6 +93,7 @@ OBJECTS.m6-server = \
 	$(OBJECTS) \
 	$(OBJDIR)/M6BlastCache.o \
 	$(OBJDIR)/M6Server.o \
+	$(OBJDIR)/M6WSBlast.o \
 	$(OBJDIR)/M6WSSearch.o \
 
 OBJECTS.m6-passwd = \

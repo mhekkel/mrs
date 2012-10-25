@@ -389,6 +389,7 @@ M6Server::M6Server(zx::element* inConfig)
 //	mount("man",			boost::bind(&M6Server::handle_file, this, _1, _2, _3));
 	mount("images",			boost::bind(&M6Server::handle_file, this, _1, _2, _3));
 	mount("favicon.ico",	boost::bind(&M6Server::handle_file, this, _1, _2, _3));
+	mount("robots.txt",		boost::bind(&M6Server::handle_file, this, _1, _2, _3));
 
 	mount("blast",				boost::bind(&M6Server::handle_blast, this, _1, _2, _3));
 	mount("ajax/blast/submit",	boost::bind(&M6Server::handle_blast_submit_ajax, this, _1, _2, _3));

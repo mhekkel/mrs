@@ -5,70 +5,25 @@
 
 Status = {
 	timeout: null,
-	viewing: 'databanks',
 
 	init: function() {
-		try {
-			var v = sessionStorage.getItem('statsViewing');
-			if (v == null) {
-				v = 'databanks';
-			}
-			Status.changeStatsView(v);
-		} catch (e) {
-			
-		}
+		Status.updateStatus();
 	},
 
-	changeStatsView: function(view) {
-		if (view == Status.viewing) {
-			return;
-		}
-	
-		if (Status.viewing != null) {
-			var o = document.getElementById(Status.viewing);
-			if (o != null)
-				o.style.display = 'none';
-		}
-		
-		var o = document.getElementById(view);
-		if (o != null)
-		{
-			Status.viewing = view;
-			o.style.display = '';
-		}
-		
-		if (Status.timeout != null) {
-			clearTimeout(Status.timeout);
-		}
-
-		if (Status.viewing != 'databanks') {
-			Status.updateStatus();
-		}
-		
-		try {
-			sessionStorage.setItem('statsViewing', view);
-		} catch (e) {}
-	},
-	
 	updateStatus: function() {
 		jQuery.getJSON("ajax/status", { method: Status.viewing },
 			function(data, status) {
 				if (status == "success") 
 				{
-					switch (Status.viewing) {
-						case 'files': Status.updateFiles(data); break;
-						case 'update': Status.updateUpdate(data); break;
-					}
-				}
-				if (Status.viewing != 'databanks') {
+					Status.updateList(data);
 					Status.timeout = setTimeout("Status.updateStatus()", 10000);
 				}
 			}
 		);
 	},
 	
-	updateFiles: function(stat) {
-		if (stat.length + 1 != document.getElementById('files').rows.length) {
+	updateList: function(stat) {
+		if (stat.length + 1 != document.getElementById('databanks').rows.length) {
 			window.location.reload();
 			return;
 		}
@@ -76,15 +31,15 @@ Status = {
 		for (i in stat) {
 			var db = stat[i];
 			
-			var row = document.getElementById("file-" + db.name);
+			var row = document.getElementById("db-" + db.name);
 			if (row == null) continue;
 
 			if (db.update != null && db.update.progress < 1) {
 				row.className = 'active';
-				row.cells[5].children[0].innerHTML = db.update.status;
+				row.cells[6].children[0].innerHTML = db.update.stage;
 				
 				// HTML 5 canvas
-				var bar = row.cells[5].children[1];
+				var bar = row.cells[6].children[1];
 				var ctx = bar.getContext('2d');
 				if (ctx != null) {
 					bar.style.display = '';
@@ -102,12 +57,13 @@ Status = {
 				}
 			} else {
 				row.className = '';
-				row.cells[5].children[0].innerHTML = '';
-				row.cells[5].children[1].style.display = 'none';
+				row.cells[6].children[0].innerHTML = '';
+				row.cells[6].children[1].style.display = 'none';
 			}
 		}
 	},
-	
+
+/*	
 	updateUpdate: function(stat) {
 		if (stat.length + 1 != document.getElementById('update').rows.length) {
 			window.location.reload();
@@ -147,7 +103,7 @@ Status = {
 			}
 		}
 	},
-	
+*/	
 	sortTable: function(table, column) {
 		var t = document.getElementById(table);
 		var rows = t.rows;

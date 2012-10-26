@@ -31,6 +31,7 @@
 #include "M6Exec.h"
 #include "M6Parser.h"
 #include "M6LinkTable.h"
+#include "M6Progress.h"
 #include "M6WSSearch.h"
 #include "M6WSBlast.h"
 
@@ -400,6 +401,7 @@ M6Server::M6Server(zx::element* inConfig)
 	mount("ajax/align/submit",	boost::bind(&M6Server::handle_align_submit_ajax, this, _1, _2, _3));
 	
 	mount("status",			boost::bind(&M6Server::handle_status, this, _1, _2, _3));
+	mount("ajax/status",	boost::bind(&M6Server::handle_status_ajax, this, _1, _2, _3));
 	mount("info",			boost::bind(&M6Server::handle_info, this, _1, _2, _3));
 
 	add_processor("entry",	boost::bind(&M6Server::process_mrs_entry, this, _1, _2, _3));
@@ -1954,6 +1956,31 @@ void M6Server::handle_status(const zh::request& request, const el::scope& scope,
 	create_reply_from_template("status.html", sub, reply);
 }
 
+void M6Server::handle_status_ajax(const zh::request& request, const el::scope& scope, zh::reply& reply)
+{
+	vector<el::object> databanks;
+	foreach (M6LoadedDatabank& db, mLoadedDatabanks)
+	{
+		el::object databank;
+		databank["name"] = db.mID;
+		
+		string stage;
+		float progress;
+		if (M6Status::Instance().GetUpdateStatus(db.mID, stage, progress))
+		{
+			el::object update;
+			update["progress"] = progress;
+			update["stage"] = stage;
+			
+			databank["update"] = update;
+		}
+
+		databanks.push_back(databank);
+	}
+
+	reply.set_content(el::object(databanks).toJSON(), "text/javascript");
+}
+
 void M6Server::handle_info(const zh::request& request, const el::scope& scope, zh::reply& reply)
 {
 	zeep::http::parameter_map params;
@@ -1982,25 +2009,13 @@ void M6Server::handle_info(const zh::request& request, const el::scope& scope, z
 		databank["name"] = ldb.mName;
 		databank["count"] = info.mDocCount;
 		databank["version"] = info.mVersion;
+		databank["path"] = info.mDbDirectory.string();
+		databank["onDiskSize"] = info.mTotalSize;
+		databank["rawDataSize"] = info.mRawTextSize;
 		databank["buildDate"] = info.mLastUpdate;
-		databank["size"] = info.mTotalSize;
 		databank["parser"] = dbConfig->get_attribute("parser");
-		
 		if (zx::element* info = dbConfig->find_first("info"))
-			databank["url"] = info->content();
-
-		el::object file;
-		file["id"] = ldb.mID;
-		file["path"] = info.mDbDirectory.string();
-		file["version"] = info.mVersion;
-		file["fileSize"] = info.mTotalSize;
-		file["entries"] = info.mDocCount;
-		file["rawDataSize"] = info.mRawTextSize;
-		file["buildDate"] = info.mLastUpdate;
-
-		vector<el::object> files;
-		files.push_back(file);
-		databank["files"] = el::object(files);
+			databank["info"] = info->content();
 
 		vector<el::object> indices;
 		foreach (M6IndexInfo& iinfo, info.mIndexInfo)
@@ -2008,11 +2023,7 @@ void M6Server::handle_info(const zh::request& request, const el::scope& scope, z
 			el::object index;
 			
 			index["id"] = iinfo.mName;
-			
-			string desc = iinfo.mName;
-			// fetch description from mParser
-			index["description"] = desc;
-			
+
 			switch (iinfo.mType)
 			{
 				case eM6CharIndex:			index["type"] = "unique string"; break;
@@ -2183,6 +2194,7 @@ int main(int argc, char* argv[])
 			nrOfThreads = vm["threads"].as<uint32>();
 
 		M6Config::SetConfigFile(configFile);
+		M6Status::Create();	// create status collector
 		
 		RunMainLoop(nrOfThreads);
 	}

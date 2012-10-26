@@ -571,11 +571,13 @@ int64 M6Builder::Glob(boost::filesystem::path inRawDir,
 
 void M6Builder::Build(uint32 inNrOfThreads)
 {
+	string dbID = mConfig->get_attribute("id");
+	
 //	boost::timer::auto_cpu_timer t;
 
 	zx::element* file = mConfig->find_first("file");
 	if (not file)
-		THROW(("Invalid config-file, file element is missing for databank %s", mConfig->get_attribute("id").c_str()));
+		THROW(("Invalid config-file, file element is missing for databank %s", dbID.c_str()));
 
 	fs::path path = file->content();
 	if (not path.has_root_path())
@@ -598,7 +600,7 @@ void M6Builder::Build(uint32 inNrOfThreads)
 	{
 		string version;
 		
-		mDatabank = M6Databank::CreateNew(path.string(), version);
+		mDatabank = M6Databank::CreateNew(dbID, path.string(), version);
 		mDatabank->StartBatchImport(mLexicon);
 		
 		vector<fs::path> files;
@@ -606,7 +608,7 @@ void M6Builder::Build(uint32 inNrOfThreads)
 			mConfig->find_first("source"), files);
 		
 		{
-			M6Progress progress(rawBytes + 1, "parsing");
+			M6Progress progress(dbID, rawBytes + 1, "parsing");
 		
 			M6Processor processor(*mDatabank, mLexicon, mConfig);
 			processor.Process(files, progress, inNrOfThreads);

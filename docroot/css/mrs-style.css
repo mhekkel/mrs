@@ -188,6 +188,7 @@ table.list {
 	padding: 0px;
 	margin: 0px;
 	vertical-align: top;
+	min-width: 450px;
 }
 
 .entry caption, .list caption {

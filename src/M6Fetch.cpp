@@ -93,6 +93,7 @@ class M6FTPFetcher
 	
 	fs::path			GetPWD();
 
+	string				mDatabank;
 	boost::asio::io_service
 						mIOService;
 	at::tcp::resolver	mResolver;
@@ -118,6 +119,8 @@ class M6FTPFetcher
 M6FTPFetcher::M6FTPFetcher(zx::element* inConfig)
 	: mResolver(mIOService), mSocket(mIOService), mDelete(false)
 {
+	mDatabank = inConfig->get_attribute("id");
+
 	zx::element* fetch = inConfig->find_first("fetch");
 
 	string src = fetch->get_attribute("src");
@@ -222,7 +225,7 @@ void M6FTPFetcher::Mirror()
 
 	if (not mFilesToFetch.empty())
 	{
-		M6Progress progress(bytesToFetch, "Fetching");
+		M6Progress progress(mDatabank, bytesToFetch, "Fetching");
 		
 		foreach (auto need, mFilesToFetch)
 		{

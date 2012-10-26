@@ -87,11 +87,12 @@ class M6DatabankImpl
 
 					M6DatabankImpl(M6Databank& inDatabank, const fs::path& inPath,
 						MOpenMode inMode);
-					M6DatabankImpl(M6Databank& inDatabank, const fs::path& inPath,
-						const string& inVersion);
+					M6DatabankImpl(M6Databank& inDatabank, const string& inID,
+						const fs::path& inPath, const string& inVersion);
 	virtual			~M6DatabankImpl();
 
 	void			GetInfo(M6DatabankInfo& outInfo);
+	string			GetID() const						{ return mID; }
 
 	void			StartBatchImport(M6Lexicon& inLexicon);
 	void			CommitBatchImport();
@@ -145,6 +146,7 @@ class M6DatabankImpl
 	typedef vector<M6IndexDesc>	M6IndexDescList;
 	
 	M6Databank&				mDatabank;
+	string					mID;
 	fs::path				mDbDirectory;
 	string					mVersion;
 	fs::ofstream*			mLinkFile;
@@ -1142,7 +1144,7 @@ void M6BatchIndexProcessor::Finish(uint32 inDocCount)
 	// Flush the entry buffer and set up for reading back in the sorted entries
 	int64 entryCount = mFullTextIndex.Finish(), entriesRead = 0;
 	
-	M6Progress progress(entryCount, "assembling index");
+	M6Progress progress(mDatabank.GetID(), entryCount, "assembling index");
 	
 	// the next loop is very *hot*, make sure it is optimized as much as possible.
 	// 
@@ -1269,9 +1271,10 @@ M6DatabankImpl::M6DatabankImpl(M6Databank& inDatabank, const fs::path& inPath, M
 	}
 }
 
-M6DatabankImpl::M6DatabankImpl(M6Databank& inDatabank, const fs::path& inPath, 
-		const string& inVersion)
+M6DatabankImpl::M6DatabankImpl(M6Databank& inDatabank, const string& inDatabankID,
+		const fs::path& inPath, const string& inVersion)
 	: mDatabank(inDatabank)
+	, mID(inDatabankID)
 	, mDbDirectory(inPath)
 	, mVersion(inVersion)
 	, mLinkFile(nullptr)
@@ -1869,7 +1872,7 @@ void M6DatabankImpl::CommitBatchImport()
 		size += desc.mIndex->size();
 	
 	{	// scope to force destruction of progress bar
-		M6Progress progress(size + 1, "writing indices");
+		M6Progress progress(mID, size + 1, "writing indices");
 
 		boost::thread_group g;
 		g.create_thread([&]() { mAllTextIndex->FinishBatchMode(progress); });
@@ -1910,7 +1913,7 @@ void M6DatabankImpl::RecalculateDocumentWeights()
 	if (ix == nullptr)
 		THROW(("Invalid index"));
 	
-	M6Progress progress(ix->size(), "calculating weights");
+	M6Progress progress(mID, ix->size(), "calculating weights");
 	ix->CalculateDocumentWeights(docCount, mDocWeights, progress);
 
 	M6File weightFile(mDbDirectory / "full-text.weights", eReadWrite);
@@ -1922,7 +1925,7 @@ void M6DatabankImpl::CreateDictionary()
 	uint32 docCount = mStore->size();
 	
 	// recalculate document weights
-	M6Progress progress(mAllTextIndex->size(), "creating dictionary");
+	M6Progress progress(mID, mAllTextIndex->size(), "creating dictionary");
 	M6File dictFile(mDbDirectory / "full-text.dict", eReadWrite);
 	M6Dictionary::Create(*mAllTextIndex, docCount, dictFile, progress);
 }
@@ -1934,7 +1937,7 @@ void M6DatabankImpl::Vacuum()
 	foreach (M6IndexDesc& desc, mIndices)
 		size += desc.mIndex->size();
 	
-	M6Progress progress(size + 1, "vacuuming");
+	M6Progress progress(mID, size + 1, "vacuuming");
 
 	mAllTextIndex->Vacuum(progress);
 	foreach (M6IndexDesc& desc, mIndices)
@@ -1969,8 +1972,8 @@ M6Databank::M6Databank(const fs::path& inPath, MOpenMode inMode)
 {
 }
 
-M6Databank::M6Databank(const fs::path& inPath, const string& inVersion)
-	: mImpl(new M6DatabankImpl(*this, inPath, inVersion))
+M6Databank::M6Databank(const string& inDatabankID, const fs::path& inPath, const string& inVersion)
+	: mImpl(new M6DatabankImpl(*this, inDatabankID, inPath, inVersion))
 {
 }
 
@@ -1984,12 +1987,12 @@ void M6Databank::GetInfo(M6DatabankInfo& outInfo)
 	mImpl->GetInfo(outInfo);
 }
 
-M6Databank* M6Databank::CreateNew(const fs::path& inPath, const string& inVersion)
+M6Databank* M6Databank::CreateNew(const string& inDatabankID, const fs::path& inPath, const string& inVersion)
 {
 	if (fs::exists(inPath))
 		fs::remove_all(inPath);
 
-	return new M6Databank(inPath, inVersion);
+	return new M6Databank(inDatabankID, inPath, inVersion);
 }
 
 void M6Databank::StartBatchImport(M6Lexicon& inLexicon)

@@ -1885,6 +1885,12 @@ Result* Search(const vector<fs::path>& inDatabanks,
 {
 	if (inProgram != "blastp")
 		throw M6Exception("Unsupported program %s", inProgram.c_str());
+
+	foreach (const fs::path& db, inDatabanks)
+	{
+		if (not fs::exists(db))
+			throw M6Exception("Databank not found (%s)", db.string().c_str());
+	}
 	
 	if (inGapped)
 	{
@@ -1931,7 +1937,7 @@ Result* Search(const vector<fs::path>& inDatabanks,
 	int64 totalLength = accumulate(inDatabanks.begin(), inDatabanks.end(), 0LL,
 		[](int64 l, const fs::path& p) -> int64 { return l + fs::file_size(p); });
 	
-	M6Progress progress(totalLength, "blast");
+	M6Progress progress("blast", totalLength, "blast");
 
 	unique_ptr<Result> result(new Result);
 

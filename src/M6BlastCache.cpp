@@ -370,11 +370,11 @@ void M6BlastCache::Work()
 
 			thr.join();
 		}
-		catch (boost::thread_interrupted)
+		catch (boost::thread_interrupted&)
 		{
 			break;
 		}
-		catch (exception e)
+		catch (exception& e)
 		{
 			cerr << e.what() << endl;
 			boost::this_thread::sleep(seconds(5));
@@ -463,7 +463,7 @@ void M6BlastCache::ExecuteJob(const string& inJobID)
 				result->mHits.empty() or result->mHits.front().mHsps.empty() ? 0 : result->mHits.front().mHsps.front().mExpect);
 		}
 	}
-	catch (exception e)
+	catch (exception& e)
 	{
 		SetJobStatus(inJobID, "error", e.what(), 0, 0);
 	}

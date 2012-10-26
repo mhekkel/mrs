@@ -82,6 +82,7 @@ class M6Server : public zh::webapp, public M6SearchServer
 	void			handle_align_submit_ajax(const zh::request& request, const el::scope& scope, zh::reply& reply);
 
 	void			handle_status(const zh::request& request, const el::scope& scope, zh::reply& reply);
+	void			handle_status_ajax(const zh::request& request, const el::scope& scope, zh::reply& reply);
 	void			handle_info(const zh::request& request, const el::scope& scope, zh::reply& reply);
 
 	void			process_mrs_entry(zx::element* node, const el::scope& scope, boost::filesystem::path dir);

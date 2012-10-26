@@ -1,9 +1,12 @@
 Todo
 
 - UUID aanmaken
+- Version
+- browse data/index
 
 - SOAP services (alleen clustal nog)
 - links
+- link in format-config uitbreiden
 - date index
 - number index improvement?
 

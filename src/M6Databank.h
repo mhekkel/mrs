@@ -43,8 +43,8 @@ class M6Databank
 	virtual			~M6Databank();
 
 	static M6Databank*
-					CreateNew(const boost::filesystem::path& inPath,
-						const std::string& inVersion);
+					CreateNew(const std::string& inDatabankID,
+						const boost::filesystem::path& inPath, const std::string& inVersion);
 
 	void			GetInfo(M6DatabankInfo& outInfo);
 
@@ -92,7 +92,7 @@ class M6Databank
 	
   private:
 					// private constructor to create a new databank
-					M6Databank(const boost::filesystem::path& inPath,
+					M6Databank(const std::string& inDatabankID, const boost::filesystem::path& inPath,
 						const std::string& inVersion);
 
 	M6DatabankImpl*	mImpl;

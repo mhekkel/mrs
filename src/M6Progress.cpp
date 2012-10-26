@@ -64,7 +64,7 @@ namespace ip = boost::interprocess;
 
 // --------------------------------------------------------------------
 
-M6Status* M6Status::sInstance = nullptr;
+unique_ptr<M6Status> M6Status::sInstance;
 
 struct M6StatusImpl
 {
@@ -159,23 +159,16 @@ void M6StatusImpl::SetUpdateStatus(const string& inDatabank, const string& inSta
 
 M6Status& M6Status::Instance()
 {
-	if (sInstance == nullptr)
-		sInstance = new M6Status(false);
+	if (not sInstance)
+		sInstance.reset(new M6Status(false));
 	
 	return *sInstance;
 }
 
 void M6Status::Create()
 {
-	if (sInstance != nullptr)
-	{
-		delete sInstance;
-		sInstance = nullptr;
-	}
-
 	ip::shared_memory_object::remove("M6SharedMemory");
-
-	sInstance = new M6Status(true);
+	sInstance.reset(new M6Status(true));
 }
 
 M6Status::M6Status(bool inServer)

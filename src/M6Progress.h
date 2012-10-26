@@ -41,6 +41,6 @@ class M6Status
 				M6Status(const M6Status&);
 	M6Status&	operator=(const M6Status&);
 
-	struct M6StatusImpl*	mImpl;
-	static M6Status*		sInstance;
+	struct M6StatusImpl*				mImpl;
+	static std::unique_ptr<M6Status>	sInstance;
 };

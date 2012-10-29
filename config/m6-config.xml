@@ -143,6 +143,14 @@
 		<index name='body'		type="text"		xpath='/article/body' />
 	</parser>
 
+	<parser id="gene" chunk="/EntrezgeneSet/Entrezgene">
+		<index name='id'		type="string"	xpath='Entrezgene_track-info/Gene-track/Gene-track_geneid'
+			   attr="true"		/>
+		<index name='title'		type="text"		xpath='Entrezgene_prot/Prot-ref/Prot-ref_name/Prot-ref_name_E'
+			   attr="true"	/>
+		<index name='text'		type='text'		xpath='.//*' />
+	</parser>
+
 	<parser id="interpro" chunk="/interprodb/interpro">
 		<index name='id'		type="string"	xpath='@id'		   attr="true"		unique="true" />
 		<index name='title'		type="text"		xpath='name'	   attr="true"	/>
@@ -532,7 +540,7 @@
 		<name>PubMed Central</name>
 		<file>pmc.m6</file>
 		<info>http://www.pubmedcentral.nih.gov/</info>
-		<source>pmc/articles*.tar.gz</source>
+		<source>pmc/articles*.tar.gz</source> 
 		<fetch src="ftp://ftp.ncbi.nih.gov/pub/pmc/articles*.tar.gz" />
 	</databank>
 

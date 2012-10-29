@@ -18,6 +18,7 @@
 #include "M6Iterator.h"
 #include "M6Document.h"
 #include "M6Blast.h"
+#include "M6Progress.h"
 #include "M6Fetch.h"
 
 using namespace std;
@@ -405,7 +406,16 @@ void M6BuildDriver::Exec(const string& inCommand, po::variables_map& vm)
 	M6Builder builder(databank);
 	
 	if (inCommand == "build" or builder.NeedsUpdate())
-		builder.Build(nrOfThreads);
+	{
+		try
+		{
+			builder.Build(nrOfThreads);
+		}
+		catch (exception& e)
+		{
+			M6Status::Instance().SetError(databank, e.what());
+		}
+	}
 	else
 		cout << databank << " is up-to-date" << endl;
 }

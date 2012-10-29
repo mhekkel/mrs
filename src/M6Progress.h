@@ -24,23 +24,25 @@ class M6Progress
 class M6Status
 {
   public:
-	static void	Create();
+				~M6Status();
 
-	static M6Status&	Instance();
+	static M6Status&
+				Instance();
 	
 	bool		GetUpdateStatus(const std::string& inDatabank,
 					std::string& outStage, float& outProgress);
 	void		SetUpdateStatus(const std::string& inDatabank,
 					const std::string& inStage, float inProgress);
 
+	void		SetError(const std::string& inDatabank,
+					const std::string& inErrorMessage);
+	void		Cleanup(const std::string& inDatabank);
+
   private:
 
-				M6Status(bool inServer);
-				~M6Status();
-				
+				M6Status();
 				M6Status(const M6Status&);
 	M6Status&	operator=(const M6Status&);
 
 	struct M6StatusImpl*				mImpl;
-	static std::unique_ptr<M6Status>	sInstance;
 };

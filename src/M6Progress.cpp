@@ -64,51 +64,59 @@ namespace ip = boost::interprocess;
 
 // --------------------------------------------------------------------
 
-unique_ptr<M6Status> M6Status::sInstance;
-
 struct M6StatusImpl
 {
 	struct M6DbStatusInfo
 	{
 		char		databank[32];
-		float		progress;
+		float		progress;			// negative value means error
 		char		stage[220];
 	};
 	
 	typedef ip::allocator<M6DbStatusInfo, ip::managed_shared_memory::segment_manager> M6ShmemAllocator;
 	typedef ip::vector<M6DbStatusInfo, M6ShmemAllocator> M6DbSet;
 
-				M6StatusImpl(bool);		// server
-				M6StatusImpl();			// client
+				M6StatusImpl();
 				~M6StatusImpl();
 
 	bool		GetUpdateStatus(const string& inDatabank, string& outStage, float& outProgress);
 	void		SetUpdateStatus(const string& inDatabank, const string& inStage, float inProgress);
+	void		SetError(const string& inDatabank, const string& inErrorMessage);
+	void		Cleanup(const string& inDatabank);
 
-	ip::managed_shared_memory	mSegment;
-	M6ShmemAllocator			mAllocator;
+	ip::managed_shared_memory*	mSegment;
+	M6ShmemAllocator*			mAllocator;
 	M6DbSet*					mDbStatus;
 };
 
 BOOST_STATIC_ASSERT(sizeof(M6StatusImpl::M6DbStatusInfo) == 256);
 
-M6StatusImpl::M6StatusImpl(bool)
-	: mSegment(ip::create_only, "M6SharedMemory", 65536)
-	, mAllocator(mSegment.get_segment_manager())
-	, mDbStatus(mSegment.construct<M6DbSet>("M6DbSet")(mAllocator))
-{
-}
-
 M6StatusImpl::M6StatusImpl()
-	: mSegment(ip::open_only, "M6SharedMemory")
-	, mAllocator(mSegment.get_segment_manager())
-	, mDbStatus(mSegment.find<M6DbSet>("M6DbSet").first)
+	: mSegment(nullptr), mAllocator(nullptr), mDbStatus(nullptr)
 {
+	try
+	{
+		mSegment = new ip::managed_shared_memory(ip::open_or_create, "M6SharedMemory", 65536);
+		mAllocator = new M6ShmemAllocator(mSegment->get_segment_manager());
+		
+		mDbStatus = mSegment->find<M6DbSet>("M6DbSet").first;
+		if (mDbStatus == nullptr)
+			mDbStatus = mSegment->construct<M6DbSet>("M6DbSet")(*mAllocator);
+	}
+	catch (ip::interprocess_exception& e)
+	{
+		mDbStatus = nullptr;
+		delete mAllocator;
+		mAllocator = nullptr;
+		delete mSegment;
+		mSegment = nullptr;
+	}
 }
 
 M6StatusImpl::~M6StatusImpl()
 {
-	ip::shared_memory_object::remove("M6SharedMemory");
+	delete mAllocator;
+	delete mSegment;
 }
 
 bool M6StatusImpl::GetUpdateStatus(const string& inDatabank, string& outStage, float& outProgress)
@@ -157,31 +165,53 @@ void M6StatusImpl::SetUpdateStatus(const string& inDatabank, const string& inSta
 	}
 }
 
+void M6StatusImpl::SetError(const string& inDatabank, const string& inErrorMessage)
+{
+	if (mDbStatus != nullptr)
+	{
+		M6DbSet::iterator i = mDbStatus->begin();
+		while (i != mDbStatus->end() and inDatabank != i->databank)
+			++i;
+		
+		if (i == mDbStatus->end())
+		{
+			M6DbStatusInfo info = {};
+			strncpy(info.databank, inDatabank.c_str(), sizeof(info.databank) - 1);
+			strncpy(info.stage, inErrorMessage.c_str(), sizeof(info.stage) - 1);
+			info.progress = -1.0f;
+			
+			i = mDbStatus->insert(i, info);
+		}
+		else
+		{
+			strncpy(i->stage, inErrorMessage.c_str(), sizeof(i->stage) - 1);
+			i->progress = -1.0f;
+		}
+	}
+}
+
+void M6StatusImpl::Cleanup(const string& inDatabank)
+{
+	if (mDbStatus != nullptr)
+	{
+		M6DbSet::iterator i = mDbStatus->begin();
+		while (i != mDbStatus->end() and inDatabank != i->databank)
+			++i;
+		
+		if (i != mDbStatus->end())
+			mDbStatus->erase(i);
+	}
+}
+
 M6Status& M6Status::Instance()
 {
-	if (not sInstance)
-		sInstance.reset(new M6Status(false));
-	
-	return *sInstance;
+	static M6Status sInstance;
+	return sInstance;
 }
 
-void M6Status::Create()
+M6Status::M6Status()
+	: mImpl(new M6StatusImpl)
 {
-	ip::shared_memory_object::remove("M6SharedMemory");
-	sInstance.reset(new M6Status(true));
-}
-
-M6Status::M6Status(bool inServer)
-	: mImpl(nullptr)
-{
-	try
-	{
-		if (inServer)
-			mImpl = new M6StatusImpl(true);
-		else
-			mImpl = new M6StatusImpl();
-	}
-	catch (...) {}
 }
 
 M6Status::~M6Status()
@@ -203,6 +233,18 @@ void M6Status::SetUpdateStatus(const string& inDatabank, const string& inStage, 
 		mImpl->SetUpdateStatus(inDatabank, inStage, inProgress);
 }
 
+void M6Status::SetError(const string& inDatabank, const string& inErrorMessage)
+{
+	if (mImpl != nullptr)
+		mImpl->SetError(inDatabank, inErrorMessage);
+}
+
+void M6Status::Cleanup(const string& inDatabank)
+{
+	if (mImpl != nullptr)
+		mImpl->Cleanup(inDatabank);
+}
+
 // --------------------------------------------------------------------
 
 struct M6ProgressImpl
@@ -211,6 +253,7 @@ struct M6ProgressImpl
 						: mDatabank(inDatabank)
 						, mMax(inMax), mConsumed(0), mAction(inAction), mMessage(inAction)
 						, mThread(boost::bind(&M6ProgressImpl::Run, this)) {}
+					~M6ProgressImpl();
 
 	void			Run();
 	
@@ -228,6 +271,11 @@ struct M6ProgressImpl
 					mTimer;
 #endif
 };
+
+M6ProgressImpl::~M6ProgressImpl()
+{
+	M6Status::Instance().Cleanup(mDatabank);
+}
 
 void M6ProgressImpl::Run()
 {

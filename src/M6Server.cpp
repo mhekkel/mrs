@@ -2194,7 +2194,6 @@ int main(int argc, char* argv[])
 			nrOfThreads = vm["threads"].as<uint32>();
 
 		M6Config::SetConfigFile(configFile);
-		M6Status::Create();	// create status collector
 		
 		RunMainLoop(nrOfThreads);
 	}

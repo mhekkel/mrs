@@ -64,21 +64,12 @@ class compress_decompressor
 	template<typename Source>
 	int				next_code(Source& src);
 
-	/* Input variables. */
 	bool			inited;
-
-	enum { kBufferSize = 256 };
 	
-	uint8			buff[kBufferSize];
-//	const uint8*	next_in;
+	/* Input variables. */
 	int				bit_buffer;
 	int				bits_avail;
 	size_t			bytes_in_section;
-
-	/* Output variables. */
-//	uint8			uncompressed_buffer[kBufferSize];
-//	uint8*			read_next;   /* Data for client. */
-	uint8*			next_out;	  /* Where to write new data. */
 
 	/* Decompression status variables. */
 	int				use_reset_code;
@@ -185,28 +176,29 @@ struct M6PlainTextDataSourceImpl : public M6DataSourceImpl
 		typedef char			char_type;
 		typedef io::source_tag	category;
 	
-						device(const fs::path inFile, M6Progress& inProgress)
-							: mFile(inFile, eReadOnly), mProgress(inProgress) {}
+					device(const fs::path inFile, M6Progress& inProgress)
+						: mFile(inFile, eReadOnly), mProgress(inProgress) {}
 
-		streamsize		read(char* s, streamsize n)
+		streamsize	read(char* s, streamsize n)
+					{
+						if (n > mFile.Size() - mFile.Tell())
+							n = mFile.Size() - mFile.Tell();
+						if (n > 0)
 						{
-							if (n > mFile.Size() - mFile.Tell())
-								n = mFile.Size() - mFile.Tell();
-							if (n > 0)
-							{
-								mFile.Read(s, n);
-								mProgress.Consumed(n);
-							}
-							else
-								n = -1;
-							return n;
+							mFile.Read(s, n);
+							mProgress.Consumed(n);
 						}
+						else
+							n = -1;
+						return n;
+					}
 	
-		M6File			mFile;
-		M6Progress&		mProgress;
+		M6File		mFile;
+		M6Progress&	mProgress;
 	};
 
-	virtual M6DataSource::M6DataFile*	Next()
+	virtual M6DataSource::M6DataFile*
+					Next()
 					{
 						M6DataSource::M6DataFile* result = nullptr;
 						if (not mFile.empty())

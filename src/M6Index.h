@@ -43,7 +43,8 @@ class M6BasicIndex
 	void			SetAutoCommit(bool inAutoCommit);
 
 	void			SetBatchMode(M6Lexicon& inLexicon);
-	void			FinishBatchMode(M6Progress& inProgress);
+	void			FinishBatchMode(M6Progress& inProgress,
+						std::exception_ptr& outException);
 	bool			IsInBatchMode();
 	
 	void			Vacuum(M6Progress& inProgress);

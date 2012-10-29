@@ -3415,9 +3415,16 @@ void M6BasicIndex::SetBatchMode(M6Lexicon& inLexicon)
 	mImpl->SetBatchMode(inLexicon);
 }
 
-void M6BasicIndex::FinishBatchMode(M6Progress& inProgress)
+void M6BasicIndex::FinishBatchMode(M6Progress& inProgress, exception_ptr& outException)
 {
-	mImpl->FinishBatchMode(inProgress);
+	try
+	{
+		mImpl->FinishBatchMode(inProgress);
+	}
+	catch (...)
+	{
+		outException = current_exception();
+	}
 }
 
 bool M6BasicIndex::IsInBatchMode()

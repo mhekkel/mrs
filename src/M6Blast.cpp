@@ -1218,6 +1218,8 @@ BlastQuery<WORDSIZE>::~BlastQuery()
 template<int WORDSIZE>
 void BlastQuery<WORDSIZE>::Search(const vector<fs::path>& inDatabanks, M6Progress& inProgress, uint32 inNrOfThreads)
 {
+	exception_ptr ex;
+	
 	foreach (const fs::path& p, inDatabanks)
 	{
 		io::mapped_file file(p.string().c_str(), io::mapped_file::readonly);
@@ -1244,17 +1246,24 @@ void BlastQuery<WORDSIZE>::Search(const vector<fs::path>& inDatabanks, M6Progres
 				while (n < length and *end != '>')
 					++end, ++n;
 	
-				t.create_thread([data, n, &m, &inProgress, this]() {
-					uint32 dbCount = 0;
-					int64 dbLength = 0;
-					vector<HitPtr> hits;
-					
-					this->SearchPart(data, n, inProgress, dbCount, dbLength, hits);
-	
-					boost::mutex::scoped_lock lock(m);
-					mDbCount += dbCount;
-					mDbLength += dbLength;
-					this->mHits.insert(mHits.end(), hits.begin(), hits.end());
+				t.create_thread([data, n, &m, &inProgress, &ex, this]() {
+					try
+					{
+						uint32 dbCount = 0;
+						int64 dbLength = 0;
+						vector<HitPtr> hits;
+						
+						this->SearchPart(data, n, inProgress, dbCount, dbLength, hits);
+		
+						boost::mutex::scoped_lock lock(m);
+						mDbCount += dbCount;
+						mDbLength += dbLength;
+						this->mHits.insert(mHits.end(), hits.begin(), hits.end());
+					}
+					catch (...)
+					{
+						ex = current_exception();
+					}
 				});
 	
 				data += n;
@@ -1264,6 +1273,9 @@ void BlastQuery<WORDSIZE>::Search(const vector<fs::path>& inDatabanks, M6Progres
 			t.join_all();
 		}
 	}
+	
+	if (not (ex == exception_ptr()))
+		rethrow_exception(ex);
 	
 	int32 lengthAdjustment = ncbi::BlastComputeLengthAdjustment(mMatrix, static_cast<uint32>(mQuery.length()), mDbLength, mDbCount);
 
@@ -1279,25 +1291,35 @@ void BlastQuery<WORDSIZE>::Search(const vector<fs::path>& inDatabanks, M6Progres
 		
 		for (uint32 i = 0; i < inNrOfThreads; ++i)
 		{
-			t.create_thread([this, &ix]() {
-				double lambda = mMatrix.GappedLambda(), logK = log(mMatrix.GappedKappa());
-
-				for (;;)
+			t.create_thread([this, &ix, &ex]() {
+				try
 				{
-					uint32 next = ++ix;
-					if (next >= mHits.size())
-						break;
-					
-					HitPtr hit = mHits[next];
-					
-					foreach (HspData& hsp, hit->mHsps)
-						hsp.mScore = this->AlignGappedSecond(hit->mTarget, hsp);
-					
-					hit->Cleanup(mSearchSpace, lambda, logK, mExpect);
+					double lambda = mMatrix.GappedLambda(), logK = log(mMatrix.GappedKappa());
+	
+					for (;;)
+					{
+						uint32 next = ++ix;
+						if (next >= mHits.size())
+							break;
+						
+						HitPtr hit = mHits[next];
+						
+						foreach (HspData& hsp, hit->mHsps)
+							hsp.mScore = this->AlignGappedSecond(hit->mTarget, hsp);
+						
+						hit->Cleanup(mSearchSpace, lambda, logK, mExpect);
+					}
+				}
+				catch (...)
+				{
+					ex = current_exception();
 				}
 			});
 		}
 		t.join_all();
+
+		if (not (ex == exception_ptr()))
+			rethrow_exception(ex);
 	}
 
 	mHits.erase(

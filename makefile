@@ -23,17 +23,15 @@ OBJDIR				= obj
 
 BOOST_LIBS			= system thread filesystem regex math_c99 math_c99f program_options date_time iostreams 
 BOOST_LIBS			:= $(BOOST_LIBS:%=boost_%$(BOOST_LIB_SUFFIX))
-LIBS				= m pthread archive bz2 z zeep pcre rt
+LIBS				= m pthread archive bz2 z zeep rt
 #LDFLAGS				+= $(BOOST_LIB_DIR:%=-L%) $(LIBS:%=-l%) -g $(BOOST_LIBS:%=$(BOOST_LIB_DIR)/lib%.a) \
 #							-L ../libzeep/ $(HOME)/lib64/libstdc++.a
 LDFLAGS				+= $(LIBS:%=-l%) $(BOOST_LIBS:%=-l%) -g -L ../libzeep/ 
 
 CXX					= c++
 CFLAGS				+= $(BOOST_INC_DIR:%=-I%) -I. -pthread -std=c++0x -I../libzeep/
-CFLAGS				+= -I $(HOME)/projects/pcre/include -Wno-multichar 
-CFLAGS				+= -Wno-deprecated
+CFLAGS				+= -Wno-deprecated -Wno-multichar 
 CFLAGS				+= $(shell $(PERL) -MExtUtils::Embed -e perl_inc)
-LDFLAGS				+= -L $(HOME)/projects/pcre/lib
 CFLAGS				+= -I $(HOME)/projects/libarchive/include
 LDFLAGS				+= -L $(HOME)/projects/libarchive/lib
 LDFLAGS				+= $(shell $(PERL) -MExtUtils::Embed -e ldopts)

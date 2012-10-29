@@ -23,8 +23,6 @@
 
 #pragma comment ( lib, "libzeep" )
 #pragma comment ( lib, "libm6" )
-#pragma comment ( lib, "libpcre" )
-//#pragma comment ( lib, "libz" )
 
 #if defined(_DEBUG)
 #	define DEBUG	1

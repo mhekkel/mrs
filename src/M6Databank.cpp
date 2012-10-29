@@ -162,6 +162,7 @@ class M6DatabankImpl
 	M6DocQueue				mStoreQueue, mIndexQueue;
 	boost::thread			mStoreThread, mIndexThread;
 	boost::mutex			mMutex;
+	exception_ptr			mException;
 };
 
 // --------------------------------------------------------------------
@@ -1144,13 +1145,14 @@ void M6BatchIndexProcessor::Finish(uint32 inDocCount)
 	// Flush the entry buffer and set up for reading back in the sorted entries
 	int64 entryCount = mFullTextIndex.Finish(), entriesRead = 0;
 	
-	M6Progress progress(mDatabank.GetID(), entryCount, "assembling index");
-	
 	// the next loop is very *hot*, make sure it is optimized as much as possible.
 	// 
 	M6FullTextIx::M6BufferEntry ie = {};
 	if (not mFullTextIndex.NextEntry(ie))
 		THROW(("Nothing was indexed..."));
+
+	// now create the progress indicator
+	M6Progress progress(mDatabank.GetID(), entryCount, "assembling index");
 
 	uint32 lastTerm = ie.term;
 	uint32 lastDoc = ie.doc;
@@ -1409,52 +1411,66 @@ M6BasicIndexPtr M6DatabankImpl::CreateIndex(const string& inName, M6IndexType in
 
 void M6DatabankImpl::StoreThread()
 {
-	for (;;)
+	try
 	{
-		M6InputDocument* doc = mStoreQueue.Get();
-		if (doc == nullptr)
-			break;
-		
-		doc->Store();
-
-		const string& fasta = doc->GetFasta();
-		if (not fasta.empty())
+		for (;;)
 		{
-			if (mFastaFile == nullptr)
+			M6InputDocument* doc = mStoreQueue.Get();
+			if (doc == nullptr)
+				break;
+			
+			doc->Store();
+	
+			const string& fasta = doc->GetFasta();
+			if (not fasta.empty())
 			{
-				mFastaFile = new fs::ofstream(mDbDirectory / "fasta", ios_base::out|ios_base::trunc|ios_base::binary);
-				if (not mFastaFile->is_open())
-					throw runtime_error("could not create link file");
+				if (mFastaFile == nullptr)
+				{
+					mFastaFile = new fs::ofstream(mDbDirectory / "fasta", ios_base::out|ios_base::trunc|ios_base::binary);
+					if (not mFastaFile->is_open())
+						throw runtime_error("could not create link file");
+				}
+				*mFastaFile << fasta;
 			}
-			*mFastaFile << fasta;
+			
+			mIndexQueue.Put(doc);
 		}
 		
-		mIndexQueue.Put(doc);
+		mIndexQueue.Put(nullptr);
 	}
-	
-	mIndexQueue.Put(nullptr);
+	catch (...)
+	{
+		mException = current_exception();
+	}
 }
 
 void M6DatabankImpl::IndexThread()
 {
-	for (;;)
+	try
 	{
-		M6InputDocument* doc = mIndexQueue.Get();
-		if (doc == nullptr)
-			break;
+		for (;;)
+		{
+			M6InputDocument* doc = mIndexQueue.Get();
+			if (doc == nullptr)
+				break;
+				
+			uint32 docNr = doc->GetDocNr();
+			assert(docNr > 0);
 			
-		uint32 docNr = doc->GetDocNr();
-		assert(docNr > 0);
-		
-		foreach (const M6InputDocument::M6IndexTokens& d, doc->GetIndexTokens())
-			mBatch->IndexTokens(d.mIndexName, d.mDataType, d.mTokens);
-
-		foreach (const M6InputDocument::M6IndexValue& v, doc->GetIndexValues())
-			mBatch->IndexValue(v.mIndexName, v.mDataType, v.mIndexValue, v.mUnique, docNr);
-
-		mBatch->FlushDoc(docNr);
-		
-		delete doc;
+			foreach (const M6InputDocument::M6IndexTokens& d, doc->GetIndexTokens())
+				mBatch->IndexTokens(d.mIndexName, d.mDataType, d.mTokens);
+	
+			foreach (const M6InputDocument::M6IndexValue& v, doc->GetIndexValues())
+				mBatch->IndexValue(v.mIndexName, v.mDataType, v.mIndexValue, v.mUnique, docNr);
+	
+			mBatch->FlushDoc(docNr);
+			
+			delete doc;
+		}
+	}
+	catch (...)
+	{
+		mException = current_exception();
 	}
 }
 
@@ -1863,6 +1879,9 @@ void M6DatabankImpl::CommitBatchImport()
 	mStoreThread.join();
 	mIndexThread.join();
 	
+	if (not (mException == exception_ptr()))
+		rethrow_exception(mException);
+	
 	mBatch->Finish(mStore->size());
 	delete mBatch;
 	mBatch = nullptr;
@@ -1875,20 +1894,13 @@ void M6DatabankImpl::CommitBatchImport()
 		M6Progress progress(mID, size + 1, "writing indices");
 
 		boost::thread_group g;
-		g.create_thread([&]() { mAllTextIndex->FinishBatchMode(progress); });
+		g.create_thread([&]() { mAllTextIndex->FinishBatchMode(progress, boost::ref(mException)); });
 		foreach (M6IndexDesc& desc, mIndices)
 		{
-#if DEBUG
 			if (desc.mIndex->IsInBatchMode())
-				desc.mIndex->FinishBatchMode(progress);
-			else
-				desc.mIndex->Vacuum(progress);
-#else
-			if (desc.mIndex->IsInBatchMode())
-				g.create_thread([&]() { desc.mIndex->FinishBatchMode(progress); });
+				g.create_thread([&]() { desc.mIndex->FinishBatchMode(progress, boost::ref(mException)); });
 			else
 				g.create_thread([&]() { desc.mIndex->Vacuum(progress); });
-#endif
 		}
 
 		g.join_all();
@@ -1896,6 +1908,9 @@ void M6DatabankImpl::CommitBatchImport()
 		fs::remove_all(mDbDirectory / "tmp");
 		progress.Consumed(1);
 	}
+
+	if (not (mException == exception_ptr()))
+		rethrow_exception(mException);
 
 	RecalculateDocumentWeights();
 	CreateDictionary();

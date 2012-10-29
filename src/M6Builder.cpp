@@ -4,9 +4,7 @@
 #include <memory>
 #include <list>
 #include <cctype>
-
-//#define PCRE_STATIC
-//#include <pcre.h>
+#include <functional>
 
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/fstream.hpp>
@@ -76,8 +74,8 @@ class M6Processor
 	void			ParseFile(const string& inFileName, istream& inFileStream);
 	void			ParseXML(const string& inFileName, istream& inFileStream);
 
-	void			ProcessFile(M6Progress& inProgress);
-	void			ProcessDocument();
+	void			ProcessFile(M6Progress& inProgress, exception_ptr& ex);
+	void			ProcessDocument(exception_ptr& ex);
 	void			ProcessDocument(const string& inDoc);
 
 	void			PutDocument(const string& inDoc)
@@ -328,29 +326,36 @@ void M6Processor::ParseFile(const string& inFileName, istream& inFileStream)
 	}
 }
 
-void M6Processor::ProcessFile(M6Progress& inProgress)
+void M6Processor::ProcessFile(M6Progress& inProgress, exception_ptr& ex)
 {
-	for (;;)
+	try
 	{
-		fs::path path = mFileQueue.Get();
-		if (path.empty())
-			break;
+		for (;;)
+		{
+			fs::path path = mFileQueue.Get();
+			if (path.empty())
+				break;
+			
+			try
+			{
+				M6DataSource data(path, inProgress);
+				for (M6DataSource::iterator i = data.begin(); i != data.end(); ++i)
+					ProcessFile(i->mFilename, i->mStream);
+			}
+			catch (exception& e)
+			{
+				cerr << endl
+					 << "Error processsing " << path << endl
+					 << e.what() << endl;
+			}
+		}
 		
-		try
-		{
-			M6DataSource data(path, inProgress);
-			for (M6DataSource::iterator i = data.begin(); i != data.end(); ++i)
-				ProcessFile(i->mFilename, i->mStream);
-		}
-		catch (exception& e)
-		{
-			cerr << endl
-				 << "Error processsing " << path << endl
-				 << e.what() << endl;
-		}
+		mFileQueue.Put(fs::path());
 	}
-	
-	mFileQueue.Put(fs::path());
+	catch (...)
+	{
+		ex = current_exception();
+	}
 }
 
 void M6Processor::ProcessDocument(const string& inDoc)
@@ -383,80 +388,87 @@ M6InputDocument* M6Processor::IndexDocument(const string& inDoc)
 	return doc;
 }
 
-void M6Processor::ProcessDocument()
+void M6Processor::ProcessDocument(exception_ptr& ex)
 {
-	unique_ptr<M6Lexicon> tsLexicon(new M6Lexicon);
-	vector<M6InputDocument*> docs;
-	
-	for (;;)
+	try
 	{
-		string text = mDocQueue.Get();
+		unique_ptr<M6Lexicon> tsLexicon(new M6Lexicon);
+		vector<M6InputDocument*> docs;
 		
-		if (text.empty() or docs.size() == 100)
+		for (;;)
 		{
-			// remap tokens
-			vector<uint32> remapped(tsLexicon->Count() + 1, 0);
-
-			{
-				M6Lexicon::M6SharedLock sharedLock(mLexicon);
-				
-				for (uint32 t = 1; t < tsLexicon->Count(); ++t)
-				{
-					const char* w;
-					size_t l;
-					tsLexicon->GetString(t, w, l);
-					remapped[t] = mLexicon.Lookup(w, l);
-				}
-			}
+			string text = mDocQueue.Get();
 			
+			if (text.empty() or docs.size() == 100)
 			{
-				M6Lexicon::M6UniqueLock uniqueLock(mLexicon);
-			
-				for (uint32 t = 1; t < tsLexicon->Count(); ++t)
+				// remap tokens
+				vector<uint32> remapped(tsLexicon->Count() + 1, 0);
+	
 				{
-					if (remapped[t] != 0)
-						continue;
+					M6Lexicon::M6SharedLock sharedLock(mLexicon);
 					
-					const char* w;
-					size_t l;
-					tsLexicon->GetString(t, w, l);
-					remapped[t] = mLexicon.Store(w, l);
+					for (uint32 t = 1; t < tsLexicon->Count(); ++t)
+					{
+						const char* w;
+						size_t l;
+						tsLexicon->GetString(t, w, l);
+						remapped[t] = mLexicon.Lookup(w, l);
+					}
 				}
+				
+				{
+					M6Lexicon::M6UniqueLock uniqueLock(mLexicon);
+				
+					for (uint32 t = 1; t < tsLexicon->Count(); ++t)
+					{
+						if (remapped[t] != 0)
+							continue;
+						
+						const char* w;
+						size_t l;
+						tsLexicon->GetString(t, w, l);
+						remapped[t] = mLexicon.Store(w, l);
+					}
+				}
+				
+				foreach (M6InputDocument* doc, docs)
+				{
+					doc->RemapTokens(&remapped[0]);
+					mDatabank.Store(doc);
+				}
+				
+				docs.clear();
+				tsLexicon.reset(new M6Lexicon);
 			}
 			
-			foreach (M6InputDocument* doc, docs)
+			if (text.empty())
+				break;
+	
+			M6InputDocument* doc = new M6InputDocument(mDatabank, text);
+			
+			mParser->ParseDocument(doc, mDbHeader);
+			if (mWriteFasta)
 			{
-				doc->RemapTokens(&remapped[0]);
-				mDatabank.Store(doc);
+				string fasta;
+				mParser->ToFasta(text, mConfig->get_attribute("id"),
+					doc->GetAttribute("id"), doc->GetAttribute("title"), fasta);
+				if (not fasta.empty())
+					doc->SetFasta(fasta);
 			}
 			
-			docs.clear();
-			tsLexicon.reset(new M6Lexicon);
+			doc->Tokenize(*tsLexicon, 0);
+			doc->Compress();
+			docs.push_back(doc);
 		}
 		
-		if (text.empty())
-			break;
-
-		M6InputDocument* doc = new M6InputDocument(mDatabank, text);
+		assert(docs.empty());
 		
-		mParser->ParseDocument(doc, mDbHeader);
-		if (mWriteFasta)
-		{
-			string fasta;
-			mParser->ToFasta(text, mConfig->get_attribute("id"),
-				doc->GetAttribute("id"), doc->GetAttribute("title"), fasta);
-			if (not fasta.empty())
-				doc->SetFasta(fasta);
-		}
-		
-		doc->Tokenize(*tsLexicon, 0);
-		doc->Compress();
-		docs.push_back(doc);
+		mDocQueue.Put(string());
 	}
-	
-	assert(docs.empty());
-	
-	mDocQueue.Put(string());
+	catch (...)
+	{
+		ex = current_exception();
+	}
 }
 
 void M6Processor::Process(vector<fs::path>& inFiles, M6Progress& inProgress,
@@ -464,13 +476,15 @@ void M6Processor::Process(vector<fs::path>& inFiles, M6Progress& inProgress,
 {
 	boost::thread_group fileThreads, docThreads;
 	
+	exception_ptr ex;
+	
 	if (inFiles.size() >= inNrOfThreads)
 		mUseDocQueue = false;
 	else
 	{
 		mUseDocQueue = true;
 		for (uint32 i = 0; i < inNrOfThreads; ++i)
-			docThreads.create_thread(boost::bind(&M6Processor::ProcessDocument, this));
+			docThreads.create_thread([&ex, this]() { this->ProcessDocument(ex); });
 	}
 
 	if (inFiles.size() == 1)
@@ -485,7 +499,7 @@ void M6Processor::Process(vector<fs::path>& inFiles, M6Progress& inProgress,
 			inNrOfThreads = inFiles.size();
 
 		for (uint32 i = 0; i < inNrOfThreads; ++i)
-			fileThreads.create_thread(boost::bind(&M6Processor::ProcessFile, this, boost::ref(inProgress)));
+			fileThreads.create_thread([&ex, &inProgress, this]() { this->ProcessFile(inProgress, ex); });
 
 		foreach (fs::path& file, inFiles)
 		{
@@ -507,6 +521,9 @@ void M6Processor::Process(vector<fs::path>& inFiles, M6Progress& inProgress,
 		mDocQueue.Put(string());
 		docThreads.join_all();
 	}
+
+	if (not (ex == std::exception_ptr()))
+		rethrow_exception(ex);
 }
 
 // --------------------------------------------------------------------

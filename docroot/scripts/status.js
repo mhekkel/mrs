@@ -34,26 +34,38 @@ Status = {
 			var row = document.getElementById("db-" + db.name);
 			if (row == null) continue;
 
-			if (db.update != null && db.update.progress < 1) {
-				row.className = 'active';
-				row.cells[6].children[0].innerHTML = db.update.stage;
-				
-				// HTML 5 canvas
-				var bar = row.cells[6].children[1];
-				var ctx = bar.getContext('2d');
-				if (ctx != null) {
-					bar.style.display = '';
-
-					var p = db.update.progress * 98;
-
-					ctx.strokeStyle = "#2f506c";
-					ctx.strokeRect(0, 0, 100, 10);
-
-					ctx.fillStyle = "#c6d4e1";
-					ctx.fillRect(1, 1, p, 8);
+			if (db.update != null)
+			{
+				if (db.update.progress < 0)
+				{
+					row.className = 'error';
+					row.cells[6].children[0].innerHTML = db.update.stage;
+					row.cells[6].children[1].style.display = 'none';
+				}
+				else
+				{
+					row.className = 'active';
+					row.cells[6].children[0].innerHTML = db.update.stage;
 					
-					ctx.fillStyle = "#ffffff";
-					ctx.fillRect(p + 1, 1, 98 - p - 1, 8);
+					// HTML 5 canvas
+					var bar = row.cells[6].children[1];
+					var ctx = bar.getContext('2d');
+					if (ctx != null) {
+						bar.style.display = '';
+	
+						var p = db.update.progress * 98;
+						if (p > 98)
+							p = 98;
+	
+						ctx.strokeStyle = "#2f506c";
+						ctx.strokeRect(0, 0, 100, 10);
+	
+						ctx.fillStyle = "#c6d4e1";
+						ctx.fillRect(1, 1, p, 8);
+						
+						ctx.fillStyle = "#ffffff";
+						ctx.fillRect(p + 1, 1, 98 - p - 1, 8);
+					}
 				}
 			} else {
 				row.className = '';

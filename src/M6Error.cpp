@@ -7,6 +7,7 @@
 #include <cstdarg>
 #include <iostream>
 #include <cstdio>
+#include <cstring>
 
 #include "M6Error.h"
 

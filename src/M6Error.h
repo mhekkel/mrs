@@ -10,6 +10,8 @@ class M6Exception : public std::exception
 
 	virtual const char* what() const throw();
 
+	static const char*	last_what();
+
   protected:
 				M6Exception();
 

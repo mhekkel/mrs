@@ -1,5 +1,7 @@
 #include "M6Lib.h"
 
+#include <signal.h>
+
 #include <iostream>
 
 #include <boost/program_options.hpp>
@@ -21,6 +23,11 @@
 #include "M6Progress.h"
 #include "M6Fetch.h"
 
+#if defined _MSC_VER
+#define WIN32_LEAN_AND_MEAN   
+#include <windows.h>
+#endif
+
 using namespace std;
 namespace po = boost::program_options;
 namespace fs = boost::filesystem;
@@ -38,6 +45,13 @@ class M6CmdLineDriver
 
 	static void		Exec(int argc, char* const argv[]);
 
+	static void		Terminated();
+	static void		SigHandler(int inSignal);
+#if defined _MSC_VER
+	static BOOL WINAPI
+					ConsoleHandler(DWORD inCEvent);
+#endif
+
   protected:
 
 					M6CmdLineDriver();
@@ -49,6 +63,8 @@ class M6CmdLineDriver
 
 	tr1::tuple<zx::element*,fs::path>
 					GetDatabank(const string& inDatabank);
+
+	static string	sDatabank;
 };
 
 // --------------------------------------------------------------------
@@ -141,6 +157,8 @@ class M6ValidateDriver : public M6CmdLineDriver
 // --------------------------------------------------------------------
 // Code for base class driver
 
+string M6CmdLineDriver::sDatabank;
+
 M6CmdLineDriver::M6CmdLineDriver()
 {
 }
@@ -220,6 +238,8 @@ bool M6CmdLineDriver::Validate(po::variables_map& vm)
 	
 	if (vm.count("help") == 0 and vm.count("databank") > 0)
 	{
+		sDatabank = vm["databank"].as<string>();
+		
 		fs::path configFile("config/m6-config.xml");
 		if (vm.count("config-file"))
 			configFile = vm["config-file"].as<string>();
@@ -255,6 +275,45 @@ M6CmdLineDriver::GetDatabank(const string& inDatabank)
 	
 	return tr1::make_tuple(config, path);
 }
+
+void M6CmdLineDriver::Terminated()
+{
+	M6Status::Instance().SetError(sDatabank, M6Exception::last_what());
+	abort();
+}
+
+void M6CmdLineDriver::SigHandler(int inSignal)
+{
+	char msg[256];
+	sprintf(msg, "terminated on signal %d", inSignal);
+	
+	M6Status::Instance().SetError(sDatabank, msg);
+	abort();
+}
+
+#if defined _MSC_VER
+
+BOOL WINAPI M6CmdLineDriver::ConsoleHandler(DWORD CEvent)
+{
+    char msg[128];
+
+    switch(CEvent)
+    {
+	    case CTRL_C_EVENT:			sprintf(msg, "terminated on CTRL-C"); break;
+	    case CTRL_BREAK_EVENT:		sprintf(msg, "terminated on CTRL-BREAK"); break;
+	    case CTRL_CLOSE_EVENT:		sprintf(msg, "terminated on close event"); break;
+	    case CTRL_LOGOFF_EVENT:		sprintf(msg, "terminated on logging off"); break;
+	    case CTRL_SHUTDOWN_EVENT:	sprintf(msg, "terminated on shutdown"); break;
+	    default:					sprintf(msg, "terminated on unknown event"); break;
+    }
+
+	M6Status::Instance().SetError(sDatabank, msg);
+	abort();
+
+    return TRUE;
+}
+
+#endif
 
 // --------------------------------------------------------------------
 //	blast
@@ -663,6 +722,22 @@ int main(int argc, char* argv[])
 {
 	try
 	{
+		set_terminate(&M6CmdLineDriver::Terminated);
+	
+#if defined _MSC_VER
+		if (::SetConsoleCtrlHandler((PHANDLER_ROUTINE)&M6CmdLineDriver::ConsoleHandler, TRUE) == FALSE)
+		{
+			// unable to install handler... 
+			// display message to the user
+			THROW(("Unable to install handler!\n"));
+		}
+#else
+		signal(SIGABRT, &M6CmdLineDriver::SigHandler);
+		signal(SIGTERM, &M6CmdLineDriver::SigHandler);
+		signal(SIGINT, &M6CmdLineDriver::SigHandler);
+#endif
+
+
 		if (argc < 2)
 		{
 			cout << "Usage: m6 command [options]" << endl

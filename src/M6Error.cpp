@@ -12,6 +12,13 @@
 
 using namespace std;
 
+namespace
+{
+
+char sLastWhat[512];
+	
+}
+
 M6Exception::M6Exception(const char* inMessage, ...)
 {
 	using namespace std;
@@ -43,6 +50,9 @@ M6Exception::M6Exception(const char* inMessage, ...)
 	}
 #endif
 
+	// copy
+	strcpy(sLastWhat, mMessage);
+
 #if DEBUG
 	cerr << mMessage << endl;
 #endif
@@ -55,6 +65,11 @@ M6Exception::M6Exception()
 const char* M6Exception::what() const throw()
 {
 	return mMessage;
+}
+
+const char* M6Exception::last_what()
+{
+	return sLastWhat;
 }
 
 #if DEBUG

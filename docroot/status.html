@@ -48,7 +48,7 @@
 			<th style="text-align:right"><a href="#" onclick="Status.sortTable('databanks', 3);">Size</a></th>
 			<th>Version</th>
 			<th><a href="#" onclick="Status.sortTable('databanks', 5);">Last Update</a></th>
-	        <th>Status</th>
+	        <th colspan="2">Status</th>
 		</tr>
 
 		<mrs:iterate collection="databanks" var="db">
@@ -59,10 +59,8 @@
 			<td style="text-align:right; white-space: nowrap;"><mrs:number f='#,##0B' n='${db.size}'/></td>
 			<td>${db.version}</td>
 			<td>${db.buildDate}</td>
-			<td style="width:20%">
-				<span id='update-status' />
-				<canvas id='update-progress' width="100" height="10" style="display:none;" />
-			</td>
+			<td><canvas id='update-progress' width="100" height="10" style="display:none;" /></td>
+			<td><span id='update-status' /></td>
 		</tr>
 		</mrs:iterate>
 		</table>

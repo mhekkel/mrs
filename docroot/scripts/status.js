@@ -39,16 +39,16 @@ Status = {
 				if (db.update.progress < 0)
 				{
 					row.className = 'error';
-					row.cells[6].children[0].innerHTML = db.update.stage;
-					row.cells[6].children[1].style.display = 'none';
+					row.cells[7].innerHTML = db.update.stage;
+					row.cells[6].children[0].style.display = 'none';
 				}
 				else
 				{
 					row.className = 'active';
-					row.cells[6].children[0].innerHTML = db.update.stage;
+					row.cells[7].innerHTML = db.update.stage;
 					
 					// HTML 5 canvas
-					var bar = row.cells[6].children[1];
+					var bar = row.cells[6].children[0];
 					var ctx = bar.getContext('2d');
 					if (ctx != null) {
 						bar.style.display = '';
@@ -69,8 +69,8 @@ Status = {
 				}
 			} else {
 				row.className = '';
-				row.cells[6].children[0].innerHTML = '';
-				row.cells[6].children[1].style.display = 'none';
+				row.cells[7].innerHTML = '';
+				row.cells[6].children[0].style.display = 'none';
 			}
 		}
 	},

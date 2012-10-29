@@ -257,6 +257,9 @@ bool M6FTPFetcher::IsOutOfDate()
 
 uint32 M6FTPFetcher::SendAndWaitForReply(const string& inCommand, const string& inParam)
 {
+	if (VERBOSE)
+		cerr << "---> " << inCommand << ' ' << inParam << endl;
+	
 	boost::asio::streambuf request;
 	ostream request_stream(&request);
 	request_stream << inCommand << ' ' << inParam << "\r\n";
@@ -274,6 +277,9 @@ uint32 M6FTPFetcher::WaitForReply()
 
 	string line;
 	getline(response_stream, line);
+	
+	if (VERBOSE)
+		cerr << line << endl;
 
 	if (line.length() < 3 or not isdigit(line[0]) or not isdigit(line[1]) or not isdigit(line[2]))
 		THROW(("FTP Server returned unexpected line:\n\"%s\"", line.c_str()));
@@ -290,6 +296,10 @@ uint32 M6FTPFetcher::WaitForReply()
 			boost::asio::read_until(mSocket, response, "\r\n");
 			istream response_stream(&response);
 			getline(response_stream, line);
+
+			if (VERBOSE)
+				cerr << line << endl;
+
 			mReply = mReply + '\n' + line;
 		}
 		while (not ba::starts_with(line, test));
@@ -335,7 +345,7 @@ int64 M6FTPFetcher::CollectFiles(fs::path inLocalDir, fs::path inRemoteDir, fs::
 			{
 				existing.erase(find(existing.begin(), existing.end(), file), existing.end());
 
-				if (fs::last_write_time(file) >= inTime)
+				if (fs::last_write_time(file) >= inTime and fs::file_size(file) == inSize)
 				{
 					if (VERBOSE)
 						cerr << file << " is up-to-date " << endl;
@@ -488,7 +498,11 @@ void M6FTPFetcher::FetchFile(fs::path inRemote, fs::path inLocal, time_t inTime,
 	if (not file.is_open())
 		Error("Could not create local file");
 
-	uint32 status = SendAndWaitForReply("pasv", "");
+	uint32 status = SendAndWaitForReply("type", "I");
+	if (status != 200)
+		Error("Setting TYPE to I failed");
+
+	status = SendAndWaitForReply("pasv", "");
 	if (status != 227)
 		Error("Passive mode failed");
 	

@@ -525,9 +525,7 @@ int compress_decompressor::getbits(Source& src, int n)
 		if (c == EOF or c == io::WOULD_BLOCK)
 			return errCompressEOF;
 			
-		uint8 b = static_cast<uint8>(c);
-
-		bit_buffer |= b << bits_avail;
+		bit_buffer |= c << bits_avail;
 		bits_avail += 8;
 		bytes_in_section++;
 	}

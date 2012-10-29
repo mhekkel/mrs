@@ -21,7 +21,7 @@ MANDIR				?= $(PREFIX)/man/man3
 
 OBJDIR				= obj
 
-BOOST_LIBS			= system thread filesystem regex math_c99 math_c99f program_options date_time iostreams 
+BOOST_LIBS			= system thread filesystem regex math_c99 math_c99f program_options date_time iostreams timer random
 BOOST_LIBS			:= $(BOOST_LIBS:%=boost_%$(BOOST_LIB_SUFFIX))
 LIBS				= m pthread archive bz2 z zeep rt
 #LDFLAGS				+= $(BOOST_LIB_DIR:%=-L%) $(LIBS:%=-l%) -g $(BOOST_LIBS:%=$(BOOST_LIB_DIR)/lib%.a) \

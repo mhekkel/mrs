@@ -142,6 +142,9 @@ bool M6StatusImpl::GetUpdateStatus(const string& inDatabank, string& outStage, f
 
 void M6StatusImpl::SetUpdateStatus(const string& inDatabank, const string& inStage, float inProgress)
 {
+	// Believe it or not, but if you compile this code with -O3 using gcc
+	// the copy of a float does not work...
+	
 	if (mDbStatus != nullptr)
 	{
 		M6DbSet::iterator i = mDbStatus->begin();
@@ -160,34 +163,15 @@ void M6StatusImpl::SetUpdateStatus(const string& inDatabank, const string& inSta
 		else
 		{
 			strncpy(i->stage, inStage.c_str(), sizeof(i->stage) - 1);
-			i->progress = inProgress;
+//			info.progress = inProgress;
+			memcpy(&i->progress, &inProgress, sizeof(float));
 		}
 	}
 }
 
 void M6StatusImpl::SetError(const string& inDatabank, const string& inErrorMessage)
 {
-	if (mDbStatus != nullptr)
-	{
-		M6DbSet::iterator i = mDbStatus->begin();
-		while (i != mDbStatus->end() and inDatabank != i->databank)
-			++i;
-		
-		if (i == mDbStatus->end())
-		{
-			M6DbStatusInfo info = {};
-			strncpy(info.databank, inDatabank.c_str(), sizeof(info.databank) - 1);
-			strncpy(info.stage, inErrorMessage.c_str(), sizeof(info.stage) - 1);
-			info.progress = -1.0f;
-			
-			i = mDbStatus->insert(i, info);
-		}
-		else
-		{
-			strncpy(i->stage, inErrorMessage.c_str(), sizeof(i->stage) - 1);
-			i->progress = -1.0f;
-		}
-	}
+	SetUpdateStatus(inDatabank, inErrorMessage, -1.0f);
 }
 
 void M6StatusImpl::Cleanup(const string& inDatabank)

@@ -95,7 +95,8 @@ class M6DatabankImpl
 	string			GetID() const						{ return mID; }
 
 	void			StartBatchImport(M6Lexicon& inLexicon);
-	void			CommitBatchImport();
+	void			EndBatchImport();
+	void			FinishBatchImport();
 		
 	void			Store(M6Document* inDocument);
 	void			StoreLink(uint32 inDocNr, const string& inDb, const string& inID);
@@ -1873,7 +1874,7 @@ void M6DatabankImpl::StartBatchImport(M6Lexicon& inLexicon)
 	mIndexThread = boost::thread(boost::bind(&M6DatabankImpl::IndexThread, this));
 }
 
-void M6DatabankImpl::CommitBatchImport()
+void M6DatabankImpl::EndBatchImport()
 {
 	mStoreQueue.Put(nullptr);
 	mStoreThread.join();
@@ -1881,7 +1882,10 @@ void M6DatabankImpl::CommitBatchImport()
 	
 	if (not (mException == exception_ptr()))
 		rethrow_exception(mException);
-	
+}
+
+void M6DatabankImpl::FinishBatchImport()
+{
 	mBatch->Finish(mStore->size());
 	delete mBatch;
 	mBatch = nullptr;
@@ -2015,9 +2019,14 @@ void M6Databank::StartBatchImport(M6Lexicon& inLexicon)
 	mImpl->StartBatchImport(inLexicon);
 }
 
-void M6Databank::CommitBatchImport()
+void M6Databank::EndBatchImport()
 {
-	mImpl->CommitBatchImport();
+	mImpl->EndBatchImport();
+}
+
+void M6Databank::FinishBatchImport()
+{
+	mImpl->FinishBatchImport();
 }
 
 void M6Databank::Store(M6Document* inDocument)

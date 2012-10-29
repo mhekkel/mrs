@@ -629,9 +629,11 @@ void M6Builder::Build(uint32 inNrOfThreads)
 		
 			M6Processor processor(*mDatabank, mLexicon, mConfig);
 			processor.Process(files, progress, inNrOfThreads);
+
+			mDatabank->EndBatchImport();
 		}
-	
-		mDatabank->CommitBatchImport();
+		
+		mDatabank->FinishBatchImport();
 		
 		delete mDatabank;
 		mDatabank = nullptr;

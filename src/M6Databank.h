@@ -49,7 +49,8 @@ class M6Databank
 	void			GetInfo(M6DatabankInfo& outInfo);
 
 	void			StartBatchImport(M6Lexicon& inLexicon);
-	void			CommitBatchImport();
+	void			EndBatchImport();
+	void			FinishBatchImport();
 	
 	void			RecalculateDocumentWeights();
 	void			Vacuum();

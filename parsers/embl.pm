@@ -35,7 +35,7 @@ sub parse
 			my $n = 0;
 			foreach my $ac (split(m/;\s*/, $value))
 			{
-				$self->index_unique_string('ac', $ac);
+				$self->index_string('ac', $ac);
 				$self->set_attribute('ac', $ac) unless ++$n > 1;
 			}
 		}

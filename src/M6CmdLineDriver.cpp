@@ -279,6 +279,8 @@ M6CmdLineDriver::GetDatabank(const string& inDatabank)
 void M6CmdLineDriver::Terminated()
 {
 	M6Status::Instance().SetError(sDatabank, M6Exception::last_what());
+	cerr << "Terminated" << endl
+		 << M6Exception::last_what() << endl;
 	abort();
 }
 
@@ -287,8 +289,11 @@ void M6CmdLineDriver::SigHandler(int inSignal)
 	char msg[256];
 	sprintf(msg, "terminated on signal %d", inSignal);
 	
+	cerr << "Terminated" << endl
+		 << msg << endl;
+
 	M6Status::Instance().SetError(sDatabank, msg);
-	abort();
+	exit(1);
 }
 
 #if defined _MSC_VER
@@ -308,6 +313,10 @@ BOOL WINAPI M6CmdLineDriver::ConsoleHandler(DWORD CEvent)
     }
 
 	M6Status::Instance().SetError(sDatabank, msg);
+
+	cerr << "Terminated" << endl
+		 << msg << endl;
+
 	abort();
 
     return TRUE;
@@ -472,6 +481,9 @@ void M6BuildDriver::Exec(const string& inCommand, po::variables_map& vm)
 		}
 		catch (exception& e)
 		{
+			cerr << endl
+				 << "Error" << endl
+				 << e.what() << endl;
 			M6Status::Instance().SetError(databank, e.what());
 		}
 	}

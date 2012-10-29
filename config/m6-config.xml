@@ -182,7 +182,7 @@
 		<info>http://www.ncbi.nlm.nih.gov/entrez/query.fcgi?db=OMIM</info>
 		<file>/data/mrs/omim.m6</file>
 		<locale>en_US.UTF-8</locale>
-		<source>omim/omim.dat.gz</source>
+		<source>omim/omim.txt.Z</source>
 		<fetch src="ftp://ftp.ncbi.nih.gov/repository/OMIM/ARCHIVE/omim.txt.Z"/>
 	</databank>
 	

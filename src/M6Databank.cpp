@@ -16,6 +16,10 @@
 #include <boost/iostreams/filter/bzip2.hpp>
 #include <boost/date_time/gregorian/gregorian.hpp>
 #include <boost/date_time/local_time/local_time.hpp>
+#include <boost/uuid/uuid.hpp>
+#include <boost/uuid/uuid_generators.hpp>
+#include <boost/uuid/uuid_io.hpp>
+#include <boost/lexical_cast.hpp>
 
 #include "M6Databank.h"
 #include "M6Document.h"
@@ -93,6 +97,7 @@ class M6DatabankImpl
 
 	void			GetInfo(M6DatabankInfo& outInfo);
 	string			GetID() const						{ return mID; }
+	string			GetUUID() const						{ return mUUID; }
 
 	void			StartBatchImport(M6Lexicon& inLexicon);
 	void			EndBatchImport();
@@ -147,7 +152,7 @@ class M6DatabankImpl
 	typedef vector<M6IndexDesc>	M6IndexDescList;
 	
 	M6Databank&				mDatabank;
-	string					mID;
+	string					mID, mUUID;
 	fs::path				mDbDirectory;
 	string					mVersion;
 	fs::ofstream*			mLinkFile;
@@ -1257,6 +1262,13 @@ M6DatabankImpl::M6DatabankImpl(M6Databank& inDatabank, const fs::path& inPath, M
 		CreateDictionary();
 	mDictionary = new M6Dictionary(dict);
 	
+	// read uuid
+	if (fs::exists(mDbDirectory / "uuid"))
+	{
+		fs::ifstream file("uuid");
+		getline(file, mUUID);
+	}
+
 	// read version info, if it exists...
 	if (fs::exists(mDbDirectory / "version.txt"))
 	{
@@ -1296,6 +1308,16 @@ M6DatabankImpl::M6DatabankImpl(M6Databank& inDatabank, const string& inDatabankI
 		
 	mStore = new M6DocStore(mDbDirectory / "data", eReadWrite);
 	mAllTextIndex.reset(new M6SimpleWeightedIndex(mDbDirectory / "full-text.index", eReadWrite));
+
+	fs::ofstream uuidFile(mDbDirectory / "uuid");
+	mUUID = boost::lexical_cast<string>(boost::uuids::random_generator()());
+	uuidFile << mUUID << endl;
+	
+	if (not mVersion.empty())
+	{
+		fs::ofstream versionFile(mDbDirectory / "version.txt");
+		versionFile << mVersion << endl;
+	}
 }
 
 M6DatabankImpl::~M6DatabankImpl()
@@ -1329,6 +1351,7 @@ void M6DatabankImpl::GetInfo(M6DatabankInfo& outInfo)
 	outInfo.mTotalSize = accumulate(fs::directory_iterator(mDbDirectory), fs::directory_iterator(),
 		0LL, [](int64 v, fs::directory_entry f) -> int64 { return v + fs::file_size(f); });
 
+	outInfo.mUUID = mUUID;
 	outInfo.mVersion = mVersion;
 
 	using namespace boost::gregorian;
@@ -2004,6 +2027,11 @@ M6Databank::~M6Databank()
 void M6Databank::GetInfo(M6DatabankInfo& outInfo)
 {
 	mImpl->GetInfo(outInfo);
+}
+
+string M6Databank::GetUUID() const
+{
+	return mImpl->GetUUID();
 }
 
 M6Databank* M6Databank::CreateNew(const string& inDatabankID, const fs::path& inPath, const string& inVersion)

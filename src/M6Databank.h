@@ -27,6 +27,7 @@ struct M6DatabankInfo
 	int64			mRawTextSize;
 	int64			mDataStoreSize;
 	int64			mTotalSize;
+	std::string		mUUID;
 	std::string		mVersion;
 	std::string		mLastUpdate;
 	boost::filesystem::path
@@ -47,6 +48,7 @@ class M6Databank
 						const boost::filesystem::path& inPath, const std::string& inVersion);
 
 	void			GetInfo(M6DatabankInfo& outInfo);
+	std::string		GetUUID() const;
 
 	void			StartBatchImport(M6Lexicon& inLexicon);
 	void			EndBatchImport();

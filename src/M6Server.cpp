@@ -1799,17 +1799,6 @@ void M6Server::handle_blast_submit_ajax(
 			}
 		}
 		
-//		CDatabankPtr mrsDb = mDbTable[db];
-//		
-//		// validate the program/query/db combo
-//		if (mrsDb->GetBlastDbSeqType() != ((program == "blastn" or program == "tblastn" or program == "tblastx") ? 'N' : 'P'))
-//			THROW(("Invalid databank for blast program"));
-//		
-//		CBlastJobPtr job = CBlastJobProcessor::Instance()->Submit(
-//			mrsDb, "", query, program, matrix, wordSize,
-//			boost::lexical_cast<double>(expect), filter,
-//			gapped, gapOpen, gapExtend, reportLimit);
-
 		string jobId = M6BlastCache::Instance().Submit(
 			db, query, matrix, wordSize,
 			boost::lexical_cast<double>(expect), filter,

@@ -1,7 +1,6 @@
 Todo
 
 - exception handling over threads
-- UUID aanmaken
 - Version
 - browse data/index
 

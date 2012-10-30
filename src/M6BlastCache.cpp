@@ -43,7 +43,7 @@ void ThrowDbException(sqlite3* conn, int err, const char* stmt, const char* file
 }
 
 #define THROW_IF_SQLITE3_ERROR(e,conn) \
-	do { int _e(e); if (_e != SQLITE_OK) ThrowDbException(conn, e, #e, __FILE__, __LINE__, BOOST_CURRENT_FUNCTION); } while (false)
+	do { int _e(e); if (_e != SQLITE_OK and _e != SQLITE_DONE) ThrowDbException(conn, e, #e, __FILE__, __LINE__, BOOST_CURRENT_FUNCTION); } while (false)
 
 // --------------------------------------------------------------------
 
@@ -73,7 +73,6 @@ M6BlastCache::M6BlastCache()
 	, mInsertStmt(nullptr)
 	, mUpdateStatusStmt(nullptr)
 	, mFetchParamsStmt(nullptr)
-	, mWorkerThread([this](){ this->Work(); })
 {
 	boost::mutex::scoped_lock lock(mDbMutex);
 	
@@ -115,6 +114,14 @@ M6BlastCache::M6BlastCache()
 			"UNIQUE(id)"
 		")"
 	);
+	
+	ExecuteStatement(
+		"CREATE TABLE IF NOT EXISTS blast_db_file ( "
+			"db TEXT, "
+			"file TEXT, "
+			"time_t INTEGER"
+		")"
+	);
 
 //	ExecuteStatement("DELETE FROM blast_cache");
 	ExecuteStatement("DELETE FROM blast_cache WHERE status = 'running' ");
@@ -144,6 +151,12 @@ M6BlastCache::M6BlastCache()
 	THROW_IF_SQLITE3_ERROR(sqlite3_prepare_v2(mCacheDB,
 		"SELECT db, query, matrix, wordsize, expect, filter, gapped, gapopen, gapextend FROM blast_cache WHERE id = ? ", -1,
 		&mFetchParamsStmt, nullptr), mCacheDB);
+
+	THROW_IF_SQLITE3_ERROR(sqlite3_prepare_v2(mCacheDB,
+		"SELECT file, time_t FROM blast_db_file WHERE db = ? ", -1,
+		&mFetchDbFilesStmt, nullptr), mCacheDB);
+
+	mWorkerThread = boost::thread([this](){ this->Work(); });
 }
 
 M6BlastCache::~M6BlastCache()
@@ -253,6 +266,84 @@ M6BlastResultPtr M6BlastCache::JobResult(const string& inJobID)
 	return result;
 }
 
+void M6BlastCache::CheckCacheForDB(const string& inDatabank, const vector<string>& inFiles)
+{
+	sqlite3_reset(mFetchDbFilesStmt);
+	THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(mFetchDbFilesStmt, 1, inDatabank.c_str(), inDatabank.length(), SQLITE_STATIC), mCacheDB);
+
+	uint32 n = inFiles.size();
+	bool clean = false;
+
+	while (clean == false and sqlite3_step(mFetchDbFilesStmt) == SQLITE_ROW)
+	{
+		const char* text = reinterpret_cast<const char*>(sqlite3_column_text(mFetchDbFilesStmt, 0));
+		uint32 length = sqlite3_column_bytes(mFetchDbFilesStmt, 0);
+		string file(text, length);
+		
+		time_t timestamp = sqlite3_column_int64(mFetchDbFilesStmt, 1);
+
+		clean = not fs::exists(file) or fs::last_write_time(file) != timestamp;
+		--n;
+	}
+
+	if (clean or n > 0)
+	{
+		sqlite3_stmt* selectStmt = nullptr;
+		sqlite3_stmt* deleteStmt = nullptr;
+		sqlite3_stmt* updateStmt = nullptr;
+		
+		try
+		{
+			THROW_IF_SQLITE3_ERROR(sqlite3_prepare_v2(mCacheDB,
+				"SELECT id FROM blast_cache WHERE db = ? ", -1,
+				&selectStmt, nullptr), mCacheDB);
+
+			THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(selectStmt, 1,
+				inDatabank.c_str(), inDatabank.length(), SQLITE_STATIC), mCacheDB);
+			
+			while (sqlite3_step(selectStmt) == SQLITE_ROW)
+			{
+				const char* text = reinterpret_cast<const char*>(sqlite3_column_text(selectStmt, 0));
+				uint32 length = sqlite3_column_bytes(selectStmt, 0);
+
+				fs::path file = mCacheDir / (string(text, length) + ".xml.bz2");
+				
+				if (fs::exists(file))
+					fs::remove(file);
+			}
+			
+			THROW_IF_SQLITE3_ERROR(sqlite3_prepare_v2(mCacheDB,
+				"DELETE FROM blast_cache WHERE db = ? ", -1,
+				&deleteStmt, nullptr), mCacheDB);
+
+			THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(deleteStmt, 1,
+				inDatabank.c_str(), inDatabank.length(), SQLITE_STATIC), mCacheDB);
+				
+			THROW_IF_SQLITE3_ERROR(sqlite3_step(deleteStmt), mCacheDB);
+
+			THROW_IF_SQLITE3_ERROR(sqlite3_prepare_v2(mCacheDB,
+				"INSERT OR REPLACE INTO blast_db_file(db, file, time_t) VALUES(?, ?, ?)", -1,
+				&updateStmt, nullptr), mCacheDB);
+
+			foreach (const string& file, inFiles)
+			{
+				THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(updateStmt, 1, inDatabank.c_str(), inDatabank.length(), SQLITE_STATIC), mCacheDB);
+				THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(updateStmt, 2, file.c_str(), file.length(), SQLITE_STATIC), mCacheDB);
+				THROW_IF_SQLITE3_ERROR(sqlite3_bind_int64(updateStmt, 3, fs::last_write_time(file)), mCacheDB);
+				
+				THROW_IF_SQLITE3_ERROR(sqlite3_step(updateStmt), mCacheDB);
+			}
+		}
+		catch (...)
+		{
+		}
+
+		if (selectStmt != nullptr) sqlite3_finalize(selectStmt);
+		if (deleteStmt != nullptr) sqlite3_finalize(deleteStmt);
+		if (updateStmt != nullptr) sqlite3_finalize(updateStmt);
+	}
+}
+
 string M6BlastCache::Submit(const string& inDatabank,
 	string inQuery, string inMatrix, uint32 inWordSize,
 	double inExpect, bool inLowComplexityFilter,
@@ -260,6 +351,25 @@ string M6BlastCache::Submit(const string& inDatabank,
 	uint32 inReportLimit)
 {
 	boost::mutex::scoped_lock lock(mDbMutex);
+
+	vector<string> files;
+	foreach (auto file, M6Config::Instance().Find((boost::format("/m6-config/blast/dbs/db[@id='%1%']/file") % inDatabank).str()))
+	{
+		fs::path path(file->content());
+		
+		if (not path.has_root_path())
+		{
+			fs::path mrsdir(M6Config::Instance().FindGlobal("/m6-config/mrsdir"));
+			path = mrsdir / path;
+		}
+		
+		if (not fs::exists(path))
+			THROW(("Fasta file (%s) is missing", path.string().c_str()));
+		
+		files.push_back(path.string());
+	}
+
+	CheckCacheForDB(inDatabank, files);
 	
 	string result;
 	

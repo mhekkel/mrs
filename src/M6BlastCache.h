@@ -60,6 +60,8 @@ class M6BlastCache
 	void						SetJobStatus(const std::string inJobID, const std::string& inStatus,
 									const std::string& inError, uint32 inHitCount, double inBestScore);
 	void						CacheResult(const std::string& inJobID, M6BlastResultPtr inResult);
+	void						CheckCacheForDB(const std::string& inDatabank,
+									const std::vector<std::string>& inFiles);
 
 	void						ExecuteStatement(const std::string& inStatement);
 
@@ -71,6 +73,7 @@ class M6BlastCache
 	sqlite3_stmt*				mInsertStmt;
 	sqlite3_stmt*				mUpdateStatusStmt;
 	sqlite3_stmt*				mFetchParamsStmt;
+	sqlite3_stmt*				mFetchDbFilesStmt;
 	boost::thread				mWorkerThread;
 	boost::mutex				mDbMutex, mCacheMutex;
 	boost::condition			mEmptyCondition, mWorkCondition;

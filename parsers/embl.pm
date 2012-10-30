@@ -65,13 +65,12 @@ sub parse
 					my $fval = $2;
 
 					next if ($fkey eq 'translation');
-					if ($fkey eq 'db_xref')
+
+					$self->index_text('feature', $fval);
+
+					if ($fkey eq 'db_xref' and $fval =~ m/^(.+?):(.+)$/)
 					{
-						$self->add_link(split(m/:/, $fval));
-					}
-					else
-					{
-						$self->index_text('feature', $fval);
+						$self->add_link($1, $2);
 					}
 				}
 			}

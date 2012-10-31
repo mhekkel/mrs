@@ -1463,8 +1463,9 @@ void M6DatabankImpl::StoreThread()
 		
 		mIndexQueue.Put(nullptr);
 	}
-	catch (...)
+	catch (exception& e)
 	{
+		cerr << "exception in thread: " << e.what() << endl;
 		mException = current_exception();
 	}
 }
@@ -1493,8 +1494,9 @@ void M6DatabankImpl::IndexThread()
 			delete doc;
 		}
 	}
-	catch (...)
+	catch (exception& e)
 	{
+		cerr << "exception in thread: " << e.what() << endl;
 		mException = current_exception();
 	}
 }

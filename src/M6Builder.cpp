@@ -352,8 +352,9 @@ void M6Processor::ProcessFile(M6Progress& inProgress, exception_ptr& ex)
 		
 		mFileQueue.Put(fs::path());
 	}
-	catch (...)
+	catch (exception& e)
 	{
+		cerr << "exception in thread: " << e.what() << endl;
 		ex = current_exception();
 	}
 }
@@ -465,8 +466,9 @@ void M6Processor::ProcessDocument(exception_ptr& ex)
 		
 		mDocQueue.Put(string());
 	}
-	catch (...)
+	catch (exception& e)
 	{
+		cerr << "exception in thread: " << e.what() << endl;
 		ex = current_exception();
 	}
 }

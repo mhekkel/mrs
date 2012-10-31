@@ -3421,8 +3421,9 @@ void M6BasicIndex::FinishBatchMode(M6Progress& inProgress, exception_ptr& outExc
 	{
 		mImpl->FinishBatchMode(inProgress);
 	}
-	catch (...)
+	catch (exception& e)
 	{
+		cerr << "exception in thread: " << e.what() << endl;
 		outException = current_exception();
 	}
 }

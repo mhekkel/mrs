@@ -33,6 +33,7 @@
 #include "M6Iterator.h"
 #include "M6Dictionary.h"
 #include "M6Tokenizer.h"
+#include "M6LinkTable.h"
 
 using namespace std;
 namespace fs = boost::filesystem;
@@ -1500,6 +1501,9 @@ void M6DatabankImpl::IndexThread()
 
 void M6DatabankImpl::Store(M6Document* inDocument)
 {
+	if (not (mException == exception_ptr()))
+		rethrow_exception(mException);
+
 	M6InputDocument* doc = dynamic_cast<M6InputDocument*>(inDocument);
 	if (doc == nullptr)
 		THROW(("Invalid document"));
@@ -1513,6 +1517,9 @@ void M6DatabankImpl::Store(M6Document* inDocument)
 
 void M6DatabankImpl::StoreLink(uint32 inDocNr, const string& inDb, const string& inID)
 {
+	if (not (mException == exception_ptr()))
+		rethrow_exception(mException);
+
 	boost::mutex::scoped_lock lock(mMutex);
 	
 	if (mLinkFile == nullptr)

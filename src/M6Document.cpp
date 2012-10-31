@@ -133,7 +133,7 @@ uint32 M6InputDocument::Store()
 
 	// store the links
 	foreach (auto link, mLinks)
-		mDatabank.StoreLink(mDocNr, link.first, link.second);
+		mDatabank.StoreLink(mDocNr, link.mLinkedDB, link.mLinkedID);
 
 	return mDocNr;
 }
@@ -243,7 +243,8 @@ void M6InputDocument::Index(const string& inIndex,
 
 void M6InputDocument::AddLink(const string& inDatabank, const string& inValue)
 {
-	mLinks.push_back(make_pair(inDatabank, inValue));
+	M6LinkInfo info = { inDatabank, inValue };
+	mLinks.push_back(info);
 }
 
 void M6InputDocument::Tokenize(M6Lexicon& inLexicon, uint32 inLastStopWord)

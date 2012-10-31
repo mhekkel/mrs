@@ -617,6 +617,8 @@ void M6Builder::Build(uint32 inNrOfThreads)
 	{
 		string version;
 		
+		// TODO fetch version string?
+		
 		mDatabank = M6Databank::CreateNew(dbID, path.string(), version);
 		mDatabank->StartBatchImport(mLexicon);
 		

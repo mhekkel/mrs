@@ -62,6 +62,14 @@ class M6InputDocument : public M6Document
 	
 	typedef std::vector<M6IndexValue>			M6IndexValueList;
 
+	struct M6LinkInfo
+	{
+		std::string		mLinkedDB;
+		std::string		mLinkedID;
+	};
+
+	typedef std::vector<M6LinkInfo>				M6LinkInfoList;
+
 						M6InputDocument(M6Databank& inDatabank);
 						M6InputDocument(M6Databank& inDatabank,
 							const std::string& inText);
@@ -100,6 +108,7 @@ class M6InputDocument : public M6Document
 	
 	const M6IndexTokenList& GetIndexTokens() const			{ return mTokens; }
 	const M6IndexValueList& GetIndexValues() const			{ return mValues; }
+	const M6LinkInfoList&	GetLinks() const				{ return mLinks; }
 
   private:
 
@@ -111,8 +120,7 @@ class M6InputDocument : public M6Document
 	std::string			mFasta;
 	std::vector<char>	mBuffer;
 	M6DocAttributes		mAttributes;
-	std::vector<std::pair<std::string,std::string>>
-						mLinks;
+	M6LinkInfoList		mLinks;
 	M6IndexTokenList	mTokens;
 	M6IndexValueList	mValues;
 	M6Lexicon			mDocLexicon;

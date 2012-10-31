@@ -1,6 +1,5 @@
 Todo
 
-- exception handling over threads
 - Version
 - browse data/index
 
@@ -19,7 +18,6 @@ Basic:
 	- store original def line of FastA file to be able to find databank
 	  or create alias system in config?
 	- Admin page to clear cache
-	- automatic clean cache
 
 - Set up testing framework
 - Status pages

@@ -70,7 +70,6 @@ OBJECTS = \
 	$(OBJDIR)/M6Index.o \
 	$(OBJDIR)/M6Iterator.o \
 	$(OBJDIR)/M6Lexicon.o \
-	$(OBJDIR)/M6LinkTable.o \
 	$(OBJDIR)/M6Matrix.o \
 	$(OBJDIR)/M6MD5.o \
 	$(OBJDIR)/M6Parser.o \

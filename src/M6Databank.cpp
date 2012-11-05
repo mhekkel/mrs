@@ -21,6 +21,8 @@
 #include <boost/uuid/uuid_io.hpp>
 #include <boost/lexical_cast.hpp>
 
+#include <zeep/http/server.hpp>	// for decode/encode URL
+
 #include "M6Databank.h"
 #include "M6Document.h"
 #include "M6DocStore.h"
@@ -568,8 +570,6 @@ class M6BasicIx
 	void			AddDocTerm(uint32 inDoc, uint32 inTerm, uint8 inFrequency, M6OBitStream& inIDL);
 
 	bool			Empty() const							{ return mLastDoc == 0; }
-	uint8			GetIxNr() const							{ return mIndexNr; }
-	string			GetName() const							{ return mName; }
 
   protected:
 	
@@ -579,7 +579,6 @@ class M6BasicIx
 	virtual void	FlushTerm(FlushedTerm* inTermData) = 0;
 	void			FlushThread();
 
-	string			mName;
 	M6FullTextIx&	mFullTextIndex;
 	M6Lexicon&		mLexicon;
 	uint8			mIndexNr;
@@ -599,8 +598,7 @@ class M6BasicIx
 
 M6BasicIx::M6BasicIx(M6FullTextIx& inFullTextIndex, M6Lexicon& inLexicon,
 		const string& inName, uint8 inIndexNr)
-	: mName(inName)
-	, mFullTextIndex(inFullTextIndex)
+	: mFullTextIndex(inFullTextIndex)
 	, mLexicon(inLexicon)
 	, mIndexNr(inIndexNr)
 	, mLastDoc(0)
@@ -1016,12 +1014,14 @@ class M6BatchIndexProcessor
 	typedef vector<M6BasicIxDesc>	M6BasicIxDescList;
 	
 	M6BasicIxDescList	mIndices;
+	uint8				mNextIndexNr;
 };
 
 M6BatchIndexProcessor::M6BatchIndexProcessor(M6DatabankImpl& inDatabank, M6Lexicon& inLexicon)
 	: mFullTextIndex(inDatabank.GetDbDirectory(), "full-text.tmp")
 	, mDatabank(inDatabank)
 	, mLexicon(inLexicon)
+	, mNextIndexNr(1)
 {
 }
 
@@ -1050,8 +1050,11 @@ M6BasicIx* M6BatchIndexProcessor::GetIndexBase(const string& inName, M6IndexType
 	{
 		M6BasicIndexPtr index = mDatabank.CreateIndex(inName, inType);
 
-		result = new T(mFullTextIndex, mLexicon, inName,
-			static_cast<uint8>(mIndices.size() + 1), index);
+		uint8 indexNr = 0;
+		if (inType != eM6LinkIndex)
+			indexNr = mNextIndexNr++;
+
+		result = new T(mFullTextIndex, mLexicon, inName, indexNr, index);
 		
 		M6BasicIxDesc desc = { result, inName, inType };
 		mIndices.push_back(desc);
@@ -1135,7 +1138,10 @@ void M6BatchIndexProcessor::IndexValue(const string& inIndexName,
 
 void M6BatchIndexProcessor::IndexLink(uint32 inDocNr, const string& inDb, const string& inID)
 {
-	M6BasicIx* index = GetIndexBase<M6StringIx>(inDb, eM6LinkIndex);
+	string db = zeep::http::encode_url(inDb);
+	ba::replace_all(db, "/", "%2F");
+	
+	M6BasicIx* index = GetIndexBase<M6StringIx>(db, eM6LinkIndex);
 	
 	uint32 t = 0;
 
@@ -1362,7 +1368,21 @@ void M6DatabankImpl::GetInfo(M6DatabankInfo& outInfo)
 	}
 	
 	outInfo.mTotalSize = accumulate(fs::directory_iterator(mDbDirectory), fs::directory_iterator(),
-		0LL, [](int64 v, fs::directory_entry f) -> int64 { return v + fs::file_size(f); });
+		0LL, [](int64 v, fs::directory_entry f) -> int64 {
+			if (not fs::is_directory(f))
+				v += fs::file_size(f);
+			return v;
+		});
+
+	if (fs::exists(mDbDirectory / "links") and fs::is_directory(mDbDirectory / "links"))
+	{
+		outInfo.mTotalSize += accumulate(fs::directory_iterator(mDbDirectory / "links"), fs::directory_iterator(),
+			0LL, [](int64 v, fs::directory_entry f) -> int64 {
+				if (not fs::is_directory(f))
+					v += fs::file_size(f);
+				return v;
+			});
+	}
 
 	outInfo.mUUID = mUUID;
 	outInfo.mVersion = mVersion;

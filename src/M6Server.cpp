@@ -30,7 +30,6 @@
 #include "M6BlastCache.h"
 #include "M6Exec.h"
 #include "M6Parser.h"
-#include "M6LinkTable.h"
 #include "M6Progress.h"
 #include "M6WSSearch.h"
 #include "M6WSBlast.h"

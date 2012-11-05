@@ -69,15 +69,11 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\sqlite-amalgamation\sqlite3.c" />
     <ClCompile Include="..\..\src\M6BlastCache.cpp" />
     <ClCompile Include="..\..\src\M6MD5.cpp" />
     <ClCompile Include="..\..\src\M6Server.cpp" />
     <ClCompile Include="..\..\src\M6WSBlast.cpp" />
     <ClCompile Include="..\..\src\M6WSSearch.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="..\..\..\sqlite-amalgamation\sqlite3.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

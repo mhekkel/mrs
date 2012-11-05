@@ -131,9 +131,13 @@ uint32 M6InputDocument::Store()
 	assert(not mBuffer.empty());
 	mDocNr = store.StoreDocument(&mBuffer[0], mBuffer.size(), mText.length());
 
+	string id = mAttributes["id"];
+	if (id.empty())
+		id = string("#") + boost::lexical_cast<string>(mDocNr);
+
 	// store the links
 	foreach (auto link, mLinks)
-		mDatabank.StoreLink(mDocNr, link.mLinkedDB, link.mLinkedID);
+		mDatabank.StoreLink(id, link.mLinkedDB, link.mLinkedID);
 
 	return mDocNr;
 }

@@ -617,7 +617,12 @@ void M6Builder::Build(uint32 inNrOfThreads)
 
 	try
 	{
-		string version;
+		zx::element* source = mConfig->find_first("source");
+		if (source == nullptr)
+			THROW(("Missing source specification for databank '%s'", dbID.c_str()));
+		
+		string version = M6Parser::GetVersion(mConfig->get_attribute("parser"),
+			source->content());
 		
 		// TODO fetch version string?
 		
@@ -626,7 +631,7 @@ void M6Builder::Build(uint32 inNrOfThreads)
 		
 		vector<fs::path> files;
 		int64 rawBytes = Glob(M6Config::Instance().FindGlobal("/m6-config/rawdir"),
-			mConfig->find_first("source"), files);
+			source, files);
 		
 		{
 			M6Progress progress(dbID, rawBytes + 1, "parsing");

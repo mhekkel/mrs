@@ -167,6 +167,9 @@
 	</parser>
 
 	<databank id="pdbfinder" parser="pdbfinder">
+		<aliases>
+			<alias>pdbfinder2</alias>
+		</aliases>
 		<name>PDBFINDER</name>
 		<file>pdbfinder.m6</file>
 		<locale>en_US.UTF-8</locale>
@@ -184,14 +187,6 @@
 		<locale>en_US.UTF-8</locale>
 		<source>omim/omim.txt.Z</source>
 		<fetch src="ftp://ftp.ncbi.nih.gov/repository/OMIM/ARCHIVE/omim.txt.Z"/>
-	</databank>
-	
-	<databank id="mini-omim" parser="omim" format="omim">
-		<name>OMIM - Online Mendelian Inheritance in Man™</name>
-		<info>http://www.ncbi.nlm.nih.gov/entrez/query.fcgi?db=OMIM</info>
-		<file>/data/mrs/omim.m6</file>
-		<locale>en_US.UTF-8</locale>
-		<source>omim/mini-omim.dat</source>
 	</databank>
 	
 	<databank id="embl" parser="embl">
@@ -280,6 +275,9 @@
 	</databank>
 
 	<databank id="sprot" parser="uniprot" format="uniprot" blast="true">
+		<aliases>
+			<alias>uniprot</alias>
+		</aliases>
 		<name>SwissProt</name>
 		<info>http://www.uniprot.org/</info>
 		<file>/data/mrs/sprot.m6</file>
@@ -289,14 +287,10 @@
 			dst="uniprot" />
 	</databank>
 
-	<databank id="sprotw" parser="uniprot" format="uniprot">
-		<name>SwissProt - mini version</name>
-		<info>http://www.uniprot.org/</info>
-		<file>/data/mrs/sprot.m6</file>
-		<source>uniprot/sprot-mini.dat</source>
-	</databank>
-	
 	<databank id="trembl" parser="uniprot" format="uniprot" blast="true">
+		<aliases>
+			<alias>uniprot</alias>
+		</aliases>
 		<name>TrEMBL</name>
 		<info>http://www.uniprot.org/</info>
 		<file>/data/mrs/trembl.m6</file>
@@ -339,16 +333,6 @@
 		<info>http://www.rcsb.org/pdb/</info>
 		<file>pdb.m6</file>
 		<source>pdb/*/pdb*.ent.gz</source>
-		<fetch
-			delete="true"
-			src="ftp://ftp.cmbi.ru.nl/pub/molbio/data/pdb/divided/??/pdb????.ent.gz" />
-	</databank>
-
-	<databank id="pdb-mini" parser="pdb" blast="true">
-		<name>PDB mini</name>
-		<info>http://www.rcsb.org/pdb/</info>
-		<file>pdb-mini.m6</file>
-		<source>pdb/cr/pdb*.ent.gz</source>
 		<fetch
 			delete="true"
 			src="ftp://ftp.cmbi.ru.nl/pub/molbio/data/pdb/divided/??/pdb????.ent.gz" />
@@ -543,5 +527,17 @@
 		<source>pmc/articles*.tar.gz</source> 
 		<fetch src="ftp://ftp.ncbi.nih.gov/pub/pmc/articles*.tar.gz" />
 	</databank>
+
+	<!-- databanks used in debugging m6 -->
+
+	<databank id="pdb-mini" parser="pdb" blast="true">
+		<name>PDB mini</name>
+		<info>http://www.rcsb.org/pdb/</info>
+		<file>pdb-mini.m6</file>
+		<source>pdb/cr/pdb?cr?.ent.gz</source>
+	</databank>
+
+	
+
 
 </m6-config>

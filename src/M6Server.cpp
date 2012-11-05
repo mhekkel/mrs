@@ -240,14 +240,14 @@ void M6SearchServer::Find(const string& inDatabank, const string& inQuery, bool 
 			hit["title"] = doc->GetAttribute("title");
 			hit["score"] = static_cast<uint16>(score * 100);
 			
-			vector<string> linked = M6LinkTable::Instance().GetLinkedDbs(inDatabank, id);
-			if (not linked.empty())
-			{
-				vector<el::object> links;
-				foreach (string& l, linked)
-					links.push_back(el::object(l));
-				hit["links"] = links;
-			}
+			//vector<string> linked = M6LinkTable::Instance().GetLinkedDbs(inDatabank, id);
+			//if (not linked.empty())
+			//{
+			//	vector<el::object> links;
+			//	foreach (string& l, linked)
+			//		links.push_back(el::object(l));
+			//	hit["links"] = links;
+			//}
 			
 			outHits.push_back(hit);
 			++nr;
@@ -564,7 +564,7 @@ void M6Server::handle_entry(const zh::request& request, const el::scope& scope, 
 	el::scope sub(scope);
 	sub.put("db", el::object(db));
 	sub.put("nr", el::object(docNr));
-	sub.put("linkeddbs", el::object(M6LinkTable::Instance().GetLinkedDbs(db)));
+	//sub.put("linkeddbs", el::object(M6LinkTable::Instance().GetLinkedDbs(db)));
 	if (not q.empty())
 		sub.put("q", el::object(q));
 	else if (not rq.empty())
@@ -575,14 +575,14 @@ void M6Server::handle_entry(const zh::request& request, const el::scope& scope, 
 	}
 	sub.put("format", el::object(format));
 
-	vector<string> linked = M6LinkTable::Instance().GetLinkedDbs(db, id);
-	if (not linked.empty())
-	{
-		vector<el::object> links;
-		foreach (string& l, linked)
-			links.push_back(el::object(l));
-		sub.put("links", el::object(links));
-	}
+	//vector<string> linked = M6LinkTable::Instance().GetLinkedDbs(db, id);
+	//if (not linked.empty())
+	//{
+	//	vector<el::object> links;
+	//	foreach (string& l, linked)
+	//		links.push_back(el::object(l));
+	//	sub.put("links", el::object(links));
+	//}
 
 	zx::element* dbConfig = M6Config::Instance().LoadDatabank(db);
 //	unique_ptr<M6Document> document(mdb->Fetch(docNr));

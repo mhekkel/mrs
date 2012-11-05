@@ -157,4 +157,11 @@ sub to_fasta
 	return ">gnl|$db|$id $title\n$seq\n";
 }
 
+sub version
+{
+	my ($self, $source) = @_;
+	
+	return undef;
+}
+
 1;

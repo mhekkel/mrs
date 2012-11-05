@@ -105,7 +105,7 @@ class M6DatabankImpl
 	void			FinishBatchImport();
 		
 	void			Store(M6Document* inDocument);
-	void			StoreLink(uint32 inDocNr, const string& inDb, const string& inID);
+	void			StoreLink(const string& inDocID, const string& inLinkedDb, const string& inLinkedID);
 
 	M6Document*		Fetch(uint32 inDocNr);
 	M6Iterator*		Find(const string& inQuery, bool inAllTermsRequired, uint32 inReportLimit);
@@ -156,8 +156,7 @@ class M6DatabankImpl
 	string					mID, mUUID;
 	fs::path				mDbDirectory;
 	string					mVersion;
-	fs::ofstream*			mLinkFile;
-	ostream*				mLinkStream;
+	M6LinkTable*			mLinkTable;
 	fs::ofstream*			mFastaFile;
 	MOpenMode				mMode;
 	M6DocStore*				mStore;
@@ -1208,8 +1207,7 @@ void M6BatchIndexProcessor::Finish(uint32 inDocCount)
 M6DatabankImpl::M6DatabankImpl(M6Databank& inDatabank, const fs::path& inPath, MOpenMode inMode)
 	: mDatabank(inDatabank)
 	, mDbDirectory(inPath)
-	, mLinkFile(nullptr)
-	, mLinkStream(nullptr)
+	, mLinkTable(nullptr)
 	, mFastaFile(nullptr)
 	, mMode(inMode)
 	, mStore(nullptr)
@@ -1293,8 +1291,7 @@ M6DatabankImpl::M6DatabankImpl(M6Databank& inDatabank, const string& inDatabankI
 	, mID(inDatabankID)
 	, mDbDirectory(inPath)
 	, mVersion(inVersion)
-	, mLinkFile(nullptr)
-	, mLinkStream(nullptr)
+	, mLinkTable(nullptr)
 	, mFastaFile(nullptr)
 	, mMode(eReadWrite)
 	, mStore(nullptr)
@@ -1331,8 +1328,7 @@ M6DatabankImpl::~M6DatabankImpl()
 	mStore->Commit();
 	delete mStore;
 
-	delete mLinkStream;
-	delete mLinkFile;
+	delete mLinkTable;
 	delete mFastaFile;
 }
 
@@ -1453,7 +1449,7 @@ void M6DatabankImpl::StoreThread()
 				{
 					mFastaFile = new fs::ofstream(mDbDirectory / "fasta", ios_base::out|ios_base::trunc|ios_base::binary);
 					if (not mFastaFile->is_open())
-						throw runtime_error("could not create link file");
+						throw runtime_error("could not create fasta file");
 				}
 				*mFastaFile << fasta;
 			}
@@ -1517,25 +1513,15 @@ void M6DatabankImpl::Store(M6Document* inDocument)
 		mStoreQueue.Put(doc);
 }
 
-void M6DatabankImpl::StoreLink(uint32 inDocNr, const string& inDb, const string& inID)
+void M6DatabankImpl::StoreLink(const string& inDocID, const string& inLinkedDb, const string& inLinkedID)
 {
 	if (not (mException == exception_ptr()))
 		rethrow_exception(mException);
 
-	boost::mutex::scoped_lock lock(mMutex);
+	if (mLinkTable == nullptr)
+		mLinkTable = new M6LinkTable(mDbDirectory / "links.db");
 	
-	if (mLinkFile == nullptr)
-	{
-		mLinkFile = new fs::ofstream(mDbDirectory / "links", ios_base::out|ios_base::trunc|ios_base::binary);
-		if (not mLinkFile->is_open())
-			throw runtime_error("could not create link file");
-		io::filtering_stream<io::output>* out = new io::filtering_stream<io::output>();
-		out->push(io::bzip2_compressor());
-		out->push(*mLinkFile);
-		mLinkStream = out;
-	}
-	
-	*mLinkStream << inDocNr << '\t' << inDb << '\t' << inID << endl;
+	mLinkTable->AddLink(inDocID, inLinkedDb, inLinkedID);
 }
 
 M6Document* M6DatabankImpl::Fetch(uint32 inDocNr)
@@ -2071,9 +2057,9 @@ void M6Databank::Store(M6Document* inDocument)
 	mImpl->Store(inDocument);
 }
 
-void M6Databank::StoreLink(uint32 inDocNr, const string& inDb, const string& inID)
+void M6Databank::StoreLink(const string& inDocID, const string& inLinkedDb, const string& inLinkedID)
 {
-	mImpl->StoreLink(inDocNr, inDb, inID);
+	mImpl->StoreLink(inDocID, inLinkedDb, inLinkedID);
 }
 
 M6DocStore& M6Databank::GetDocStore()

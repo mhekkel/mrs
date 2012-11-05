@@ -61,7 +61,8 @@ class M6Databank
 	void			DumpIndex(const std::string& inIndex, std::ostream& inStream);
 	
 	void			Store(M6Document* inDocument);
-	void			StoreLink(uint32 inDocNr, const std::string& inDb, const std::string& inID);
+	void			StoreLink(const std::string& inDocID,
+						const std::string& inLinkedDb, const std::string& inLinkedID);
 	
 	M6Document*		Fetch(uint32 inDocNr);
 	M6Document*		Fetch(const std::string& inID);

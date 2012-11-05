@@ -42,7 +42,7 @@ struct M6ParserImpl
 						~M6ParserImpl();
 
 	void				Parse(M6InputDocument* inDoc, const string& inDbHeader);
-	void				GetVersion(string& outVersion);
+	string				GetVersion(const string& inSourceConfig);
 	void				ToFasta(const string& inDoc, const string& inDb, const string& inID,
 							const string& inTitle, string& outFasta);
 	
@@ -252,44 +252,40 @@ void M6ParserImpl::Parse(M6InputDocument* inDocument, const string& inDbHeader)
 	}
 }
 
-//void M6ParserImpl::GetVersion(
-//	string&				outVersion)
-//{
-//	PERL_SET_CONTEXT(mPerl);
-//
-//	dSP;
-//	ENTER;
-//	SAVETMPS;
-//	PUSHMARK(SP);
-//	
-//	XPUSHs(SvRV(mParser));
-//
-//	PUTBACK;
-//	
-//	int n = call_method("version", G_EVAL);
-//
-//	SPAGAIN;
-//	
-//	string errmsg;
-//
-//	if (SvTRUE(ERRSV))
-//		errmsg = string(SvPVX(ERRSV), SvCUR(ERRSV));
-//	else if (n == 1 and SvPOK(*SP))
-//		outVersion = SvPVX(POPs);
-//
-//	PUTBACK;
-//	FREETMPS;
-//	LEAVE;
-//	
-//	if (errmsg.length())
-//		THROW(("Error calling version: %s", errmsg.c_str()));
-//
-//	if (n != 1 or outVersion.empty())
-//		THROW(("version method of parser script should return one version string"));
-//	
-//	mCallback.clear();
-//	mUserData = nullptr;
-//}
+string M6ParserImpl::GetVersion(const string& inSourceConfig)
+{
+	PERL_SET_CONTEXT(mPerl);
+
+	dSP;
+	ENTER;
+	SAVETMPS;
+	PUSHMARK(SP);
+	
+	XPUSHs(SvRV(mParser));
+	XPUSHs(sv_2mortal(newSVpv(inSourceConfig.c_str(), inSourceConfig.length())));
+
+	PUTBACK;
+	
+	int n = call_method("version", G_EVAL);
+
+	SPAGAIN;
+	
+	string result, errmsg;
+
+	if (SvTRUE(ERRSV))
+		errmsg = string(SvPVX(ERRSV), SvCUR(ERRSV));
+	else if (n == 1 and SvPOK(*SP))
+		result = SvPVX(POPs);
+
+	PUTBACK;
+	FREETMPS;
+	LEAVE;
+	
+	if (errmsg.length())
+		THROW(("Error calling version: %s", errmsg.c_str()));
+
+	return result;
+}
 
 void M6ParserImpl::ToFasta(const string& inDocument, const string& inDb, const string& inID,
 	const string& inTitle, string& outFasta)
@@ -971,6 +967,22 @@ M6ParserImpl* M6Parser::Impl()
 	return mImpl.get();
 }
 	
+string M6Parser::GetVersion(const string& inName, const string& inSourceConfig)
+{
+	string result;
+	try
+	{
+		M6ParserImpl impl(inName);
+		result = impl.GetVersion(inSourceConfig);
+	}
+	catch (exception& e)
+	{
+		if (VERBOSE)
+			cerr << endl << e.what() << endl;
+	}
+	return result;
+}
+
 void M6Parser::ParseDocument(M6InputDocument* inDoc, const string& inDbHeader)
 {
 	Impl()->Parse(inDoc, inDbHeader);

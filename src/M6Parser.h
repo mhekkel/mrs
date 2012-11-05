@@ -13,6 +13,12 @@ class M6Parser
 					M6Parser(const std::string& inName);
 					~M6Parser();
 
+					// return the version string of the current data set.
+					// creates a temporary parser object.
+	static std::string
+					GetVersion(const std::string& inName,
+						const std::string& inSourceConfig);
+
 	void			ParseDocument(M6InputDocument* inDoc,
 						const std::string& inDbHeader);
 	std::string		GetValue(const std::string& inName);

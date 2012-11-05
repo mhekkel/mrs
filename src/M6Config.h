@@ -20,6 +20,9 @@ class M6Config
 	zeep::xml::element_set
 						LoadDatabanks();
 
+	void				ExpandDatabankAlias(const std::string& inAlias,
+							std::vector<std::string>& outDatabanks);
+
 	zeep::xml::element*	LoadParser(const std::string& inParser);
 
 	zeep::xml::element_set

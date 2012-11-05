@@ -240,14 +240,15 @@ void M6SearchServer::Find(const string& inDatabank, const string& inQuery, bool 
 			hit["title"] = doc->GetAttribute("title");
 			hit["score"] = static_cast<uint16>(score * 100);
 			
-			//vector<string> linked = M6LinkTable::Instance().GetLinkedDbs(inDatabank, id);
-			//if (not linked.empty())
-			//{
-			//	vector<el::object> links;
-			//	foreach (string& l, linked)
-			//		links.push_back(el::object(l));
-			//	hit["links"] = links;
-			//}
+			vector<string> linked;
+			databank->GetLinkedDbs(id, linked);
+			if (not linked.empty())
+			{
+				vector<el::object> links;
+				foreach (string& l, linked)
+					links.push_back(el::object(l));
+				hit["links"] = links;
+			}
 			
 			outHits.push_back(hit);
 			++nr;

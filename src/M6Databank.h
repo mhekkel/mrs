@@ -61,8 +61,6 @@ class M6Databank
 	void			DumpIndex(const std::string& inIndex, std::ostream& inStream);
 	
 	void			Store(M6Document* inDocument);
-	void			StoreLink(const std::string& inDocID,
-						const std::string& inLinkedDb, const std::string& inLinkedID);
 	
 	M6Document*		Fetch(uint32 inDocNr);
 	M6Document*		Fetch(const std::string& inID);
@@ -78,6 +76,14 @@ class M6Databank
 						M6QueryOperator inOperator = eM6Equals);
 	M6Iterator*		FindPattern(const std::string& inIndex, const std::string& inPattern);
 	M6Iterator*		FindString(const std::string& inIndex, const std::string& inString);
+
+	// retrieve links for a certain record
+	void			GetLinks(const std::string& inDocID,
+						std::vector<std::pair<std::string,std::string>>& outLinks);
+	void			GetLinks(uint32 inDocNr,
+						std::vector<std::pair<std::string,std::string>>& outLinks);
+	void			GetLinkedDbs(const std::string& inDocID, std::vector<std::string>& outDbs);
+	void			GetLinkedDbs(uint32 inDocNr, std::vector<std::string>& outDbs);
 
 	// Exist returns <documents exist,docnr for a unique match>
 	std::tr1::tuple<bool,uint32>

@@ -50,14 +50,28 @@ void ThrowDbException(sqlite3* conn, int err, const char* stmt, const char* file
 
 }
 
-M6LinkTable::M6LinkTable(boost::filesystem::path& inLinkDB)
-	: mDb(nullptr)
+M6LinkTable::M6LinkTable(const string& inDatabank, boost::filesystem::path& inLinkDB)
+	: mDatabank(inDatabank), mDb(nullptr)
 {
 	// only open read/write when the databank does not exist yet
 	if (fs::exists(inLinkDB))
 	{
 		THROW_IF_SQLITE3_ERROR(sqlite3_open_v2(inLinkDB.string().c_str(), &mDb,
 			SQLITE_OPEN_READONLY, nullptr), nullptr);
+
+		sqlite3_stmt* stmt;
+		THROW_IF_SQLITE3_ERROR(sqlite3_prepare_v2(mDb, inSQL, -1, &stmt, nullptr), mDb);
+		
+		while (sqlite3_step(stmt) == SQLITE_ROW)
+		{
+			const char* text = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
+			uint32 length = sqlite3_column_bytes(stmt, 0);
+			string db(text, length);
+			
+			mLinkedDbs.insert(db);
+		}
+		
+		sqlite3_finalize(stmt.second);
 	}
 	else
 	{
@@ -147,11 +161,12 @@ void M6LinkTable::ExecuteStatement(const char* inStatement)
 	THROW_IF_SQLITE3_ERROR(err, mDb);
 }
 
-void M6LinkTable::GetLinkedDbs(const string& inDatabank, vector<string>& outDatabanks)
+void M6LinkTable::GetLinkedDbs(const string& inID, vector<string>& outDatabanks)
 {
 	boost::mutex::scoped_lock lock(mLock);
 
-	sqlite3_stmt* stmt = Prepare("SELECT DISTINCT linked_db FROM links");
+	sqlite3_stmt* stmt = Prepare("SELECT DISTINCT linked_db FROM links WHERE id = ?");
+	THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(stmt, 1, inID.c_str(), inID.length(), SQLITE_STATIC), mDb);
 	
 	outDatabanks.clear();
 	
@@ -167,21 +182,24 @@ void M6LinkTable::GetLinkedDbs(const string& inDatabank, vector<string>& outData
 
 void M6LinkTable::GetLinksIn(const string& inDatabank, const string& inID, vector<string>& outIDs)
 {
-	boost::mutex::scoped_lock lock(mLock);
-	
-	sqlite3_stmt* stmt = Prepare("SELECT my_id FROM links WHERE linked_db = ? AND linked_id = ?");
-	THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(stmt, 1, inDatabank.c_str(), inDatabank.length(), SQLITE_STATIC), mDb);
-	THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(stmt, 2, inID.c_str(), inID.length(), SQLITE_STATIC), mDb);
-	
-	outIDs.clear();
-	
-	while (sqlite3_step(stmt) == SQLITE_ROW)
+	if (mLinkedDbs.count(inDatabank))
 	{
-		const char* text = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
-		uint32 length = sqlite3_column_bytes(stmt, 0);
-		string id(text, length);
+		boost::mutex::scoped_lock lock(mLock);
 		
-		outIDs.push_back(id);
+		sqlite3_stmt* stmt = Prepare("SELECT my_id FROM links WHERE linked_db = ? AND linked_id = ?");
+		THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(stmt, 1, inDatabank.c_str(), inDatabank.length(), SQLITE_STATIC), mDb);
+		THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(stmt, 2, inID.c_str(), inID.length(), SQLITE_STATIC), mDb);
+		
+		outIDs.clear();
+		
+		while (sqlite3_step(stmt) == SQLITE_ROW)
+		{
+			const char* text = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
+			uint32 length = sqlite3_column_bytes(stmt, 0);
+			string id(text, length);
+			
+			outIDs.push_back(id);
+		}
 	}
 }
 

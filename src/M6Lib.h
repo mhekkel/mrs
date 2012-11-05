@@ -64,7 +64,10 @@ enum M6IndexType : uint32
 	eM6NumberMultiIndex		= 'M6nm',
 //	eM6DateMultiIndex		= 'M6dm',
 	eM6CharMultiIDLIndex	= 'M6ci',
-	eM6CharWeightedIndex	= 'M6cw'
+	eM6CharWeightedIndex	= 'M6cw',
+	
+	// special name
+	eM6LinkIndex			= 'M6ln'
 };
 
 enum M6QueryOperator

@@ -33,7 +33,6 @@
 #include "M6Iterator.h"
 #include "M6Dictionary.h"
 #include "M6Tokenizer.h"
-#include "M6LinkTable.h"
 
 using namespace std;
 namespace fs = boost::filesystem;
@@ -105,7 +104,6 @@ class M6DatabankImpl
 	void			FinishBatchImport();
 		
 	void			Store(M6Document* inDocument);
-	void			StoreLink(const string& inDocID, const string& inLinkedDb, const string& inLinkedID);
 
 	M6Document*		Fetch(uint32 inDocNr);
 	M6Iterator*		Find(const string& inQuery, bool inAllTermsRequired, uint32 inReportLimit);
@@ -117,6 +115,9 @@ class M6DatabankImpl
 	tr1::tuple<bool,uint32>
 					Exists(const string& inIndex, const string& inValue);
 
+	void			GetLinks(uint32 inDocNr, vector<pair<string,string>>& outLinks);
+	void			GetLinkedDbs(uint32 inDocNr, vector<string>& outDbs);
+
 	void			SuggestCorrection(const string& inWord, vector<pair<string,uint16>>& outCorrections);
 	void			SuggestSearchTerms(const string& inWord, vector<string>& outSearchTerms);
 	
@@ -126,8 +127,7 @@ class M6DatabankImpl
 	M6BasicIndexPtr	GetIndex(const string& inName, M6IndexType inType);
 	M6BasicIndexPtr	CreateIndex(const string& inName, M6IndexType inType);
 	M6BasicIndexPtr	GetAllTextIndex()					{ return mAllTextIndex; }
-	
-	fs::path		GetScratchDir() const				{ return mDbDirectory / "tmp"; }
+	fs::path		GetDbDirectory() const				{ return mDbDirectory; }
 
 	void			RecalculateDocumentWeights();
 	void			CreateDictionary();
@@ -156,7 +156,6 @@ class M6DatabankImpl
 	string					mID, mUUID;
 	fs::path				mDbDirectory;
 	string					mVersion;
-	M6LinkTable*			mLinkTable;
 	fs::ofstream*			mFastaFile;
 	MOpenMode				mMode;
 	M6DocStore*				mStore;
@@ -176,7 +175,7 @@ class M6DatabankImpl
 class M6FullTextIx
 {
   public:
-					M6FullTextIx(const fs::path& inScratch);
+					M6FullTextIx(const fs::path& inDbDirectory, const string& inName);
 	virtual			~M6FullTextIx();
 	
 	void			SetUsesInDocLocation(uint32 inIndexNr)		{ mDocLocationIxMap |= (1 << inIndexNr); }
@@ -207,7 +206,7 @@ class M6FullTextIx
 	int64			Finish();
 	bool			NextEntry(M6BufferEntry& outEntry);
 	
-	fs::path		GetScratchDir() const						{ return mScratchDir; }
+	fs::path		GetDbDirectory() const						{ return mDbDirectory; }
 
   private:
 	
@@ -279,7 +278,7 @@ class M6FullTextIx
 	DocWords		mDocWords;
 	uint32			mDocLocationIxMap, mFullTextIxMap;
 	uint32			mDocWordLocation;
-	fs::path		mScratchDir;
+	fs::path		mDbDirectory;
 
 	M6File			mEntryBuffer;
 	M6EntryRun*		mEntryRun;
@@ -298,11 +297,11 @@ ostream& operator<<(ostream& os, const M6FullTextIx::M6BufferEntry& e)
 	return os;
 }
 
-M6FullTextIx::M6FullTextIx(const fs::path& inScratchUrl)
+M6FullTextIx::M6FullTextIx(const fs::path& inDbDirectory, const string& inName)
 	: mDocLocationIxMap(0), mFullTextIxMap(0)
 	, mDocWordLocation(1)
-	, mScratchDir(inScratchUrl)
-	, mEntryBuffer(mScratchDir / "fulltext", eReadWrite)
+	, mDbDirectory(inDbDirectory)
+	, mEntryBuffer(mDbDirectory / inName, eReadWrite)
 	, mEntryRun(nullptr)
 	, mEntryRunThread(boost::bind(&M6FullTextIx::FlushEntryRuns, this))
 	, mEntryCount(0)
@@ -324,12 +323,12 @@ M6FullTextIx::~M6FullTextIx()
 
 void M6FullTextIx::AddWord(uint8 inIndex, uint32 inWord)
 {
-	++mDocWordLocation;	// always increment, no matter if we do not add the word
+	++mDocWordLocation;	// always increment, even if we do not add the word
 	
 	if (inWord > 0)
 	{
 		if (inIndex > kMaxIndexNr)
-			THROW(("Too many full text indices"));
+			THROW(("Too many indices"));
 		
 		DocWord w = { inWord, inIndex, 1 };
 		
@@ -807,7 +806,7 @@ M6TextIx::M6TextIx(M6FullTextIx& inFullTextIndex, M6Lexicon& inLexicon,
 	mIndex->SetBatchMode(inLexicon);
 	mFullTextIndex.SetUsesInDocLocation(mIndexNr);
 	mIDLFile = new M6File(
-		mFullTextIndex.GetScratchDir().parent_path() / (inName + ".idl"), eReadWrite);
+		mFullTextIndex.GetDbDirectory().parent_path() / (inName + ".idl"), eReadWrite);
 }
 
 M6TextIx::~M6TextIx()
@@ -994,6 +993,7 @@ class M6BatchIndexProcessor
 					const M6InputDocument::M6TokenList& inTokens);
 	void		IndexValue(const string& inIndexName, M6DataType inDataType,
 					const string& inValue, bool inUnique, uint32 inDocNr);
+	void		IndexLink(uint32 inDocNr, const string& inDb, const string& inID);
 	void		FlushDoc(uint32 inDocNr);
 	void		Finish(uint32 inDocCount);
 
@@ -1019,7 +1019,7 @@ class M6BatchIndexProcessor
 };
 
 M6BatchIndexProcessor::M6BatchIndexProcessor(M6DatabankImpl& inDatabank, M6Lexicon& inLexicon)
-	: mFullTextIndex(inDatabank.GetScratchDir())
+	: mFullTextIndex(inDatabank.GetDbDirectory(), "full-text.tmp")
 	, mDatabank(inDatabank)
 	, mLexicon(inLexicon)
 {
@@ -1133,6 +1133,26 @@ void M6BatchIndexProcessor::IndexValue(const string& inIndexName,
 	}
 }
 
+void M6BatchIndexProcessor::IndexLink(uint32 inDocNr, const string& inDb, const string& inID)
+{
+	M6BasicIx* index = GetIndexBase<M6StringIx>(inDb, eM6LinkIndex);
+	
+	uint32 t = 0;
+
+	{
+		M6Lexicon::M6SharedLock lock(mLexicon);
+		t = mLexicon.Lookup(inID);
+	}
+	
+	if (t == 0)
+	{
+		M6Lexicon::M6UniqueLock lock(mLexicon);
+		t = mLexicon.Store(inID);
+	}
+	
+	index->AddWord(t);
+}
+
 void M6BatchIndexProcessor::FlushDoc(uint32 inDocNr)
 {
 	mFullTextIndex.FlushDoc(inDocNr);
@@ -1207,7 +1227,6 @@ void M6BatchIndexProcessor::Finish(uint32 inDocCount)
 M6DatabankImpl::M6DatabankImpl(M6Databank& inDatabank, const fs::path& inPath, MOpenMode inMode)
 	: mDatabank(inDatabank)
 	, mDbDirectory(inPath)
-	, mLinkTable(nullptr)
 	, mFastaFile(nullptr)
 	, mMode(inMode)
 	, mStore(nullptr)
@@ -1291,7 +1310,6 @@ M6DatabankImpl::M6DatabankImpl(M6Databank& inDatabank, const string& inDatabankI
 	, mID(inDatabankID)
 	, mDbDirectory(inPath)
 	, mVersion(inVersion)
-	, mLinkTable(nullptr)
 	, mFastaFile(nullptr)
 	, mMode(eReadWrite)
 	, mStore(nullptr)
@@ -1302,7 +1320,7 @@ M6DatabankImpl::M6DatabankImpl(M6Databank& inDatabank, const string& inDatabankI
 		fs::remove_all(inPath);
 	
 	fs::create_directory(mDbDirectory);
-	fs::create_directory(mDbDirectory / "tmp");
+	fs::create_directory(mDbDirectory / "links");
 		
 	mStore = new M6DocStore(mDbDirectory / "data", eReadWrite);
 	mAllTextIndex.reset(new M6SimpleWeightedIndex(mDbDirectory / "full-text.index", eReadWrite));
@@ -1328,7 +1346,6 @@ M6DatabankImpl::~M6DatabankImpl()
 	mStore->Commit();
 	delete mStore;
 
-	delete mLinkTable;
 	delete mFastaFile;
 }
 
@@ -1422,6 +1439,7 @@ M6BasicIndexPtr M6DatabankImpl::CreateIndex(const string& inName, M6IndexType in
 			case eM6NumberMultiIndex:	result.reset(new M6NumberMultiIndex(path, mMode)); break;
 			case eM6CharMultiIDLIndex:	result.reset(new M6SimpleIDLMultiIndex(path, mMode)); break;
 			case eM6CharWeightedIndex:	result.reset(new M6SimpleWeightedIndex(path, mMode)); break;
+			case eM6LinkIndex:			result.reset(new M6SimpleMultiIndex(mDbDirectory / "links" / (inName + ".index"), mMode)); break;
 			default:					THROW(("unsupported"));
 		}
 
@@ -1485,6 +1503,9 @@ void M6DatabankImpl::IndexThread()
 			foreach (const M6InputDocument::M6IndexValue& v, doc->GetIndexValues())
 				mBatch->IndexValue(v.mIndexName, v.mDataType, v.mIndexValue, v.mUnique, docNr);
 	
+			foreach (const M6InputDocument::M6LinkInfo& l, doc->GetLinks())
+				mBatch->IndexLink(docNr, l.mLinkedDB, l.mLinkedID);
+	
 			mBatch->FlushDoc(docNr);
 			
 			delete doc;
@@ -1511,17 +1532,6 @@ void M6DatabankImpl::Store(M6Document* inDocument)
 
 	if (mBatch != nullptr)
 		mStoreQueue.Put(doc);
-}
-
-void M6DatabankImpl::StoreLink(const string& inDocID, const string& inLinkedDb, const string& inLinkedID)
-{
-	if (not (mException == exception_ptr()))
-		rethrow_exception(mException);
-
-	if (mLinkTable == nullptr)
-		mLinkTable = new M6LinkTable(mDbDirectory / "links.db");
-	
-	mLinkTable->AddLink(inDocID, inLinkedDb, inLinkedID);
 }
 
 M6Document* M6DatabankImpl::Fetch(uint32 inDocNr)
@@ -1872,6 +1882,16 @@ tr1::tuple<bool,uint32> M6DatabankImpl::Exists(const string& inIndex, const stri
 	return result;
 }
 
+void M6DatabankImpl::GetLinks(uint32 inDocNr, vector<pair<string,string>>& outLinks)
+{
+	
+}
+
+void M6DatabankImpl::GetLinkedDbs(uint32 inDocNr, vector<string>& outDbs)
+{
+	
+}
+
 void M6DatabankImpl::SuggestCorrection(const string& inWord, vector<pair<string,uint16>>& outCorrections)
 {
 	if (mDictionary != nullptr)
@@ -1927,7 +1947,7 @@ void M6DatabankImpl::FinishBatchImport()
 
 		g.join_all();
 
-		fs::remove_all(mDbDirectory / "tmp");
+		fs::remove(mDbDirectory / "full-text.tmp");
 		progress.Consumed(1);
 	}
 
@@ -2057,11 +2077,6 @@ void M6Databank::Store(M6Document* inDocument)
 	mImpl->Store(inDocument);
 }
 
-void M6Databank::StoreLink(const string& inDocID, const string& inLinkedDb, const string& inLinkedID)
-{
-	mImpl->StoreLink(inDocID, inLinkedDb, inLinkedID);
-}
-
 M6DocStore& M6Databank::GetDocStore()
 {
 	return mImpl->GetDocStore();
@@ -2120,6 +2135,26 @@ M6Iterator* M6Databank::FindString(const string& inIndex, const string& inString
 tr1::tuple<bool,uint32> M6Databank::Exists(const string& inIndex, const string& inValue)
 {
 	return mImpl->Exists(inIndex, inValue);
+}
+
+void M6Databank::GetLinks(const string& inDocID, vector<pair<string,string>>& outLinks)
+{
+	
+}
+
+void M6Databank::GetLinks(uint32 inDocNr, vector<pair<string,string>>& outLinks)
+{
+	
+}
+
+void M6Databank::GetLinkedDbs(const string& inDocID, vector<string>& outDbs)
+{
+//	mImpl->GetLinkedDbs(in
+}
+
+void M6Databank::GetLinkedDbs(uint32 inDocNr, vector<string>& outDbs)
+{
+	mImpl->GetLinkedDbs(inDocNr, outDbs);
 }
 
 void M6Databank::SuggestCorrection(const string& inWord, vector<pair<string,uint16>>& outCorrections)

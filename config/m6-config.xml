@@ -143,7 +143,7 @@
 		<index name='body'		type="text"		xpath='/article/body' />
 	</parser>
 
-	<parser id="gene" chunk="/EntrezgeneSet/Entrezgene">
+	<parser id="gene" chunk="/Entrezgene-Set/Entrezgene">
 		<index name='id'		type="string"	xpath='Entrezgene_track-info/Gene-track/Gene-track_geneid'
 			   attr="true"		/>
 		<index name='title'		type="text"		xpath='Entrezgene_prot/Prot-ref/Prot-ref_name/Prot-ref_name_E'
@@ -305,6 +305,7 @@
 		<info>http://www.ncbi.nlm.nih.gov/genbank/</info>
 		<file>/data/mrs/genbank.m6</file>
 		<source>genbank/*.seq.gz</source>
+		<fetch delete="true" src="ftp://ftp.ncbi.nih.gov/genbank/*.seq.gz" />
 	</databank>
 
 	<databank id="refseq" parser="genbank">
@@ -312,6 +313,7 @@
 		<info>http://www.ncbi.nlm.nih.gov/RefSeq/</info>
 		<file>/data/mrs/refseq.m6</file>
 		<source>refseq_release/*gpff.gz;refseq_release/*gbff.gz</source>
+		<fetch delete="true" src="ftp://ftp.ncbi.nih.gov/refseq/release/complete/*gbff.gz" />
 	</databank>
 
 	<databank id="taxonomy" parser="taxonomy" format="taxonomy">
@@ -352,7 +354,7 @@
 		<name>HSSP</name>
 		<info>http://www.cmbi.ru.nl/hssp</info>
 		<file>hssp.m6</file>
-		<source>hssp/?cr?.hssp.bz2</source>
+		<source>hssp/????.hssp.bz2</source>
 		<fetch
 			delete="true"
 			src="ftp://ftp.cmbi.ru.nl/pub/molbio/data/hssp/????.hssp.bz2" />

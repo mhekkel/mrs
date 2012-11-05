@@ -427,12 +427,10 @@ void M6FTPFetcher::ListFiles(const string& inPattern,
 		
 	// Yeah, we have a data connection, now send the List command
 	status = SendAndWaitForReply("list", "");
-
-	if (status < 200)
-		status = WaitForReply();
-	if (status != 226)
-		Error("Error listing");
-
+	
+	if (status != 125 and status != 150)
+		Error((string("Error listing: ") + mReply).c_str());
+		
 	time_t now;
 	time(&now);
 	struct tm t = {}, n;
@@ -486,6 +484,10 @@ void M6FTPFetcher::ListFiles(const string& inPattern,
 				inProc(line[0], file, size, time);
 		}
 	}
+	
+	status = WaitForReply();
+	if (status != 226)
+		Error("Error listing");
 }
 
 void M6FTPFetcher::FetchFile(fs::path inRemote, fs::path inLocal, time_t inTime, M6Progress& inProgress)

@@ -36,6 +36,7 @@ CFLAGS				+= -I $(HOME)/projects/libarchive/include
 LDFLAGS				+= -L $(HOME)/projects/libarchive/lib
 LDFLAGS				+= $(shell $(PERL) -MExtUtils::Embed -e ldopts)
 LDFLAGS				+= $(shell curl-config --libs)
+LDFLAGS				+= -lsqlite3
 ifneq ($(DEBUG),1)
 CFLAGS				+= -O3 -DNDEBUG -g
 else
@@ -110,7 +111,7 @@ m6-make: $(OBJECTS.m6-make)
 
 m6-server: $(OBJECTS.m6-server)
 	@ echo ">>" $@
-	@ $(CXX) $(BOOST_INC_DIR:%=-I%) -o $@ -I. $^ $(LDFLAGS) -lsqlite3
+	@ $(CXX) $(BOOST_INC_DIR:%=-I%) -o $@ -I. $^ $(LDFLAGS)
 
 m6-passwd: $(OBJECTS.m6-passwd)
 	@ echo ">>" $@

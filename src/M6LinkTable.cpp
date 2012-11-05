@@ -1,5 +1,7 @@
 #include "M6Lib.h"
 
+#include <iostream>
+
 #include <sqlite3.h>
 
 #include <boost/filesystem/operations.hpp>
@@ -50,7 +52,7 @@ void ThrowDbException(sqlite3* conn, int err, const char* stmt, const char* file
 
 }
 
-M6LinkTable::M6LinkTable(const string& inDatabank, boost::filesystem::path& inLinkDB)
+M6LinkTable::M6LinkTable(const string& inDatabank, const boost::filesystem::path& inLinkDB)
 	: mDatabank(inDatabank), mDb(nullptr)
 {
 	// only open read/write when the databank does not exist yet

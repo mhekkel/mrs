@@ -18,7 +18,7 @@ class M6LinkTable
 {
   public:
 					M6LinkTable(const std::string& inDatabank,
-						boost::filesystem::path& inLinkDB);
+						const boost::filesystem::path& inLinkDB);
 					~M6LinkTable();
 
 	void			AddLink(const std::string& inMyID,

@@ -1356,7 +1356,6 @@ void M6DatabankImpl::GetInfo(M6DatabankInfo& outInfo)
 	foreach (const M6IndexDesc& desc, mIndices)
 	{
 		fs::path path(mDbDirectory / (desc.mName + ".index"));
-		assert(fs::exists(path));
 		
 		M6IndexInfo info = { desc.mName, desc.mType, desc.mIndex->size(), fs::file_size(path) };
 		outInfo.mIndexInfo.push_back(info);

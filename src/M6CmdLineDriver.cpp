@@ -488,7 +488,10 @@ void M6BuildDriver::Exec(const string& inCommand, po::variables_map& vm)
 		}
 	}
 	else
+	{
 		cout << databank << " is up-to-date" << endl;
+		M6Status::Instance().Cleanup(databank);
+	}
 }
 
 // --------------------------------------------------------------------

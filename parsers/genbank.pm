@@ -6,6 +6,7 @@ sub new
 {
 	my $invocant = shift;
 	my $self = new M6::Script(
+		firstdocline => qr/^LOCUS.+/,
 		lastdocline => '//',
 		@_
 	);
@@ -15,13 +16,14 @@ sub new
 sub parse
 {
 	my ($self, $text) = @_;
-
-	while ($text =~ m/^\s*(\w+)\s+((?:.+)(?:\n\s{5,}.+)*)/mg)
+	
+	# watch out, recursion in subexpressions is limited to 32k lines.
+	# that's not enough for genbank records containing complete genomes...
+	while ($text =~ m/^(\w+)\s+(.+?)(?=\n\S)/msg)
 	{
 		my $key = lc $1;
 		my $value = $2;
-#		$value =~ s/^\s{5,}//gm;
-		
+
 		if ($key eq 'locus')
 		{
 			my $id = substr($value, 0, 15);
@@ -58,6 +60,16 @@ sub parse
 				$self->index_string('keywords', $kw);
 			}
 		}
+		elsif ($key eq 'reference')
+		{
+			while ($value =~ m/^  (\w+)\s+((?:\S.+)(?:\n\s{12,}.+)*)/mg)
+			{
+				my $rkey = lc $1;
+				my $rvalue = $2;
+
+				$self->index_text($rkey, $rvalue);
+			}
+		}
 		elsif ($key eq 'features')
 		{
 			while ($value =~ m/^\s{5}\w+\s+((?:\S.+)(?:\n\s{20,}.+)*)/gm)
@@ -68,14 +80,14 @@ sub parse
 					my $fkey = $1;
 					my $fval = $2;
 
-					next if ($fkey eq 'translation');
-					if ($fkey eq 'db_xref')
-					{
-						$self->add_link(split(m/:/, $fval));
-					}
-					else
+					if ($fkey ne 'translation')
 					{
 						$self->index_text('feature', $fval);
+	
+						if ($fkey eq 'db_xref' and $fval =~ m/(.+?):(.+)/)
+						{
+							$self->add_link($1, $2);
+						}
 					}
 				}
 			}

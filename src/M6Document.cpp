@@ -122,6 +122,31 @@ void M6InputDocument::Compress()
 	
 	char mark = 0;
 	out.write(&mark, 1);
+	
+	// write links
+	
+	if (not mLinks.empty())
+	{
+		out << "[[" << endl;
+		stringstream ls;
+		map<string,vector<string>> lm;
+
+		foreach (auto link, mLinks)
+			lm[link.mLinkedDB].push_back(link.mLinkedID);
+
+		foreach (auto& l, lm)
+		{
+			sort(l.second.begin(), l.second.end());
+			l.second.erase(unique(l.second.begin(), l.second.end()), l.second.end());
+			out << l.first << '\t';
+			foreach (auto id, l.second)
+				out << id << ';';
+			out << endl;
+		}
+
+		out << "]]" << endl;
+	}
+	
 	out.write(mText.c_str(), mText.length());
 }
 
@@ -337,6 +362,13 @@ string M6OutputDocument::GetText()
 	
 	string text;
 	
+	getline(is, text);
+	if (text == "[[")
+	{
+		do getline(is, text); while (text != "]]" and not is.eof());
+		text.clear();
+	}
+
 	io::filtering_ostream out(io::back_inserter(text));
 	io::copy(is, out);
 	

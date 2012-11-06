@@ -1049,7 +1049,7 @@ M6BasicIx* M6BatchIndexProcessor::GetIndexBase(const string& inName, M6IndexType
 	if (result == nullptr)
 	{
 		M6BasicIndexPtr index = mDatabank.CreateIndex(inName, inType);
-
+		
 		uint8 indexNr = 0;
 		if (inType != eM6LinkIndex)
 			indexNr = mNextIndexNr++;

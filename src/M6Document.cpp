@@ -125,7 +125,7 @@ void M6InputDocument::Compress()
 	
 	// write links
 	
-	if (not mLinks.empty())
+	if (not mLinks.empty() or ba::starts_with(mText, "[[\n"))
 	{
 		out << "[[" << endl;
 		stringstream ls;

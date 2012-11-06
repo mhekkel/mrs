@@ -158,10 +158,10 @@
 		<index name='name'		type="string"	xpath='@short_name' />
 
 		<!-- Everything else (all nodes that are not 'name') -->
-		<index name='attr'		type="text"		xpath='*[name() != "name"]' />
+		<index name='text'		type="text"		xpath='*[name() != "name"]' />
 
 		<!-- All attributes -->
-		<index name='text'		type="text"		xpath='.//@*' />
+		<index name='attr'		type="text"		xpath='.//@*' />
 		
 		<link xpath="db_xref" db="@db" id="@dbkey" />
 	</parser>

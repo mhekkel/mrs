@@ -95,23 +95,28 @@ void M6SearchServer::LoadAllDatabanks()
 		try
 		{
 			string name = databank;
+			set<string> aliases;
 			bool blast = false;
 			
 			M6Parser* parser = nullptr;
-			zx::element_set config(M6Config::Instance().Find((boost::format("/m6-config/databank[@id='%1%']") % databank).str()));
-			if (not config.empty())
+			zx::element_set dbConfig(M6Config::Instance().Find((boost::format("/m6-config/databank[@id='%1%']") % databank).str()));
+			if (not dbConfig.empty())
 			{
-				parser = new M6Parser(config.front()->get_attribute("parser"));
-				blast = config.front()->get_attribute("blast") == "true";
-				if (zx::element* n = config.front()->find_first("name"))
+				parser = new M6Parser(dbConfig.front()->get_attribute("parser"));
+				blast = dbConfig.front()->get_attribute("blast") == "true";
+				if (zx::element* n = dbConfig.front()->find_first("name"))
 					name = n->content();
 			}
+			
+			foreach (zx::element* alias, config->find("aliases/alias"))
+				aliases.insert(alias->content());
 			
 			M6LoadedDatabank ldb =
 			{
 				new M6Databank(path, eReadOnly),
 				databank,
 				name,
+				aliases,
 				blast,
 				parser
 			};
@@ -135,7 +140,7 @@ M6Databank* M6SearchServer::Load(const string& inDatabank)
 
 	foreach (M6LoadedDatabank& db, mLoadedDatabanks)
 	{
-		if (db.mID == databank)
+		if (db.mID == databank or db.mAliases.count(databank))
 		{
 			result = db.mDatabank;
 			break;
@@ -300,7 +305,10 @@ void M6SearchServer::GetLinkedDbs(const string& inDb, const string& inId,
 			if (doc)
 			{
 				foreach (const auto& l, doc->GetLinks())
-					dbs.insert(l.first);
+				{
+					if (Load(l.first) != nullptr)
+						dbs.insert(l.first);
+				}
 			}
 		}
 		else if (db.mDatabank->IsLinked(inDb, inId))
@@ -418,6 +426,7 @@ M6Server::M6Server(zx::element* inConfig)
 	mount("download",		boost::bind(&M6Server::handle_download, this, _1, _2, _3));
 	mount("entry",			boost::bind(&M6Server::handle_entry, this, _1, _2, _3));
 	mount("link",			boost::bind(&M6Server::handle_link, this, _1, _2, _3));
+	mount("linked",			boost::bind(&M6Server::handle_linked, this, _1, _2, _3));
 	mount("search",			boost::bind(&M6Server::handle_search, this, _1, _2, _3));
 	mount("similar",		boost::bind(&M6Server::handle_similar, this, _1, _2, _3));
 	mount("admin",			boost::bind(&M6Server::handle_admin, this, _1, _2, _3));
@@ -1049,6 +1058,115 @@ void M6Server::handle_link(const zh::request& request, const el::scope& scope, z
 	create_redirect(db, ix, id, q, false, request, reply);
 }
 
+void M6Server::handle_linked(const zh::request& request, const el::scope& scope, zh::reply& reply)
+{
+	string sdb, ddb;
+	uint32 page, hitCount = 0, firstDocNr = 0, nr, hits_per_page = 15;
+
+	zeep::http::parameter_map params;
+	get_parameters(scope, params);
+
+	sdb = params.get("s", "").as<string>();
+	ddb = params.get("d", "").as<string>();
+	nr = params.get("nr", "0").as<uint32>();
+	page = params.get("page", 1).as<uint32>();
+	
+	if (page < 1)
+		page = 1;
+
+	int32 maxresultcount = hits_per_page, resultoffset = 0;
+	
+	if (page > 1)
+		resultoffset = (page - 1) * maxresultcount;
+
+	el::scope sub(scope);
+	sub.put("page", el::object(page));
+	sub.put("db", el::object(ddb));
+
+	if (nr == 0 or sdb.empty() or ddb.empty())
+		THROW(("Invalid linked reference"));
+	
+	M6Databank* msdb = Load(sdb);
+	M6Databank* mddb = Load(ddb);
+	
+	if (msdb == nullptr or mddb == nullptr)
+		THROW(("Invalid databanks"));
+	
+	unique_ptr<M6Document> doc(msdb->Fetch(nr));
+	if (not doc)
+		THROW(("Document not found"));
+	
+	// Collect the links
+	string id = doc->GetAttribute("id");
+	M6UnionIterator iter;
+	
+	foreach (const auto& l, doc->GetLinks())
+	{
+		if (Load(l.first) == mddb)
+		{
+			vector<uint32> docs;
+			
+			foreach (string id, l.second)
+			{
+				if (id.empty())
+					continue;
+
+				M6Tokenizer::CaseFold(id);
+
+				bool exists;
+				uint32 docNr;
+				tr1::tie(exists, docNr) = mddb->Exists("id", id);
+				if (exists)
+					docs.push_back(docNr);
+			}
+			
+			if (not docs.empty())
+				iter.AddIterator(new M6VectorIterator(docs));
+		}
+	}
+	
+	iter.AddIterator(mddb->GetLinks(sdb, id));
+	
+	uint32 docNr, count = iter.GetCount();
+	float score;
+	
+	nr = 1;
+	while (resultoffset-- > 0 and iter.Next(docNr, score))
+		++nr;
+	
+	vector<el::object> hits;
+	sub.put("first", el::object(nr));
+	
+	while (maxresultcount-- > 0 and iter.Next(docNr, score))
+	{
+		el::object hit;
+		
+		unique_ptr<M6Document> doc(mddb->Fetch(docNr));
+
+		hit["nr"] = nr;
+		hit["docNr"] = docNr;
+		hit["id"] = doc->GetAttribute("id");
+		hit["title"] = doc->GetAttribute("title");;
+		
+		AddLinks(sdb, doc->GetAttribute("id"), hit);
+		
+		hits.push_back(hit);
+
+		++nr;
+	}
+	
+	if (maxresultcount > 0 and count + 1 > nr)
+		count = nr - 1;
+	
+	sub.put("hits", el::object(hits));
+	sub.put("hitCount", el::object(count));
+	sub.put("lastPage", el::object(((count - 1) / hits_per_page) + 1));
+	sub.put("last", el::object(nr - 1));
+	sub.put("ranked", el::object(false));
+	
+	create_reply_from_template("results.html", sub, reply);
+}
+
 void M6Server::handle_similar(const zh::request& request, const el::scope& scope, zh::reply& reply)
 {
 	string db, id, nr;
@@ -1110,7 +1228,7 @@ void M6Server::handle_similar(const zh::request& request, const el::scope& scope
 			hit["title"] = doc->GetAttribute("title");;
 			hit["score"] = tr1::trunc(score);
 			
-			AddLinks(db, id, hit);
+			AddLinks(db, doc->GetAttribute("id"), hit);
 			
 			hits.push_back(hit);
 

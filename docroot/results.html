@@ -91,7 +91,7 @@
 						<span class="reference">
 							<span class="reference-label">References:</span>
 							<mrs:iterate collection="${hit.links}" var="link">
-								<a href="linked?s=${db}&amp;d=${link}&amp;id=${hit.id}">${link}</a>
+								<a href="linked?s=${db}&amp;d=${link}&amp;nr=${hit.docNr}">${link}</a>
 							</mrs:iterate>
 						</span>
 					</mrs:if>

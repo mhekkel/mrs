@@ -29,10 +29,11 @@ class M6SearchServer
 
 	struct M6LoadedDatabank
 	{
-		M6Databank*	mDatabank;
-		std::string	mID, mName;
-		bool		mBlast;
-		M6Parser*	mParser;
+		M6Databank*				mDatabank;
+		std::string				mID, mName;
+		std::set<std::string>	mAliases;
+		bool					mBlast;
+		M6Parser*				mParser;
 	};
 	typedef std::vector<M6LoadedDatabank> M6DbList;
 
@@ -72,6 +73,7 @@ class M6Server : public zh::webapp, public M6SearchServer
 	void			handle_entry(const zh::request& request, const el::scope& scope, zh::reply& reply);
 	void			handle_file(const zh::request& request, const el::scope& scope, zh::reply& reply);
 	void			handle_link(const zh::request& request, const el::scope& scope, zh::reply& reply);
+	void			handle_linked(const zh::request& request, const el::scope& scope, zh::reply& reply);
 	void			handle_search(const zh::request& request, const el::scope& scope, zh::reply& reply);
 	void			handle_similar(const zh::request& request, const el::scope& scope, zh::reply& reply);
 	void			handle_welcome(const zh::request& request, const el::scope& scope, zh::reply& reply);

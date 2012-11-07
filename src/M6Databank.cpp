@@ -117,9 +117,8 @@ class M6DatabankImpl
 	tr1::tuple<bool,uint32>
 					Exists(const string& inIndex, const string& inValue);
 
-	void			GetLinks(uint32 inDocNr, M6DocLinks& outLinks);
-	void			GetLinkedDbs(uint32 inDocNr, vector<string>& outLinkedDbs);
 	bool			IsLinked(const string& inDb, const string& inId);
+	M6Iterator*		GetLinks(const string& inDb, const string& inId);
 
 	void			SuggestCorrection(const string& inWord, vector<pair<string,uint16>>& outCorrections);
 	void			SuggestSearchTerms(const string& inWord, vector<string>& outSearchTerms);
@@ -1921,25 +1920,27 @@ tr1::tuple<bool,uint32> M6DatabankImpl::Exists(const string& inIndex, const stri
 	return result;
 }
 
-void M6DatabankImpl::GetLinks(uint32 inDocNr, M6DocLinks& outLinks)
+M6Iterator* M6DatabankImpl::GetLinks(const string& inDb, const string& inId)
 {
-	unique_ptr<M6Document> doc(Fetch(inDocNr));
+	M6Iterator* result = nullptr;
 	
-	if (doc)
+	string id(inId);
+	M6Tokenizer::CaseFold(id);
+	
+	foreach (auto& li, mLinkIndices)
 	{
-		outLinks = doc->GetLinks();
-	}
-}
+		if (ba::iequals(inDb, li.mName) == false)
+			continue;
+		
+//		if (not li.mIndex)
+//			li.mIndex = Load
 
-void M6DatabankImpl::GetLinkedDbs(uint32 inDocNr, vector<string>& outLinkedDbs)
-{
-	unique_ptr<M6Document> doc(Fetch(inDocNr));
-	
-	if (doc)
-	{
-		foreach (auto& l, doc->GetLinks())
-			outLinkedDbs.push_back(l.first);
+		result = li.mIndex->Find(id);
+		
+		break;
 	}
+	
+	return result;
 }
 
 bool M6DatabankImpl::IsLinked(const string& inDb, const string& inId)
@@ -2210,19 +2211,14 @@ tr1::tuple<bool,uint32> M6Databank::Exists(const string& inIndex, const string& 
 	return mImpl->Exists(inIndex, inValue);
 }
 
-void M6Databank::GetLinks(uint32 inDocNr, M6DocLinks& outLinks)
-{
-	mImpl->GetLinks(inDocNr, outLinks);
-}
-
-void M6Databank::GetLinkedDbs(uint32 inDocNr, vector<string>& outLinkedDbs)
-{
-	mImpl->GetLinkedDbs(inDocNr, outLinkedDbs);
-}
-
 bool M6Databank::IsLinked(const string& inDb, const string& inId)
 {
 	return mImpl->IsLinked(inDb, inId);
+}
+
+M6Iterator* M6Databank::GetLinks(const string& inDb, const string& inId)
+{
+	return mImpl->GetLinks(inDb, inId);
 }
 
 void M6Databank::SuggestCorrection(const string& inWord, vector<pair<string,uint16>>& outCorrections)

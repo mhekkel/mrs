@@ -82,9 +82,8 @@ class M6Databank
 	M6Iterator*		FindString(const std::string& inIndex, const std::string& inString);
 
 	// retrieve links for a certain record
-	void			GetLinks(uint32 inDocNr, M6DocLinks& outLinks);
-	void			GetLinkedDbs(uint32 inDocNr, std::vector<std::string>& outLinkedDbs);
 	bool			IsLinked(const std::string& inDb, const std::string& inId);
+	M6Iterator*		GetLinks(const std::string& inDb, const std::string& inId);
 
 	// Exist returns <documents exist,docnr for a unique match>
 	std::tr1::tuple<bool,uint32>

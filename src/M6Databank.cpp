@@ -805,7 +805,7 @@ M6TextIx::M6TextIx(M6FullTextIx& inFullTextIndex, M6Lexicon& inLexicon,
 	mIndex->SetBatchMode(inLexicon);
 	mFullTextIndex.SetUsesInDocLocation(mIndexNr);
 	mIDLFile = new M6File(
-		mFullTextIndex.GetDbDirectory().parent_path() / (inName + ".idl"), eReadWrite);
+		mFullTextIndex.GetDbDirectory() / (inName + ".idl"), eReadWrite);
 }
 
 M6TextIx::~M6TextIx()

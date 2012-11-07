@@ -2103,18 +2103,30 @@ void M6Server::handle_status(const zh::request& request, const el::scope& scope,
 	el::scope sub(scope);
 
 	vector<el::object> databanks;
-	foreach (M6LoadedDatabank& db, mLoadedDatabanks)
+//	foreach (M6LoadedDatabank& db, mLoadedDatabanks)
+
+	zx::element_set dbs(mConfig->find("dbs/db"));
+	foreach (zx::element* db, dbs)
 	{
+		string dbn = db->content();
+
 		el::object databank;
-		databank["id"] = db.mID;
-		databank["name"] = db.mName;
+		databank["id"] = dbn;
+
+		databank["name"] = M6Config::Instance().FindGlobal(
+			(boost::format("/m6-config/databank[@id='%1%']/name") % dbn).str());
 		
-		M6DatabankInfo info;
-		db.mDatabank->GetInfo(info);
+		M6DatabankInfo info = {};
+		M6Databank* dbo = Load(dbn);
+
+		if (dbo != nullptr)
+			dbo->GetInfo(info);
+
 		databank["entries"] = info.mDocCount;
 		databank["version"] = info.mVersion;
 		databank["buildDate"] = info.mLastUpdate;
 		databank["size"] = info.mTotalSize;
+		
 		databanks.push_back(databank);
 	}
 	sub.put("databanks", el::object(databanks));
@@ -2125,14 +2137,16 @@ void M6Server::handle_status(const zh::request& request, const el::scope& scope,
 void M6Server::handle_status_ajax(const zh::request& request, const el::scope& scope, zh::reply& reply)
 {
 	vector<el::object> databanks;
-	foreach (M6LoadedDatabank& db, mLoadedDatabanks)
+
+	zx::element_set dbs(mConfig->find("dbs/db"));
+	foreach (zx::element* db, dbs)
 	{
 		el::object databank;
-		databank["name"] = db.mID;
+		databank["name"] = db->content();
 		
 		string stage;
 		float progress;
-		if (M6Status::Instance().GetUpdateStatus(db.mID, stage, progress))
+		if (M6Status::Instance().GetUpdateStatus(db->content(), stage, progress))
 		{
 			el::object update;
 			update["progress"] = progress;
@@ -2276,51 +2290,84 @@ void M6Server::ValidateAuthentication(const zh::request& request)
 
 void RunMainLoop(uint32 inNrOfThreads)
 {
-	cout << "Restarting services..."; cout.flush();
-	
-	vector<zeep::http::server*> servers;
-	boost::thread_group threads;
-
-	foreach (zx::element* config, M6Config::Instance().LoadServers())
+	for (;;)
 	{
-		string addr = config->get_attribute("addr");
-		string port = config->get_attribute("port");
-		if (port.empty())
-			port = "80";
-		
-		if (VERBOSE)
-			cout << "listening at " << addr << ':' << port << endl;
-		
-		string service = config->get_attribute("type");
-		unique_ptr<zeep::http::server> server;
-		
-		if (service == "www" or service.empty())
-			server.reset(new M6Server(config));
-		else if (service == "search")
-			server.reset(new M6WSSearch(config));
-		else if (service == "blast")
-			server.reset(new M6WSBlast(config));
-		else
-			THROW(("Unknown service %s", service.c_str()));
-
-		server->bind(addr, boost::lexical_cast<uint16>(port));
-		threads.create_thread(boost::bind(&zeep::http::server::run, server.get(), inNrOfThreads));
-		servers.push_back(server.release());
-	}
-
-	if (servers.empty())
-	{
-		cerr << "No servers configured" << endl;
-		exit(1);
-	}
-
-	if (not VERBOSE)
-		cout << " done" << endl;
+		cout << "Restarting services..."; cout.flush();
 	
-	threads.join_all();
+#ifndef _MSC_VER
+	    sigset_t new_mask, old_mask;
+	    sigfillset(&new_mask);
+	    pthread_sigmask(SIG_BLOCK, &new_mask, &old_mask);
+#endif
+	
+		vector<zeep::http::server*> servers;
+		boost::thread_group threads;
+	
+		foreach (zx::element* config, M6Config::Instance().LoadServers())
+		{
+			string addr = config->get_attribute("addr");
+			string port = config->get_attribute("port");
+			if (port.empty())
+				port = "80";
+			
+			if (VERBOSE)
+				cout << "listening at " << addr << ':' << port << endl;
+			
+			string service = config->get_attribute("type");
+			unique_ptr<zeep::http::server> server;
+			
+			if (service == "www" or service.empty())
+				server.reset(new M6Server(config));
+			else if (service == "search")
+				server.reset(new M6WSSearch(config));
+			else if (service == "blast")
+				server.reset(new M6WSBlast(config));
+			else
+				THROW(("Unknown service %s", service.c_str()));
+	
+			server->bind(addr, boost::lexical_cast<uint16>(port));
+			threads.create_thread(boost::bind(&zeep::http::server::run, server.get(), inNrOfThreads));
+			servers.push_back(server.release());
+		}
+	
+		if (servers.empty())
+		{
+			cerr << "No servers configured" << endl;
+			exit(1);
+		}
+	
+		if (not VERBOSE)
+			cout << " done" << endl;
+	
+#ifndef _MSC_VER
+	    pthread_sigmask(SIG_SETMASK, &old_mask, 0);
+	
+		// Wait for signal indicating time to shut down.
+		sigset_t wait_mask;
+		sigemptyset(&wait_mask);
+		sigaddset(&wait_mask, SIGINT);
+		sigaddset(&wait_mask, SIGHUP);
+		sigaddset(&wait_mask, SIGQUIT);
+		sigaddset(&wait_mask, SIGTERM);
+		pthread_sigmask(SIG_BLOCK, &wait_mask, 0);
+		int sig = 0;
+		sigwait(&wait_mask, &sig);
+		
+		for_each(servers.begin(), servers.end(), [](zeep::http::server* server) { server->stop(); });
+#endif
+		
+		threads.join_all();
+	
+		foreach (zeep::http::server* server, servers)
+			delete server;
 
-	foreach (zeep::http::server* server, servers)
-		delete server;
+#ifndef _MSC_VER
+		if (sig == SIGHUP)
+			continue;
+#endif		
+		
+		break;
+	}
 }
 
 int main(int argc, char* argv[])

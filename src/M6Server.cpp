@@ -1102,7 +1102,7 @@ void M6Server::handle_linked(const zh::request& request, const el::scope& scope,
 	el::scope sub(scope);
 	sub.put("page", el::object(page));
 	sub.put("db", el::object(ddb));
-
+	
 	if (nr == 0 or sdb.empty() or ddb.empty())
 		THROW(("Invalid linked reference"));
 	
@@ -1116,8 +1116,14 @@ void M6Server::handle_linked(const zh::request& request, const el::scope& scope,
 	if (not doc)
 		THROW(("Document not found"));
 	
-	// Collect the links
 	string id = doc->GetAttribute("id");
+
+	el::object linkedInfo;
+	linkedInfo["db"] = sdb;
+	linkedInfo["id"] = id;
+	sub.put("linked", linkedInfo);
+
+	// Collect the links
 	M6UnionIterator iter;
 	
 	foreach (const auto& l, doc->GetLinks())

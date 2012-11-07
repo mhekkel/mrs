@@ -113,26 +113,8 @@ sub TIEHASH
 
 sub version
 {
-	my ($self, $version) = @_;
-	
-	if (defined $version)
-	{
-		$self->{version} = $version;
-	}
-	elsif (not defined $self->{version})
-	{
-		my $date = 0;
-		
-		foreach my $file ($self->raw_files)
-		{
-			my $mtime = stat($file)->mtime;
-			$date = $mtime if $mtime > $date;
-		}
-	
-		$self->{version} = localtime $date;
-	}
-	
-	return $self->{version};
+	my ($self, $source) = @_;
+	croak("version not implemented");
 }
 
 sub to_fasta

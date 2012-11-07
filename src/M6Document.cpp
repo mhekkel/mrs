@@ -12,6 +12,7 @@
 #define foreach BOOST_FOREACH
 #include <boost/algorithm/string.hpp>
 //#include <boost/locale.hpp>
+#include <boost/range/sub_range.hpp>
 
 #include "M6Document.h"
 #include "M6DocStore.h"
@@ -463,7 +464,8 @@ M6DocLinks& M6OutputDocument::GetLinks()
 				string db = line.substr(0, s);
 				
 				vector<string> ids;
-				ba::split(ids, line.substr(s + 1), ba::is_any_of(";"), ba::token_compress_on);
+				line.erase(0, s + 1);
+				ba::split(ids, line, ba::is_any_of(";"), ba::token_compress_on);
 				mLinks[db].insert(ids.begin(), ids.end());
 			}
 		}

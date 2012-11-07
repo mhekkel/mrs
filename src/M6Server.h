@@ -41,15 +41,17 @@ class M6SearchServer
 	std::string		GetEntry(M6Databank* inDatabank, const std::string& inFormat,
 						const std::string& inIndex, const std::string& inValue);
 	
-	void			Find(const std::string& inDatabank,
-						const std::string& inQuery, bool inAllTermsRequired,
-						uint32 inResultOffset, uint32 inMaxResultCount,
+	void			Find(const std::string& inDatabank, const std::string& inQuery,
+						bool inAllTermsRequired, uint32 inResultOffset,
+						uint32 inMaxResultCount, bool inAddLinks,
 						std::vector<el::object>& outHits, uint32& outHitCount, bool& outRanked);
 
 	void			GetLinkedDbs(const std::string& inDb, const std::string& inId, std::vector<std::string>& outLinkedDbs);
 	void			AddLinks(const std::string& inDb, const std::string& inId, el::object& inHit);
 
 	uint32			Count(const std::string& inDatabank, const std::string& inQuery);
+	std::vector<std::string>
+					UnAlias(const std::string& inDatabank);
 
 	const zx::element*	mConfig;
 	M6DbList			mLoadedDatabanks;

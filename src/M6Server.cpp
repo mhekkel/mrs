@@ -140,7 +140,7 @@ M6Databank* M6SearchServer::Load(const string& inDatabank)
 
 	foreach (M6LoadedDatabank& db, mLoadedDatabanks)
 	{
-		if (db.mID == databank or db.mAliases.count(databank))
+		if (db.mID == databank)
 		{
 			result = db.mDatabank;
 			break;
@@ -197,7 +197,7 @@ string M6SearchServer::GetEntry(M6Databank* inDatabank,
 }
 
 void M6SearchServer::Find(const string& inDatabank, const string& inQuery, bool inAllTermsRequired,
-	uint32 inResultOffset, uint32 inMaxResultCount,
+	uint32 inResultOffset, uint32 inMaxResultCount, bool inAddLinks,
 	vector<el::object>& outHits, uint32& outHitCount, bool& outRanked)
 {
 	M6Databank* databank = Load(inDatabank);
@@ -243,7 +243,9 @@ void M6SearchServer::Find(const string& inDatabank, const string& inQuery, bool 
 			hit["id"] = id;
 			hit["title"] = doc->GetAttribute("title");
 			hit["score"] = static_cast<uint16>(score * 100);
-			AddLinks(inDatabank, id, hit);
+			
+			if (inAddLinks)
+				AddLinks(inDatabank, id, hit);
 			
 			outHits.push_back(hit);
 			++nr;
@@ -286,32 +288,50 @@ uint32 M6SearchServer::Count(const string& inDatabank, const string& inQuery)
 
 // --------------------------------------------------------------------
 
+vector<string> M6SearchServer::UnAlias(const string& inDatabank)
+{
+	vector<string> result;
+	
+	foreach (auto& db, mLoadedDatabanks)
+	{
+		if (db.mID == inDatabank or db.mAliases.count(inDatabank))
+			result.push_back(db.mID);
+	}
+	
+	sort(result.begin(), result.end());
+	result.erase(unique(result.begin(), result.end()), result.end());
+	
+	return result;
+}
+
 void M6SearchServer::GetLinkedDbs(const string& inDb, const string& inId,
 	vector<string>& outLinkedDbs)
 {
 	set<string> dbs;
+
+	string id(inId);
+	M6Tokenizer::CaseFold(id);
+	
+	M6Databank* databank = Load(inDb);
+	if (databank != nullptr)
+	{
+		unique_ptr<M6Document> doc(databank->Fetch(id));
+		if (doc)
+		{
+			foreach (const auto& l, doc->GetLinks())
+			{
+				vector<string> aliases(UnAlias(l.first));
+				dbs.insert(aliases.begin(), aliases.end());
+			}
+		}
+	}
 
 	foreach (auto& db, mLoadedDatabanks)
 	{
 		if (dbs.count(db.mID))
 			continue;
 		
-		if (db.mID == inDb)
-		{
-			string id(inId);
-			M6Tokenizer::CaseFold(id);
-
-			unique_ptr<M6Document> doc(db.mDatabank->Fetch(id));
-			if (doc)
-			{
-				foreach (const auto& l, doc->GetLinks())
-				{
-					if (Load(l.first) != nullptr)
-						dbs.insert(l.first);
-				}
-			}
-		}
-		else if (db.mDatabank->IsLinked(inDb, inId))
+		if (db.mDatabank->IsLinked(inDb, inId))
 			dbs.insert(db.mID);
 	}
 	
@@ -899,7 +919,7 @@ void M6Server::handle_search(const zh::request& request,
 					uint32 c;
 					bool r;
 					
-					Find(db.mID, q, true, 0, 5, hits, c, r);
+					Find(db.mID, q, true, 0, 5, false, hits, c, r);
 					
 					boost::mutex::scoped_lock lock(m);
 					
@@ -953,11 +973,11 @@ void M6Server::handle_search(const zh::request& request,
 		vector<el::object> hits;
 		bool ranked;
 		
-		Find(db, q, true, resultoffset, maxresultcount, hits, hitCount, ranked);
+		Find(db, q, true, resultoffset, maxresultcount, true, hits, hitCount, ranked);
 		if (hitCount == 0)
 		{
 			sub.put("relaxed", el::object(true));
-			Find(db, q, false, resultoffset, maxresultcount, hits, hitCount, ranked);
+			Find(db, q, false, resultoffset, maxresultcount, true, hits, hitCount, ranked);
 		}
 		
 		if (not hits.empty())

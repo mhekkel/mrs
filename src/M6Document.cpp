@@ -465,6 +465,8 @@ M6DocLinks& M6OutputDocument::GetLinks()
 				
 				vector<string> ids;
 				line.erase(0, s + 1);
+				if (ba::ends_with(line, ";"))
+					line.erase(line.end() - 1);
 				ba::split(ids, line, ba::is_any_of(";"), ba::token_compress_on);
 				mLinks[db].insert(ids.begin(), ids.end());
 			}

@@ -822,6 +822,7 @@ struct M6IndexImpl
 	virtual bool	Find(const string& inKey, uint32& outValue)						{ THROW(("Incorrect use of index")); }
 	virtual bool	Find(const string& inKey, M6MultiData& outValue)				{ THROW(("Incorrect use of index")); }
 	virtual bool	Find(const string& inKey, M6MultiIDLData& outValue)				{ THROW(("Incorrect use of index")); }
+	virtual bool	Contains(const string& inKey) = 0;
 
 	virtual M6Iterator*	Find(const string& inKey) = 0;
 	virtual void		Find(const string& inKey, M6QueryOperator inOperator, vector<bool>& outBitmap, uint32& outCount) = 0;
@@ -938,6 +939,8 @@ class M6IndexImplT : public M6IndexImpl
 	virtual void		Find(const string& inKey, M6QueryOperator inOperator, vector<bool>& outBitmap, uint32& outCount);
 	virtual void		FindPattern(const string& inPattern, vector<bool>& outBitmap, uint32& outCount);
 	virtual M6Iterator*	FindString(const string& inString);
+
+	virtual bool	Contains(const string& inKey);
 
 	void			Remap(M6DataType& ioData, const vector<uint32>& inRemappedBitPageNrs);
 
@@ -2817,6 +2820,20 @@ M6Iterator* M6IndexImplT<M6MultiIDLData>::FindString(const string& inString)
 }
 
 template<class M6DataType>
+bool M6IndexImplT<M6DataType>::Contains(const string& inKey)
+{
+	bool result = false;
+	if (mHeader.mRoot != 0)
+	{
+		IndexPage* root(Load<IndexPage>(mHeader.mRoot));
+		M6DataType value;
+		result = root->Find(inKey, value);
+		Release(root);
+	}
+	return result;
+}
+
+template<class M6DataType>
 void M6IndexImplT<M6DataType>::Vacuum(M6Progress& inProgress)
 {
 	int64 fileSize = mFile.Size();
@@ -3383,6 +3400,11 @@ void M6BasicIndex::FindPattern(const string& inPattern, vector<bool>& outBitmap,
 M6Iterator* M6BasicIndex::FindString(const string& inString)
 {
 	return mImpl->FindString(inString);
+}
+
+bool M6BasicIndex::Contains(const string& inKey)
+{
+	return mImpl->Contains(inKey);
 }
 
 uint32 M6BasicIndex::size() const

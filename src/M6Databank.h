@@ -1,6 +1,8 @@
 #pragma once
 
 #include <vector>
+#include <map>
+#include <set>
 #include <boost/tr1/tuple.hpp>
 
 #include "M6File.h"
@@ -10,6 +12,8 @@ class M6DatabankImpl;
 class M6DocStore;
 class M6Lexicon;
 class M6Iterator;
+
+typedef std::map<std::string,std::set<std::string>> M6DocLinks;
 
 struct M6IndexInfo
 {
@@ -78,12 +82,9 @@ class M6Databank
 	M6Iterator*		FindString(const std::string& inIndex, const std::string& inString);
 
 	// retrieve links for a certain record
-	void			GetLinks(const std::string& inDocID,
-						std::vector<std::pair<std::string,std::string>>& outLinks);
-	void			GetLinks(uint32 inDocNr,
-						std::vector<std::pair<std::string,std::string>>& outLinks);
-	void			GetLinkedDbs(const std::string& inDocID, std::vector<std::string>& outDbs);
-	void			GetLinkedDbs(uint32 inDocNr, std::vector<std::string>& outDbs);
+	void			GetLinks(uint32 inDocNr, M6DocLinks& outLinks);
+	void			GetLinkedDbs(uint32 inDocNr, std::vector<std::string>& outLinkedDbs);
+	bool			IsLinked(const std::string& inDb, const std::string& inId);
 
 	// Exist returns <documents exist,docnr for a unique match>
 	std::tr1::tuple<bool,uint32>

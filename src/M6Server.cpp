@@ -238,16 +238,7 @@ void M6SearchServer::Find(const string& inDatabank, const string& inQuery, bool 
 			hit["id"] = id;
 			hit["title"] = doc->GetAttribute("title");
 			hit["score"] = static_cast<uint16>(score * 100);
-			
-			vector<string> linked;
-			databank->GetLinkedDbs(id, linked);
-			if (not linked.empty())
-			{
-				vector<el::object> links;
-				foreach (string& l, linked)
-					links.push_back(el::object(l));
-				hit["links"] = links;
-			}
+			AddLinks(inDatabank, id, hit);
 			
 			outHits.push_back(hit);
 			++nr;
@@ -286,6 +277,51 @@ uint32 M6SearchServer::Count(const string& inDatabank, const string& inQuery)
 	}
 	
 	return result;
+}
+
+// --------------------------------------------------------------------
+
+void M6SearchServer::GetLinkedDbs(const string& inDb, const string& inId,
+	vector<string>& outLinkedDbs)
+{
+	set<string> dbs;
+
+	foreach (auto& db, mLoadedDatabanks)
+	{
+		if (dbs.count(db.mID))
+			continue;
+		
+		if (db.mID == inDb)
+		{
+			string id(inId);
+			M6Tokenizer::CaseFold(id);
+
+			unique_ptr<M6Document> doc(db.mDatabank->Fetch(id));
+			if (doc)
+			{
+				foreach (const auto& l, doc->GetLinks())
+					dbs.insert(l.first);
+			}
+		}
+		else if (db.mDatabank->IsLinked(inDb, inId))
+			dbs.insert(db.mID);
+	}
+	
+	outLinkedDbs.assign(dbs.begin(), dbs.end());
+}
+
+void M6SearchServer::AddLinks(const string& inDB, const string& inID, el::object& inHit)
+{
+	vector<string> linkedDbs;
+	GetLinkedDbs(inDB, inID, linkedDbs);
+	
+	if (not linkedDbs.empty())
+	{
+		vector<el::object> linked;
+		foreach (string& db, linkedDbs)
+			linked.push_back(el::object(db));
+		inHit["links"] = el::object(linked);
+	}
 }
 
 // --------------------------------------------------------------------
@@ -539,12 +575,13 @@ void M6Server::handle_entry(const zh::request& request, const el::scope& scope, 
 		return;
 	}
 
+	M6Databank* mdb = Load(db);
+	if (mdb == nullptr)
+		THROW(("Databank %s not loaded", db.c_str()));
+
 	uint32 docNr = 0;
 	if (nr.empty())
 	{
-		M6Databank* mdb = Load(db);
-		if (mdb == nullptr)
-			THROW(("Databank %s not loaded", db.c_str()));
 		bool exists;
 		tr1::tie(exists, docNr) = mdb->Exists("id", id);
 		if (not exists)
@@ -554,7 +591,11 @@ void M6Server::handle_entry(const zh::request& request, const el::scope& scope, 
 
 	}
 	else
+	{
 		docNr = boost::lexical_cast<uint32>(nr);
+		unique_ptr<M6Document> doc(mdb->Fetch(docNr));
+		id = doc->GetAttribute("id");
+	}
 	
 	string q, rq, format;
 	q = params.get("q", "").as<string>();
@@ -564,7 +605,17 @@ void M6Server::handle_entry(const zh::request& request, const el::scope& scope, 
 	el::scope sub(scope);
 	sub.put("db", el::object(db));
 	sub.put("nr", el::object(docNr));
-	//sub.put("linkeddbs", el::object(M6LinkTable::Instance().GetLinkedDbs(db)));
+	
+	vector<string> linkedDbs;
+	GetLinkedDbs(db, id, linkedDbs);
+	if (not linkedDbs.empty())
+	{
+		vector<el::object> linked;
+		foreach (string& db, linkedDbs)
+			linked.push_back(el::object(db));
+		sub.put("links", el::object(linked));
+	}
+
 	if (not q.empty())
 		sub.put("q", el::object(q));
 	else if (not rq.empty())
@@ -575,17 +626,7 @@ void M6Server::handle_entry(const zh::request& request, const el::scope& scope, 
 	}
 	sub.put("format", el::object(format));
 
-	//vector<string> linked = M6LinkTable::Instance().GetLinkedDbs(db, id);
-	//if (not linked.empty())
-	//{
-	//	vector<el::object> links;
-	//	foreach (string& l, linked)
-	//		links.push_back(el::object(l));
-	//	sub.put("links", el::object(links));
-	//}
-
 	zx::element* dbConfig = M6Config::Instance().LoadDatabank(db);
-//	unique_ptr<M6Document> document(mdb->Fetch(docNr));
 
 	// first stuff some data into scope
 	
@@ -1069,15 +1110,7 @@ void M6Server::handle_similar(const zh::request& request, const el::scope& scope
 			hit["title"] = doc->GetAttribute("title");;
 			hit["score"] = tr1::trunc(score);
 			
-//			vector<string> linked;
-//			GetLinkedDbs(db, id, linked);
-//			if (not linked.empty())
-//			{
-//				vector<el::object> links;
-//				foreach (string& l, linked)
-//					links.push_back(el::object(l));
-//				hit["links"] = links;
-//			}
+			AddLinks(db, id, hit);
 			
 			hits.push_back(hit);
 

@@ -107,6 +107,7 @@ class M6BasicIndex
 	void			Insert(const std::string& inKey, uint32 inValue);
 	void			Erase(const std::string& inKey);
 	bool			Find(const std::string& inKey, uint32& outValue);
+	bool			Contains(const std::string& inKey);
 	
 	// for batch mode only:
 	void			Insert(uint32 inKey, uint32 inValue);

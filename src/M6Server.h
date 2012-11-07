@@ -45,6 +45,9 @@ class M6SearchServer
 						uint32 inResultOffset, uint32 inMaxResultCount,
 						std::vector<el::object>& outHits, uint32& outHitCount, bool& outRanked);
 
+	void			GetLinkedDbs(const std::string& inDb, const std::string& inId, std::vector<std::string>& outLinkedDbs);
+	void			AddLinks(const std::string& inDb, const std::string& inId, el::object& inHit);
+
 	uint32			Count(const std::string& inDatabank, const std::string& inQuery);
 
 	const zx::element*	mConfig;

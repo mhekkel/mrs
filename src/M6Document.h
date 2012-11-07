@@ -8,11 +8,15 @@
 
 #include <string>
 #include <map>
+#include <set>
 #include <vector>
 
 #include "M6Lexicon.h"
 
 class M6Databank;
+
+// Documents can have links:
+typedef std::map<std::string,std::set<std::string>> M6DocLinks;
 
 // Basic M6Document is only a mere interface
 
@@ -25,9 +29,12 @@ class M6Document
 	virtual std::string	GetText() = 0;
 	virtual std::string	GetAttribute(const std::string& inName) = 0;
 
+	virtual M6DocLinks&	GetLinks() = 0;
+
   protected:
 
 	M6Databank&			mDatabank;
+	M6DocLinks			mLinks;
 	
   private:
 						M6Document(const M6Document&);
@@ -61,14 +68,6 @@ class M6InputDocument : public M6Document
 	};
 	
 	typedef std::vector<M6IndexValue>			M6IndexValueList;
-
-	struct M6LinkInfo
-	{
-		std::string		mLinkedDB;
-		std::string		mLinkedID;
-	};
-
-	typedef std::vector<M6LinkInfo>				M6LinkInfoList;
 
 						M6InputDocument(M6Databank& inDatabank);
 						M6InputDocument(M6Databank& inDatabank,
@@ -108,7 +107,7 @@ class M6InputDocument : public M6Document
 	
 	const M6IndexTokenList& GetIndexTokens() const			{ return mTokens; }
 	const M6IndexValueList& GetIndexValues() const			{ return mValues; }
-	const M6LinkInfoList&	GetLinks() const				{ return mLinks; }
+	virtual M6DocLinks&	GetLinks()							{ return mLinks; }
 
   private:
 
@@ -120,7 +119,6 @@ class M6InputDocument : public M6Document
 	std::string			mFasta;
 	std::vector<char>	mBuffer;
 	M6DocAttributes		mAttributes;
-	M6LinkInfoList		mLinks;
 	M6IndexTokenList	mTokens;
 	M6IndexValueList	mValues;
 	M6Lexicon			mDocLexicon;
@@ -137,7 +135,10 @@ class M6OutputDocument : public M6Document
 
 	virtual std::string	GetText();
 	virtual std::string	GetAttribute(const std::string& inName);
+
+	virtual M6DocLinks&	GetLinks();
 	
   private:
 	uint32				mDocNr, mDocPage, mDocSize;
+	bool				mLinksRead;
 };

@@ -129,15 +129,9 @@ void M6InputDocument::Compress()
 	{
 		out << "[[" << endl;
 		stringstream ls;
-		map<string,vector<string>> lm;
 
-		foreach (auto link, mLinks)
-			lm[link.mLinkedDB].push_back(link.mLinkedID);
-
-		foreach (auto& l, lm)
+		foreach (auto& l, mLinks)
 		{
-			sort(l.second.begin(), l.second.end());
-			l.second.erase(unique(l.second.begin(), l.second.end()), l.second.end());
 			out << l.first << '\t';
 			foreach (auto id, l.second)
 				out << id << ';';
@@ -263,8 +257,7 @@ void M6InputDocument::Index(const string& inIndex,
 
 void M6InputDocument::AddLink(const string& inDatabank, const string& inValue)
 {
-	M6LinkInfo info = { inDatabank, inValue };
-	mLinks.push_back(info);
+	mLinks[inDatabank].insert(inValue);
 }
 
 void M6InputDocument::Tokenize(M6Lexicon& inLexicon, uint32 inLastStopWord)
@@ -330,6 +323,7 @@ M6OutputDocument::M6OutputDocument(M6Databank& inDatabank,
 	, mDocNr(inDocNr)
 	, mDocPage(inDocPage)
 	, mDocSize(inDocSize)
+	, mLinksRead(false)
 {
 }
 
@@ -421,4 +415,61 @@ string M6OutputDocument::GetAttribute(const string& inName)
 	}
 	
 	return result;
+}
+
+M6DocLinks& M6OutputDocument::GetLinks()
+{
+	if (not mLinksRead)
+	{
+		M6DocStore& store(mDatabank.GetDocStore());
+		
+		// set-up the decompression machine
+		io::zlib_params params;
+		params.noheader = true;
+		params.calculate_crc = true;
+		
+		io::zlib_decompressor z_stream(params);
+		
+		io::filtering_stream<io::input> is;
+		is.push(z_stream);
+		store.OpenDataStream(mDocNr, mDocPage, mDocSize, is);
+		
+		// skip over the attributes first
+		char c;
+		is.read(&c, 1);
+		while (c != 0 and not is.eof())
+		{
+			uint8 l;
+			is.read(reinterpret_cast<char*>(&l), 1);
+			is.ignore(l);
+			is.read(&c, 1);
+		}
+		
+		string line;
+		getline(is, line);
+	
+		if (line == "[[")
+		{
+			for (;;)
+			{
+				getline(is, line);
+				if ((line.empty() and is.eof()) or line == "]]")
+					break;
+				
+				string::size_type s = line.find('\t');
+				if (s == string::npos)
+					continue;
+				
+				string db = line.substr(0, s);
+				
+				vector<string> ids;
+				ba::split(ids, line.substr(s + 1), ba::is_any_of(";"), ba::token_compress_on);
+				mLinks[db].insert(ids.begin(), ids.end());
+			}
+		}
+		
+		mLinksRead = true;
+	}
+	
+	return mLinks;
 }

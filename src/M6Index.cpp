@@ -112,7 +112,8 @@ const int64
 
 const uint32
 	kM6MaxKeyLength			= (kM6MinKeySpace / 2 > 255 ? 255 : kM6MinKeySpace / 2),
-	kM6BatchSize			= 1024 * 1024;
+//	kM6BatchSize			= 1024 * 1024;
+	kM6BatchSize			= 1024;
 
 #endif
 

@@ -5,6 +5,7 @@
 #include <iterator>
 #include <numeric>
 
+#include <boost/array.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
 #include <boost/foreach.hpp>
@@ -46,7 +47,9 @@ namespace io = boost::iostreams;
 const uint32
 	kM6WeightBitCount = 5,
 	kM6MaxWeight = (1 << kM6WeightBitCount) - 1,
-	kMaxIndexNr = 30;
+	kM6MaxIndexNr = numeric_limits<uint8>::max();
+
+typedef boost::array<bool,256> M6IndexMap;
 
 class M6BatchIndexProcessor;
 
@@ -181,13 +184,12 @@ class M6FullTextIx
 					M6FullTextIx(const fs::path& inDbDirectory, const string& inName);
 	virtual			~M6FullTextIx();
 	
-	void			SetUsesInDocLocation(uint32 inIndexNr)		{ mDocLocationIxMap |= (1 << inIndexNr); }
-	bool			UsesInDocLocation(uint32 inIndexNr) const	{ return mDocLocationIxMap & (1 << inIndexNr); }
-	uint32			GetDocLocationIxMap() const					{ return mDocLocationIxMap; }
+	void			SetUsesInDocLocation(uint32 inIndexNr)		{ mDocLocationIxMap[inIndexNr] = true; }
+	bool			UsesInDocLocation(uint32 inIndexNr) const	{ return mDocLocationIxMap[inIndexNr]; }
 
-	void			SetExcludeInFullText(uint32 inIndexNr)		{ mFullTextIxMap |= (1 << inIndexNr); }
-	bool			ExcludesInFullText(uint32 inIndexNr) const	{ return mFullTextIxMap & (1 << inIndexNr); }
-	uint32			GetFullTextIxMap() const					{ return mFullTextIxMap; }
+	void			SetExcludeInFullText(uint32 inIndexNr)		{ mFullTextIxMap[inIndexNr] = true; }
+	bool			ExcludesInFullText(uint32 inIndexNr) const	{ return mFullTextIxMap[inIndexNr]; }
+	M6IndexMap		GetFullTextIxMap() const					{ return mFullTextIxMap; }
 
 	void			AddWord(uint8 inIndex, uint32 inWord);
 	void			FlushDoc(uint32 inDocNr);
@@ -251,7 +253,7 @@ class M6FullTextIx
 	struct M6BufferEntryIterator
 	{
 						M6BufferEntryIterator(M6File& inFile, int64 inOffset, uint32 inCount,
-							uint32 inFirstDoc, uint32 inIDLIxMap)
+							uint32 inFirstDoc, const M6IndexMap& inIDLIxMap)
 							: mBits(inFile, inOffset, kM6LargeBitBufferSize)
 							, mCount(inCount), mFirstDoc(inFirstDoc), mIDLIxMap(inIDLIxMap)
 							, mTerm(1), mDoc(inFirstDoc) {}
@@ -261,7 +263,7 @@ class M6FullTextIx
 		M6IBitStream	mBits;
 		uint32			mCount;
 		uint32			mFirstDoc;
-		uint32			mIDLIxMap;
+		M6IndexMap		mIDLIxMap;
 		uint32			mTerm;
 		uint32			mDoc;
 		M6BufferEntry	mEntry;
@@ -279,7 +281,7 @@ class M6FullTextIx
 	typedef vector<M6BufferEntryIterator*>	M6EntryQueue;
 	
 	DocWords		mDocWords;
-	uint32			mDocLocationIxMap, mFullTextIxMap;
+	M6IndexMap		mDocLocationIxMap, mFullTextIxMap;
 	uint32			mDocWordLocation;
 	fs::path		mDbDirectory;
 
@@ -301,8 +303,7 @@ ostream& operator<<(ostream& os, const M6FullTextIx::M6BufferEntry& e)
 }
 
 M6FullTextIx::M6FullTextIx(const fs::path& inDbDirectory, const string& inName)
-	: mDocLocationIxMap(0), mFullTextIxMap(0)
-	, mDocWordLocation(1)
+	: mDocWordLocation(1)
 	, mDbDirectory(inDbDirectory)
 	, mEntryBuffer(mDbDirectory / inName, eReadWrite)
 	, mEntryRun(nullptr)
@@ -330,9 +331,6 @@ void M6FullTextIx::AddWord(uint8 inIndex, uint32 inWord)
 	
 	if (inWord > 0)
 	{
-		if (inIndex > kMaxIndexNr)
-			THROW(("Too many indices"));
-		
 		DocWord w = { inWord, inIndex, 1 };
 		
 		DocWords::iterator i = mDocWords.find(w);
@@ -443,7 +441,7 @@ void M6FullTextIx::FlushEntryRuns()
 			WriteGamma(bits, entries[i].ix + 1);
 			WriteBinary(bits, kM6WeightBitCount, entries[i].weight);
 	
-			if (mDocLocationIxMap & (1 << entries[i].ix))
+			if (mDocLocationIxMap[entries[i].ix])
 				WriteBits(bits, entries[i].idl);
 	
 			t = entries[i].term;
@@ -540,7 +538,7 @@ bool M6FullTextIx::M6BufferEntryIterator::Next()
 		mEntry.ix -= 1;
 		ReadBinary(mBits, kM6WeightBitCount, mEntry.weight);
 		
-		if (mIDLIxMap & (1 << mEntry.ix))
+		if (mIDLIxMap[mEntry.ix])
 			ReadBits(mBits, mEntry.idl);
 	
 		--mCount;
@@ -1015,14 +1013,12 @@ class M6BatchIndexProcessor
 	typedef vector<M6BasicIxDesc>	M6BasicIxDescList;
 	
 	M6BasicIxDescList	mIndices;
-	uint8				mNextIndexNr;
 };
 
 M6BatchIndexProcessor::M6BatchIndexProcessor(M6DatabankImpl& inDatabank, M6Lexicon& inLexicon)
 	: mFullTextIndex(inDatabank.GetDbDirectory(), "full-text.tmp")
 	, mDatabank(inDatabank)
 	, mLexicon(inLexicon)
-	, mNextIndexNr(1)
 {
 }
 
@@ -1049,13 +1045,12 @@ M6BasicIx* M6BatchIndexProcessor::GetIndexBase(const string& inName, M6IndexType
 	
 	if (result == nullptr)
 	{
+		if (mIndices.size() + 1 == kM6MaxIndexNr)
+			THROW(("Too many indices"));
+		
 		M6BasicIndexPtr index = mDatabank.CreateIndex(inName, inType);
 		
-		uint8 indexNr = 0;
-		if (inType != eM6LinkIndex)
-			indexNr = mNextIndexNr++;
-
-		result = new T(mFullTextIndex, mLexicon, inName, indexNr, index);
+		result = new T(mFullTextIndex, mLexicon, inName, mIndices.size() + 1, index);
 		
 		M6BasicIxDesc desc = { result, inName, inType };
 		mIndices.push_back(desc);
@@ -1191,7 +1186,7 @@ void M6BatchIndexProcessor::Finish(uint32 inDocCount)
 	uint32 lastDoc = ie.doc;
 	uint32 termFrequency = ie.weight;
 
-	uint32 exclude = mFullTextIndex.GetFullTextIxMap();
+	M6IndexMap exclude = mFullTextIndex.GetFullTextIxMap();
 
 	do
 	{
@@ -1215,7 +1210,7 @@ void M6BatchIndexProcessor::Finish(uint32 inDocCount)
 		if (ie.ix > 0)
 			mIndices[ie.ix - 1].mBasicIx->AddDocTerm(ie.doc, ie.term, ie.weight, ie.idl);
 		
-		if ((exclude & (1 << ie.ix)) == 0)
+		if (not exclude[ie.ix])
 			termFrequency += ie.weight;
 		
 		if (termFrequency > numeric_limits<uint8>::max())

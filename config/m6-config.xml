@@ -539,4 +539,10 @@
 		<source>pdb/cr/pdb?cr?.ent.gz</source>
 	</databank>
 
+	<databank id="sprot-mini" parser="uniprot" blast="true">
+		<name>SwissProt mini</name>
+		<file>sprot-mini.m6</file>
+		<source>uniprot/sprot-mini.dat</source>
+	</databank>
+
 </m6-config>

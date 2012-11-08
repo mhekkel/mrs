@@ -54,6 +54,11 @@ M6SearchServer::M6SearchServer(const zx::element* inConfig)
 
 M6SearchServer::~M6SearchServer()
 {
+	foreach (M6LoadedDatabank& db, mLoadedDatabanks)
+	{
+		delete db.mDatabank;
+		delete db.mParser;
+	}
 }
 
 void M6SearchServer::LoadAllDatabanks()
@@ -1147,7 +1152,10 @@ void M6Server::handle_linked(const zh::request& request, const el::scope& scope,
 			}
 			
 			if (not docs.empty())
+			{
+				sort(docs.begin(), docs.end());
 				iter.AddIterator(new M6VectorIterator(docs));
+			}
 		}
 	}
 	

@@ -357,6 +357,43 @@ void M6SearchServer::AddLinks(const string& inDB, const string& inID, el::object
 	}
 }
 
+M6Iterator* M6SearchServer::GetLinks(const string& inDb, M6Document& inDoc, M6Databank& inLinkedDb)
+{
+	unique_ptr<M6UnionIterator> result(new M6UnionIterator);
+	
+	foreach (const auto& l, inDoc.GetLinks())
+	{
+		if (Load(l.first) == &inLinkedDb)
+		{
+			vector<uint32> docs;
+			
+			foreach (string id, l.second)
+			{
+				if (id.empty())
+					continue;
+
+				M6Tokenizer::CaseFold(id);
+
+				bool exists;
+				uint32 docNr;
+				tr1::tie(exists, docNr) = inLinkedDb.Exists("id", id);
+				if (exists)
+					docs.push_back(docNr);
+			}
+			
+			if (not docs.empty())
+			{
+				sort(docs.begin(), docs.end());
+				result->AddIterator(new M6VectorIterator(docs));
+			}
+		}
+	}
+	
+	result->AddIterator(inLinkedDb.GetLinks(inDb, inDoc.GetAttribute("id")));
+	
+	return result.release();
+}
+
 // --------------------------------------------------------------------
 
 struct M6AuthInfo
@@ -1129,7 +1166,7 @@ void M6Server::handle_linked(const zh::request& request, const el::scope& scope,
 	sub.put("linked", linkedInfo);
 
 	// Collect the links
-	M6UnionIterator iter;
+	unique_ptr<M6Iterator> iter(GetLinks(sdb, *doc, *mddb));
 	
 	foreach (const auto& l, doc->GetLinks())
 	{
@@ -1165,13 +1202,13 @@ void M6Server::handle_linked(const zh::request& request, const el::scope& scope,
 	float score;
 	
 	nr = 1;
-	while (resultoffset-- > 0 and iter.Next(docNr, score))
+	while (resultoffset-- > 0 and iter->Next(docNr, score))
 		++nr;
 	
 	vector<el::object> hits;
 	sub.put("first", el::object(nr));
 	
-	while (maxresultcount-- > 0 and iter.Next(docNr, score))
+	while (maxresultcount-- > 0 and iter->Next(docNr, score))
 	{
 		el::object hit;
 		
@@ -1192,13 +1229,18 @@ void M6Server::handle_linked(const zh::request& request, const el::scope& scope,
 	if (maxresultcount > 0 and count + 1 > nr)
 		count = nr - 1;
 	
-	sub.put("hits", el::object(hits));
-	sub.put("hitCount", el::object(count));
-	sub.put("lastPage", el::object(((count - 1) / hits_per_page) + 1));
-	sub.put("last", el::object(nr - 1));
-	sub.put("ranked", el::object(false));
-	
-	create_reply_from_template("results.html", sub, reply);
+	if (count == 1)
+		create_redirect(ddb, docNr, "linked record", true, request, reply);
+	else
+	{
+		sub.put("hits", el::object(hits));
+		sub.put("hitCount", el::object(count));
+		sub.put("lastPage", el::object(((count - 1) / hits_per_page) + 1));
+		sub.put("last", el::object(nr - 1));
+		sub.put("ranked", el::object(false));
+		
+		create_reply_from_template("results.html", sub, reply);
+	}
 }
 
 void M6Server::handle_similar(const zh::request& request, const el::scope& scope, zh::reply& reply)

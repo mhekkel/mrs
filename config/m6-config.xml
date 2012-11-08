@@ -84,6 +84,7 @@
 			<db>genbank</db>
 			<db>refseq</db>
 			<db>taxonomy</db>
+			<db>pdb</db>
 		</dbs>
 	</server>
 

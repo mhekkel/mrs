@@ -535,6 +535,47 @@ void M6WSSearch::FindBoolean(const string& inDatabank, const WSSearchNS::Boolean
 void M6WSSearch::GetLinked(const string& db, const string& id,
 	const string& linkedDb, int resultoffset, int maxresultcount, vector<WSSearchNS::FindResult>& response)
 {
-	
-}
+	log() << db << "/" << id << " => " << linkedDb;
 
+	M6Databank* msdb = Load(db);
+	M6Databank* mddb = Load(linkedDb);
+	
+	if (msdb == nullptr or mddb == nullptr)
+		THROW(("Databank not loaded"));
+	
+	unique_ptr<M6Document> doc(msdb->Fetch(id));
+	if (not doc)
+		THROW(("Document not found"));
+	
+	// Collect the links
+	unique_ptr<M6Iterator> iter(GetLinks(db, *doc, *mddb));
+	
+	if (iter)
+	{
+		if (maxresultcount <= 0)
+			maxresultcount = 15;
+		
+		WSSearchNS::FindResult result = { linkedDb, iter->GetCount() };
+			
+		uint32 docNr;
+		float rank;
+			
+		while (resultoffset-- > 0 and iter->Next(docNr, rank))
+			;
+			
+		while (maxresultcount-- > 0 and iter->Next(docNr, rank))
+		{
+			WSSearchNS::Hit h;
+				
+			unique_ptr<M6Document> doc(mddb->Fetch(docNr));
+				
+			h.id = doc->GetAttribute("id");
+			h.title = doc->GetAttribute("title");
+			h.score = rank;
+				
+			result.hits.push_back(h);
+		}
+
+		response.push_back(result);
+	}
+}

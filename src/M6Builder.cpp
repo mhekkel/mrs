@@ -615,52 +615,44 @@ void M6Builder::Build(uint32 inNrOfThreads)
 		path = path.string() + "-" + boost::lexical_cast<string>(u);
 	}
 
-	try
+	zx::element* source = mConfig->find_first("source");
+	if (source == nullptr)
+		THROW(("Missing source specification for databank '%s'", dbID.c_str()));
+	
+	string version = M6Parser::GetVersion(mConfig->get_attribute("parser"),
+		source->content());
+	
+	// TODO fetch version string?
+	
+	mDatabank = M6Databank::CreateNew(dbID, path.string(), version);
+	mDatabank->StartBatchImport(mLexicon);
+	
+	vector<fs::path> files;
+	int64 rawBytes = Glob(M6Config::Instance().FindGlobal("/m6-config/rawdir"),
+		source, files);
+	
 	{
-		zx::element* source = mConfig->find_first("source");
-		if (source == nullptr)
-			THROW(("Missing source specification for databank '%s'", dbID.c_str()));
-		
-		string version = M6Parser::GetVersion(mConfig->get_attribute("parser"),
-			source->content());
-		
-		// TODO fetch version string?
-		
-		mDatabank = M6Databank::CreateNew(dbID, path.string(), version);
-		mDatabank->StartBatchImport(mLexicon);
-		
-		vector<fs::path> files;
-		int64 rawBytes = Glob(M6Config::Instance().FindGlobal("/m6-config/rawdir"),
-			source, files);
-		
-		{
-			M6Progress progress(dbID, rawBytes + 1, "parsing");
-		
-			M6Processor processor(*mDatabank, mLexicon, mConfig);
-			processor.Process(files, progress, inNrOfThreads);
+		M6Progress progress(dbID, rawBytes + 1, "parsing");
+	
+		M6Processor processor(*mDatabank, mLexicon, mConfig);
+		processor.Process(files, progress, inNrOfThreads);
 
-			mDatabank->EndBatchImport();
-		}
-		
-		mDatabank->FinishBatchImport();
-		
-		delete mDatabank;
-		mDatabank = nullptr;
-		
-		// if we created a temporary db
-		if (path != dstPath)
-		{
-			fs::remove_all(dstPath);
-			fs::rename(path, dstPath);
-		}
-		
-		cout << "done" << endl;
+		mDatabank->EndBatchImport();
 	}
-	catch (...)
+	
+	mDatabank->FinishBatchImport();
+	
+	delete mDatabank;
+	mDatabank = nullptr;
+	
+	// if we created a temporary db
+	if (path != dstPath)
 	{
-		fs::remove_all(path);
-		throw;
+		fs::remove_all(dstPath);
+		fs::rename(path, dstPath);
 	}
+	
+	cout << "done" << endl;
 }
 
 void M6Builder::IndexDocument(const string& inText, vector<string>& outTerms)

@@ -258,7 +258,13 @@ void M6InputDocument::Index(const string& inIndex,
 
 void M6InputDocument::AddLink(const string& inDatabank, const string& inValue)
 {
-	mLinks[inDatabank].insert(inValue);
+	string db(inDatabank);
+	M6Tokenizer::CaseFold(db);
+	
+	string id(inValue);
+	M6Tokenizer::CaseFold(id);
+	
+	mLinks[db].insert(id);
 }
 
 void M6InputDocument::Tokenize(M6Lexicon& inLexicon, uint32 inLastStopWord)

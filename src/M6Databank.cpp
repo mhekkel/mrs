@@ -310,6 +310,8 @@ M6FullTextIx::M6FullTextIx(const fs::path& inDbDirectory, const string& inName)
 	, mEntryRunThread(boost::bind(&M6FullTextIx::FlushEntryRuns, this))
 	, mEntryCount(0)
 {
+	mFullTextIxMap.assign(false);
+	mDocLocationIxMap.assign(false);
 }
 
 M6FullTextIx::~M6FullTextIx()

@@ -35,6 +35,14 @@ sub parse
 			$value = substr($value, 0, 255) if length($value) > 255;
 			$self->set_attribute('title', lc $value);
 		}
+		elsif ($key eq 'DR')
+		{
+			$self->index_text('dr', $value);
+			while ($value =~ m/(\w+?), (\w+) ;/g)
+			{
+				$self->add_link('sprot', $2);
+			}
+		}
 		elsif ($key eq 'PR')
 		{
 			$value = $1 if $value =~ m/PROSITE; (.+)/;

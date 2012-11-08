@@ -57,7 +57,7 @@ sub parse
 			$self->set_attribute('title', $1) if ($value =~ m/Full=(.+?);/);
 			$self->index_text('de', $value);
 
-			while ($value =~ /(EC\s*)(\d+\.\d+\.\d+\.\d+)/g)
+			while ($value =~ /(EC=)(\d+\.\d+\.\d+\.\d+)/g)
 			{
 				$self->add_link('enzyme', $2);
 			}

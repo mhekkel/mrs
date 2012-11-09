@@ -1038,10 +1038,8 @@ M6BasicIx* M6BatchIndexProcessor::GetIndexBase(const string& inName, M6IndexType
 	T* result = nullptr;
 	foreach (M6BasicIxDesc& ix, mIndices)
 	{
-		if (inName == ix.mName)
+		if (inName == ix.mName and inType == ix.mType)
 		{
-			if (inType != ix.mType)
-				THROW(("Inconsistent use of indices (%s)", inName.c_str()));
 			result = dynamic_cast<T*>(ix.mBasicIx);
 			break;
 		}
@@ -1428,11 +1426,8 @@ M6BasicIndexPtr M6DatabankImpl::GetIndex(const string& inName, M6IndexType inTyp
 	
 	foreach (M6IndexDesc& desc, mIndices)
 	{
-		if (desc.mName == inName)
+		if (desc.mName == inName and desc.mType == inType)
 		{
-			if (desc.mType != inType)
-				THROW(("Inconsistent use of indices (%s)", inName.c_str()));
-			
 			result = desc.mIndex;
 			break;
 		}
@@ -1446,7 +1441,16 @@ M6BasicIndexPtr M6DatabankImpl::CreateIndex(const string& inName, M6IndexType in
 	M6BasicIndexPtr result = GetIndex(inName, inType);
 	if (result == nullptr)
 	{
-		fs::path path = mDbDirectory / (inName + ".index");
+		fs::path path;
+		
+		if (inType == eM6LinkIndex)
+			path = mDbDirectory / "links" / (inName + ".index");
+		else
+		{
+			path = mDbDirectory / (inName + ".index");
+			if (fs::exists(path))
+				THROW(("Inconsistent use of indices (%s)", inName.c_str()));
+		}
 		
 		switch (inType)
 		{
@@ -1458,7 +1462,7 @@ M6BasicIndexPtr M6DatabankImpl::CreateIndex(const string& inName, M6IndexType in
 			case eM6NumberMultiIndex:	result.reset(new M6NumberMultiIndex(path, mMode)); break;
 			case eM6CharMultiIDLIndex:	result.reset(new M6SimpleIDLMultiIndex(path, mMode)); break;
 			case eM6CharWeightedIndex:	result.reset(new M6SimpleWeightedIndex(path, mMode)); break;
-			case eM6LinkIndex:			result.reset(new M6SimpleMultiIndex(mDbDirectory / "links" / (inName + ".index"), mMode)); break;
+			case eM6LinkIndex:			result.reset(new M6SimpleMultiIndex(path, mMode)); break;
 			default:					THROW(("unsupported"));
 		}
 

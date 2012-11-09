@@ -24,8 +24,6 @@ sub parse
 	{
 		$self->set_attribute('id', $1);
 		$self->index_unique_string('id', $1);
-
-print STDERR "id: $id\n";
 	}
 	
 	my $title = '';
@@ -33,7 +31,7 @@ print STDERR "id: $id\n";
 	{
 		$title .= "; $1";
 	}
-print STDERR "title: $title\n";
+
 	$self->set_attribute('title', $title) if length($title) > 0;	
 	
 	# index attribute values
@@ -42,8 +40,6 @@ print STDERR "title: $title\n";
 		my $attr = $1;
 		while ($attr =~ m/\S+?=('|")([^'"]+)\1/g)
 		{
-print STDERR "attr: $2\n";
-
 			$self->index_text('attr', $2);
 		}
 	}
@@ -51,7 +47,6 @@ print STDERR "attr: $2\n";
 	# index content
 	while ($text =~ m|>([^<>]++)<|g)
 	{
-print STDERR "text: $1\n";
 		$self->index_text('text', $1);
 	}
 	

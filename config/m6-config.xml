@@ -32,9 +32,6 @@
 			<db id="pdb" name="PDB">
 				<file>pdb.m6/fasta</file>
 			</db>
-			<db id="pdb-mini" name="PDB mini">
-				<file>pdb-mini.m6/fasta</file>
-			</db>
 		</dbs>
 	</blast>
 
@@ -53,7 +50,6 @@
 			<db>go</db>
 			<db>interpro</db>
 			<db>pdb</db>
-			<db>pdb-mini</db>
 			<db>dssp</db>
 			<db>hssp</db>
 			<db>gene</db>
@@ -144,13 +140,13 @@
 		<index name='body'		type="text"		xpath='/article/body' />
 	</parser>
 
-	<parser id="gene" chunk="/Entrezgene-Set/Entrezgene">
-		<index name='id'		type="string"	xpath='Entrezgene_track-info/Gene-track/Gene-track_geneid'
-			   attr="true"		/>
-		<index name='title'		type="text"		xpath='Entrezgene_prot/Prot-ref/Prot-ref_name/Prot-ref_name_E'
-			   attr="true"	/>
-		<index name='text'		type='text'		xpath='.//*' />
-	</parser>
+<!--	<parser id="gene" chunk="/Entrezgene-Set/Entrezgene">-->
+<!--		<index name='id'		type="string"	xpath='Entrezgene_track-info/Gene-track/Gene-track_geneid'-->
+<!--			   attr="true"		/>-->
+<!--		<index name='title'		type="text"		xpath='Entrezgene_prot/Prot-ref/Prot-ref_name/Prot-ref_name_E'-->
+<!--			   attr="true"	/>-->
+<!--		<index name='text'		type='text'		xpath='.//*' />-->
+<!--	</parser>-->
 
 	<parser id="interpro" chunk="/interprodb/interpro">
 		<index name='id'		type="string"	xpath='@id'		   attr="true"		unique="true" />

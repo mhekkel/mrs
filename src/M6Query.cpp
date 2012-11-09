@@ -26,6 +26,7 @@ class M6QueryParser
   private:
 	M6Iterator*		ParseQuery();
 	M6Iterator*		ParseTest();
+	M6Iterator*		ParseLink();
 	M6Iterator*		ParseQualifiedTest(const string& inIndex);
 	M6Iterator*		ParseTerm(const string& inIndex);
 	M6Iterator*		ParseBooleanTerm(const string& inIndex, M6QueryOperator inOperator);
@@ -33,6 +34,9 @@ class M6QueryParser
 
 	M6Token			GetNextToken();
 	void			Match(M6Token inToken);
+
+	M6Iterator*		GetLinks(const string& inDB, const string& inDocID);
+	M6Iterator*		GetLinks(const string& inDB, uint32 inDocNr);
 	
 	M6Databank*		mDatabank;
 	M6Tokenizer		mTokenizer;
@@ -116,6 +120,12 @@ M6Iterator* M6QueryParser::ParseTest()
 	
 	switch (mLookahead)
 	{
+		case eM6TokenOpenBracket:
+			Match(eM6TokenOpenBracket);
+			result.reset(ParseLink());
+			Match(eM6TokenCloseBracket);
+			break;
+		
 		case eM6TokenOpenParenthesis:
 			Match(eM6TokenOpenParenthesis);
 			result.reset(ParseQuery());
@@ -259,6 +269,38 @@ M6Iterator* M6QueryParser::ParseQualifiedTest(const string& inIndex)
 	return result.release();	
 }
 
+M6Iterator* M6QueryParser::ParseLink()
+{
+	unique_ptr<M6UnionIterator> result(new M6UnionIterator);
+	
+	while (mLookahead != eM6TokenCloseBracket)
+	{
+		string db = mTokenizer.GetTokenString();
+		Match(eM6TokenWord);
+		Match(eM6TokenSlash);
+		switch (mLookahead)
+		{
+			case eM6TokenDocNr:
+				if (mDatabank != nullptr)
+					result->AddIterator(GetLinks(db, boost::lexical_cast<uint32>(mTokenizer.GetTokenString())));
+				Match(eM6TokenDocNr);
+				break;
+			
+			case eM6TokenNumber:
+			case eM6TokenWord:
+				if (mDatabank != nullptr)
+					result->AddIterator(GetLinks(db, mTokenizer.GetTokenString()));
+				Match(mLookahead);
+				break;
+			
+			default:
+				Match(eM6TokenWord);
+		}
+	}
+	
+	return result.release();
+}
+
 M6Iterator* M6QueryParser::ParseTerm(const string& inIndex)
 {
 	unique_ptr<M6Iterator> result;
@@ -345,6 +387,16 @@ M6Iterator* M6QueryParser::ParseBooleanTerm(const string& inIndex, M6QueryOperat
 	}
 	
 	return result.release();
+}
+
+M6Iterator* M6QueryParser::GetLinks(const string& inDB, const string& inDocID)
+{
+	return mDatabank->GetLinkedDocuments(inDB, inDocID);
+}
+
+M6Iterator* M6QueryParser::GetLinks(const string& inDB, uint32 inDocNr)
+{
+	return mDatabank->GetLinkedDocuments(inDB, boost::lexical_cast<string>(inDocNr));
 }
 
 // --------------------------------------------------------------------

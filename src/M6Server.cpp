@@ -65,6 +65,8 @@ void M6SearchServer::LoadAllDatabanks()
 {
 	fs::path mrsDir(M6Config::Instance().FindGlobal("/m6-config/mrsdir"));
 	
+	mLinkMap.clear();
+	
 	zx::element_set dbs(mConfig->find("dbs/db"));
 	foreach (zx::element* db, dbs)
 	{
@@ -114,7 +116,11 @@ void M6SearchServer::LoadAllDatabanks()
 			}
 			
 			foreach (zx::element* alias, config->find("aliases/alias"))
-				aliases.insert(alias->content());
+			{
+				string s(alias->content());
+				M6Tokenizer::CaseFold(s);
+				aliases.insert(s);
+			}
 			
 			M6LoadedDatabank ldb =
 			{
@@ -127,6 +133,10 @@ void M6SearchServer::LoadAllDatabanks()
 			};
 
 			mLoadedDatabanks.push_back(ldb);
+			
+			mLinkMap[databank].insert(ldb.mDatabank);
+			foreach (const string& alias, aliases)
+				mLinkMap[alias].insert(ldb.mDatabank);
 		}
 		catch (exception& e)
 		{
@@ -134,6 +144,9 @@ void M6SearchServer::LoadAllDatabanks()
 				 << " >> " << e.what() << endl;
 		}
 	}
+	
+	foreach (M6LoadedDatabank& db, mLoadedDatabanks)
+		db.mDatabank->InitLinkMap(mLinkMap);
 }
 
 M6Databank* M6SearchServer::Load(const string& inDatabank)
@@ -389,7 +402,7 @@ M6Iterator* M6SearchServer::GetLinks(const string& inDb, M6Document& inDoc, M6Da
 		}
 	}
 	
-	result->AddIterator(inLinkedDb.GetLinks(inDb, inDoc.GetAttribute("id")));
+	result->AddIterator(inLinkedDb.GetLinkedDocuments(inDb, inDoc.GetAttribute("id")));
 	
 	return result.release();
 }
@@ -1200,7 +1213,7 @@ void M6Server::handle_linked(const zh::request& request, const el::scope& scope,
 		count = nr - 1;
 	
 	if (count == 1)
-		create_redirect(ddb, docNr, "linked record", true, request, reply);
+		create_redirect(ddb, docNr, sdb + '/' + id, true, request, reply);
 	else
 	{
 		sub.put("hits", el::object(hits));

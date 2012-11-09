@@ -7,13 +7,16 @@
 
 #include "M6File.h"
 
+class M6Databank;
 class M6Document;
 class M6DatabankImpl;
 class M6DocStore;
 class M6Lexicon;
 class M6Iterator;
 
-typedef std::map<std::string,std::set<std::string>> M6DocLinks;
+// A link mesh contains a mapping from db ID's and aliases to
+// actual databank objects.
+typedef std::map<std::string,std::set<M6Databank*>> M6LinkMap;
 
 struct M6IndexInfo
 {
@@ -82,12 +85,20 @@ class M6Databank
 	M6Iterator*		FindString(const std::string& inIndex, const std::string& inString);
 
 	// retrieve links for a certain record
+	void			InitLinkMap(const M6LinkMap& inLinkMap);
 	bool			IsLinked(const std::string& inDb, const std::string& inId);
-	M6Iterator*		GetLinks(const std::string& inDb, const std::string& inId);
+
+	// GetLinkedDocuments returns documents in this databank that are linked to
+	// by inDb/inId or that link themselves to inDb/inId
+	M6Iterator*		GetLinkedDocuments(const std::string& inDb, const std::string& inId);
 
 	// Exist returns <documents exist,docnr for a unique match>
 	std::tr1::tuple<bool,uint32>
 					Exists(const std::string& inIndex, const std::string& inValue);
+
+	// DocNrForID returns a doc number for an ID if the document exists
+	// and zero if it doesn't.
+	uint32			DocNrForID(const std::string& inID);
 	
 	// dictionary interface
 	void			SuggestCorrection(const std::string& inWord,
@@ -101,6 +112,9 @@ class M6Databank
 	uint32			GetMaxDocNr() const;
 	
   private:
+
+	friend class M6DatabankImpl;
+
 					// private constructor to create a new databank
 					M6Databank(const std::string& inDatabankID, const boost::filesystem::path& inPath,
 						const std::string& inVersion);

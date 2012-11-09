@@ -56,6 +56,7 @@ class M6SearchServer
 
 	const zx::element*	mConfig;
 	M6DbList			mLoadedDatabanks;
+	M6LinkMap			mLinkMap;
 };
 
 class M6Server : public zh::webapp, public M6SearchServer

@@ -38,6 +38,9 @@ ostream& operator<<(ostream& os, M6Token inToken)
 		case eM6TokenAND:				os << "AND"; break;
 		case eM6TokenOpenParenthesis:	os << "'('"; break;
 		case eM6TokenCloseParenthesis:	os << "')'"; break;
+		case eM6TokenOpenBracket:		os << "'['"; break;
+		case eM6TokenCloseBracket:		os << "']'"; break;
+		case eM6TokenSlash:				os << "'/'"; break;
 		case eM6TokenColon:				os << "':'"; break;
 		case eM6TokenEquals:			os << "'='"; break;
 		case eM6TokenLessThan:			os << "'<'"; break;
@@ -694,6 +697,9 @@ M6Token M6Tokenizer::GetNextQueryToken()
 //					case '+':	result = eM6TokenPlus; break;
 					case '(':	result = eM6TokenOpenParenthesis; break;
 					case ')':	result = eM6TokenCloseParenthesis; break;
+					case '[':	result = eM6TokenOpenBracket; break;
+					case ']':	result = eM6TokenCloseBracket; break;
+					case '/':	result = eM6TokenSlash; break;
 					case ':':	result = eM6TokenColon; break;
 					case '=':	result = eM6TokenEquals; break;
 					case '<':	state = 11; break;

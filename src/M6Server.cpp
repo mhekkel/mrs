@@ -1168,37 +1168,7 @@ void M6Server::handle_linked(const zh::request& request, const el::scope& scope,
 	// Collect the links
 	unique_ptr<M6Iterator> iter(GetLinks(sdb, *doc, *mddb));
 	
-	foreach (const auto& l, doc->GetLinks())
-	{
-		if (Load(l.first) == mddb)
-		{
-			vector<uint32> docs;
-			
-			foreach (string id, l.second)
-			{
-				if (id.empty())
-					continue;
-
-				M6Tokenizer::CaseFold(id);
-
-				bool exists;
-				uint32 docNr;
-				tr1::tie(exists, docNr) = mddb->Exists("id", id);
-				if (exists)
-					docs.push_back(docNr);
-			}
-			
-			if (not docs.empty())
-			{
-				sort(docs.begin(), docs.end());
-				iter.AddIterator(new M6VectorIterator(docs));
-			}
-		}
-	}
-	
-	iter.AddIterator(mddb->GetLinks(sdb, id));
-	
-	uint32 docNr, count = iter.GetCount();
+	uint32 docNr, count = iter->GetCount();
 	float score;
 	
 	nr = 1;

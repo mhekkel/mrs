@@ -48,7 +48,6 @@ class M6SearchServer
 
 	void			GetLinkedDbs(const std::string& inDb, const std::string& inId, std::vector<std::string>& outLinkedDbs);
 	void			AddLinks(const std::string& inDb, const std::string& inId, el::object& inHit);
-	M6Iterator*		GetLinks(const std::string& inDb, M6Document& inDoc, M6Databank& inLinkedDb);
 
 	uint32			Count(const std::string& inDatabank, const std::string& inQuery);
 	std::vector<std::string>

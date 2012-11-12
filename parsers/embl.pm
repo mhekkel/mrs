@@ -18,11 +18,12 @@ sub parse
 
 	my %skip = ( XX => 1, DT => 1, RN => 1, RP => 1, FH => 1 );
 	
-	while ($text =~ m/^(?:([A-Z]{2})   ).+\n(?:\1.+\n)*/mg)
+	while ($text =~ m/^(?:([A-Z]{2})   ).+\n(?:\1.+\n)*+/mg)
 	{
 		my $key = $1;
 		my $value = $&;
 		$value =~ s/^$key   //gm;
+		chomp($value);
 		
 		if ($key eq 'ID')
 		{

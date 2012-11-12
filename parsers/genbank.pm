@@ -27,6 +27,7 @@ sub parse
 		if ($key eq 'locus')
 		{
 			my $id = substr($value, 0, 15);
+			$id =~ s/\s+$//;
 			$self->index_unique_string('id', $id);
 			$self->set_attribute('id', $id);
 			

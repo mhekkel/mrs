@@ -91,7 +91,9 @@ sub parse
 		my $acc = substr($line, 80, 10); $acc =~ s/\s+$//;
 		
 		$self->index_string('seqid', $id);
+		$self->add_link('uniprot', $id);
 		$self->index_string('strid', $id) unless $strid eq '    ';
+		$self->add_link('pdb', $id);
 		$self->index_string('seqacc', $id);
 	}
 }

@@ -1981,12 +1981,15 @@ M6Iterator* M6DatabankImpl::GetLinkedDocuments(const string& inDB, const string&
 		}
 
 		unique_ptr<M6Document> doc(db->Fetch(id));
+
+		if (not doc)
+			continue;
 		
 		foreach (auto& l, doc->GetLinks())
 		{
 			if (mLinkMap[l.first].count(&mDatabank) == 0)
 				continue;
-			
+		
 			vector<uint32> docs;
 			foreach (const string& id, l.second)
 			{

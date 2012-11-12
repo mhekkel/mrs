@@ -42,12 +42,17 @@ sub parse
 			{}
 			elsif ($fld eq 'DR')
 			{
-				my @l = split(m/;\s*/, $value);
-				foreach my $l (@l)
+				while ($value =~ m/\S+?, (\S+)\s*, \S;/g)
 				{
-					$self->add_link('uniprot', $1)
-						if ($l =~ m/^(\w+),/);
+					$self->add_link('uniprot', $1);
 				}
+				
+#				my @l = split(m/;\s*/, $value);
+#				foreach my $l (@l)
+#				{
+#					$self->add_link('uniprot', $1)
+#						if ($l =~ m/^(\w+),/);
+#				}
 				
 				$self->index_text(lc $fld, $value);
 			}

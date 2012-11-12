@@ -543,13 +543,9 @@ void M6WSSearch::GetLinked(const string& db, const string& id,
 	if (msdb == nullptr or mddb == nullptr)
 		THROW(("Databank not loaded"));
 	
-	unique_ptr<M6Document> doc(msdb->Fetch(id));
-	if (not doc)
-		THROW(("Document not found"));
-	
 	// Collect the links
-	unique_ptr<M6Iterator> iter(GetLinks(db, *doc, *mddb));
-	
+	unique_ptr<M6Iterator> iter(mddb->GetLinkedDocuments(db, id));
+
 	if (iter)
 	{
 		if (maxresultcount <= 0)

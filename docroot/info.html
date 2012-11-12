@@ -83,7 +83,7 @@
 						<td><a href="browse?db=${databank.id}&amp;ix=${i.id}">${i.id}</a></td>
 						<td>${i.type}</td>
 						<td style="text-align:right"><mrs:number n="${i.count}"/></td>
-						<td style="text-align:right;"><mrs:number n="${i.size}"/></td>
+						<td style="text-align:right;"><mrs:number f='#,##0B' n="${i.size}"/></td>
 					</tr>
 				</mrs:iterate>
 			</table>

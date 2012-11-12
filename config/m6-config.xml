@@ -102,6 +102,13 @@
 	<format id="uniprot" script="scripts/uniprot.js">
 		<link regex="(?&lt;=DR   EMBL; )(\S+)(?=;)" db="embl" ix="id" id="$1" />
 		<link regex="(?&lt;=DR   PDB; )(\S+)(?=;)" db="pdb" ix="id" id="$1" />
+		<link regex="(?&lt;=DR   RefSeq; )(?:(\S+)\.\d+)(?=;)" db="refseq" ix="id" id="$1" />
+		<link regex="(?&lt;=DR   UniGene; )(\S+)(?=;)" db="unigene" ix="id" id="$1" />
+		<link regex="(?&lt;=DR   GO; )GO:(\S+)(?=;)" db="go" ix="id" id="$1" />
+		<link regex="(?&lt;=DR   InterPro; )(\S+)(?=;)" db="interpro" ix="id" id="$1" />
+		<link regex="(?&lt;=DR   PFam; )(\S+)(?=;)" db="pfam" ix="id" id="$1" />
+		<link regex="(?&lt;=DR   PRINTS; )(\S+)(?=;)" db="prints" ix="id" id="$1" />
+		<link regex="(?&lt;=DR   PROSITE; )(\S+)(?=;)" db="prosite" ix="ac" id="$1" />
 	</format>
 
 	<format id="enzyme">
@@ -170,7 +177,7 @@
 		<name>PDBFINDER</name>
 		<file>pdbfinder.m6</file>
 		<locale>en_US.UTF-8</locale>
-		<source>pdbfinder2/PDBFIND.TXT.gz</source>
+		<source>pdbfinder2/PDBFIND2.TXT.gz</source>
 		<fetch
 			src="ftp://ftp.cmbi.ru.nl/pub/molbio/data/pdbfinder2/PDBFIND2.TXT.gz"
 			dst="pdbfinder2" />
@@ -432,6 +439,9 @@
 	</databank>
 
 	<databank id="pfama" parser="pfam" format="stockholm">
+		<aliases>
+			<alias>pfam</alias>
+		</aliases>
 		<name>Pfam-A</name>
 		<file>pfama.m6</file>
 		<info>http://pfam.sanger.ac.uk/</info>
@@ -440,6 +450,9 @@
 	</databank>
 
 	<databank id="pfamb" parser="pfam" format="stockholm">
+		<aliases>
+			<alias>pfam</alias>
+		</aliases>
 		<name>Pfam-B</name>
 		<file>pfamb.m6</file>
 		<info>http://pfam.sanger.ac.uk/</info>
@@ -448,6 +461,9 @@
 	</databank>
 
 	<databank id="pfamseed" parser="pfam" format="stockholm">
+		<aliases>
+			<alias>pfam</alias>
+		</aliases>
 		<name>Pfam-Seed</name>
 		<file>pfamseed.m6</file>
 		<info>http://pfam.sanger.ac.uk/</info>
@@ -541,5 +557,11 @@
 		<file>sprot-mini.m6</file>
 		<source>uniprot/sprot-mini.dat</source>
 	</databank>
-
+	
+	<databank id="embl-mini" parser="embl">
+		<name>EMBL mini</name>
+		<file>embl-mini.m6</file>
+		<source>embl_release/rel_est_vrl_01_r113.dat.gz</source>
+	</databank>
+	
 </m6-config>

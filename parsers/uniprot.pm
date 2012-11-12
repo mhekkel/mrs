@@ -106,9 +106,23 @@ sub parse
 		}
 		elsif ($key eq 'DR')
 		{
-			while ($value =~ m/^(.+?); (.+?);/mg)
+			while ($value =~ m/^(.+?); (.+?);(?: (.+?);)?/mg)
 			{
-				$self->add_link($1, $2);
+				my ($db, $id, $ac) = ($1, $2, $3);
+				
+				if (lc $db eq 'prosite')
+				{
+					$id = $ac;
+				}
+				elsif (lc $db eq 'refseq')
+				{
+					$id =~ s/\.\d+$//;
+				}
+				elsif (lc $db eq 'go')
+				{
+					$id = substr($id, 3);
+				}
+				$self->add_link($db, $id);
 			}
 			
 			$self->index_text('dr', $value);

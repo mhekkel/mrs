@@ -35,6 +35,9 @@ Embl = {
 	},
 	
 	createReference: function(ref) {
+
+		var table = $("<table class='list' cellspacing='0' cellpadding='0' width='100%'/>");
+
 		var s = '';
 		if (ref.ra != null && ref.ra.length > 0) s += ref.ra;
 		if (ref.rt != null && ref.rt.length > 0) s += "<strong>" + ref.rt + "</strong>";
@@ -42,49 +45,49 @@ Embl = {
 		if (s.length > 0) s += "<br/>";
 
 		// be very careful here, the rx may contain a ';' inside a DOI specifier e.g.
-		ref.rx = ref.rx.replace(/;\s+/g, '\n').replace(/;$/, '');
+//		ref.rx = ref.rx.replace(/;\s+/g, '\n').replace(/;$/, '');
 
-		var rx = $(ref.rx.split(/\n/)).map(function(index,value) {
-			var a = value.split(/=/);
-			if (a.length == 2) {
-				var e = a[1];
-				if (a[0] == 'MEDLINE')
-					e = "<a href='http://www.ncbi.nlm.nih.gov/entrez/query.fcgi?cmd=Retrieve&amp;db=PubMed&amp;list_uids=" + a[1] + "&amp;dopt=Abstract'>" + a[1] + "</a>";
-				else if (a[0] == 'PubMed')
-					e = "<a href='http://www.ncbi.nlm.nih.gov/entrez/query.fcgi?db=pubmed&amp;cmd=search&amp;term=" + a[1] + "'>" + a[1] + "</a>";
-				else if (a[0] == 'DOI')
-					e = "<a href='http://dx.doi.org/" + a[1] + "'>" + a[1] + "</a>";
-				return "<td class='label'>" + a[0] + "</td><td>" + e + "</td>";
-			}
-			if (value.length > 0)
-				return "<td colspan='2'>" + a[0] + "</td>";
-			return "";
-		});
-
-		var rows = new Array();
-
-		if (rx.length > 0) {
-			$.each(rx, function(index, value) {
-				if (value.length > 0)
-					rows.push(value);
-			});
-		}
+		var a, rx = new Array(), re = /(DOI|PUBMED); (.+)\.$/gm;
 		
-		if (ref.rp != null && ref.rp.length > 0) rows.push("<td class='label'>Reference Position</td><td>" + ref.rp.toLowerCase() + "</td>");
+		while ((a = re.exec(ref.rx)) != null)
+		{
+			var url;
+		
+			if (a[1] == 'MEDLINE')
+				url = "<a href='http://www.ncbi.nlm.nih.gov/entrez/query.fcgi?cmd=Retrieve&amp;db=PubMed&amp;list_uids=" + a[2] + "&amp;dopt=Abstract'>" + a[2] + "</a>";
+			else if (a[1] == 'PUBMED')
+				url = "<a href='http://www.ncbi.nlm.nih.gov/entrez/query.fcgi?db=pubmed&amp;cmd=search&amp;term=" + a[2] + "'>" + a[2] + "</a>";
+			else if (a[1] == 'DOI')
+				url = "<a href='http://dx.doi.org/" + a[2] + "'>" + a[2] + "</a>";
+		
+			if (url != null)
+				$("<tr/>").append(
+					$("<td class='label'/>").append(a[1]),
+					$("<td/>").append(url)
+				).appendTo(table);
+		}
+
+		if (ref.rp != null && ref.rp.length > 0)
+			$("<tr/>").append(
+				$("<td class='label'/>").append("Reference Position"),
+				$("<td/>").append(ref.rp.toLowerCase())
+			).appendTo(table);
+
 		$(ref.rc.split(/;\s*/)).each(function(index, value) {
 			if (value.length > 0)
-				rows.push("<td class='label'>Reference Comment</td><td>" + value.toLowerCase() + "</td>");
+				$("<tr/>").append(
+					$("<td class='label'/>").append("Reference Comment"),
+					$("<td/>").append(value.toLowerCase())
+				).appendTo(table);
 		});
-		if (ref.rg != null && ref.rg.length > 0) rows.push("<td class='label'>Reference Group</td><td>" + ref.rg + "</td>");
-	
-		if (rows.length > 0)
-		{
-			var table = $(document.createElement("table")).attr("cellpadding", 0)
-				.attr("cellspacing", 0).attr("width", '100%');
-			$(rows).each(function(index,value) { $("<tr/>").append(value).appendTo(table); });
-			s += $("<table/>").append(table).html();
-		}
 
+		if (ref.rg != null && ref.rg.length > 0)
+			$("<tr/>").append(
+				$("<td class='label'/>").append("Reference Group"),
+				$("<td/>").append(ref.rg)
+			).appendTo(table);
+		
+		s += table.html();
 		return "<td>" + ref.nr + "</td><td class='sub_entry'>" + s + "</td>";
 	},
 
@@ -135,9 +138,11 @@ Embl = {
 		var refs = new Array();
 		var xref = new Array();
 		var seqr = new Array();
-		var ftbl, floc;
+		var ftbl, floc, atbl;
 	
 		var re = /^(([A-Z]{2})   ).+\n(\2.+\n)*/gm;
+		
+		var aso = [ 5, 21, 42, 57 ];
 		
 		var m;
 		while ((m = re.exec(text)) != null) {
@@ -208,7 +213,10 @@ Embl = {
 			else if (m[2] == 'KW') {
 				var a = m[0].replace(/^KW   /gm, '').replace(/;\s*$/, '').replace(/\.\n/, '').split(/;\s*/);
 				a = $.map(a, function(value) {
-					return "<a href='search?db=embl&amp;q=kw:\"" + value + "\"'>" + value + "</a>";
+					var attr = value;
+					if (attr.indexOf('<') >= 0)
+						attr = $(attr).text();
+					return "<a href='search?db=embl&amp;q=kw:\"" + attr + "\"'>" + value + "</a>";
 				});
 				desc.push(Embl.cell("Keywords", a.join(", ")));
 			}
@@ -218,7 +226,7 @@ Embl = {
 				refs.push(ref);
 			}
 			else if (m[2] == 'RP') { refs[refs.length - 1].rp += m[0].replace(/^RP   (.+)\n?$/gm, "$1"); }
-			else if (m[2] == 'RX') { refs[refs.length - 1].rx += m[0].replace(/^RX   (.+)\n?$/gm, "$1"); }
+			else if (m[2] == 'RX') { refs[refs.length - 1].rx += m[0]; }
 			else if (m[2] == 'RC') { refs[refs.length - 1].rc += m[0].replace(/^RC   (.+)\n?$/gm, "$1"); }
 			else if (m[2] == 'RG') { refs[refs.length - 1].rg += m[0].replace(/^RG   (.+)\n?$/gm, "$1"); }
 			else if (m[2] == 'RA') { refs[refs.length - 1].ra += m[0].replace(/^RA   (.+)\n?$/gm, "$1"); }
@@ -234,6 +242,43 @@ Embl = {
 			else if (m[2] == 'CC') {
 				cmnt.push(Embl.cell("Comment", m[0].replace(/^CC   /g, '')));
 			}
+			else if (m[2] == 'AH') {
+				aso[0] = m[0].indexOf('LOCAL_SPAN');
+				aso[1] = m[0].indexOf('PRIMARY_IDENTIFIER');
+				aso[2] = m[0].indexOf('PRIMARY_SPAN');
+				aso[3] = m[0].indexOf('COMP');
+			}
+			else if (m[2] == 'AS') {
+				
+				atbl = $("<table class='list' cellspacing='0' cellpadding='0' width='100%'/>");
+				atbl.append(
+					$("<tr/>").append(
+						$("<th width='10%'/>").append('Primary seq.'),
+						$("<th width='10%'/>").append('Span in assembly'),
+						$("<th width='80%'/>").append('Span in primary sequence')
+					)
+				);
+			
+				var rx = /^.+$/gm;
+				var mx;
+				while ((mx = rx.exec(m[0])) != null)
+				{
+					var s = mx[0].replace(/<[^>]+>/g, '');
+				
+					var localSpan = s.substr(aso[0], aso[1] - aso[0]);
+					var primIdent = s.substr(aso[1], aso[2] - aso[1]);
+					var primSpan  = s.substr(aso[2], aso[3] - aso[2]);
+					var comp      = s.substr(aso[3]) == 'c' ? ' (complement)' : '';
+					
+					atbl.append(
+						$("<tr/>").append(
+							$("<td/>").append(localSpan),
+							$("<td/>").append(primIdent),
+							$("<td/>").append(primSpan + comp)
+						)
+					);
+				}
+			}
 			else if (m[2] == 'FT') {
 				// the feature table...
 				
@@ -242,39 +287,44 @@ Embl = {
 				floc = new Array();
 				
 				$("<tr/>").append(
-					$("<th width='10%'/>").append('Key'),
-					$("<th width='5%'/>").append('From'),
-					$("<th width='5%'/>").append('To'),
-					$("<th width='5%'/>").append('Length'),
-					$("<th width='10%'/>").append('Qualifier'),
-					$("<th width='65%'/>").append('Value')
+					$("<th/>").append('Key'),
+					$("<th/>").append('From'),
+					$("<th/>").append('To'),
+					$("<th/>").append('Length'),
+					$("<th/>").append('Qualifier'),
+					$("<th/>").append('Value')
 				).appendTo(ftbl);
 				
 				var s = m[0].replace(/^FT   /gm, '');
 				
-				var rx = /^([^ ].{14}) (\d+)\.\.(\d+)\n(( {15}.+\n)+)/gm;
+				var rx = /^([^ ].{14}) (join\([^)]+?\)|((&lt;)?\d+)(\.\.((&gt;)?\d+))?)((\n {15}.+)*)/gm;
 				while ((m = rx.exec(s)) != null) {
 					
 					var len = 0;
-					try { len = m[3] - m[2] + 1; } catch (e) {}
-					var loc = { from: m[2], to: m[3], length: len };
-
-					floc.push(loc);
+					try { len = m[5] - m[3] + 1; } catch (e) {}
+					
+					if (m[3] != null && m[6] != null) {
+						var loc = { from: m[3].replace("&lt;", ''), to: m[6].replace("&gt;", ''), length: len };
+						floc.push(loc);
+					}
+					else {
+						floc.push({});
+					}
 					Embl.features.push(new Array());
 					
 					var featureId = "feature-" + featureNr++;
 					
-					var rxf = /\/([^=]+)=(("[^"]+")|\d+)/gm;
+					var rxf = /\/([^=]+)=("(([^<"]|<[^>]+>)+)"|\d+)/gm;
 					
 					var fv = new Array();
 					var m2;
-					while ((m2 = rxf.exec(m[4])) != null)
+					while ((m2 = rxf.exec(m[8])) != null)
 					{
-						var fvv = { name: m2[1], value: m2[2].replace(/^"(.+)"$/, "$1") };
+						var fvv = { name: m2[1], value: m2[3] ? m2[3] : m2[2] };
 						
 						if (fvv.name == 'translation')
 						{
-							fvv.value = $("<div/").addClass("scrolling-sequence").append(
+							fvv.value = $("<div/>").addClass("scrolling-sequence").append(
 								fvv.value.replace(/\s+/g, '').replace(/.{30}/g, "$&\n")
 							);
 						}
@@ -285,11 +335,23 @@ Embl = {
 					if (fv.length == 0)
 						fv.push({name: '', value: ''});
 					
-					$("<tr/>").append(
-						$("<td/>").attr('rowspan', fv.length).append(m[1].toLowerCase()),
-						$("<td class='right'/>").attr('rowspan', fv.length).append(m[2]),
-						$("<td class='right'/>").attr('rowspan', fv.length).append(m[3]),
-						$("<td class='right'/>").attr('rowspan', fv.length).append(len ? len : ''),
+					var row = $("<tr/>").append(
+						$("<td/>").attr('rowspan', fv.length).append(m[1].toLowerCase()));
+						
+					if (m[3] != null) {
+						row.append(
+							$("<td class='right'/>").attr('rowspan', fv.length).append(m[3]),
+							$("<td class='right'/>").attr('rowspan', fv.length).append(m[6]),
+							$("<td class='right'/>").attr('rowspan', fv.length).append(len ? len : '')
+						);
+					}
+					else {
+						row.append(
+							$("<td colspan='3'/>").attr('rowspan', fv.length)
+								.append(m[2].replace(/,/g, ",\n")));
+					}
+					
+					row.append(
 						$("<td/>").append(fv[0].name),
 						$("<td/>").append(fv[0].value)
 					).attr('id', featureId).addClass('feature')
@@ -380,6 +442,12 @@ Embl = {
 			$(cmnt).each(function(index, value) {
 				$("<tr/>").append(value).appendTo(table);
 			});
+		}
+
+		if (atbl != null)
+		{
+			$("<tr/>").append("<th colspan='2'>Assembly information</th>").appendTo(table);
+			$("<tr/>").append($("<td colspan='2' class='sub_entry'/>").append(atbl)).appendTo(table);
 		}
 		
 		if (xref.length > 0)

@@ -320,7 +320,7 @@ div.redirect {
 	width: 320px;
 	height: 66px;
 	font-family: monospace;
-	font-size: 80%;
+	font-size: small;
 	overflow: auto;
 	white-space: pre;
 }

@@ -404,7 +404,10 @@ UniProt = {
 			else if (m[2] == 'KW') {
 				var a = m[0].replace(/^KW   /gm, '').replace(/;\s*$/, '').replace(/\.\n/, '').split(/;\s*/);
 				a = $.map(a, function(value) {
-					return "<a href='search?db=sprot&amp;q=kw:\"" + $(value).text() + "\"'>" + value + "</a>";
+					var attr = value;
+					if (attr.indexOf('<') >= 0)
+						attr = $(attr).text();
+					return "<a href='search?db=sprot&amp;q=kw:\"" + attr + "\"'>" + value + "</a>";
 				});
 				name.push(UniProt.cell("Keywords", a.join(", ")));
 			}

@@ -111,6 +111,8 @@
 		<link regex="(?&lt;=DR   PROSITE; )(\S+)(?=;)" db="prosite" ix="ac" id="$1" />
 	</format>
 
+	<format id="embl" script="scripts/embl.js" />
+
 	<format id="enzyme">
 		<link regex="([A-Z]+[A-Z0-9]+)(?=, )" db="sprot" ix="ac" id="$1" />
 	</format>
@@ -193,7 +195,7 @@
 		<fetch src="ftp://ftp.ncbi.nih.gov/repository/OMIM/ARCHIVE/omim.txt.Z"/>
 	</databank>
 	
-	<databank id="embl" parser="embl">
+	<databank id="embl" parser="embl" format="embl">
 		<name>EMBL</name>
 		<info>http://www.ebi.ac.uk/embl/index.html</info>
 		<file>/data/mrs/embl.m6</file>

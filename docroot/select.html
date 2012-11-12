@@ -20,7 +20,7 @@
 		
 		<label>Databank to link to
 			<select id="linkToDB" style="max-width:10em;">
-				<mrs:options collection="${linkeddbs}" value="id" label="name" />
+				<mrs:options collection="${databanks}" value="id" label="name" />
 			</select>
 		</label>
 	</div>
@@ -55,9 +55,9 @@
 			<li>Selected:</li>
 		</ul>
 
-		<mrs:if test="${linkeddbs}">
+<!--		<mrs:if test="${linkeddbs}">-->
 			<input type="button" name="btn1" value="Link" class="submit" onclick="GlobalSelection.link();"/>
-		</mrs:if>
+<!--		</mrs:if>-->
 		<input type="button" name="btn2" value="Align" class="submit" onclick="GlobalSelection.align();"/>
 		<input type="button" name="download" value="Download" class="submit" onclick="GlobalSelection.download();"/>
 		<input type="button" name="clear" value="Clear" class="submit" onclick="GlobalSelection.clear();"/>

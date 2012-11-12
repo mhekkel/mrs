@@ -64,7 +64,7 @@
 		
 		<table id="tabel" cellspacing="0" cellpadding="0" style="position:relative;" class="list">
 			<caption>
-				<mrs:if test="${q}">Results for query [${q}]</mrs:if>
+				<mrs:if test="${q and not linked.db}">Results for query [${q}]</mrs:if>
 				<mrs:if test="${similar}">Records similar to ${db}/${similar}</mrs:if>
 				<mrs:if test="${linked.db}">Records linked to ${linked.db}/${linked.id}</mrs:if>
 			</caption>

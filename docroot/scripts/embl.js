@@ -36,16 +36,13 @@ Embl = {
 	
 	createReference: function(ref) {
 
-		var table = $("<table class='list' cellspacing='0' cellpadding='0' width='100%'/>");
+		var table = $("<table class='list sub_entry' cellspacing='0' cellpadding='0' width='100%'/>");
 
 		var s = '';
 		if (ref.ra != null && ref.ra.length > 0) s += ref.ra;
 		if (ref.rt != null && ref.rt.length > 0) s += "<strong>" + ref.rt + "</strong>";
 		if (ref.rl != null && ref.rl.length > 0) s += ' ' + ref.rl;
 		if (s.length > 0) s += "<br/>";
-
-		// be very careful here, the rx may contain a ';' inside a DOI specifier e.g.
-//		ref.rx = ref.rx.replace(/;\s+/g, '\n').replace(/;$/, '');
 
 		var a, rx = new Array(), re = /(DOI|PUBMED); (.+)\.$/gm;
 		
@@ -62,7 +59,7 @@ Embl = {
 		
 			if (url != null)
 				$("<tr/>").append(
-					$("<td class='label'/>").append(a[1]),
+					$("<td width='40%' class='label'/>").append(a[1]),
 					$("<td/>").append(url)
 				).appendTo(table);
 		}
@@ -88,7 +85,7 @@ Embl = {
 			).appendTo(table);
 		
 		s += table.html();
-		return "<td>" + ref.nr + "</td><td class='sub_entry'>" + s + "</td>";
+		return "<td>" + ref.nr + "</td><td>" + s + "</td>";
 	},
 
 	createSequence: function(seq, floc) {
@@ -148,7 +145,7 @@ Embl = {
 		while ((m = re.exec(text)) != null) {
 			if (m[2] == 'ID') {
 				info.push(Embl.cell("Entry name",
-					m[0].replace(/ID\s+(\S+?)(;.+)/, "<strong>$1</strong>$2")));
+					m[0].replace(/ID\s+([^;]+)(;.+)/, "<strong>$1</strong>$2")));
 			}
 			else if (m[2] == 'AC') {
 				var a = m[0].replace(/;\s*$/, '').replace(/^AC\s+/gm, '').split(/;\s*/);
@@ -240,7 +237,7 @@ Embl = {
 				}
 			}
 			else if (m[2] == 'CC') {
-				cmnt.push(Embl.cell("Comment", m[0].replace(/^CC   /g, '')));
+				cmnt.push($("<td colspan='2'/>").append(m[0].replace(/^CC   /gm, '')));
 			}
 			else if (m[2] == 'AH') {
 				aso[0] = m[0].indexOf('LOCAL_SPAN');
@@ -250,7 +247,7 @@ Embl = {
 			}
 			else if (m[2] == 'AS') {
 				
-				atbl = $("<table class='list' cellspacing='0' cellpadding='0' width='100%'/>");
+				atbl = $("<table class='list sub_entry' cellspacing='0' cellpadding='0' width='100%'/>");
 				atbl.append(
 					$("<tr/>").append(
 						$("<th width='10%'/>").append('Primary seq.'),
@@ -288,9 +285,9 @@ Embl = {
 				
 				$("<tr/>").append(
 					$("<th/>").append('Key'),
-					$("<th/>").append('From'),
-					$("<th/>").append('To'),
-					$("<th/>").append('Length'),
+					$("<th width='8%'/>").append('From'),
+					$("<th width='8%'/>").append('To'),
+					$("<th width='8%'/>").append('Length'),
 					$("<th/>").append('Qualifier'),
 					$("<th/>").append('Value')
 				).appendTo(ftbl);
@@ -301,7 +298,7 @@ Embl = {
 				while ((m = rx.exec(s)) != null) {
 					
 					var len = 0;
-					try { len = m[5] - m[3] + 1; } catch (e) {}
+					try { len = m[6] - m[3] + 1; } catch (e) {}
 					
 					if (m[3] != null && m[6] != null) {
 						var loc = { from: m[3].replace("&lt;", ''), to: m[6].replace("&gt;", ''), length: len };
@@ -325,7 +322,7 @@ Embl = {
 						if (fvv.name == 'translation')
 						{
 							fvv.value = $("<div/>").addClass("scrolling-sequence").append(
-								fvv.value.replace(/\s+/g, '').replace(/.{30}/g, "$&\n")
+								fvv.value.replace(/\s+/g, '').replace(/.{40}/g, "$&\n")
 							);
 						}
 						
@@ -437,6 +434,14 @@ Embl = {
 			});
 		}
 
+		if (xref.length > 0)
+		{
+			$("<tr/>").append("<th colspan='2'>Cross-references</th>").appendTo(table);
+			$(xref).each(function(index, value) {
+				$("<tr/>").append(value).appendTo(table);
+			});
+		}
+		
 		if (cmnt.length > 0) {
 			$("<tr/>").append("<th colspan='2'>Comments</th>").appendTo(table);
 			$(cmnt).each(function(index, value) {
@@ -447,15 +452,9 @@ Embl = {
 		if (atbl != null)
 		{
 			$("<tr/>").append("<th colspan='2'>Assembly information</th>").appendTo(table);
-			$("<tr/>").append($("<td colspan='2' class='sub_entry'/>").append(atbl)).appendTo(table);
-		}
-		
-		if (xref.length > 0)
-		{
-			$("<tr/>").append("<th colspan='2'>Cross-references</th>").appendTo(table);
-			$(xref).each(function(index, value) {
-				$("<tr/>").append(value).appendTo(table);
-			});
+			$("<tr/>").append(
+				$("<td colspan='2' class='sub_entry'/>")
+					.append($("<div/>").addClass('feature_table').append(atbl))).appendTo(table);
 		}
 		
 		if (ftbl != null) {

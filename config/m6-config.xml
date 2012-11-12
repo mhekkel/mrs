@@ -106,7 +106,7 @@
 		<link regex="(?&lt;=DR   UniGene; )(\S+)(?=;)" db="unigene" ix="id" id="$1" />
 		<link regex="(?&lt;=DR   GO; )GO:(\S+)(?=;)" db="go" ix="id" id="$1" />
 		<link regex="(?&lt;=DR   InterPro; )(\S+)(?=;)" db="interpro" ix="id" id="$1" />
-		<link regex="(?&lt;=DR   PFam; )(\S+)(?=;)" db="pfam" ix="id" id="$1" />
+		<link regex="(?&lt;=DR   Pfam; )(\S+)(?=;)" db="pfama" ix="ac" id="$1" />
 		<link regex="(?&lt;=DR   PRINTS; )(\S+)(?=;)" db="prints" ix="id" id="$1" />
 		<link regex="(?&lt;=DR   PROSITE; )(\S+)(?=;)" db="prosite" ix="ac" id="$1" />
 	</format>

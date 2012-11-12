@@ -233,22 +233,14 @@ GlobalSelection = {
 				"Ok": function() {
 					$(this).dialog("close");
 					
-					var sdb;
-					var ids = '';
-
+					var q = '';
 					GlobalSelection.each(function(db, id){
-						if (sdb == null) {
-							sdb = db;
-							ids = id;
-						} else {
-							ids += ';' + id;
-						}
+						q += db + '/' + id + ' ';
 					});
 
-					var form = document.getElementById('linkForm');
-					form.id.value = ids;
-					form.s.value = sdb;
-					form.d.value = $("#linkToDB").val();
+					var form = document.getElementById('queryForm');
+					form.db.value = $("#linkToDB").val();
+					form.q.value = '[' + q + ']';
 					form.submit();
 				}
 			}

@@ -110,15 +110,17 @@ sub parse
 			{
 				my ($db, $id, $ac) = ($1, $2, $3);
 				
-				if (lc $db eq 'prosite')
+				my $ldb = lc $db;
+				
+				if ($ldb eq 'prosite' or $ldb eq 'pfam')
 				{
 					$id = $ac;
 				}
-				elsif (lc $db eq 'refseq')
+				elsif ($ldb eq 'refseq')
 				{
 					$id =~ s/\.\d+$//;
 				}
-				elsif (lc $db eq 'go')
+				elsif ($ldb eq 'go')
 				{
 					$id = substr($id, 3);
 				}

@@ -19,8 +19,7 @@ class M6Iterator;
 typedef std::map<std::string,std::set<M6Databank*>> M6LinkMap;
 
 struct M6IndexInfo
-{
-#pragma message("unique??? data type???")
+{	// TODO: add unique flag here
 	std::string		mName;
 	M6IndexType		mType;
 	uint32			mCount;

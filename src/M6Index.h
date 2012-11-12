@@ -164,41 +164,7 @@ struct M6BasicComparator
 
 struct M6NumericComparator
 {
-	int operator()(const char* inKeyA, size_t inKeyLengthA, const char* inKeyB, size_t inKeyLengthB) const
-	{
-#pragma message("TODO improve numeric comparison")
-		int d = 0;
-		const char* ai = inKeyA + inKeyLengthA;
-		const char* bi = inKeyB + inKeyLengthB;
-		while (ai > inKeyA and bi > inKeyB)
-		{
-			--ai; --bi;
-			if (*ai != *bi)
-				d = *ai - *bi;
-		}
-
-		while (ai > inKeyA)
-		{
-			--ai;
-			if (*ai != '0')
-			{
-				d = 1;
-				break;
-			}
-		}
-
-		while (bi > inKeyB)
-		{
-			--bi;
-			if (*bi != '0')
-			{
-				d = -1;
-				break;
-			}
-		}
-
-		return d;
-	}
+	int operator()(const char* inKeyA, size_t inKeyLengthA, const char* inKeyB, size_t inKeyLengthB) const;
 };
 
 typedef M6Index<M6BasicIndex, M6BasicComparator, eM6CharIndex>	M6SimpleIndex;

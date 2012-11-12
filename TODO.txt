@@ -4,12 +4,8 @@ Todo
 - browse data/index
 
 - SOAP services (alleen clustal nog)
-- links
-- link in format-config uitbreiden
+- link in format-config uitbreiden ?
 - date index
-- number index improvement?
-
-- Joined databanks? Aliases?
 - near operator, how to implement? new query language?
 
 Basic:

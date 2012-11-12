@@ -2,44 +2,6 @@ package M6::Script::pfam;
 
 our @ISA = "M6::Script";
 
-my @links = (
-	{
-		match	=> qr|^(#=GF DR\s+PFAMA;\s)(\S+)(?=;)|mo,
-		db		=> 'pfama',
-		ix		=> 'ac'
-	},
-	{
-		match	=> qr|^(#=GF DR\s+PFAMB;\s)(\S+)(?=;)|mo,
-		db		=> 'pfamb',
-		ix		=> 'ac'
-	},
-	{
-		match	=> qr|^(#=GF DR\s+PDB;\s)(\S+)|mo,
-		db		=> 'pdb',
-		ix		=> 'id'
-	},
-	{
-		match	=> qr|^(#=GF DR\s+PROSITE;\s)(\S+)(?=;)|mo,
-		db		=> 'prosite_doc',
-		ix		=> 'id'
-	},
-	{
-		match	=> qr|^(#=GF DR\s+INTERPRO;\s)(\S+)(?=;)|mo,
-		db		=> 'interpro',
-		ix		=> 'id'
-	},
-	{
-		match	=> qr|^(#=GS .+?AC )([0-9A-Z]+)|mo,
-		db		=> 'uniprot',
-		ix		=> 'ac'
-	},
-	{
-		match	=> qr|^(#=GS .+DR PDB; )(\w{4})|mo,
-		db		=> 'pdb',
-		ix		=> 'id'
-	},
-);
-
 sub new
 {
 	my $invocant = shift;
@@ -70,6 +32,7 @@ sub parse
 			if ($field eq 'ID')
 			{
 				$self->index_unique_string('id', $value);
+				$self->set_attribute('id', $value);
 			}
 			elsif ($field =~ /BM|GA|TC|NC/o)  # useless fields
 			{}
@@ -120,7 +83,6 @@ sub version
 	
 	my $fh;
 
-print "zcat $raw_dir/relnotes.txt.Z\n";
 	open($fh, "zcat $raw_dir/relnotes.txt.Z|");
 
 	while (my $line = <$fh>)
@@ -137,28 +99,6 @@ print "zcat $raw_dir/relnotes.txt.Z\n";
 	chomp($vers);
 
 	return $vers;
-}
-
-sub pp
-{
-	my ($this, $q, $text, $id, $url) = @_;
-	
-	$text = $this->link_url($text);
-
-	# some entries are really way too large, so only when we have less than 1000 links:
-	if ($text =~ m/^#=GF SQ\s+(\d+)/mo and int($1) < 1000)
-	{
-		foreach my $l (@links)
-		{
-			my $db = $l->{db};
-			my $ix = $l->{ix};
-			$text =~ s|$l->{match}|$1<mrs:link db='$db' index='$ix' id='$2'>$2</mrs:link>|g;
-		}
-	}
-	
-	return
-		$q->div({-class=>'entry', 'xmlns:mrs' => 'http://mrs.cmbi.ru.nl/mrs-web/ml'},
-		$q->pre($text));
 }
 
 1;

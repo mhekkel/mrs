@@ -61,6 +61,43 @@ class M6ValidationException : public std::exception
 
 // --------------------------------------------------------------------
 
+int M6NumericComparator::operator()(const char* inKeyA, size_t inKeyLengthA, const char* inKeyB, size_t inKeyLengthB) const
+{
+	int d = 0;
+	const char* ai = inKeyA + inKeyLengthA;
+	const char* bi = inKeyB + inKeyLengthB;
+	while (ai > inKeyA and bi > inKeyB)
+	{
+		--ai; --bi;
+		if (*ai != *bi)
+			d = *ai - *bi;
+	}
+
+	while (ai > inKeyA)
+	{
+		--ai;
+		if (*ai != '0')
+		{
+			d = 1;
+			break;
+		}
+	}
+
+	while (bi > inKeyB)
+	{
+		--bi;
+		if (*bi != '0')
+		{
+			d = -1;
+			break;
+		}
+	}
+
+	return d;
+}
+
+// --------------------------------------------------------------------
+
 // The index will probably never have keys less than 3 bytes in length.
 // Including the length byte, this means a minimal key length of 4. Add
 // a data element of uint32 and the minimal storage per entry is 8 bytes.
@@ -112,8 +149,8 @@ const int64
 
 const uint32
 	kM6MaxKeyLength			= (kM6MinKeySpace / 2 > 255 ? 255 : kM6MinKeySpace / 2),
-//	kM6BatchSize			= 1024 * 1024;
-	kM6BatchSize			= 1024;
+//	kM6BatchSize			= 1024 * 1024;		// 40 MB at most (MultiIDL)
+	kM6BatchSize			=   64 * 1024;		// 2.5 MB at most
 
 #endif
 

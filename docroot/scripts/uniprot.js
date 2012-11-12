@@ -614,7 +614,7 @@ UniProt = {
 		});
 		
 		if (ftbl != null) {
-			$("<tr/>").append($("<th colspan='2'/>").append("Cross-references")).appendTo(table);
+			$("<tr/>").append($("<th colspan='2'/>").append("Features")).appendTo(table);
 			$("<tr/>").append(
 				$("<td colspan='2' class='sub_entry'/>")
 					.append($("<div/>").addClass('feature_table').append(ftbl))).appendTo(table);

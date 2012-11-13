@@ -560,7 +560,7 @@
 		<source>uniprot/sprot-mini.dat</source>
 	</databank>
 	
-	<databank id="embl-mini" parser="embl">
+	<databank id="embl-mini" parser="embl" format="embl">
 		<name>EMBL mini</name>
 		<file>embl-mini.m6</file>
 		<source>embl_release/rel_est_vrl_01_r113.dat.gz</source>

@@ -1039,6 +1039,9 @@ void M6Server::handle_search(const zh::request& request,
 				if (s.size() > 10)
 					s.erase(s.begin() + 10, s.end());
 				
+				if (s.size() > 10)
+					s.erase(s.begin() + 10, s.end());
+				
 				vector<el::object> alternatives;
 				foreach (auto c, s)
 				{

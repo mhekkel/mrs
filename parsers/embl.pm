@@ -67,7 +67,7 @@ sub parse
 
 					next if ($fkey eq 'translation');
 
-					$self->index_text('feature', $fval);
+					$self->index_text('ft', $fval);
 
 					if ($fkey eq 'db_xref' and $fval =~ m/^(.+?):(.+)$/)
 					{

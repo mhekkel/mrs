@@ -133,11 +133,18 @@ M6Iterator* M6QueryParser::ParseTest()
 			break;
 		
 		case eM6TokenNOT:
+		{
 			Match(eM6TokenNOT);
 			mIsBooleanQuery = true;
+
+			vector<string> queryterms(mQueryTerms);
+
 			if (mDatabank != nullptr)
 				result.reset(new M6NotIterator(ParseQuery(), mDatabank->GetMaxDocNr()));
+
+			mQueryTerms = queryterms;
 			break;
+		}
 		
 		case eM6TokenDocNr:
 			result.reset(new M6SingleDocIterator(boost::lexical_cast<uint32>(mTokenizer.GetTokenString())));

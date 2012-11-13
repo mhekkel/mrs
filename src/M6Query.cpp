@@ -133,6 +133,7 @@ M6Iterator* M6QueryParser::ParseTest()
 			break;
 		
 		case eM6TokenNOT:
+			Match(eM6TokenNOT);
 			mIsBooleanQuery = true;
 			if (mDatabank != nullptr)
 				result.reset(new M6NotIterator(ParseQuery(), mDatabank->GetMaxDocNr()));

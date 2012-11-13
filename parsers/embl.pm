@@ -82,7 +82,7 @@ sub parse
 		}
 		elsif (not defined $skip{$key})
 		{
-			$self->index_text('text', $value);
+			$self->index_text(lc $key, $value);
 		}
 	}
 }

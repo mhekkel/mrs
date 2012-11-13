@@ -1280,9 +1280,8 @@ M6DatabankImpl::M6DatabankImpl(M6Databank& inDatabank, const fs::path& inPath, M
 		RecalculateDocumentWeights();
 
 	fs::path dict(mDbDirectory / "full-text.dict");
-	if (not fs::exists(dict))
-		CreateDictionary();
-	mDictionary = new M6Dictionary(dict);
+	if (fs::exists(dict) and fs::file_size(dict) > 0)
+		mDictionary = new M6Dictionary(dict);
 	
 	// read uuid
 	if (fs::exists(mDbDirectory / "uuid"))

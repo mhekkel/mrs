@@ -920,6 +920,7 @@ void M6Server::handle_search(const zh::request& request,
 
 //		sub.put("linkeddbs", el::object(GetLinkedDbs(db)));
 		sub.put("count", el::object(hits_per_page));
+		sub.put("show", el::object(hits_per_page));
 	
 		string hitDb = db;
 		bool ranked = false;
@@ -1034,6 +1035,9 @@ void M6Server::handle_search(const zh::request& request,
 				SpellCheck(db, term, s);
 				if (s.empty())
 					continue;
+
+				if (s.size() > 10)
+					s.erase(s.begin() + 10, s.end());
 				
 				vector<el::object> alternatives;
 				foreach (auto c, s)

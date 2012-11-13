@@ -109,6 +109,7 @@
 		<link regex="(?&lt;=DR   Pfam; )(\S+)(?=;)" db="pfama" ix="ac" id="$1" />
 		<link regex="(?&lt;=DR   PRINTS; )(\S+)(?=;)" db="prints" ix="id" id="$1" />
 		<link regex="(?&lt;=DR   PROSITE; )(\S+)(?=;)" db="prosite" ix="ac" id="$1" />
+		<link regex="(?&lt;=DR   MIM; )(\S+)(?=;)" db="omim" ix="id" id="$1" />
 	</format>
 
 	<format id="embl" script="scripts/embl.js" />
@@ -187,6 +188,9 @@
 	
 	<!-- omim -->
 	<databank id="omim" parser="omim" format="omim">
+		<aliases>
+			<alias>MIM</alias>
+		</aliases>
 		<name>OMIM - Online Mendelian Inheritance in Man™</name>
 		<info>http://www.ncbi.nlm.nih.gov/entrez/query.fcgi?db=OMIM</info>
 		<file>/data/mrs/omim.m6</file>

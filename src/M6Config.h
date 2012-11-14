@@ -30,12 +30,17 @@ class M6Config
 
 	zeep::xml::element*	LoadFormat(const std::string& inDatabank);
 	std::string			LoadFormatScript(const std::string& inDatabank);
+	
+	void				SetPassword(const std::string& inRealm,
+							const std::string& inUser, const std::string& inPassword);
 
   private:
 						M6Config();
 						~M6Config();
 
-	zeep::xml::document*				mConfig;
-	static boost::filesystem::path		sConfigFile;
+	void				WriteOut();
+
+	zeep::xml::document*			mConfig;
+	static boost::filesystem::path	sConfigFile;
 };
 

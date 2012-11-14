@@ -4,6 +4,8 @@
 #include <boost/filesystem/operations.hpp>
 #include <boost/format.hpp>
 
+#include <zeep/xml/writer.hpp>
+
 #include "M6Config.h"
 #include "M6Error.h"
 
@@ -150,3 +152,41 @@ string M6Config::LoadFormatScript(const string& inDatabank)
 	
 	return result;
 }
+
+void M6Config::SetPassword(const string& inRealm, const string& inUser, const string& inPassword)
+{
+	string xp = (boost::format("/m6-config/users/user[@name = '%1%' and @realm = '%2%']") % inUser % inRealm).str();
+	zx::element* user = mConfig->find_first(xp);
+	if (user == nullptr)
+		THROW(("User not found in config file"));
+
+	user->set_attribute("password", inPassword);
+
+	WriteOut();
+}
+
+void M6Config::WriteOut()
+{
+	fs::path dir(sConfigFile.parent_path());
+	boost::format name(sConfigFile.filename().stem().string() + "-%1%" + sConfigFile.filename().extension().string());
+
+	uint32 i = 1;
+	while (fs::exists(dir / (name % i).str()))
+		++i;
+	
+	boost::system::error_code ec;
+	fs::rename(sConfigFile, dir / (name % i).str(), ec);
+	if (ec)
+		THROW(("Failed to create backup file for configuration file"));
+
+	fs::ofstream configFileStream(sConfigFile, ios::binary);
+	
+	zx::writer w(configFileStream);
+	w.set_xml_decl(true);
+	w.set_indent(false);
+	w.set_trim(false);
+	w.set_escape_whitespace(false);
+	w.set_wrap(false);
+
+	mConfig->write(w);
+}	

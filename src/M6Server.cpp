@@ -468,7 +468,6 @@ M6Server::M6Server(zx::element* inConfig)
 	mount("linked",			boost::bind(&M6Server::handle_linked, this, _1, _2, _3));
 	mount("search",			boost::bind(&M6Server::handle_search, this, _1, _2, _3));
 	mount("similar",		boost::bind(&M6Server::handle_similar, this, _1, _2, _3));
-	mount("admin",			boost::bind(&M6Server::handle_admin, this, _1, _2, _3));
 	mount("scripts",		boost::bind(&M6Server::handle_file, this, _1, _2, _3));
 	mount("css",			boost::bind(&M6Server::handle_file, this, _1, _2, _3));
 //	mount("man",			boost::bind(&M6Server::handle_file, this, _1, _2, _3));
@@ -488,10 +487,17 @@ M6Server::M6Server(zx::element* inConfig)
 	mount("ajax/status",	boost::bind(&M6Server::handle_status_ajax, this, _1, _2, _3));
 	mount("info",			boost::bind(&M6Server::handle_info, this, _1, _2, _3));
 
+	mount("admin",			boost::bind(&M6Server::handle_admin, this, _1, _2, _3));
+	mount("admin/rename",	boost::bind(&M6Server::handle_admin_rename_ajax, this, _1, _2, _3));
+
 	add_processor("entry",	boost::bind(&M6Server::process_mrs_entry, this, _1, _2, _3));
 	add_processor("link",	boost::bind(&M6Server::process_mrs_link, this, _1, _2, _3));
 	add_processor("redirect",
 							boost::bind(&M6Server::process_mrs_redirect, this, _1, _2, _3));
+
+	zx::node* realm = mConfig->find_first_node("admin/@realm");
+	if (realm != nullptr)
+		mAdminRealm = realm->str();
 }
 
 void M6Server::init_scope(el::scope& scope)
@@ -530,19 +536,16 @@ void M6Server::handle_request(const zh::request& req, zh::reply& rep)
 	}
 }
 
-void M6Server::create_unauth_reply(bool stale, zh::reply& rep)
+void M6Server::create_unauth_reply(bool stale, const string& realm, zh::reply& rep)
 {
 	boost::mutex::scoped_lock lock(mAuthMutex);
 	
 	rep = zh::reply::stock_reply(zh::unauthorized);
 	
-	if (zx::element* realm = mConfig->find_first("realm"))
-		mAuthInfo.push_back(new M6AuthInfo(realm->get_attribute("name")));
-	else
-		THROW(("Realm missing from config file"));
-	
-	string challenge = mAuthInfo.back()->GetChallenge();
-	
+	M6AuthInfo* authInfo = new M6AuthInfo(realm);
+	mAuthInfo.push_back(authInfo);
+
+	string challenge = authInfo->GetChallenge();
 	if (stale)
 		challenge += ", stale=\"true\"";
 
@@ -1284,8 +1287,62 @@ void M6Server::handle_similar(const zh::request& request, const el::scope& scope
 void M6Server::handle_admin(const zh::request& request,
 	const el::scope& scope, zh::reply& reply)
 {
-	ValidateAuthentication(request);
-	create_reply_from_template("admin.html", scope, reply);
+	ValidateAuthentication(request, mAdminRealm);
+
+	el::scope sub(scope);
+
+	vector<el::object> databanks;
+
+	zx::element_set dbs(mConfig->find("dbs/db"));
+	foreach (zx::element* db, dbs)
+	{
+		string dbn = db->content();
+
+		zx::element* dbConfig = M6Config::Instance().LoadDatabank(dbn);
+		zx::element* e;
+		
+		el::object databank;
+		databank["id"] = dbn;
+		databank["format"] = dbConfig->get_attribute("format");
+		databank["parser"] = dbConfig->get_attribute("parser");
+		if ((e = dbConfig->find_first("name")) != nullptr)
+			databank["name"] = e->content();
+		if ((e = dbConfig->find_first("info")) != nullptr)
+			databank["info"] = e->content();
+		if ((e = dbConfig->find_first("source")) != nullptr)
+			databank["source"] = e->content();
+		if ((e = dbConfig->find_first("fetch")) != nullptr)
+		{
+			el::object fetch;
+			fetch["src"] = e->get_attribute("src");
+			fetch["dst"] = e->get_attribute("dst");
+			fetch["delete"] = e->get_attribute("delete");
+		}
+		
+		databanks.push_back(databank);
+	}
+	sub.put("databanks", el::object(databanks));
+
+	create_reply_from_template("admin.html", sub, reply);
+}
+
+void M6Server::handle_admin_rename_ajax(const zh::request& request,
+	const el::scope& scope, zh::reply& reply)
+{
+	ValidateAuthentication(request, mAdminRealm);
+	
+	zeep::http::parameter_map params;
+	get_parameters(scope, params);
+
+	string db = params.get("db", "").as<string>();
+	string prop = params.get("prop", "").as<string>();
+	string value = params.get("value", "").as<string>();
+
+	el::object result;
+
+	result["value"] = value;
+
+	reply.set_content(result.toJSON(), "text/javascript");
 }
 
 // --------------------------------------------------------------------
@@ -2240,7 +2297,8 @@ void M6Server::handle_info(const zh::request& request, const el::scope& scope, z
 
 // --------------------------------------------------------------------
 
-void M6Server::ValidateAuthentication(const zh::request& request)
+void M6Server::ValidateAuthentication(const zh::request& request,
+	const string& inRealm)
 {
 	string authorization;
 	foreach (const zeep::http::header& h, request.headers)
@@ -2250,7 +2308,7 @@ void M6Server::ValidateAuthentication(const zh::request& request)
 	}
 
 	if (authorization.empty())
-		throw zh::unauthorized_exception(false);
+		throw zh::unauthorized_exception(false, inRealm);
 
 	// That was easy, now check the response
 	
@@ -2268,10 +2326,10 @@ void M6Server::ValidateAuthentication(const zh::request& request)
 
 	bool authorized = false, stale = false;
 
-	boost::format f("realm[@name='%1%']/user[@name='%2%']");
-	if (zx::element* user = mConfig->find_first((f % info["realm"] % info["username"]).str()))
+	boost::format f("/m6-config/users/user[@name='%1%' and @realm='%2%']");
+	if (zx::element* user = mConfig->find_first((f % info["username"] % info["realm"]).str()))
 	{
-		string ha1 = user->content();
+		string ha1 = user->get_attribute("password");
 
 		boost::mutex::scoped_lock lock(mAuthMutex);
 	
@@ -2290,7 +2348,7 @@ void M6Server::ValidateAuthentication(const zh::request& request)
 	}
 	
 	if (stale or not authorized)
-		throw zh::unauthorized_exception(stale);
+		throw zh::unauthorized_exception(stale, inRealm);
 }
 
 // --------------------------------------------------------------------

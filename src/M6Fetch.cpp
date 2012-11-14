@@ -592,5 +592,5 @@ bool M6FetchNeeded(const string& inDatabank)
 		THROW(("Configuration for %s is missing", inDatabank.c_str()));
 
 	M6FTPFetcher fetch(config);
-	fetch.IsOutOfDate();
+	return fetch.IsOutOfDate();
 }

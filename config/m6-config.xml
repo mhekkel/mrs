@@ -14,6 +14,10 @@
 		<tool name="clustalo">/usr/bin/clustalo</tool>
 	</tools>
 	
+	<users>
+		<user name="scott" realm="M6 Administrator" password="b92ff7d60b994c8a0d2941ad9349e841"/>
+	</users>
+	
 	<blast>
 		<cache-dir>/data/blast-cache/</cache-dir>
 		<cache-index>/data/blast-cache/index.db</cache-index>
@@ -36,6 +40,7 @@
 	</blast>
 
 	<server type="www" addr="0.0.0.0" port="18090">
+		<admin realm="M6 Administrator"/>
 		<docroot>./docroot/</docroot>
 		<dbs>
 			<db>embl</db>
@@ -63,9 +68,6 @@
 			<db>unigene</db>
 			<db>pmc</db>
 		</dbs>
-		<realm name="M6 Administrator">
-			<user name="scott">b92ff7d60b994c8a0d2941ad9349e841</user>
-		</realm>
 	</server>
 
 	<server type="search" addr="0.0.0.0" port="18091">
@@ -95,59 +97,56 @@
 	</server>
 
 	<format id="omim" script="scripts/omim.js">
-		<link regex="(?&lt;=\()(?:[^();]+?; )?(\d{6})(?:\.(\d{4}))?(?=\))"
-			db="omim" ix="id" id="$1" anchor="$2" />
+		<link regex="(?&lt;=\()(?:[^();]+?; )?(\d{6})(?:\.(\d{4}))?(?=\))" db="omim" ix="id" id="$1" anchor="$2"/>
 	</format>
 	
 	<format id="uniprot" script="scripts/uniprot.js">
-		<link regex="(?&lt;=DR   EMBL; )(\S+)(?=;)" db="embl" ix="id" id="$1" />
-		<link regex="(?&lt;=DR   PDB; )(\S+)(?=;)" db="pdb" ix="id" id="$1" />
-		<link regex="(?&lt;=DR   RefSeq; )(?:(\S+)\.\d+)(?=;)" db="refseq" ix="id" id="$1" />
-		<link regex="(?&lt;=DR   UniGene; )(\S+)(?=;)" db="unigene" ix="id" id="$1" />
-		<link regex="(?&lt;=DR   GO; )GO:(\S+)(?=;)" db="go" ix="id" id="$1" />
-		<link regex="(?&lt;=DR   InterPro; )(\S+)(?=;)" db="interpro" ix="id" id="$1" />
-		<link regex="(?&lt;=DR   Pfam; )(\S+)(?=;)" db="pfama" ix="ac" id="$1" />
-		<link regex="(?&lt;=DR   PRINTS; )(\S+)(?=;)" db="prints" ix="id" id="$1" />
-		<link regex="(?&lt;=DR   PROSITE; )(\S+)(?=;)" db="prosite" ix="ac" id="$1" />
-		<link regex="(?&lt;=DR   MIM; )(\S+)(?=;)" db="omim" ix="id" id="$1" />
+		<link regex="(?&lt;=DR   EMBL; )(\S+)(?=;)" db="embl" ix="id" id="$1"/>
+		<link regex="(?&lt;=DR   PDB; )(\S+)(?=;)" db="pdb" ix="id" id="$1"/>
+		<link regex="(?&lt;=DR   RefSeq; )(?:(\S+)\.\d+)(?=;)" db="refseq" ix="id" id="$1"/>
+		<link regex="(?&lt;=DR   UniGene; )(\S+)(?=;)" db="unigene" ix="id" id="$1"/>
+		<link regex="(?&lt;=DR   GO; )GO:(\S+)(?=;)" db="go" ix="id" id="$1"/>
+		<link regex="(?&lt;=DR   InterPro; )(\S+)(?=;)" db="interpro" ix="id" id="$1"/>
+		<link regex="(?&lt;=DR   Pfam; )(\S+)(?=;)" db="pfama" ix="ac" id="$1"/>
+		<link regex="(?&lt;=DR   PRINTS; )(\S+)(?=;)" db="prints" ix="id" id="$1"/>
+		<link regex="(?&lt;=DR   PROSITE; )(\S+)(?=;)" db="prosite" ix="ac" id="$1"/>
+		<link regex="(?&lt;=DR   MIM; )(\S+)(?=;)" db="omim" ix="id" id="$1"/>
 	</format>
 
-	<format id="embl" script="scripts/embl.js" />
+	<format id="embl" script="scripts/embl.js"/>
 
 	<format id="enzyme">
-		<link regex="([A-Z]+[A-Z0-9]+)(?=, )" db="sprot" ix="ac" id="$1" />
+		<link regex="([A-Z]+[A-Z0-9]+)(?=, )" db="sprot" ix="ac" id="$1"/>
 	</format>
 
 	<format id="taxonomy">
-		<link regex="(?&lt;=^PARENT ID                 : )(\d+)" ix="id" id="$1" />
+		<link regex="(?&lt;=^PARENT ID                 : )(\d+)" ix="id" id="$1"/>
 	</format>
 	
-	<format id="interpro" stylesheet="interpro.xslt" />
-	<format id="gene" stylesheet="gene.xslt" />
-	<format id="pmc" stylesheet="ViewNLM-v2.3.xsl" />
+	<format id="interpro" stylesheet="interpro.xslt"/>
+	<format id="gene" stylesheet="gene.xslt"/>
+	<format id="pmc" stylesheet="ViewNLM-v2.3.xsl"/>
 
 	<format id="stockholm">
-		<link regex="^(?:#=GF DR\s+PFAMA;\s)(\S+)(?=;)" db="pfama" ix="id" id="$1" />
-		<link regex="^(?:#=GF DR\s+PFAMB;\s)(\S+)(?=;)" db="pfamb" ix="id" id="$1" />
-		<link regex="^(?:#=GF DR\s+PDB;\s)(\S+)(?=;)" db="pdb" ix="id" id="$1" />
-		<link regex="^(?:#=GF DR\s+PROSITE;\s)(\S+)(?=;)" db="prosite" ix="id" id="$1" />
-		<link regex="^(?:#=GF DR\s+INTERPRO;\s)(\S+)(?=;)" db="interpro" ix="id" id="$1" />
-		<link regex="^(?:#=GS .+?AC )([0-9A-Z]+)" db="uniprot" ix="ac" id="$1" />
-		<link regex="^(?:#=GS .+?DR PDB; )([0-9A-Z]{4})" db="pdb" ix="id" id="$1" />
+		<link regex="^(?:#=GF DR\s+PFAMA;\s)(\S+)(?=;)" db="pfama" ix="id" id="$1"/>
+		<link regex="^(?:#=GF DR\s+PFAMB;\s)(\S+)(?=;)" db="pfamb" ix="id" id="$1"/>
+		<link regex="^(?:#=GF DR\s+PDB;\s)(\S+)(?=;)" db="pdb" ix="id" id="$1"/>
+		<link regex="^(?:#=GF DR\s+PROSITE;\s)(\S+)(?=;)" db="prosite" ix="id" id="$1"/>
+		<link regex="^(?:#=GF DR\s+INTERPRO;\s)(\S+)(?=;)" db="interpro" ix="id" id="$1"/>
+		<link regex="^(?:#=GS .+?AC )([0-9A-Z]+)" db="uniprot" ix="ac" id="$1"/>
+		<link regex="^(?:#=GS .+?DR PDB; )([0-9A-Z]{4})" db="pdb" ix="id" id="$1"/>
 	</format>
 	
 	<parser id="pmc" chunk="/article">
-		<index name='id'		type="string"	xpath='/article/front/article-meta/article-id[@pub-id-type="pmc"]'
-			   attr="true"		/> <!-- really, in pmc id is not unique...  unique="true"  -->
-		<index name='pmid'		type="string"	xpath='/article/front/article-meta/article-id[@pub-id-type="pmid"]' />
-		<index name='doi'		type="string"	xpath='/article/front/article-meta/article-id[@pub-id-type="doi"]' />
-		<index name='subject'	type="text"		xpath='/article/front/article-meta/article-categories/subj-group[@subj-group-type="heading"]/subject' />
-		<index name='title'		type="text"		xpath='/article/front/article-meta/title-group/article-title'
-			   attr="true"	/>
-		<index name='authors'	type="text"		xpath='/article/front/article-meta/contrib-group/contrib/name/*' />
-		<index name='aff'		type="text"		xpath='/article/front/article-meta/aff' />
-		<index name='abstract'	type="text"		xpath='/article/front/article-meta/abstract' />
-		<index name='body'		type="text"		xpath='/article/body' />
+		<index name="id" type="string" xpath="/article/front/article-meta/article-id[@pub-id-type=&quot;pmc&quot;]" attr="true"/> <!-- really, in pmc id is not unique...  unique="true"  -->
+		<index name="pmid" type="string" xpath="/article/front/article-meta/article-id[@pub-id-type=&quot;pmid&quot;]"/>
+		<index name="doi" type="string" xpath="/article/front/article-meta/article-id[@pub-id-type=&quot;doi&quot;]"/>
+		<index name="subject" type="text" xpath="/article/front/article-meta/article-categories/subj-group[@subj-group-type=&quot;heading&quot;]/subject"/>
+		<index name="title" type="text" xpath="/article/front/article-meta/title-group/article-title" attr="true"/>
+		<index name="authors" type="text" xpath="/article/front/article-meta/contrib-group/contrib/name/*"/>
+		<index name="aff" type="text" xpath="/article/front/article-meta/aff"/>
+		<index name="abstract" type="text" xpath="/article/front/article-meta/abstract"/>
+		<index name="body" type="text" xpath="/article/body"/>
 	</parser>
 
 <!--	<parser id="gene" chunk="/Entrezgene-Set/Entrezgene">-->
@@ -159,18 +158,18 @@
 <!--	</parser>-->
 
 	<parser id="interpro" chunk="/interprodb/interpro">
-		<index name='id'		type="string"	xpath='@id'		   attr="true"		unique="true" />
-		<index name='title'		type="text"		xpath='name'	   attr="true"	/>
-		<index name='type'		type="string"	xpath='@type' />
-		<index name='name'		type="string"	xpath='@short_name' />
+		<index name="id" type="string" xpath="@id" attr="true" unique="true"/>
+		<index name="title" type="text" xpath="name" attr="true"/>
+		<index name="type" type="string" xpath="@type"/>
+		<index name="name" type="string" xpath="@short_name"/>
 
 		<!-- Everything else (all nodes that are not 'name') -->
-		<index name='text'		type="text"		xpath='*[name() != "name"]' />
+		<index name="text" type="text" xpath="*[name() != &quot;name&quot;]"/>
 
 		<!-- All attributes -->
-		<index name='attr'		type="text"		xpath='.//@*' />
+		<index name="attr" type="text" xpath=".//@*"/>
 		
-		<link xpath="db_xref" db="@db" id="@dbkey" />
+		<link xpath="db_xref" db="@db" id="@dbkey"/>
 	</parser>
 
 	<databank id="pdbfinder" parser="pdbfinder">
@@ -181,9 +180,7 @@
 		<file>pdbfinder.m6</file>
 		<locale>en_US.UTF-8</locale>
 		<source>pdbfinder2/PDBFIND2.TXT.gz</source>
-		<fetch
-			src="ftp://ftp.cmbi.ru.nl/pub/molbio/data/pdbfinder2/PDBFIND2.TXT.gz"
-			dst="pdbfinder2" />
+		<fetch src="ftp://ftp.cmbi.ru.nl/pub/molbio/data/pdbfinder2/PDBFIND2.TXT.gz" dst="pdbfinder2"/>
 	</databank>
 	
 	<!-- omim -->
@@ -281,7 +278,7 @@
 		<info>http://ca.expasy.org/enzyme/</info>
 		<file>/data/mrs/enzyme.m6</file>
 		<source>enzyme/enzyme.dat</source>
-		<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/enzyme/release_with_updates/enzyme.dat" />
+		<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/enzyme/release_with_updates/enzyme.dat"/>
 	</databank>
 
 	<databank id="sprot" parser="uniprot" format="uniprot" blast="true">
@@ -292,9 +289,7 @@
 		<info>http://www.uniprot.org/</info>
 		<file>/data/mrs/sprot.m6</file>
 		<source>uniprot/uniprot_sprot.dat.gz</source>
-		<fetch
-			src="ftp://ftp.ebi.ac.uk/pub/databases/uniprot/current_release/knowledgebase/complete/uniprot_sprot.dat.gz"
-			dst="uniprot" />
+		<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/uniprot/current_release/knowledgebase/complete/uniprot_sprot.dat.gz" dst="uniprot"/>
 	</databank>
 
 	<databank id="trembl" parser="uniprot" format="uniprot" blast="true">
@@ -305,9 +300,7 @@
 		<info>http://www.uniprot.org/</info>
 		<file>/data/mrs/trembl.m6</file>
 		<source>uniprot/uniprot_trembl.dat.gz</source>
-		<fetch
-			src="ftp://ftp.ebi.ac.uk/pub/databases/uniprot/current_release/knowledgebase/complete/uniprot_trembl.dat.gz"
-			dst="uniprot" />
+		<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/uniprot/current_release/knowledgebase/complete/uniprot_trembl.dat.gz" dst="uniprot"/>
 	</databank>
 	
 	<databank id="genbank" parser="genbank">
@@ -315,7 +308,7 @@
 		<info>http://www.ncbi.nlm.nih.gov/genbank/</info>
 		<file>/data/mrs/genbank.m6</file>
 		<source>genbank/*.seq.gz</source>
-		<fetch delete="true" src="ftp://ftp.ncbi.nih.gov/genbank/*.seq.gz" />
+		<fetch delete="true" src="ftp://ftp.ncbi.nih.gov/genbank/*.seq.gz"/>
 	</databank>
 
 	<databank id="refseq" parser="genbank">
@@ -323,7 +316,7 @@
 		<info>http://www.ncbi.nlm.nih.gov/RefSeq/</info>
 		<file>/data/mrs/refseq.m6</file>
 		<source>refseq_release/*gpff.gz;refseq_release/*gbff.gz</source>
-		<fetch delete="true" src="ftp://ftp.ncbi.nih.gov/refseq/release/complete/*gbff.gz" />
+		<fetch delete="true" src="ftp://ftp.ncbi.nih.gov/refseq/release/complete/*gbff.gz"/>
 	</databank>
 
 	<databank id="taxonomy" parser="taxonomy" format="taxonomy">
@@ -331,7 +324,7 @@
 		<info>http://www.ncbi.nlm.nih.gov/entrez/query.fcgi?db=Taxonomy</info>
 		<file>/data/mrs/taxonomy.m6</file>
 		<source>taxonomy/taxonomy.dat</source>
-		<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/taxonomy/taxonomy.dat" />
+		<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/taxonomy/taxonomy.dat"/>
 	</databank>
 
 	<databank id="nlwiki" parser="mediawiki">
@@ -345,9 +338,7 @@
 		<info>http://www.rcsb.org/pdb/</info>
 		<file>pdb.m6</file>
 		<source>pdb/*/pdb*.ent.gz</source>
-		<fetch
-			delete="true"
-			src="ftp://ftp.cmbi.ru.nl/pub/molbio/data/pdb/divided/??/pdb????.ent.gz" />
+		<fetch delete="true" src="ftp://ftp.cmbi.ru.nl/pub/molbio/data/pdb/divided/??/pdb????.ent.gz"/>
 	</databank>
 
 	<databank id="dssp" parser="dssp">
@@ -355,9 +346,7 @@
 		<info>http://www.cmbi.ru.nl/dssp.html</info>
 		<file>dssp.m6</file>
 		<source>dssp/*.dssp</source>
-		<fetch
-			delete="true"
-			src="ftp://ftp.cmbi.ru.nl/pub/molbio/data/dssp/????.dssp" />
+		<fetch delete="true" src="ftp://ftp.cmbi.ru.nl/pub/molbio/data/dssp/????.dssp"/>
 	</databank>
 
 	<databank id="hssp" parser="hssp">
@@ -365,9 +354,7 @@
 		<info>http://www.cmbi.ru.nl/hssp</info>
 		<file>hssp.m6</file>
 		<source>hssp/????.hssp.bz2</source>
-		<fetch
-			delete="true"
-			src="ftp://ftp.cmbi.ru.nl/pub/molbio/data/hssp/????.hssp.bz2" />
+		<fetch delete="true" src="ftp://ftp.cmbi.ru.nl/pub/molbio/data/hssp/????.hssp.bz2"/>
 	</databank>
 
 	<databank id="gene" parser="gene" format="gene">
@@ -376,8 +363,7 @@
 		<file>gene.m6</file>
 		<source>gene/All_Data.ags.gz</source>
 		<filter>/usr/bin/gene2xml -bT</filter>
-		<fetch
-			src="ftp://ftp.ncbi.nlm.nih.gov/gene/DATA/ASN_BINARY/All_Data.ags.gz" />
+		<fetch src="ftp://ftp.ncbi.nlm.nih.gov/gene/DATA/ASN_BINARY/All_Data.ags.gz"/>
 	</databank>
 
 	<databank id="go" parser="go">
@@ -385,8 +371,7 @@
 		<info>http://www.geneontology.org/</info>
 		<file>go.m6</file>
 		<source>go/gene_ontology.obo</source>
-		<fetch
-			src="ftp://ftp.geneontology.org/pub/go/ontology/gene_ontology.obo" />
+		<fetch src="ftp://ftp.geneontology.org/pub/go/ontology/gene_ontology.obo"/>
 	</databank>
 
 <!--	<databank id="goa" parser="goa">-->
@@ -402,8 +387,7 @@
 		<info>http://www.ebi.ac.uk/interpro/</info>
 		<file>interpro.m6</file>
 		<source>interpro/interpro.xml.gz</source>
-		<fetch
-			src="ftp://ftp.ebi.ac.uk/pub/databases/interpro/interpro.xml.gz" />
+		<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/interpro/interpro.xml.gz"/>
 	</databank>
 
 	<databank id="oxford" parser="oxford">
@@ -411,17 +395,14 @@
 		<info>http://www.informatics.jax.org/</info>
 		<file>oxford.m6</file>
 		<source>oxford/HMD_Human3.rpt</source>
-		<fetch
-			src="ftp://ftp.informatics.jax.org/pub/reports/HMD_Human3.rpt" />
+		<fetch src="ftp://ftp.informatics.jax.org/pub/reports/HMD_Human3.rpt"/>
 	</databank>
 
 	<databank id="mimmap" parser="mimmap">
 		<name>Mimmap, our view on genemap from OMIM</name>
 		<file>mimmap.m6</file>
 		<source>omim/genemap</source>
-		<fetch
-			src="ftp://ftp.ncbi.nih.gov/repository/OMIM/ARCHIVE/genemap"
-			dst="omim" />
+		<fetch src="ftp://ftp.ncbi.nih.gov/repository/OMIM/ARCHIVE/genemap" dst="omim"/>
 	</databank>
 	
 	<databank id="dbest" parser="dbest">
@@ -429,7 +410,7 @@
 		<file>dbest.m6</file>
 		<info>http://www.ncbi.nlm.nih.gov/dbEST/</info>
 		<source>dbest/dbEST.reports.*</source>
-		<fetch delete="true" src="ftp://ftp.ncbi.nih.gov/repository/dbEST/dbEST.reports.*.gz" />
+		<fetch delete="true" src="ftp://ftp.ncbi.nih.gov/repository/dbEST/dbEST.reports.*.gz"/>
 	</databank>
 
 	<databank id="sprot-fa" parser="fasta">
@@ -452,7 +433,7 @@
 		<file>pfama.m6</file>
 		<info>http://pfam.sanger.ac.uk/</info>
 		<source>pfam/Pfam-A.full.gz</source>
-		<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/Pfam/Pfam-A.full.gz" />
+		<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/Pfam/Pfam-A.full.gz"/>
 	</databank>
 
 	<databank id="pfamb" parser="pfam" format="stockholm">
@@ -463,7 +444,7 @@
 		<file>pfamb.m6</file>
 		<info>http://pfam.sanger.ac.uk/</info>
 		<source>pfam/Pfam-B.gz</source>
-		<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/Pfam/Pfam-B.gz" />
+		<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/Pfam/Pfam-B.gz"/>
 	</databank>
 
 	<databank id="pfamseed" parser="pfam" format="stockholm">
@@ -474,7 +455,7 @@
 		<file>pfamseed.m6</file>
 		<info>http://pfam.sanger.ac.uk/</info>
 		<source>pfam/Pfam-A.seed.gz</source>
-		<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/Pfam/Pfam-A.seed.gz" />
+		<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/Pfam/Pfam-A.seed.gz"/>
 	</databank>
 
 	<databank id="prints" parser="prints">
@@ -482,7 +463,7 @@
 		<file>prints.m6</file>
 		<info>http://bioinf.man.ac.uk/dbbrowser/PRINTS/</info>
 		<source>prints/prints*.dat.gz</source>
-		<fetch delete="true" src="ftp://ftp.ebi.ac.uk/pub/databases/prints/prints*.dat.gz" />
+		<fetch delete="true" src="ftp://ftp.ebi.ac.uk/pub/databases/prints/prints*.dat.gz"/>
 	</databank>
 
 	<databank id="prosite" parser="prosite">
@@ -490,7 +471,7 @@
 		<file>prosite.m6</file>
 		<info>http://www.expasy.org/prosite/</info>
 		<source>prosite/prosite*.dat</source>
-		<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/prosite/prosite*.dat" />
+		<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/prosite/prosite*.dat"/>
 	</databank>
 
 	<databank id="prosite_doc" parser="prosite_doc">
@@ -498,7 +479,7 @@
 		<file>prosite_doc.m6</file>
 		<info>http://www.expasy.org/prosite/</info>
 		<source>prosite/prosite*.doc</source>
-		<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/prosite/prosite*.doc" />
+		<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/prosite/prosite*.doc"/>
 	</databank>
 
 	<databank id="rebase" parser="rebase">
@@ -506,7 +487,7 @@
 		<file>rebase.m6</file>
 		<info>http://rebase.neb.com/rebase/rebase.html</info>
 		<source>rebase/bairoch.txt</source>
-		<fetch delete="true" src="ftp://ftp.neb.com/pub/rebase/bairoch.*" />
+		<fetch delete="true" src="ftp://ftp.neb.com/pub/rebase/bairoch.*"/>
 	</databank>
 
 	<databank id="unigene" parser="unigene">
@@ -514,7 +495,7 @@
 		<file>unigene.m6</file>
 		<info>http://www.ncbi.nlm.nih.gov/entrez/query.fcgi?db=unigene</info>
 		<source>unigene/*/*.data.gz</source>
-		<fetch src="ftp://ftp.ncbi.nih.gov/repository/UniGene/*/*.data.gz" />
+		<fetch src="ftp://ftp.ncbi.nih.gov/repository/UniGene/*/*.data.gz"/>
 	</databank>
 
 	<databank id="uniref50" parser="uniref">
@@ -522,7 +503,7 @@
 		<file>uniref50.m6</file>
 		<info>http://www.uniprot.org/help/uniref</info>
 		<source>uniref50/uniref50.xml.gz</source>
-		<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/uniprot/current_release/uniref/uniref50/*" />
+		<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/uniprot/current_release/uniref/uniref50/*"/>
 	</databank>
 
 	<databank id="uniref90" parser="uniref">
@@ -530,7 +511,7 @@
 		<file>uniref90.m6</file>
 		<info>http://www.uniprot.org/help/uniref</info>
 		<source>uniref90/uniref90.xml.gz</source>
-		<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/uniprot/current_release/uniref/uniref90/*" />
+		<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/uniprot/current_release/uniref/uniref90/*"/>
 	</databank>
 
 	<databank id="uniref100" parser="uniref">
@@ -538,7 +519,7 @@
 		<file>uniref100.m6</file>
 		<info>http://www.uniprot.org/help/uniref</info>
 		<source>uniref100/uniref100.xml.gz</source>
-		<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/uniprot/current_release/uniref/uniref100/*" />
+		<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/uniprot/current_release/uniref/uniref100/*"/>
 	</databank>
 
 	<databank id="pmc" parser="pmc" format="pmc">
@@ -546,7 +527,7 @@
 		<file>pmc.m6</file>
 		<info>http://www.pubmedcentral.nih.gov/</info>
 		<source>pmc/articles*.tar.gz</source> 
-		<fetch src="ftp://ftp.ncbi.nih.gov/pub/pmc/articles*.tar.gz" />
+		<fetch src="ftp://ftp.ncbi.nih.gov/pub/pmc/articles*.tar.gz"/>
 	</databank>
 
 	<!-- databanks used in debugging m6 -->

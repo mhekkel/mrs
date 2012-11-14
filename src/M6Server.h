@@ -64,14 +64,13 @@ class M6Server : public zh::webapp, public M6SearchServer
 					M6Server(zx::element* inConfig);
 
 	virtual void	handle_request(const zh::request& req, zh::reply& rep);
-	virtual void	create_unauth_reply(bool stale, zh::reply& rep);
+	virtual void	create_unauth_reply(bool stale, const std::string& realm, zh::reply& rep);
 
   private:
 	virtual void	init_scope(el::scope& scope);
 
-	void			ValidateAuthentication(const zh::request& request);
+	void			ValidateAuthentication(const zh::request& request, const std::string& inRealm);
 
-	void			handle_admin(const zh::request& request, const el::scope& scope, zh::reply& reply);
 	void			handle_download(const zh::request& request, const el::scope& scope, zh::reply& reply);
 	void			handle_entry(const zh::request& request, const el::scope& scope, zh::reply& reply);
 	void			handle_file(const zh::request& request, const el::scope& scope, zh::reply& reply);
@@ -93,6 +92,9 @@ class M6Server : public zh::webapp, public M6SearchServer
 	void			handle_status_ajax(const zh::request& request, const el::scope& scope, zh::reply& reply);
 	void			handle_info(const zh::request& request, const el::scope& scope, zh::reply& reply);
 
+	void			handle_admin(const zh::request& request, const el::scope& scope, zh::reply& reply);
+	void			handle_admin_rename_ajax(const zh::request& request, const el::scope& scope, zh::reply& reply);
+	
 	void			process_mrs_entry(zx::element* node, const el::scope& scope, boost::filesystem::path dir);
 	void			process_mrs_link(zx::element* node, const el::scope& scope, boost::filesystem::path dir);
 	void			process_mrs_redirect(zx::element* node, const el::scope& scope, boost::filesystem::path dir);
@@ -113,4 +115,5 @@ class M6Server : public zh::webapp, public M6SearchServer
 
 	M6AuthInfoList	mAuthInfo;
 	boost::mutex	mAuthMutex;
+	std::string		mAdminRealm;
 };

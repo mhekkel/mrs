@@ -752,8 +752,9 @@ void M6PasswordDriver::AddOptions(po::options_description& desc,
 	unique_ptr<po::positional_options_description>& p)
 {
 	desc.add_options()
-		("user,u", po::value<string>(),		"User to modify")
-		("realm,r", po::value<string>(),	"Realm to modify (default is 'M6 Administrator'")
+		("config-file,c", po::value<string>(),	"Configuration file")
+		("user,u", po::value<string>(),			"User to modify")
+		("realm,r", po::value<string>(),		"Realm to modify (default is 'M6 Administrator'")
 		;
 
 	p.reset(new po::positional_options_description());
@@ -763,6 +764,15 @@ void M6PasswordDriver::AddOptions(po::options_description& desc,
 
 bool M6PasswordDriver::Validate(po::variables_map& vm)
 {
+	fs::path configFile("config/m6-config.xml");
+	if (vm.count("config-file"))
+		configFile = vm["config-file"].as<string>();
+		
+	if (not fs::exists(configFile))
+		THROW(("Configuration file not found (\"%s\")", configFile.string().c_str()));
+		
+	M6Config::SetConfigFile(configFile);
+
 	return true;
 }
 
@@ -792,8 +802,9 @@ void M6PasswordDriver::Exec(const string& inCommand, po::variables_map& vm)
 	getline(cin, password);
 	SetStdinEcho(true);
 
-	cout << endl << endl
-		 << M6MD5(username + ':' + realm + ':' + password).Finalise() << endl;
+	string hash = M6MD5(username + ':' + realm + ':' + password).Finalise();
+
+	M6Config::Instance().SetPassword(realm, username, hash);
 }
 
 // --------------------------------------------------------------------

@@ -1052,7 +1052,7 @@ M6BasicIx* M6BatchIndexProcessor::GetIndexBase(const string& inName, M6IndexType
 		
 		M6BasicIndexPtr index = mDatabank.CreateIndex(inName, inType);
 		
-		result = new T(mFullTextIndex, mLexicon, inName, mIndices.size() + 1, index);
+		result = new T(mFullTextIndex, mLexicon, inName, static_cast<uint8>(mIndices.size() + 1), index);
 		
 		M6BasicIxDesc desc = { result, inName, inType };
 		mIndices.push_back(desc);

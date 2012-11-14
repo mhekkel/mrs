@@ -8,8 +8,7 @@ Todo
 - m6 integration (server/build/password)
 - config file:
 	- blast db specification
-	- user tag, password as attribute?
-	- 
+
 - Version
 - browse data/index
 

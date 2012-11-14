@@ -14,6 +14,7 @@
 	<meta http-equiv="content-type" content="text/html; charset=utf-8" />
 
 	<link rel="stylesheet" type="text/css" href="css/mrs-style.css" />
+	<link rel="stylesheet" type="text/css" href="css/jquery-ui.css" />
 
 	<script src="scripts/jquery.js" type="text/javascript">
 	</script>
@@ -27,11 +28,15 @@
 	<script src="scripts/blast.js" type="text/javascript">
 	</script>
 
-<script language="JavaScript">
-jQuery(function() {
-	$('#tabs').tabs();
-});
-</script>
+	<script language="JavaScript">
+		$(function() {
+			$("#accordion").accordion(
+			{
+				heightStyle: content,
+				collapsible: true
+			});
+		});
+	</script>
 
 </head>
 <body>
@@ -44,66 +49,59 @@ jQuery(function() {
 			<form id="blastForm" method="POST" action="/blast" onsubmit="BlastJobs.submit(); return false;"
 				style="display: inline-block; padding-right:1em; vertical-align: top;">
 				<input type="hidden" name="program" value="blastp" />
-				<div id="tabs" class="tabs">
-					<ul>
-						<li><a href="#tab-1">Query</a></li>
-						<li><a href="#tab-2">Options</a></li>
-						<li><a href="#tab-3">Advanced Options</a></li>
+
+				<ul class="options-tab">
+					<li style="color:red; display:none;">NOTE: Please check the reformatted sequence and resubmit</li>
+					<li id="label1">Enter <em>one</em> protein sequence in <em>FastA</em> format</li>
+					<li><textarea name="query" rows="5" cols="72">${query}</textarea></li>
+<!--					<li>Or enter filename: <input type="file" name="queryFile" size="50" maxlength="80" /></li>-->
+					<li><label>Databank to search
+						<select name="db" style="width:10em;">
+							<mrs:options collection="blastdatabanks" value="id" label="name" selected="${blastdb}" />
+						</select></label>
+						<input type="submit" name="submit" value="Run Blast" style="float:right;" class="submit"/>
+					</li>
+				</ul>
+
+				<div id="accordion">
+					<h3>Options</h3>
+					<ul class="options-tab">
+						<li><label><mrs:checkbox name="filter" checked="${filter}" />Filter sequence (low complexity)</label></li>
+						<li><label>E-value cutoff
+							<select name="expect">
+								<mrs:options collection="expectRange" selected="${expect}" />
+							</select></label>
+						</li>
 					</ul>
-					<div id="tab-1">
-						<ul class="options-tab">
-							<li style="color:red; display:none;">NOTE: Please check the reformatted sequence and resubmit</li>
-							<li id="label1">Enter <em>one</em> protein sequence in <em>FastA</em> format</li>
-							<li><textarea name="query" rows="5" cols="72">${query}</textarea></li>
-	<!--					<li>Or enter filename: <input type="file" name="queryFile" size="50" maxlength="80" /></li>-->
-							<li><label>Databank to search
-								<select name="db" style="width:10em;">
-									<mrs:options collection="blastdatabanks" value="id" label="name" selected="${blastdb}" />
-								</select></label>
-								<input type="submit" name="submit" value="Run Blast" style="float:right;" class="submit"/>
-							</li>
-						</ul>
-					</div>
-					<div id="tab-2">
-						<ul class="options-tab">
-							<li><label><mrs:checkbox name="filter" checked="${filter}" />Filter sequence (low complexity)</label></li>
-							<li><label>E-value cutoff
-								<select name="expect">
-									<mrs:options collection="expectRange" selected="${expect}" />
-								</select></label>
-							</li>
-						</ul>
-					</div>
-					<div id="tab-3">
-						<ul class="options-tab">
-							<li><label>Word size
-								<select name="wordSize">
-									<mrs:options collection="wordSizeRange" selected="${wordSize}" />
-								</select></label>
-							</li>
-							<li><label>Scoring matrix
-								<select name="matrix" onchange="updateGapValues();">
-									<mrs:options collection="matrices" selected="${matrix}" />
-								</select></label>
-							</li>
-							<li><label><mrs:checkbox name="gapped" checked="${gapped}" onchange="gappedChanged();" />Perform gapped alignment</label></li>
-							<li><label>Cost to open a gap
-								<select name="gapOpen" onchange="gapOpenChanged();">
-									<mrs:options collection="gapOpenRange" selected="${gapOpen}" />
-								</select></label>
-							</li>
-							<li><label>Cost to extend a gap
-								<select name="gapExtend" onchange="gapExtendChanged();">
-									<mrs:options collection="gapExtendRange" selected="${gapExtend}" />
-								</select></label>
-							</li>
-							<li><label>Limit reported hits
-								<select name="reportLimit">
-									<mrs:options collection="reportLimitRange" 	selected="${reportLimit}" />
-								</select></label>
-							</li>
-						</ul>
-					</div>
+					<h3>Advanced options</h3>
+					<ul class="options-tab">
+						<li><label>Word size
+							<select name="wordSize">
+								<mrs:options collection="wordSizeRange" selected="${wordSize}" />
+							</select></label>
+						</li>
+						<li><label>Scoring matrix
+							<select name="matrix" onchange="updateGapValues();">
+								<mrs:options collection="matrices" selected="${matrix}" />
+							</select></label>
+						</li>
+						<li><label><mrs:checkbox name="gapped" checked="${gapped}" onchange="gappedChanged();" />Perform gapped alignment</label></li>
+						<li><label>Cost to open a gap
+							<select name="gapOpen" onchange="gapOpenChanged();">
+								<mrs:options collection="gapOpenRange" selected="${gapOpen}" />
+							</select></label>
+						</li>
+						<li><label>Cost to extend a gap
+							<select name="gapExtend" onchange="gapExtendChanged();">
+								<mrs:options collection="gapExtendRange" selected="${gapExtend}" />
+							</select></label>
+						</li>
+						<li><label>Limit reported hits
+							<select name="reportLimit">
+								<mrs:options collection="reportLimitRange" 	selected="${reportLimit}" />
+							</select></label>
+						</li>
+					</ul>
 				</div>
 			</form>
 

@@ -94,6 +94,7 @@
     <ClCompile Include="..\..\src\M6Query.cpp" />
     <ClCompile Include="..\..\src\M6SequenceFilter.cpp" />
     <ClCompile Include="..\..\src\M6Tokenizer.cpp" />
+    <ClCompile Include="..\..\src\M6Utilities.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\M6BitStream.h" />

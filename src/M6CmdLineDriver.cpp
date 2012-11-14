@@ -22,6 +22,8 @@
 #include "M6Blast.h"
 #include "M6Progress.h"
 #include "M6Fetch.h"
+#include "M6MD5.h"
+#include "M6Utilities.h"
 
 #if defined _MSC_VER
 #define WIN32_LEAN_AND_MEAN   
@@ -154,6 +156,17 @@ class M6ValidateDriver : public M6CmdLineDriver
 	virtual void	Exec(const string& inCommand, po::variables_map& vm);
 };
 
+class M6PasswordDriver : public M6CmdLineDriver
+{
+  public:
+					M6PasswordDriver() {};
+
+	virtual void	AddOptions(po::options_description& desc,
+						unique_ptr<po::positional_options_description>& p);
+	virtual bool	Validate(po::variables_map& vm);
+	virtual void	Exec(const string& inCommand, po::variables_map& vm);
+};
+
 // --------------------------------------------------------------------
 // Code for base class driver
 
@@ -185,6 +198,8 @@ void M6CmdLineDriver::Exec(int argc, char* const argv[])
 		driver.reset(new M6VacuumDriver());
 	else if (strcmp(argv[1], "validate") == 0)
 		driver.reset(new M6ValidateDriver());
+	else if (strcmp(argv[1], "password") == 0)
+		driver.reset(new M6PasswordDriver());
 	else
 	{
 		cout << "Unknown command " << argv[1] << endl
@@ -731,6 +746,57 @@ void M6ValidateDriver::Exec(const string& inCommand, po::variables_map& vm)
 }
 
 // --------------------------------------------------------------------
+//	password
+
+void M6PasswordDriver::AddOptions(po::options_description& desc,
+	unique_ptr<po::positional_options_description>& p)
+{
+	desc.add_options()
+		("user,u", po::value<string>(),		"User to modify")
+		("realm,r", po::value<string>(),	"Realm to modify (default is 'M6 Administrator'")
+		;
+
+	p.reset(new po::positional_options_description());
+	p->add("user", 1);
+	p->add("realm", 2);
+}
+
+bool M6PasswordDriver::Validate(po::variables_map& vm)
+{
+	return true;
+}
+
+void M6PasswordDriver::Exec(const string& inCommand, po::variables_map& vm)
+{
+	string username, realm = "M6 Administrator", password;
+
+	if (vm.count("user"))
+		username = vm["user"].as<string>();
+	
+	if (username.empty())
+	{
+		cout << "Enter username: "; cout.flush();
+		getline(cin, username);
+	}
+	
+	if (vm.count("realm"))
+		realm = vm["realm"].as<string>();
+	
+	if (realm.empty())
+	{
+		cout << "Enter realm:    "; cout.flush();
+		getline(cin, realm);
+	}
+	
+	cout << "Enter password: "; cout.flush(); SetStdinEcho(false);
+	getline(cin, password);
+	SetStdinEcho(true);
+
+	cout << endl << endl
+		 << M6MD5(username + ':' + realm + ':' + password).Finalise() << endl;
+}
+
+// --------------------------------------------------------------------
 //	main
 
 int main(int argc, char* argv[])
@@ -769,6 +835,7 @@ int main(int argc, char* argv[])
 				 << "    vacuum      Clean up a databank removing unused data" << endl
 				 << "    validate    Perform a set of validation tests" << endl
 				 << "    update      Same as build, but does a fetch first" << endl
+				 << "    password    Generate password for use in configuration file" << endl
 				 << endl
 				 << "  Use m6 command --help for more info on each command" << endl;
 			exit(1);

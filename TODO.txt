@@ -1,11 +1,15 @@
 BUGS:
 
-- NOT is not working
-- 
-
+- embl CO section in format is missing
+- blast knop, invullen sequentie (sprot entry)
 
 Todo
 
+- m6 integration (server/build/password)
+- config file:
+	- blast db specification
+	- user tag, password as attribute?
+	- 
 - Version
 - browse data/index
 

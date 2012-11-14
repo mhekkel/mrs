@@ -13,6 +13,7 @@
   <ItemGroup>
     <ClCompile Include="..\..\src\M6CmdLineDriver.cpp" />
     <ClCompile Include="..\..\src\M6Fetch.cpp" />
+    <ClCompile Include="..\..\src\M6MD5.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{9E5E7747-2076-4E8C-8DCE-71C09ADD1B06}</ProjectGuid>

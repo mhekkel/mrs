@@ -17,6 +17,7 @@
 #include <boost/random/random_device.hpp>
 #endif
 
+#include "M6Utilities.h"
 #include "M6Databank.h"
 #include "M6Server.h"
 #include "M6Error.h"
@@ -2300,11 +2301,8 @@ void RunMainLoop(uint32 inNrOfThreads)
 	{
 		cout << "Restarting services..."; cout.flush();
 	
-#ifndef _MSC_VER
-	    sigset_t new_mask, old_mask;
-	    sigfillset(&new_mask);
-	    pthread_sigmask(SIG_BLOCK, &new_mask, &old_mask);
-#endif
+		M6SignalCatcher catcher;
+		catcher.BlockSignals();
 	
 		vector<zeep::http::server*> servers;
 		boost::thread_group threads;
@@ -2344,33 +2342,20 @@ void RunMainLoop(uint32 inNrOfThreads)
 	
 		if (not VERBOSE)
 			cout << " done" << endl;
-	
-#ifndef _MSC_VER
-	    pthread_sigmask(SIG_SETMASK, &old_mask, 0);
-	
-		// Wait for signal indicating time to shut down.
-		sigset_t wait_mask;
-		sigemptyset(&wait_mask);
-		sigaddset(&wait_mask, SIGINT);
-		sigaddset(&wait_mask, SIGHUP);
-		sigaddset(&wait_mask, SIGQUIT);
-		sigaddset(&wait_mask, SIGTERM);
-		pthread_sigmask(SIG_BLOCK, &wait_mask, 0);
-		int sig = 0;
-		sigwait(&wait_mask, &sig);
+		
+		catcher.UnblockSignals();
+		
+		int sig = catcher.WaitForSignal();
 		
 		for_each(servers.begin(), servers.end(), [](zeep::http::server* server) { server->stop(); });
-#endif
 		
 		threads.join_all();
 	
 		foreach (zeep::http::server* server, servers)
 			delete server;
 
-#ifndef _MSC_VER
 		if (sig == SIGHUP)
 			continue;
-#endif		
 		
 		break;
 	}

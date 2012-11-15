@@ -116,4 +116,6 @@ class M6Server : public zh::webapp, public M6SearchServer
 	M6AuthInfoList	mAuthInfo;
 	boost::mutex	mAuthMutex;
 	std::string		mAdminRealm;
+	std::string		mBaseURL;
+	bool			mBlastEnabled, mAlignEnabled;
 };

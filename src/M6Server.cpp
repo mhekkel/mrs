@@ -454,6 +454,7 @@ struct M6Redirect
 M6Server::M6Server(zx::element* inConfig)
 	: webapp(kM6ServerNS)
 	, M6SearchServer(inConfig)
+	, mBlastEnabled(false), mAlignEnabled(false)
 {
 	string docroot = "docroot";
 	zx::element* e = mConfig->find_first("docroot");
@@ -498,11 +499,23 @@ M6Server::M6Server(zx::element* inConfig)
 	zx::node* realm = mConfig->find_first_node("admin/@realm");
 	if (realm != nullptr)
 		mAdminRealm = realm->str();
+	
+	if ((e = mConfig->find_first("base-url")) != nullptr)
+		mBaseURL = e->content();
+
+	mBlastEnabled = not mConfig->find("blast-dbs/db").empty();
+	
+	fs::path clustalo(M6Config::Instance().FindGlobal("/m6-config/tools/tool[@name='clustalo']"));
+	if (fs::exists(clustalo))
+		mAlignEnabled = true;
 }
 
 void M6Server::init_scope(el::scope& scope)
 {
 	webapp::init_scope(scope);
+
+	if (not mBaseURL.empty())
+		scope.put("baseUrl", el::object(mBaseURL));
 
 	vector<el::object> databanks;
 	foreach (M6LoadedDatabank& db, mLoadedDatabanks)
@@ -513,6 +526,9 @@ void M6Server::init_scope(el::scope& scope)
 		databanks.push_back(databank);
 	}
 	scope.put("databanks", el::object(databanks));
+	
+	scope.put("blastEnabled", el::object(mBlastEnabled));
+	scope.put("alignEnabled", el::object(mAlignEnabled));
 }
 
 // --------------------------------------------------------------------
@@ -612,6 +628,7 @@ void M6Server::handle_download(const zh::request& request, const el::scope& scop
 void M6Server::handle_entry(const zh::request& request, const el::scope& scope, zh::reply& reply)
 {
 	string db, nr, id;
+	string q, rq, format;
 
 	zh::parameter_map params;
 	get_parameters(scope, params);
@@ -619,18 +636,58 @@ void M6Server::handle_entry(const zh::request& request, const el::scope& scope, 
 	db = params.get("db", "").as<string>();
 	nr = params.get("nr", "").as<string>();
 	id = params.get("id", "").as<string>();
+	q = params.get("q", "").as<string>();
+	rq = params.get("rq", "").as<string>();
+	format = params.get("format", "entry").as<string>();
+	
+	if (id.empty() and db.empty())
+	{
+		fs::path path(scope["baseuri"].as<string>());
+		
+		fs::path::iterator p = path.begin();
+		if ((p++)->string() == "entry" and p != path.end())
+		{
+			db = (p++)->string();
+			if (p != path.end())
+				id = (p++)->string();
+			if (p != path.end())
+				format = (p++)->string();
+			if (p != path.end())
+				q = (p++)->string();
+		}
+	}
 
 	if (db.empty() or (nr.empty() and id.empty()))		// shortcut
 	{
-		handle_welcome(request, scope, reply);
+		reply = zh::reply::redirect(mBaseURL);
 		return;
 	}
 
 	M6Databank* mdb = Load(db);
+	uint32 docNr = 0;
+
+	if (mdb == nullptr and not id.empty())
+	{
+		foreach (string adb, UnAlias(db))
+		{
+			mdb = Load(adb);
+			if (mdb != nullptr)
+			{
+				bool exists;
+				tr1::tie(exists, docNr) = mdb->Exists("id", id);
+				if (exists)
+				{
+					db = adb;
+					nr = boost::lexical_cast<string>(docNr);
+					break;
+				}
+			}
+		}
+	}
+	
 	if (mdb == nullptr)
 		THROW(("Databank %s not loaded", db.c_str()));
 
-	uint32 docNr = 0;
 	if (nr.empty())
 	{
 		bool exists;
@@ -647,11 +704,6 @@ void M6Server::handle_entry(const zh::request& request, const el::scope& scope, 
 		unique_ptr<M6Document> doc(mdb->Fetch(docNr));
 		id = doc->GetAttribute("id");
 	}
-	
-	string q, rq, format;
-	q = params.get("q", "").as<string>();
-	rq = params.get("rq", "").as<string>();
-	format = params.get("format", "entry").as<string>();
 	
 	el::scope sub(scope);
 	sub.put("db", el::object(db));
@@ -1291,6 +1343,23 @@ void M6Server::handle_admin(const zh::request& request,
 
 	el::scope sub(scope);
 
+	// add the global settings
+	el::object global;
+	global["srvdir"] = M6Config::Instance().FindGlobal("/m6-config/srvdir");
+	global["mrsdir"] = M6Config::Instance().FindGlobal("/m6-config/mrsdir");
+	global["rawdir"] = M6Config::Instance().FindGlobal("/m6-config/rawdir");
+	global["scriptdir"] = M6Config::Instance().FindGlobal("/m6-config/scriptdir");
+	
+	el::object tools;
+	tools["clustalo"] = M6Config::Instance().FindGlobal("/m6-config/tools/tool[@name='clustalo']");
+	global["tools"] = tools;
+	
+	sub.put("global", global);
+
+	// add server settings
+	
+
+	// add the databank settings
 	vector<el::object> databanks;
 
 	zx::element_set dbs(mConfig->find("dbs/db"));
@@ -1317,6 +1386,7 @@ void M6Server::handle_admin(const zh::request& request,
 			fetch["src"] = e->get_attribute("src");
 			fetch["dst"] = e->get_attribute("dst");
 			fetch["delete"] = e->get_attribute("delete");
+			databank["fetch"] = fetch;
 		}
 		
 		databanks.push_back(databank);

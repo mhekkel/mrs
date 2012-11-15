@@ -581,3 +581,82 @@ div#globalSelection input, div#globalSelection select {
 	margin: 5px;
 	float:right;
 }
+
+.admin {
+	width: 100%;
+	margin-bottom: 4px;
+}
+
+.admin table {
+	width: 100%;
+	padding: 0px;
+	margin: 0px;
+}
+
+.admin table caption {
+	background-color: #44749d;
+	color: white;
+	font-weight: bold;
+	text-align: left;
+	padding: 3px 5px 3px 5px;
+}
+
+.admin td {
+	padding: 2px;
+	padding-left: 4px;
+	margin: 0px;
+	vertical-align: top;
+	border-top: solid 1px #ebe7e0;
+	width: 9em;
+}
+
+.admin tr:first-child td {
+	border-top-width: 0px;
+}
+
+.admin td:first-child {
+	margin: 1px;
+	font-weight: bold;
+}
+
+.admin td + td {
+	width: auto;
+	white-space: nowrap;
+	overflow: hidden;
+}
+
+.admin td.admin-edit-text span {
+	margin: -1px;
+	padding: 1px;
+	display: block;
+	border: solid 1px white;
+}
+
+.admin td.admin-edit-text span:hover {
+	border: solid 1px #ccc;
+}
+
+.admin td.admin-edit-text input {
+	margin: -2px;
+	width: 100%;
+}
+
+.admin .admin-left {
+	float: left;
+	width: 30%;
+	vertical-align: top;
+	padding-right: 10px;
+}
+
+.admin .admin-right {
+	margin-left: 30%;
+	padding-left: 10px;
+	vertical-align: top;
+}
+
+.admin .admin-clear {
+	clear: both;
+	height: 1px;
+	overflow: hidden;
+	margin: 0;
+}

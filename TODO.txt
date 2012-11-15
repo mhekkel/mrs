@@ -5,6 +5,10 @@ BUGS:
 
 Todo
 
+- verwijder nr als parameter voor entry, gebruik '#0000' constructie
+- integratie SOAP/REST/WWW server
+- GetDocument routine in server die aliases gebruikt
+
 - m6 integration (server/build/password)
 - config file:
 	- blast db specification

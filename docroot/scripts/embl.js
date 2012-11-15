@@ -188,7 +188,7 @@ Embl = {
 			else if (m[2] == "OC") {
 				var a = m[0].replace(/^OC   /gm, '').replace(/\.\s*$/mg, '').split(/;\s*/);
 				var b = $.map(a, function(v) {
-					return "<a href='link?db=taxonomy&amp;ix=sn&amp;id=" + $(v).text() + "'>" + v + "</a>";
+					return "<a href='link?db=taxonomy&amp;ix=sn&amp;id=" + $("<span/>").text(v).text() + "'>" + v + "</a>";
 				});
 				desc.push(Embl.cell("Taxonomy", b.join(", ")));
 			}
@@ -212,7 +212,7 @@ Embl = {
 				a = $.map(a, function(value) {
 					var attr = value;
 					if (attr.indexOf('<') >= 0)
-						attr = $(attr).text();
+						attr = $("<span/>").text(attr).text();
 					return "<a href='search?db=embl&amp;q=kw:\"" + attr + "\"'>" + value + "</a>";
 				});
 				desc.push(Embl.cell("Keywords", a.join(", ")));
@@ -488,7 +488,7 @@ Embl = {
 //				parser.parse(m[0].replace(/^DE   /gm, ''));
 
 //				if (parser.name != null && parser.name.name != null)
-//					de = $(parser.name.name).text();  // strip out tags
+//					de = $("<span/>").text(parser.name.name).text();  // strip out tags
 //*/
 //			}
 //			else if (m[2] == 'SQ') {

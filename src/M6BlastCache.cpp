@@ -76,17 +76,15 @@ M6BlastCache::M6BlastCache()
 {
 	boost::mutex::scoped_lock lock(mDbMutex);
 	
-	string s = M6Config::Instance().FindGlobal("//blast/cache-dir");
+	string s = M6Config::Instance().FindGlobal("/m6-config/blastdir");
 	if (s.empty())
-		s = M6Config::Instance().FindGlobal("//srvdir") + "blast-cache";
+		THROW(("Missing blastdir configuration"));
 
 	mCacheDir = fs::path(s);
 	if (not fs::exists(mCacheDir))
 		fs::create_directory(mCacheDir);
 	
-	s = M6Config::Instance().FindGlobal("//blast/cache-index");
-	if (s.empty())
-		s = (mCacheDir / "index.db").string();
+	s = (mCacheDir / "index.db").string();
 
 	sqlite3_config(SQLITE_CONFIG_MULTITHREAD);
 

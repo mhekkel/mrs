@@ -28,12 +28,6 @@
 	<script src="scripts/admin.js" type="text/javascript">
 	</script>
 
-	<script language="JavaScript">
-		$(function() {
-			$( "#accordion" ).accordion();
-		});
-	</script>
-
 </head>
 <body>
 	<mrs:include file="menu.html" />
@@ -41,64 +35,62 @@
 		<mrs:include file="form.html" />
 		<div class="nav">
 			<ul>
-				<li><a href="#" id="stats_db" onclick="Admin.changeStatsView('databanks');">Databanks</a></li>
-				<li><a href="#" id="stats_blast" onclick="Admin.changeStatsView('blast');">Blast</a></li>
+				<li><a href="#" id="global" onclick="Admin.changeStatsView('global');">Main</a></li>
+				<li><a href="#" id="servers" onclick="Admin.changeStatsView('servers');">Servers</a></li>
+				<li><a href="#" id="parsers" onclick="Admin.changeStatsView('parsers');">Parsers</a></li>
+				<li><a href="#" id="formats" onclick="Admin.changeStatsView('formats');">Formats</a></li>
+				<li><a href="#" id="databanks" onclick="Admin.changeStatsView('databanks');">Databanks</a></li>
+				<li><a href="#" id="blast" onclick="Admin.changeStatsView('blast');">Blast</a></li>
 			</ul>
 		</div>
 
-		<div id="databanks">
-			<div id="accordion">
-			<mrs:iterate collection="databanks" var="db">
-				<h3>${db.id} — ${db.name}</h3>
-
-				<table id="${db.id}-tbl" class="list status" cellspacing="0" cellpadding="0" width="100%"
-					xmlns:m2="http://mrs.cmbi.ru.nl/mrs-web/nl/my-ns">
-					<tr>
-						<td class="label" width="20%">ID</td>
-						<td>${db.id}</td>
-					</tr>
-					<tr>
-						<td class="label">Name</td>
-						<td ondblclick="Admin.editProperty('${db.id}', 'name');">
-							<span id="${db.id}-name" class="editable">${db.name}</span>
-							<input type="hidden" id="edit-${db.id}-name" value="${db.name}" class="edit" />
-						</td>
-					</tr>
-					<tr>
-						<td class="label">Parser</td>
-						<td ondblclick="Admin.editProperty('${db.id}', 'parser');">
-							<span id="${db.id}-parser" class="editable">${db.parser}</span>
-							<input type="hidden" id="edit-${db.id}-parser" value="${db.parser}" class="edit" />
-						</td>
-					</tr>
-					<tr>
-						<td class="label">Format</td>
-						<td ondblclick="Admin.editProperty('${db.id}', 'format');">
-							<span id="${db.id}-format" class="editable">${db.format}</span>
-							<input type="hidden" id="edit-${db.id}-format" value="${db.format}" class="edit" />
-						</td>
-					</tr>
-					<tr>
-						<td class="label">Info URL</td>
-						<td ondblclick="Admin.editProperty('${db.id}', 'info');">
-							<span id="${db.id}-info" class="editable">${db.info}</span>
-							<input type="hidden" id="edit-${db.id}-info" value="${db.info}" class="edit" />
-						</td>
-					</tr>
-					<tr>
-						<td class="label">Source files</td>
-						<td ondblclick="Admin.editProperty('${db.id}', 'source');">
-							<span id="${db.id}-source" class="editable">${db.source}</span>
-							<input type="hidden" id="edit-${db.id}-source" value="${db.source}" class="edit" />
-						</td>
-					</tr>
+		<div class="admin">
+			<div id="global" class="section">
+				<table cellspacing="0" cellpadding="0">
+					<caption>Directories</caption>
+					<tr><td>Base directory</td><td id="srvdir" class="admin-edit-text">${global.srvdir ? global.srvdir : 'not set'}</td></tr>
+					<tr><td>MRS-file directory</td><td id="srvdir" class="admin-edit-text">${global.mrsdir ? global.mrsdir : 'not set'}</td></tr>
+					<tr><td>Raw directory</td><td id="srvdir" class="admin-edit-text">${global.rawdir ? global.rawdir : 'not set'}</td></tr>
+					<tr><td>Script directory</td><td id="srvdir" class="admin-edit-text">${global.scriptdir ? global.scriptdir : 'not set'}</td></tr>
 				</table>
-			</mrs:iterate>
-			</div>
-		</div>
 
-		<div id="blast" />
+				<table cellspacing="0" cellpadding="0" style="margin-top: 20px">
+					<caption>Tools</caption>
+					<tr><td>Clustal Omega</td><td id="srvdir" class="admin-edit-text">${global.tools.clustalo ? global.tools.clustalo : 'not set'}</td></tr>
+				</table>
+
+			</div>
+	
+			<div id="servers" class="section" />
+			<div id="parsers" class="section" />
+			<div id="formats" class="section" />
+	
+			<div id="databanks" class="section">
+				<mrs:iterate collection="databanks" var="db">
+					<table cellspacing="0" cellpadding="0">
+						<caption>${db.id}</caption>
+						<tr><td>Name</td><td id="${db.id}-name" class="admin-edit-text">${db.name}</td></tr>
+						<tr><td>Info URL</td><td id="${db.id}-info" class="admin-edit-text">${db.info ? db.info : '-'}</td></tr>
+						<tr><td>Parser</td><td>${db.parser}</td></tr>
+						<tr><td>Formatter</td><td>${db.format}</td></tr>
+						<tr><td>Source files</td><td class="admin-edit-text">${db.source}</td></tr>
+						<tr><td>Upstream</td>
+							<td>
+								<table cellspacing="0" cellpadding="0">
+									<tr><td>URL</td><td class="admin-edit-text">${db.fetch.src}</td></tr>
+									<tr><td>Destination</td><td class="admin-edit-text">${db.fetch.dst}</td></tr>
+									<tr><td>Delete</td><td class="admin-edit-text">${db.fetch.delete}</td></tr>
+								</table>
+							</td>
+						</tr>
+						
+					</table>
+				</mrs:iterate>
+			</div>
+	
+			<div id="blast" class="section" />
 		
+		</div>
 	</div>
 </body>
 </html>

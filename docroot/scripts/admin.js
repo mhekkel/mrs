@@ -5,32 +5,63 @@
 
 Admin = {
 	timeout: null,
-	viewing: 'databanks',
+	viewing: null,
 
 	init: function() {
-		Admin.updateStatus();
+
+		var a = 0;
+		$("td.admin-edit-text").each(function() {
+			var text = $(this).text();
+			var id = $(this).attr("id");
+			
+			var span = $("<span/>").append(text);
+			var edit = $("<input type='text'/>").attr("value", text).hide();
+			
+			span.click(function() {
+				$(this).hide();
+				edit.show().focus().select();
+			});
+			
+			edit.blur(function() {
+				this.value = text;
+				$(this).hide();
+				span.show();
+			}).keydown(function(event) {
+				if (event.which == 13) {
+					text = this.value;
+					$(span).text(text);
+					$(this).blur();
+					event.preventDefault();
+				}
+				else if (event.which == 27) {
+					$(this).blur();
+					event.preventDefault();
+				}
+			});
+			
+			$(this).html(span).append(edit);
+		});
+
+//		Admin.updateStatus();
+		Admin.changeStatsView('global');
 	},
 
 	changeStatsView: function(view) {
-		if (view == Admin.viewing) {
+		if (Admin.viewing == view)
 			return;
-		}
-	
-		if (Admin.viewing != null) {
-			document.getElementById(Admin.viewing).style.display = 'none';
-		}
+		
 		Admin.viewing = view;
-		document.getElementById(Admin.viewing).style.display = '';
 		
-		if (Admin.timeout != null) {
-			clearTimeout(Admin.timeout);
-		}
+		$("div.section").each(function() {
+			if (this.id != view) { $(this).hide(); }
+		});
 
-		Admin.updateStatus();
+		$("div.nav li a").each(function() {
+			if (this.id == view)	{ $(this).addClass("selected"); }
+			else					{ $(this).removeClass("selected"); }
+		});
 		
-		try {
-			sessionStorage.setItem('statsViewing', view);
-		} catch (e) {}
+		$("div #" + view).show();
 	},
 	
 	updateStatus: function() {

@@ -8,39 +8,20 @@
 	<rawdir>/data/raw/</rawdir>
 <!--	<scriptdir>/data/parsers</scriptdir>-->
 	<scriptdir>/home/maarten/projects/m6/parsers</scriptdir>
+	<blastdir>/data/blast-cache</blastdir>
 
 	<!-- Tools section, specify external executables used by M6 -->
 	<tools>
-		<tool name="clustalo">/usr/bin/clustalo</tool>
+		<tool name="clustalo">C:\Users\maarten\bin\clustal-omega\clustalo.exe</tool>
 	</tools>
 	
 	<users>
 		<user name="scott" realm="M6 Administrator" password="b92ff7d60b994c8a0d2941ad9349e841"/>
 	</users>
 	
-	<blast>
-		<cache-dir>/data/blast-cache/</cache-dir>
-		<cache-index>/data/blast-cache/index.db</cache-index>
-		
-		<dbs>
-			<db id="sprot" name="SwissProt">
-				<file>sprot.m6/fasta</file>
-			</db>
-			<db id="trembl" name="TrEMBL">
-				<file>trembl.m6/fasta</file>
-			</db>
-			<db id="uniprot" name="UniProt (SwissProt + TrEMBL)">
-				<file>sprot.m6/fasta</file>
-				<file>trembl.m6/fasta</file>
-			</db>
-			<db id="pdb" name="PDB">
-				<file>pdb.m6/fasta</file>
-			</db>
-		</dbs>
-	</blast>
-
 	<server type="www" addr="0.0.0.0" port="18090">
 		<admin realm="M6 Administrator"/>
+		<base-url>http://lord-jim.cmbi.umcn.nl:18090/</base-url>
 		<docroot>./docroot/</docroot>
 		<dbs>
 			<db>embl</db>
@@ -68,32 +49,13 @@
 			<db>unigene</db>
 			<db>pmc</db>
 		</dbs>
-	</server>
-
-	<server type="search" addr="0.0.0.0" port="18091">
-		<external-address>http://mrs.cmbi.ru.nl/mrsws/search</external-address>
-		<dbs>
-			<db>embl</db>
-			<db>enzyme</db>
-			<db>omim</db>
-			<db>pdbfinder</db>
-			<db>sprot</db>
-			<db>trembl</db>
-			<db>genbank</db>
-			<db>refseq</db>
-			<db>taxonomy</db>
-			<db>pdb</db>
-		</dbs>
-	</server>
-
-	<server type="blast" addr="0.0.0.0" port="18092">
-<!--		<external-address>http://mrs.cmbi.ru.nl/mrsws/blast</external-address>-->
-		<external-address>http://localhost:18092/mrsws_blast</external-address>
-		<dbs>
+		
+		<blast-dbs>
 			<db>sprot</db>
 			<db>trembl</db>
 			<db>uniprot</db>
-		</dbs>
+			<db>pdb</db>
+		</blast-dbs>
 	</server>
 
 	<format id="omim" script="scripts/omim.js">

@@ -1,10 +1,12 @@
 #pragma once
 
-#include <zeep/server.hpp>
+#include <zeep/dispatcher.hpp>
 #include <boost/shared_ptr.hpp>
 #include <list>
 
 #include <zeep/xml/node.hpp>
+
+class M6Server;
 
 namespace M6WSBlastNS
 {
@@ -119,27 +121,21 @@ struct BlastResult
 
 }
 
-class M6WSBlast : public zeep::server
+class M6WSBlast : public zeep::dispatcher
 {
   public:
-						M6WSBlast(const zeep::xml::element* inConfig);
-	virtual				~M6WSBlast();
+				M6WSBlast(M6Server& inServer, const std::string& inNS, const std::string& inService);
+	virtual		~M6WSBlast();
 	
-	void				Blast(const std::string& query,
-							const std::string& program, const std::string& db,
-							const std::string& mrsBooleanQuery,
-							const M6WSBlastNS::Parameters& params,
-							uint32 reportLimit, std::string& jobId);
+	void		Blast(const std::string& query, const std::string& program, const std::string& db,
+					const std::string& mrsBooleanQuery, const M6WSBlastNS::Parameters& params,
+					uint32 reportLimit, std::string& jobId);
 		
-	void				BlastJobStatus(std::string jobId,
-							M6WSBlastNS::JobStatus& status);
-						
-	void				BlastJobResult(std::string jobId,
-							M6WSBlastNS::BlastResult& result);
-					
-	void				BlastJobError(std::string jobId, std::string& error);
+	void		BlastJobStatus(std::string jobId, M6WSBlastNS::JobStatus& status);
+	void		BlastJobResult(std::string jobId, M6WSBlastNS::BlastResult& result);
+	void		BlastJobError(std::string jobId, std::string& error);
 	
   protected:
-	std::vector<std::string>
-						mDbTable;
+	M6Server&	mServer;
+//	std::vector<std::string> mDbTable;
 };

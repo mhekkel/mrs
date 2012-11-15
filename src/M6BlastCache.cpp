@@ -21,6 +21,7 @@
 #include <boost/iostreams/copy.hpp>
 #include <boost/iostreams/filter/bzip2.hpp>
 #include <boost/iostreams/filter/gzip.hpp>
+#include <boost/algorithm/string.hpp>
 
 #include <sqlite3.h>
 
@@ -32,6 +33,7 @@ using namespace std;
 
 namespace fs = boost::filesystem;
 namespace io = boost::iostreams;
+namespace ba = boost::algorithm;
 
 // --------------------------------------------------------------------
 
@@ -264,7 +266,35 @@ M6BlastResultPtr M6BlastCache::JobResult(const string& inJobID)
 	return result;
 }
 
-void M6BlastCache::CheckCacheForDB(const string& inDatabank, const vector<string>& inFiles)
+void M6BlastCache::FastaFilesForDatabank(const string& inDatabank, vector<fs::path>& outFiles)
+{
+	fs::path mrsdir(M6Config::Instance().FindGlobal("/m6-config/mrsdir"));
+	boost::format xp("/m6-config/databank[@id='%1%']/file");
+	M6Config& config = M6Config::Instance();
+
+	vector<string> dbs;
+	ba::split(dbs, inDatabank, ba::is_any_of(";"));
+	
+	foreach (string& db, dbs)
+	{
+		fs::path dbdir(config.FindGlobal((xp % db).str()));
+		if (dbdir.empty())
+			THROW(("Databank directory not found for %s", db.c_str()));
+		
+		if (not dbdir.has_root_path())
+			dbdir = mrsdir / dbdir;
+		
+		if (not fs::exists(dbdir / "fasta"))
+			THROW(("Databank '%s' does not contain a fasta file", db.c_str()));
+		
+		outFiles.push_back(dbdir / "fasta");
+	}
+	
+	if (outFiles.empty())
+		THROW(("Databank '%s' does not contain a fasta file", inDatabank.c_str()));
+}
+
+void M6BlastCache::CheckCacheForDB(const string& inDatabank, const vector<fs::path>& inFiles)
 {
 	sqlite3_reset(mFetchDbFilesStmt);
 	THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(mFetchDbFilesStmt, 1, inDatabank.c_str(), inDatabank.length(), SQLITE_STATIC), mCacheDB);
@@ -323,10 +353,12 @@ void M6BlastCache::CheckCacheForDB(const string& inDatabank, const vector<string
 				"INSERT OR REPLACE INTO blast_db_file(db, file, time_t) VALUES(?, ?, ?)", -1,
 				&updateStmt, nullptr), mCacheDB);
 
-			foreach (const string& file, inFiles)
+			foreach (const fs::path& file, inFiles)
 			{
+				string path = file.string();
+				
 				THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(updateStmt, 1, inDatabank.c_str(), inDatabank.length(), SQLITE_STATIC), mCacheDB);
-				THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(updateStmt, 2, file.c_str(), file.length(), SQLITE_STATIC), mCacheDB);
+				THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(updateStmt, 2, path.c_str(), path.length(), SQLITE_STATIC), mCacheDB);
 				THROW_IF_SQLITE3_ERROR(sqlite3_bind_int64(updateStmt, 3, fs::last_write_time(file)), mCacheDB);
 				
 				THROW_IF_SQLITE3_ERROR(sqlite3_step(updateStmt), mCacheDB);
@@ -350,23 +382,8 @@ string M6BlastCache::Submit(const string& inDatabank,
 {
 	boost::mutex::scoped_lock lock(mDbMutex);
 
-	vector<string> files;
-	foreach (auto file, M6Config::Instance().Find((boost::format("/m6-config/blast/dbs/db[@id='%1%']/file") % inDatabank).str()))
-	{
-		fs::path path(file->content());
-		
-		if (not path.has_root_path())
-		{
-			fs::path mrsdir(M6Config::Instance().FindGlobal("/m6-config/mrsdir"));
-			path = mrsdir / path;
-		}
-		
-		if (not fs::exists(path))
-			THROW(("Fasta file (%s) is missing", path.string().c_str()));
-		
-		files.push_back(path.string());
-	}
-
+	vector<fs::path> files;
+	FastaFilesForDatabank(inDatabank, files);
 	CheckCacheForDB(inDatabank, files);
 	
 	string result;
@@ -534,18 +551,7 @@ void M6BlastCache::ExecuteJob(const string& inJobID)
 			int gapextend = sqlite3_column_int(mFetchParamsStmt, 8);
 			
 			vector<fs::path> files;
-			foreach (auto file, M6Config::Instance().Find((boost::format("/m6-config/blast/dbs/db[@id='%1%']/file") % db).str()))
-			{
-				fs::path path(file->content());
-				
-				if (not path.has_root_path())
-				{
-					fs::path mrsdir(M6Config::Instance().FindGlobal("/m6-config/mrsdir"));
-					path = mrsdir / path;
-				}
-				
-				files.push_back(path);
-			}
+			FastaFilesForDatabank(db, files);
 			
 			M6BlastResultPtr result(M6Blast::Search(files, query, "blastp",
 				matrix, wordsize, expect, filter, gapped, gapopen, gapextend, 250));

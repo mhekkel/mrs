@@ -5,18 +5,20 @@
 #include <boost/bind.hpp>
 #include <boost/foreach.hpp>
 #define foreach BOOST_FOREACH
+#include <boost/algorithm/string.hpp>
 
 #include "M6Config.h"
 #include "M6Error.h"
 #include "M6BlastCache.h"
+#include "M6Databank.h"
 
 #include "M6WSBlast.h"
+#include "M6Server.h"
 
 using namespace std;
 namespace zx = zeep::xml;
-
-const
-	string	kBlastNS = "http://mrs.cmbi.ru.nl/mrsws/blast";
+namespace ba = boost::algorithm;
+namespace fs = boost::filesystem;
 
 namespace M6WSBlastNS
 {
@@ -39,16 +41,10 @@ Parameters::Parameters()
 //	Server implementation
 // 
 
-M6WSBlast::M6WSBlast(const zeep::xml::element* inConfig)
-	: zeep::server(kBlastNS, "mrsws_blast")
+M6WSBlast::M6WSBlast(M6Server& inServer, const string& inNS, const string& inService)
+	: mServer(inServer)
+	, zeep::dispatcher(inNS, inService)
 {
-	zx::element* addr = inConfig->find_first("external-address");
-	if (addr != nullptr)
-		set_location(addr->content());
-
-	foreach (zx::element* db, inConfig->find("dbs/db"))
-		mDbTable.push_back(db->content());
-
 	using namespace M6WSBlastNS;
 	
 	SOAP_XML_SET_STRUCT_NAME(Parameters);
@@ -96,24 +92,28 @@ void M6WSBlast::Blast(const string& query, const string& program, const string& 
 		THROW(("Only blastp is supported for now, sorry"));
 
 	// see if we can blast this databank
-	if (find(mDbTable.begin(), mDbTable.end(), db) == mDbTable.end())
-		THROW(("Databank %s cannot be used to do blast searches", db.c_str()));
+	vector<string> dbs(mServer.UnAlias(db));
+	if (dbs.empty())
+		THROW(("Databank '%s' not configured", db.c_str()));
 
+	foreach (string adb, dbs)
+	{
+		M6Databank* mdb = mServer.Load(adb);
+		if (not fs::exists(mdb->GetDbDirectory() / "fasta"))
+			THROW(("Databank does not have blastable sequences (%s/%s)", db.c_str(), adb.c_str()));
+	}
+	
 //	// try to load the matrix, fails if the parameters are incorrect
 //	M6Matrix matrix(params.matrix, params.gapOpen, params.gapExtend);
 
 	response = M6BlastCache::Instance().Submit(
-		db, query, params.matrix, params.wordSize,
+		ba::join(dbs, ";"), query, params.matrix, params.wordSize,
 		params.expect, params.lowComplexityFilter,
 		params.gapped, params.gapOpen, params.gapExtend, reportLimit);
-
-	log() << response;
 }
 
 void M6WSBlast::BlastJobStatus(string job_id, M6WSBlastNS::JobStatus& response)
 {
-	log() << job_id;
-
 	M6BlastJobStatus status;
 	string error;
 	uint32 hitCount;
@@ -133,8 +133,6 @@ void M6WSBlast::BlastJobStatus(string job_id, M6WSBlastNS::JobStatus& response)
 
 void M6WSBlast::BlastJobResult(string job_id, M6WSBlastNS::BlastResult& response)
 {
-	log() << job_id;
-
 	// check status first
 	M6BlastJobStatus status;
 	string error;
@@ -195,8 +193,6 @@ void M6WSBlast::BlastJobResult(string job_id, M6WSBlastNS::BlastResult& response
 
 void M6WSBlast::BlastJobError(string job_id, string& response)
 {
-	log() << job_id;
-
 	M6BlastJobStatus status;
 	uint32 hitCount;
 	double bestScore;

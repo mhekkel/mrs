@@ -4,6 +4,7 @@
 
 #include <zeep/http/webapp.hpp>
 #include <zeep/http/webapp/el.hpp>
+#include <zeep/dispatcher.hpp>
 
 namespace zh = zeep::http;
 namespace zx = zeep::xml;
@@ -12,17 +13,22 @@ namespace el = zeep::http::el;
 class M6Iterator;
 class M6Databank;
 class M6Parser;
+class M6WSSearch;
+class M6WSBlast;
+
+typedef std::map<std::string,std::set<M6Databank*>> M6LinkMap;
 
 struct M6AuthInfo;
 typedef std::vector<M6AuthInfo*> M6AuthInfoList;
 
-class M6SearchServer
+class M6Server : public zh::webapp
 {
   public:
-					M6SearchServer(const zx::element* inConfig);
-	virtual			~M6SearchServer();
+					M6Server(zx::element* inConfig);
+	virtual			~M6Server();
 
-  protected:
+	virtual void	handle_request(const zh::request& req, zh::reply& rep);
+	virtual void	create_unauth_reply(bool stale, const std::string& realm, zh::reply& rep);
 
 	void			LoadAllDatabanks();
 	M6Databank*		Load(const std::string& inDatabank);
@@ -53,18 +59,7 @@ class M6SearchServer
 	std::vector<std::string>
 					UnAlias(const std::string& inDatabank);
 
-	const zx::element*	mConfig;
-	M6DbList			mLoadedDatabanks;
-	M6LinkMap			mLinkMap;
-};
-
-class M6Server : public zh::webapp, public M6SearchServer
-{
-  public:
-					M6Server(zx::element* inConfig);
-
-	virtual void	handle_request(const zh::request& req, zh::reply& rep);
-	virtual void	create_unauth_reply(bool stale, const std::string& realm, zh::reply& rep);
+	const M6DbList&	GetLoadedDatabanks()						{ return mLoadedDatabanks; }
 
   private:
 	virtual void	init_scope(el::scope& scope);
@@ -113,9 +108,17 @@ class M6Server : public zh::webapp, public M6SearchServer
 	void			SpellCheck(const std::string& inDatabank, const std::string& inTerm,
 						std::vector<std::pair<std::string,uint16>>& outCorrections);
 
+	const zx::element*
+					mConfig;
+	M6DbList		mLoadedDatabanks;
+	M6LinkMap		mLinkMap;
+
 	M6AuthInfoList	mAuthInfo;
 	boost::mutex	mAuthMutex;
 	std::string		mAdminRealm;
 	std::string		mBaseURL;
 	bool			mBlastEnabled, mAlignEnabled;
+	
+	std::vector<zeep::dispatcher*>
+					mWebServices;
 };

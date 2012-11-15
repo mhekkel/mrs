@@ -61,7 +61,10 @@ class M6BlastCache
 									const std::string& inError, uint32 inHitCount, double inBestScore);
 	void						CacheResult(const std::string& inJobID, M6BlastResultPtr inResult);
 	void						CheckCacheForDB(const std::string& inDatabank,
-									const std::vector<std::string>& inFiles);
+									const std::vector<boost::filesystem::path>& inFiles);
+
+	void						FastaFilesForDatabank(const std::string& inDatabank,
+									std::vector<boost::filesystem::path>& outFiles);
 
 	void						ExecuteStatement(const std::string& inStatement);
 

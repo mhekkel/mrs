@@ -2,7 +2,7 @@
 
 #include <set>
 
-#include <zeep/server.hpp>
+#include <zeep/dispatcher.hpp>
 #include "M6Server.h"
 
 namespace WSSearchNS
@@ -154,29 +154,16 @@ struct FindResult
 	}
 };
 
-//struct Cluster
-//{
-//	std::string					id;
-//	std::string					title;
-//	float						similarity;
-//	std::vector<Cluster>		children;
-//
-//	template<class Archive>
-//	void serialize(Archive& ar, const unsigned int)
-//	{
-//		ar & BOOST_SERIALIZATION_NVP(id)
-//		   & BOOST_SERIALIZATION_NVP(title)
-//		   & BOOST_SERIALIZATION_NVP(similarity)
-//		   & BOOST_SERIALIZATION_NVP(children);
-//	}
-//};
-
 }
 
-class M6WSSearch : public zeep::server, public M6SearchServer
+class M6WSSearch : public zeep::dispatcher
 {
   public:
-					M6WSSearch(const zeep::xml::element* inConfig);
+	typedef M6Server::M6LoadedDatabank M6LoadedDatabank;
+	typedef M6Server::M6DbList M6DbList;
+
+					M6WSSearch(M6Server& inServer, const M6DbList& inLoadedDatabanks,
+						const std::string& inNS, const std::string& inService);
 
 	void			GetDatabankInfo(const std::string& db,
 						std::vector<WSSearchNS::DatabankInfo>& info);
@@ -202,29 +189,11 @@ class M6WSSearch : public zeep::server, public M6SearchServer
 						int resultoffset, int maxresultcount,
 						std::vector<WSSearchNS::FindResult>& response);
 
-//	void			FindSimilar(const std::string& db, const std::string& id,
-//						WSSearchNS::Algorithm algorithm, int resultoffset, int maxresultcount,
-//						std::vector<WSSearchNS::FindResult>& response);
-
 	void			GetLinked(const std::string& db, const std::string& id,
 						const std::string& linkedDb, int resultoffset, int maxresultcount,
 						std::vector<WSSearchNS::FindResult>& response);
 
-//	void			Count(const std::string& db, const std::string& booleanquery, uint32& response);
-//
-//	void			Cooccurrence(const std::string& db, const std::vector<std::string>& ids,
-//						float idf_cutoff, int resultoffset, int maxresultcount,
-//						std::vector<std::string>& terms);
-//
-//	void			SpellCheck(const std::string& db, const std::string& queryterm,
-//						std::vector<std::string>& suggestions);
-//
-//	void			SuggestSearchTerms(const std::string& db, const std::string& queryterm,
-//						std::vector<std::string>& suggestions);
-//
-//	void			CompareDocuments(const std::string& db,
-//						const std::string& doc_a, const std::string& doc_b, float& similarity);
-//
-//	void			ClusterDocuments(const std::string& db, const std::vector<std::string>& ids,
-//						WSSearchNS::Cluster& response);
+  private:
+	M6Server&		mServer;
+	const M6DbList&	mLoadedDatabanks;
 };

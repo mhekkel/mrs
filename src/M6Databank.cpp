@@ -2165,6 +2165,11 @@ string M6Databank::GetUUID() const
 	return mImpl->GetUUID();
 }
 
+fs::path M6Databank::GetDbDirectory() const
+{
+	return mImpl->GetDbDirectory();
+}
+
 M6Databank* M6Databank::CreateNew(const string& inDatabankID, const fs::path& inPath, const string& inVersion)
 {
 	if (fs::exists(inPath))

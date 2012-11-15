@@ -22,6 +22,8 @@
 	<server type="www" addr="0.0.0.0" port="18090">
 		<admin realm="M6 Administrator"/>
 		<base-url>http://lord-jim.cmbi.umcn.nl:18090/</base-url>
+		<web-service service="search" ns="http://mrs.cmbi.ru.nl/mrsws/search" location="mrsws/search" />
+		<web-service service="blast" ns="http://mrs.cmbi.ru.nl/mrsws/blast" location="mrsws/blast" />
 		<docroot>./docroot/</docroot>
 		<dbs>
 			<db>embl</db>
@@ -53,7 +55,7 @@
 		<blast-dbs>
 			<db>sprot</db>
 			<db>trembl</db>
-			<db>uniprot</db>
+			<db name="Uniprot">uniprot</db>
 			<db>pdb</db>
 		</blast-dbs>
 	</server>

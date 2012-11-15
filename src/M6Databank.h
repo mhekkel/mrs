@@ -55,6 +55,8 @@ class M6Databank
 
 	void			GetInfo(M6DatabankInfo& outInfo);
 	std::string		GetUUID() const;
+	boost::filesystem::path
+					GetDbDirectory() const;
 
 	void			StartBatchImport(M6Lexicon& inLexicon);
 	void			EndBatchImport();

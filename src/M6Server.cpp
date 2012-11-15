@@ -17,6 +17,8 @@
 #include <boost/random/random_device.hpp>
 #endif
 
+#include <zeep/envelope.hpp>
+
 #include "M6Utilities.h"
 #include "M6Databank.h"
 #include "M6Server.h"
@@ -47,22 +49,197 @@ int VERBOSE;
 
 // --------------------------------------------------------------------
 
-M6SearchServer::M6SearchServer(const zx::element* inConfig)
-	: mConfig(inConfig)
+struct M6AuthInfo
 {
-	LoadAllDatabanks();
+						M6AuthInfo(const string& inRealm);
+	
+	bool				Validate(const string& inMethod, const string& inURI,
+							const string& inHA1, map<string,string>& inInfo);
+	string				GetChallenge() const;
+	bool				Stale() const;
+	
+	string				mNonce, mRealm;
+	uint32				mLastNC;
+	pt::ptime			mCreated;
+};
+
+M6AuthInfo::M6AuthInfo(const string& inRealm)
+	: mRealm(inRealm)
+	, mLastNC(0)
+{
+	using namespace boost::gregorian;
+
+#if BOOST_VERSION >= 104800
+	boost::random::random_device rng;
+	uint32 data[4] = { rng(), rng(), rng(), rng() };
+#else
+	int64 data[2] = { random(), random() };
+#endif
+
+	mNonce = M6MD5(data, sizeof(data)).Finalise();
+	mCreated = pt::second_clock::local_time();
 }
 
-M6SearchServer::~M6SearchServer()
+string M6AuthInfo::GetChallenge() const
+{
+	string challenge = "Digest ";
+	challenge += "realm=\"" + mRealm + "\", qop=\"auth\", nonce=\"" + mNonce + '"';
+	return challenge;
+}
+
+bool M6AuthInfo::Stale() const
+{
+	pt::time_duration age = pt::second_clock::local_time() - mCreated;
+	return age.total_seconds() > 1800;
+}
+
+bool M6AuthInfo::Validate(const string& inMethod, const string& inURI,
+	const string& inHA1, map<string,string>& inInfo)
+{
+	bool valid = false;
+	
+	uint32 nc = strtol(inInfo["nc"].c_str(), nullptr, 16);
+	if (nc > mLastNC)
+	{
+		string ha2 = M6MD5(inMethod + ':' + inInfo["uri"]).Finalise();
+		
+		string response = M6MD5(
+			inHA1 + ':' +
+			inInfo["nonce"] + ':' +
+			inInfo["nc"] + ':' +
+			inInfo["cnonce"] + ':' +
+			inInfo["qop"] + ':' +
+			ha2).Finalise();
+		
+		valid = inInfo["response"] == response;
+		mLastNC = nc;
+	}
+	return valid;
+}
+
+// --------------------------------------------------------------------
+
+struct M6Redirect
+{
+	string	db;
+	uint32	nr;
+};
+
+// --------------------------------------------------------------------
+
+M6Server::M6Server(zx::element* inConfig)
+	: webapp(kM6ServerNS)
+	, mConfig(inConfig)
+	, mBlastEnabled(false), mAlignEnabled(false)
+{
+	LoadAllDatabanks();
+
+	string docroot = "docroot";
+	zx::element* e = mConfig->find_first("docroot");
+	if (e != nullptr)
+		docroot = e->content();
+	set_docroot(docroot);
+	
+	mount("",				boost::bind(&M6Server::handle_welcome, this, _1, _2, _3));
+	mount("download",		boost::bind(&M6Server::handle_download, this, _1, _2, _3));
+	mount("entry",			boost::bind(&M6Server::handle_entry, this, _1, _2, _3));
+	mount("link",			boost::bind(&M6Server::handle_link, this, _1, _2, _3));
+	mount("linked",			boost::bind(&M6Server::handle_linked, this, _1, _2, _3));
+	mount("search",			boost::bind(&M6Server::handle_search, this, _1, _2, _3));
+	mount("similar",		boost::bind(&M6Server::handle_similar, this, _1, _2, _3));
+	mount("scripts",		boost::bind(&M6Server::handle_file, this, _1, _2, _3));
+	mount("css",			boost::bind(&M6Server::handle_file, this, _1, _2, _3));
+//	mount("man",			boost::bind(&M6Server::handle_file, this, _1, _2, _3));
+	mount("images",			boost::bind(&M6Server::handle_file, this, _1, _2, _3));
+	mount("favicon.ico",	boost::bind(&M6Server::handle_file, this, _1, _2, _3));
+	mount("robots.txt",		boost::bind(&M6Server::handle_file, this, _1, _2, _3));
+
+	mount("blast",				boost::bind(&M6Server::handle_blast, this, _1, _2, _3));
+	mount("ajax/blast/submit",	boost::bind(&M6Server::handle_blast_submit_ajax, this, _1, _2, _3));
+	mount("ajax/blast/status",	boost::bind(&M6Server::handle_blast_status_ajax, this, _1, _2, _3));
+	mount("ajax/blast/result",	boost::bind(&M6Server::handle_blast_results_ajax, this, _1, _2, _3));
+
+	mount("align",				boost::bind(&M6Server::handle_align, this, _1, _2, _3));
+	mount("ajax/align/submit",	boost::bind(&M6Server::handle_align_submit_ajax, this, _1, _2, _3));
+	
+	mount("status",			boost::bind(&M6Server::handle_status, this, _1, _2, _3));
+	mount("ajax/status",	boost::bind(&M6Server::handle_status_ajax, this, _1, _2, _3));
+	mount("info",			boost::bind(&M6Server::handle_info, this, _1, _2, _3));
+
+	mount("admin",			boost::bind(&M6Server::handle_admin, this, _1, _2, _3));
+	mount("admin/rename",	boost::bind(&M6Server::handle_admin_rename_ajax, this, _1, _2, _3));
+
+	add_processor("entry",	boost::bind(&M6Server::process_mrs_entry, this, _1, _2, _3));
+	add_processor("link",	boost::bind(&M6Server::process_mrs_link, this, _1, _2, _3));
+	add_processor("redirect",
+							boost::bind(&M6Server::process_mrs_redirect, this, _1, _2, _3));
+
+	zx::node* realm = mConfig->find_first_node("admin/@realm");
+	if (realm != nullptr)
+		mAdminRealm = realm->str();
+	
+	if ((e = mConfig->find_first("base-url")) != nullptr)
+	{
+		mBaseURL = e->content();
+		if (not ba::ends_with(mBaseURL, "/"))
+			mBaseURL += '/';
+	}
+
+	mBlastEnabled = not mConfig->find("blast-dbs/db").empty();
+	
+	fs::path clustalo(M6Config::Instance().FindGlobal("/m6-config/tools/tool[@name='clustalo']"));
+	if (fs::exists(clustalo))
+		mAlignEnabled = true;
+		
+	// web services:
+	foreach (zx::element* ws, mConfig->find("web-service"))
+	{
+		string service = ws->get_attribute("service");
+		string ns = ws->get_attribute("ns");
+		string location = ws->get_attribute("location");
+		
+		zeep::dispatcher* d = nullptr;
+		if (service == "search")
+			d = new M6WSSearch(*this, mLoadedDatabanks, ns, location);
+		else if (service == "blast")
+			d = new M6WSBlast(*this, ns, location);
+		else
+			THROW(("Invalid web service specified: %s", service.c_str()));
+
+		mWebServices.push_back(d);
+		
+		mount(location, [d] (const zh::request& request, const el::scope& scope, zh::reply& reply)
+		{
+			zx::document doc;
+			doc.read(request.payload);
+			zeep::envelope env(doc);
+		
+			reply.set_content(zeep::make_envelope(d->dispatch(env.request())));
+		});
+		
+		string wsdl = location + "/wsdl";
+		location = mBaseURL + location;
+
+		mount(wsdl, [d, location] (const zh::request& request, const el::scope& scope, zh::reply& reply)
+		{
+			reply.set_content(d->make_wsdl(location));
+		});
+	}
+}
+
+M6Server::~M6Server()
 {
 	foreach (M6LoadedDatabank& db, mLoadedDatabanks)
 	{
 		delete db.mDatabank;
 		delete db.mParser;
 	}
+	
+	foreach (zeep::dispatcher* ws, mWebServices)
+		delete ws;
 }
 
-void M6SearchServer::LoadAllDatabanks()
+void M6Server::LoadAllDatabanks()
 {
 	fs::path mrsDir(M6Config::Instance().FindGlobal("/m6-config/mrsdir"));
 	
@@ -150,7 +327,7 @@ void M6SearchServer::LoadAllDatabanks()
 		db.mDatabank->InitLinkMap(mLinkMap);
 }
 
-M6Databank* M6SearchServer::Load(const string& inDatabank)
+M6Databank* M6Server::Load(const string& inDatabank)
 {
 	M6Databank* result = nullptr;
 
@@ -169,7 +346,7 @@ M6Databank* M6SearchServer::Load(const string& inDatabank)
 	return result;
 }
 
-string M6SearchServer::GetEntry(M6Databank* inDatabank, const string& inFormat, uint32 inDocNr)
+string M6Server::GetEntry(M6Databank* inDatabank, const string& inFormat, uint32 inDocNr)
 {
 	unique_ptr<M6Document> doc(inDatabank->Fetch(inDocNr));
 	if (not doc)
@@ -202,7 +379,7 @@ string M6SearchServer::GetEntry(M6Databank* inDatabank, const string& inFormat, 
 	return result;
 }
 
-string M6SearchServer::GetEntry(M6Databank* inDatabank,
+string M6Server::GetEntry(M6Databank* inDatabank,
 	const string& inFormat, const string& inIndex, const string& inValue)
 {
 	unique_ptr<M6Iterator> iter(inDatabank->Find(inIndex, inValue));
@@ -215,7 +392,7 @@ string M6SearchServer::GetEntry(M6Databank* inDatabank,
 	return GetEntry(inDatabank, inFormat, docNr);
 }
 
-void M6SearchServer::Find(const string& inDatabank, const string& inQuery, bool inAllTermsRequired,
+void M6Server::Find(const string& inDatabank, const string& inQuery, bool inAllTermsRequired,
 	uint32 inResultOffset, uint32 inMaxResultCount, bool inAddLinks,
 	vector<el::object>& outHits, uint32& outHitCount, bool& outRanked)
 {
@@ -275,7 +452,7 @@ void M6SearchServer::Find(const string& inDatabank, const string& inQuery, bool 
 	}		
 }
 
-uint32 M6SearchServer::Count(const string& inDatabank, const string& inQuery)
+uint32 M6Server::Count(const string& inDatabank, const string& inQuery)
 {
 	uint32 result = 0;
 	
@@ -307,7 +484,7 @@ uint32 M6SearchServer::Count(const string& inDatabank, const string& inQuery)
 
 // --------------------------------------------------------------------
 
-vector<string> M6SearchServer::UnAlias(const string& inDatabank)
+vector<string> M6Server::UnAlias(const string& inDatabank)
 {
 	vector<string> result;
 	
@@ -323,7 +500,7 @@ vector<string> M6SearchServer::UnAlias(const string& inDatabank)
 	return result;
 }
 
-void M6SearchServer::GetLinkedDbs(const string& inDb, const string& inId,
+void M6Server::GetLinkedDbs(const string& inDb, const string& inId,
 	vector<string>& outLinkedDbs)
 {
 	set<string> dbs;
@@ -357,7 +534,7 @@ void M6SearchServer::GetLinkedDbs(const string& inDb, const string& inId,
 	outLinkedDbs.assign(dbs.begin(), dbs.end());
 }
 
-void M6SearchServer::AddLinks(const string& inDB, const string& inID, el::object& inHit)
+void M6Server::AddLinks(const string& inDB, const string& inID, el::object& inHit)
 {
 	vector<string> linkedDbs;
 	GetLinkedDbs(inDB, inID, linkedDbs);
@@ -371,144 +548,7 @@ void M6SearchServer::AddLinks(const string& inDB, const string& inID, el::object
 	}
 }
 
-// --------------------------------------------------------------------
 
-struct M6AuthInfo
-{
-						M6AuthInfo(const string& inRealm);
-	
-	bool				Validate(const string& inMethod, const string& inURI,
-							const string& inHA1, map<string,string>& inInfo);
-	string				GetChallenge() const;
-	bool				Stale() const;
-	
-	string				mNonce, mRealm;
-	uint32				mLastNC;
-	pt::ptime			mCreated;
-};
-
-M6AuthInfo::M6AuthInfo(const string& inRealm)
-	: mRealm(inRealm)
-	, mLastNC(0)
-{
-	using namespace boost::gregorian;
-
-#if BOOST_VERSION >= 104800
-	boost::random::random_device rng;
-	uint32 data[4] = { rng(), rng(), rng(), rng() };
-#else
-	int64 data[2] = { random(), random() };
-#endif
-
-	mNonce = M6MD5(data, sizeof(data)).Finalise();
-	mCreated = pt::second_clock::local_time();
-}
-
-string M6AuthInfo::GetChallenge() const
-{
-	string challenge = "Digest ";
-	challenge += "realm=\"" + mRealm + "\", qop=\"auth\", nonce=\"" + mNonce + '"';
-	return challenge;
-}
-
-bool M6AuthInfo::Stale() const
-{
-	pt::time_duration age = pt::second_clock::local_time() - mCreated;
-	return age.total_seconds() > 1800;
-}
-
-bool M6AuthInfo::Validate(const string& inMethod, const string& inURI,
-	const string& inHA1, map<string,string>& inInfo)
-{
-	bool valid = false;
-	
-	uint32 nc = strtol(inInfo["nc"].c_str(), nullptr, 16);
-	if (nc > mLastNC)
-	{
-		string ha2 = M6MD5(inMethod + ':' + inInfo["uri"]).Finalise();
-		
-		string response = M6MD5(
-			inHA1 + ':' +
-			inInfo["nonce"] + ':' +
-			inInfo["nc"] + ':' +
-			inInfo["cnonce"] + ':' +
-			inInfo["qop"] + ':' +
-			ha2).Finalise();
-		
-		valid = inInfo["response"] == response;
-		mLastNC = nc;
-	}
-	return valid;
-}
-
-// --------------------------------------------------------------------
-
-struct M6Redirect
-{
-	string	db;
-	uint32	nr;
-};
-
-// --------------------------------------------------------------------
-
-M6Server::M6Server(zx::element* inConfig)
-	: webapp(kM6ServerNS)
-	, M6SearchServer(inConfig)
-	, mBlastEnabled(false), mAlignEnabled(false)
-{
-	string docroot = "docroot";
-	zx::element* e = mConfig->find_first("docroot");
-	if (e != nullptr)
-		docroot = e->content();
-	set_docroot(docroot);
-	
-	mount("",				boost::bind(&M6Server::handle_welcome, this, _1, _2, _3));
-	mount("download",		boost::bind(&M6Server::handle_download, this, _1, _2, _3));
-	mount("entry",			boost::bind(&M6Server::handle_entry, this, _1, _2, _3));
-	mount("link",			boost::bind(&M6Server::handle_link, this, _1, _2, _3));
-	mount("linked",			boost::bind(&M6Server::handle_linked, this, _1, _2, _3));
-	mount("search",			boost::bind(&M6Server::handle_search, this, _1, _2, _3));
-	mount("similar",		boost::bind(&M6Server::handle_similar, this, _1, _2, _3));
-	mount("scripts",		boost::bind(&M6Server::handle_file, this, _1, _2, _3));
-	mount("css",			boost::bind(&M6Server::handle_file, this, _1, _2, _3));
-//	mount("man",			boost::bind(&M6Server::handle_file, this, _1, _2, _3));
-	mount("images",			boost::bind(&M6Server::handle_file, this, _1, _2, _3));
-	mount("favicon.ico",	boost::bind(&M6Server::handle_file, this, _1, _2, _3));
-	mount("robots.txt",		boost::bind(&M6Server::handle_file, this, _1, _2, _3));
-
-	mount("blast",				boost::bind(&M6Server::handle_blast, this, _1, _2, _3));
-	mount("ajax/blast/submit",	boost::bind(&M6Server::handle_blast_submit_ajax, this, _1, _2, _3));
-	mount("ajax/blast/status",	boost::bind(&M6Server::handle_blast_status_ajax, this, _1, _2, _3));
-	mount("ajax/blast/result",	boost::bind(&M6Server::handle_blast_results_ajax, this, _1, _2, _3));
-
-	mount("align",				boost::bind(&M6Server::handle_align, this, _1, _2, _3));
-	mount("ajax/align/submit",	boost::bind(&M6Server::handle_align_submit_ajax, this, _1, _2, _3));
-	
-	mount("status",			boost::bind(&M6Server::handle_status, this, _1, _2, _3));
-	mount("ajax/status",	boost::bind(&M6Server::handle_status_ajax, this, _1, _2, _3));
-	mount("info",			boost::bind(&M6Server::handle_info, this, _1, _2, _3));
-
-	mount("admin",			boost::bind(&M6Server::handle_admin, this, _1, _2, _3));
-	mount("admin/rename",	boost::bind(&M6Server::handle_admin_rename_ajax, this, _1, _2, _3));
-
-	add_processor("entry",	boost::bind(&M6Server::process_mrs_entry, this, _1, _2, _3));
-	add_processor("link",	boost::bind(&M6Server::process_mrs_link, this, _1, _2, _3));
-	add_processor("redirect",
-							boost::bind(&M6Server::process_mrs_redirect, this, _1, _2, _3));
-
-	zx::node* realm = mConfig->find_first_node("admin/@realm");
-	if (realm != nullptr)
-		mAdminRealm = realm->str();
-	
-	if ((e = mConfig->find_first("base-url")) != nullptr)
-		mBaseURL = e->content();
-
-	mBlastEnabled = not mConfig->find("blast-dbs/db").empty();
-	
-	fs::path clustalo(M6Config::Instance().FindGlobal("/m6-config/tools/tool[@name='clustalo']"));
-	if (fs::exists(clustalo))
-		mAlignEnabled = true;
-}
 
 void M6Server::init_scope(el::scope& scope)
 {
@@ -1450,53 +1490,6 @@ void M6Server::process_mrs_entry(zx::element* node, const el::scope& scope, fs::
 		pre->add_text(doc->GetText());
 		replacement = pre;
 	}
-//#ifndef NO_BLAST
-//	else if (format == "fasta")
-//	{
-//		zx::element* pre = new zx::element("pre");
-//		pre->add_text(doc->GetText());
-//		replacement = pre;
-//	}
-//#endif
-//	else	// fall back to html
-//	{
-//		string entry = WFormat::Instance()->Format(mDbTable, db, id, "html");
-//
-//		try
-//		{
-//			// turn into XML... this is tricky
-//			zx::document doc;
-//			doc.set_preserve_cdata(true);
-//			doc.read(entry);
-//		
-//			replacement = doc.child();
-//			doc.root()->remove(replacement);
-//		}
-//		catch (exception& ex)
-//		{
-//			// parsing the pretty printed entry went wrong, try
-//			// to display the plain text along with a warning
-//			
-//			zx::element* e = new zx::element("div");
-//			
-//			zx::element* m = new zx::element("div");
-//			m->set_attribute("class", "format-error");
-//			m->add_text("Error formatting entry: ");
-//			m->add_text(ex.what());
-//			e->push_back(m);
-//			e->add_text("\n");
-//			zx::comment* cmt = new zx::comment(entry);
-//			e->push_back(cmt);
-//			e->add_text("\n");
-//			
-//			zx::element* pre = new zx::element("pre");
-//			pre->set_attribute("class", "format-error");
-//			pre->add_text(mrsDb->GetDocument(id));
-//			e->push_back(pre);
-//			
-//			replacement = e;
-//		}
-//	}
 	
 	if (replacement != nullptr)
 	{
@@ -1749,23 +1742,32 @@ void M6Server::handle_blast(const zeep::http::request& request, const el::scope&
 
 	el::scope sub(scope);
 
-	vector<el::object> databanks;
-	foreach (M6LoadedDatabank& db, mLoadedDatabanks)
+	vector<el::object> blastdatabanks;
+	foreach (zx::element* bdb, mConfig->find("blast-dbs/db"))
 	{
-		if (db.mBlast)
+		string db = bdb->content();
+		
+		el::object databank;
+		databank["id"] = db;
+		
+		string name = bdb->get_attribute("name");
+		if (name.empty())
 		{
-			el::object databank;
-			databank["id"] = db.mID;
-			databank["name"] = db.mName;
-			databanks.push_back(databank);
+			foreach (M6LoadedDatabank& ldb, mLoadedDatabanks)
+				if (ldb.mID == db) { name = ldb.mName; break; }
 		}
+		if (name.empty())
+			name = db;
+		
+		databank["name"] = name;
+		blastdatabanks.push_back(databank);
 	}
 		
 	// fetch some parameters, if any
 	string db = params.get("db", "sprot").as<string>();
 	string query = params.get("query", "").as<string>();
 	
-	sub.put("blastdatabanks", el::object(databanks));
+	sub.put("blastdatabanks", el::object(blastdatabanks));
 	sub.put("blastdb", db);
 	sub.put("query", query);
 
@@ -1941,7 +1943,7 @@ void M6Server::handle_blast_results_ajax(const zeep::http::request& request, con
 			else
 				coverageColor = 5;
 
-			float queryLength = job->mQueryLength;
+			float queryLength = static_cast<float>(job->mQueryLength);
 			const int kGraphicWidth = 100;
 
 			coverageStart = uint32(best.mQueryStart * kGraphicWidth / queryLength);
@@ -2062,6 +2064,19 @@ void M6Server::handle_blast_submit_ajax(
 	gapExtend = params.get("gapExtend", gapExtend).as<int>();
 	reportLimit = params.get("reportLimit", reportLimit).as<int>();
 	filter = params.get("filter", true).as<bool>();
+	
+	// validate and unalias the databank
+	vector<string> dbs(UnAlias(db));
+	if (dbs.empty())
+		THROW(("Databank '%s' not configured", db.c_str()));
+
+	foreach (string adb, dbs)
+	{
+		M6Databank* mdb = Load(adb);
+		if (not fs::exists(mdb->GetDbDirectory() / "fasta"))
+			THROW(("Databank does not have blastable sequences (%s/%s)", db.c_str(), adb.c_str()));
+	}
+	db = ba::join(dbs, ";");
 	
 	// first parse the query (in case it is in FastA format)
 	ba::replace_all(query, "\r\n", "\n");
@@ -2435,7 +2450,7 @@ void RunMainLoop(uint32 inNrOfThreads)
 		vector<zeep::http::server*> servers;
 		boost::thread_group threads;
 	
-		foreach (zx::element* config, M6Config::Instance().LoadServers())
+		foreach (zx::element* config, M6Config::Instance().Find("/m6-config/server"))
 		{
 			string addr = config->get_attribute("addr");
 			string port = config->get_attribute("port");
@@ -2445,17 +2460,7 @@ void RunMainLoop(uint32 inNrOfThreads)
 			if (VERBOSE)
 				cout << "listening at " << addr << ':' << port << endl;
 			
-			string service = config->get_attribute("type");
-			unique_ptr<zeep::http::server> server;
-			
-			if (service == "www" or service.empty())
-				server.reset(new M6Server(config));
-			else if (service == "search")
-				server.reset(new M6WSSearch(config));
-			else if (service == "blast")
-				server.reset(new M6WSBlast(config));
-			else
-				THROW(("Unknown service %s", service.c_str()));
+			unique_ptr<zeep::http::server> server(new M6Server(config));
 	
 			server->bind(addr, boost::lexical_cast<uint16>(port));
 			threads.create_thread(boost::bind(&zeep::http::server::run, server.get(), inNrOfThreads));

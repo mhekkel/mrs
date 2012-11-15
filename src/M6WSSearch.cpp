@@ -41,14 +41,11 @@ const string kSearchNS = "http://mrs.cmbi.ru.nl/mrsws/search";
 //	M6 SOAP Search Server implementation
 // 
 
-M6WSSearch::M6WSSearch(const zeep::xml::element* inConfig)
-	: zeep::server(kSearchNS, "mrsws_search")
-	, M6SearchServer(inConfig)
+M6WSSearch::M6WSSearch(M6Server& inServer, const M6DbList& inLoadedDatabanks,
+		const string& inNS, const string& inService)
+	: mServer(inServer), mLoadedDatabanks(inLoadedDatabanks)
+	, zeep::dispatcher(inNS, inService)
 {
-	zx::element* addr = inConfig->find_first("external-address");
-	if (addr != nullptr)
-		set_location(addr->content());
-
 	using namespace WSSearchNS;
 
 	SOAP_XML_SET_STRUCT_NAME(FileInfo);
@@ -129,14 +126,6 @@ M6WSSearch::M6WSSearch(const zeep::xml::element* inConfig)
 		"FindBoolean", this, &M6WSSearch::FindBoolean, kFindBooleanArgs);
 	set_response_name("FindBoolean", "FindResponse");
 	
-//	const char* kFindSimilarArgs[] = {
-//		"db", "id", "algorithm", "resultoffset", "maxresultcount", "response"
-//	};
-//	register_action(
-//		"FindSimilar", this, &M6WSSearch::FindSimilar,
-//		kFindSimilarArgs);
-//	set_response_name("FindSimilar", "FindResponse");
-	
 	const char* kGetLinkedArgs[] = {
 		"db", "id", "linkedDatabank", "resultoffset", "maxresultcount", "response"
 	};
@@ -144,57 +133,12 @@ M6WSSearch::M6WSSearch(const zeep::xml::element* inConfig)
 		"GetLinked", this, &M6WSSearch::GetLinked,
 		kGetLinkedArgs);
 	set_response_name("GetLinked", "FindResponse");
-	
-//	const char* kCountArgs[] = {
-//		"db", "booleanquery", "response"
-//	};
-//	register_action(
-//		"Count", this, &M6WSSearch::Count,
-//		kCountArgs);
-//
-//	const char* kCooccurrenceArgs[] = {
-//		"db", "ids", "idf_cutoff", "resultoffset", "maxresultcount", "terms"
-//	};	
-//	register_action(
-//		"Cooccurrence", this, &M6WSSearch::Cooccurrence,
-//		kCooccurrenceArgs);
-//
-//	const char* kSpellCheckArgs[] = {
-//		"db", "queryterm", "suggestions"
-//	};
-//	register_action(
-//		"SpellCheck", this, &M6WSSearch::SpellCheck,
-//		kSpellCheckArgs);
-//	
-//	const char* kSuggestSearchTermsArgs[] = {
-//		"db", "queryterm", "suggestions"
-//	};
-//	register_action(
-//		"SuggestSearchTerms", this, &M6WSSearch::SuggestSearchTerms,
-//		kSuggestSearchTermsArgs);
-//
-//	const char* kCompareDocumentsArgs[] = {
-//		"db", "doc_a", "doc_b", "similarity"
-//	};
-//	register_action(
-//		"CompareDocuments", this, &M6WSSearch::CompareDocuments,
-//		kCompareDocumentsArgs);
-//
-//	const char* kClusterDocumentsArgs[] = {
-//		"db", "ids", "response"
-//	};
-//	register_action(
-//		"ClusterDocuments", this, &M6WSSearch::ClusterDocuments,
-//		kClusterDocumentsArgs);
-
 }
 
 void M6WSSearch::GetDatabankInfo(const string& databank,
 	vector<WSSearchNS::DatabankInfo>& info)
 {
-	log() << databank;
-
-	foreach (M6LoadedDatabank& db, mLoadedDatabanks)
+	foreach (const M6LoadedDatabank& db, mLoadedDatabanks)
 	{
 		if (databank != "all" and db.mID != databank)
 			continue;
@@ -211,11 +155,8 @@ void M6WSSearch::GetDatabankInfo(const string& databank,
 			
 			info.push_back(dbInfo);
 		}
-		catch (exception& e)
+		catch (...)
 		{
-			log() << endl
-				  << "Skipping db " << db.mID
-				  << ": " << e.what();
 		}
 	}
 
@@ -225,9 +166,7 @@ void M6WSSearch::GetDatabankInfo(const string& databank,
 
 void M6WSSearch::GetIndices(const string& inDatabank, vector<WSSearchNS::Index>& outIndices)
 {
-	log() << inDatabank;
-
-	M6Databank* db = Load(inDatabank);
+	M6Databank* db = mServer.Load(inDatabank);
 	if (db == nullptr)
 		THROW(("Databank %s not loaded", inDatabank.c_str()));
 	
@@ -255,26 +194,22 @@ void M6WSSearch::GetIndices(const string& inDatabank, vector<WSSearchNS::Index>&
 void M6WSSearch::GetEntry(const string& inDatabank, const string& inID,
 	WSSearchNS::Format inFormat, string& outEntry)
 {
-	log() << inDatabank << ' ' << inID;
-	
-	M6Databank* db = Load(inDatabank);
+	M6Databank* db = mServer.Load(inDatabank);
 	if (db == nullptr)
 		THROW(("Databank %s not loaded", inDatabank.c_str()));
 	
 	switch (inFormat)
 	{
 		case WSSearchNS::plain:
-			log() << ' ' << "plain";
-			outEntry = M6SearchServer::GetEntry(db, "plain", "id", inID);
+			outEntry = mServer.GetEntry(db, "plain", "id", inID);
 			break;
 		
 		case WSSearchNS::title:
-			log() << ' ' << "title";
-			outEntry = M6SearchServer::GetEntry(db, "title", "id", inID);
+			outEntry = mServer.GetEntry(db, "title", "id", inID);
 			break;
 		
 		case WSSearchNS::fasta:
-			outEntry = M6SearchServer::GetEntry(db, "fasta", "id", inID);
+			outEntry = mServer.GetEntry(db, "fasta", "id", inID);
 			break;
 		
 		default:
@@ -285,13 +220,11 @@ void M6WSSearch::GetEntry(const string& inDatabank, const string& inID,
 void M6WSSearch::GetEntryLinesMatchingRegularExpression(
 	const string& inDatabank, const string& inID, const string& inRE, string& outText)
 {
-	log() << inDatabank << ' ' << inID;
-	
-	M6Databank* db = Load(inDatabank);
+	M6Databank* db = mServer.Load(inDatabank);
 	if (db == nullptr)
 		THROW(("Databank %s not loaded", inDatabank.c_str()));
 	
-	istringstream s(M6SearchServer::GetEntry(db, "plain", "id", inID));
+	istringstream s(mServer.GetEntry(db, "plain", "id", inID));
 	ostringstream result;
 	
 	boost::regex re(inRE);
@@ -313,9 +246,7 @@ void M6WSSearch::GetEntryLinesMatchingRegularExpression(
 
 void M6WSSearch::GetMetaData(const string& inDatabank, const string& inID, const string& inMeta, string& outData)
 {
-	log() << inDatabank << ' ' << inID;
-	
-	M6Databank* db = Load(inDatabank);
+	M6Databank* db = mServer.Load(inDatabank);
 	if (db == nullptr)
 		THROW(("Databank %s not loaded", inDatabank.c_str()));
 
@@ -342,13 +273,13 @@ void M6WSSearch::Find(const string& db, const vector<string>& queryterms,
 		if (maxresultcount <= 0)
 			maxresultcount = 5;
 
-		foreach (M6LoadedDatabank& ldb, mLoadedDatabanks)
+		foreach (const M6LoadedDatabank& ldb, mLoadedDatabanks)
 		{
 			Find(ldb.mID, queryterms, algorithm, alltermsrequired, booleanfilter,
 				resultoffset, maxresultcount, response);
 		}
 	}
-	else if (M6Databank* databank = Load(db))
+	else if (M6Databank* databank = mServer.Load(db))
 	{
 		if (maxresultcount <= 0)
 			maxresultcount = 15;
@@ -487,17 +418,15 @@ M6Iterator* ParseQuery(M6Databank* inDatabank, const WSSearchNS::BooleanQuery& i
 void M6WSSearch::FindBoolean(const string& inDatabank, const WSSearchNS::BooleanQuery& inQuery,
 	int resultoffset, int maxresultcount, vector<WSSearchNS::FindResult>& response)
 {
-	log() << inDatabank;
-	
 	if (inDatabank == "*" or inDatabank == "all" or inDatabank == "")
 	{
 		if (maxresultcount > 5 or maxresultcount <= 0)
 			maxresultcount = 3;
 
-		foreach (M6LoadedDatabank& ldb, mLoadedDatabanks)
+		foreach (const M6LoadedDatabank& ldb, mLoadedDatabanks)
 			FindBoolean(ldb.mID, inQuery, resultoffset, maxresultcount, response);
 	}
-	else if (M6Databank* databank = Load(inDatabank))
+	else if (M6Databank* databank = mServer.Load(inDatabank))
 	{
 		if (maxresultcount <= 0)
 			maxresultcount = 15;
@@ -535,10 +464,8 @@ void M6WSSearch::FindBoolean(const string& inDatabank, const WSSearchNS::Boolean
 void M6WSSearch::GetLinked(const string& db, const string& id,
 	const string& linkedDb, int resultoffset, int maxresultcount, vector<WSSearchNS::FindResult>& response)
 {
-	log() << db << "/" << id << " => " << linkedDb;
-
-	M6Databank* msdb = Load(db);
-	M6Databank* mddb = Load(linkedDb);
+	M6Databank* msdb = mServer.Load(db);
+	M6Databank* mddb = mServer.Load(linkedDb);
 	
 	if (msdb == nullptr or mddb == nullptr)
 		THROW(("Databank not loaded"));

@@ -78,7 +78,7 @@ M6BlastCache::M6BlastCache()
 {
 	boost::mutex::scoped_lock lock(mDbMutex);
 	
-	string s = M6Config::Instance().FindGlobal("/m6-config/blastdir");
+	string s = M6Config::GetDirectory("blast");
 	if (s.empty())
 		THROW(("Missing blastdir configuration"));
 
@@ -268,16 +268,14 @@ M6BlastResultPtr M6BlastCache::JobResult(const string& inJobID)
 
 void M6BlastCache::FastaFilesForDatabank(const string& inDatabank, vector<fs::path>& outFiles)
 {
-	fs::path mrsdir(M6Config::Instance().FindGlobal("/m6-config/mrsdir"));
-	boost::format xp("/m6-config/databank[@id='%1%']/file");
-	M6Config& config = M6Config::Instance();
+	fs::path mrsdir(M6Config::GetDirectory("mrs"));
 
 	vector<string> dbs;
 	ba::split(dbs, inDatabank, ba::is_any_of(";"));
 	
 	foreach (string& db, dbs)
 	{
-		fs::path dbdir(config.FindGlobal((xp % db).str()));
+		fs::path dbdir(M6Config::GetDatabankParam(db, "file"));
 		if (dbdir.empty())
 			THROW(("Databank directory not found for %s", db.c_str()));
 		

@@ -107,7 +107,7 @@ M6ParserImpl::M6ParserImpl(const string& inScriptName)
 		sInited = true;
 	}
 
-	fs::path scriptdir = M6Config::Instance().FindGlobal("/m6-config/scriptdir");
+	fs::path scriptdir = M6Config::GetDirectory("parser");
 	if (not fs::exists(scriptdir))
 	{
 		if (fs::exists("./parsers"))

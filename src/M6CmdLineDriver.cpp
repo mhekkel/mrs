@@ -12,6 +12,7 @@
 #define foreach BOOST_FOREACH
 //#include <boost/timer/timer.hpp>
 #include <boost/tr1/tuple.hpp>
+#include <boost/algorithm/string.hpp>
 
 #include "M6Builder.h"
 #include "M6Databank.h"
@@ -34,6 +35,7 @@ using namespace std;
 namespace po = boost::program_options;
 namespace fs = boost::filesystem;
 namespace zx = zeep::xml;
+namespace ba = boost::algorithm;
 
 int VERBOSE;
 
@@ -63,7 +65,7 @@ class M6CmdLineDriver
 	virtual bool	Validate(po::variables_map& vm);
 	virtual void	Exec(const string& inCommand, po::variables_map& vm) = 0;
 
-	tr1::tuple<zx::element*,fs::path>
+	tr1::tuple<const zx::element*,fs::path>
 					GetDatabank(const string& inDatabank);
 
 	static string	sDatabank;
@@ -262,7 +264,7 @@ bool M6CmdLineDriver::Validate(po::variables_map& vm)
 		if (not fs::exists(configFile))
 			THROW(("Configuration file not found (\"%s\")", configFile.string().c_str()));
 		
-		M6Config::SetConfigFile(configFile);
+		M6Config::SetConfigFilePath(configFile);
 
 		result = true;
 	}
@@ -270,10 +272,10 @@ bool M6CmdLineDriver::Validate(po::variables_map& vm)
 	return result;
 }
 
-tr1::tuple<zx::element*,fs::path>
+tr1::tuple<const zx::element*,fs::path>
 M6CmdLineDriver::GetDatabank(const string& inDatabank)
 {
-	zx::element* config = M6Config::Instance().LoadDatabank(inDatabank);
+	const zx::element* config = M6Config::GetDatabank(inDatabank);
 	if (not config)
 		THROW(("Configuration for %s is missing", inDatabank.c_str()));
 
@@ -284,7 +286,7 @@ M6CmdLineDriver::GetDatabank(const string& inDatabank)
 	fs::path path = file->content();
 	if (not path.has_root_path())
 	{
-		fs::path mrsdir(M6Config::Instance().FindGlobal("/m6-config/mrsdir"));
+		fs::path mrsdir(M6Config::GetDirectory("mrs"));
 		path = mrsdir / path;
 	}
 	
@@ -348,8 +350,7 @@ void M6BlastDriver::AddOptions(po::options_description& desc,
 	desc.add_options()
 		("query,i",			po::value<string>(),	"File containing query in FastA format")
 		("program,p",		po::value<string>(),	"Blast program (only supported program is blastp for now...)")
-		("databank,d",		po::value<vector<string>>(),
-													"Databank(s) in FastA format, can be specified multiple times")
+		("databank,d",		po::value<string>(),	"Databank(s) in FastA format, can be specified multiple times")
 		("output,o",		po::value<string>(),	"Output file, default is stdout")
 		("report-limit,b",	po::value<int32>(),		"Number of results to report")
 		("matrix,M",		po::value<string>(),	"Matrix (default is BLOSUM62)")
@@ -369,7 +370,23 @@ void M6BlastDriver::AddOptions(po::options_description& desc,
 
 bool M6BlastDriver::Validate(po::variables_map& vm)
 {
-	return M6CmdLineDriver::Validate(vm) and vm.count("query") != 0;
+	bool result = false;
+	
+	if (vm.count("help") == 0 and vm.count("databank") > 0 and vm.count("query") > 0)
+	{
+		fs::path configFile("config/m6-config.xml");
+		if (vm.count("config-file"))
+			configFile = vm["config-file"].as<string>();
+		
+		if (not fs::exists(configFile))
+			THROW(("Configuration file not found (\"%s\")", configFile.string().c_str()));
+		
+		M6Config::SetConfigFilePath(configFile);
+
+		result = true;
+	}
+	
+	return result;
 }
 
 void M6BlastDriver::Exec(const string& inCommand, po::variables_map& vm)
@@ -396,33 +413,29 @@ void M6BlastDriver::Exec(const string& inCommand, po::variables_map& vm)
 		query += line + '\n';
 	}
 
-	fs::path mrsDir(M6Config::Instance().FindGlobal("/m6-config/mrsdir"));
+	fs::path mrsDir(M6Config::GetDirectory("mrs"));
 
 	vector<fs::path> databanks;
-	vector<string> dbs(vm["databank"].as<vector<string>>());
-	string dbdesc;
-	
-	foreach (const string& db, dbs)
+	string db = vm["databank"].as<string>();
+	foreach (const zx::element* dbc, M6Config::GetDatabanks(db))
 	{
-		if (not dbdesc.empty())
-			dbdesc += ' ';
-		dbdesc += db;
+		fs::path dbdir;
+
+		if (zx::element* file = dbc->find_first("file"))
+			dbdir = file->content();
 		
-		zx::element_set dbc(M6Config::Instance().Find(
-			(boost::format("/m6-config/blast/dbs/db[@id='%1%']/file") % db).str()));
-		foreach (const zx::element* f, dbc)
-		{
-			fs::path db(f->content());
-
-			if (not db.has_root_directory())
-				db = mrsDir / db;
-
-			if (not fs::exists(db))
-				throw M6Exception("Databank %s does not exist", f->content().c_str());
-			databanks.push_back(db);
-		}
+		if (dbdir.empty())
+			THROW(("Databank directory not found for %s", db.c_str()));
+		
+		if (not dbdir.has_root_path())
+			dbdir = mrsDir / dbdir;
+		
+		if (not fs::exists(dbdir / "fasta"))
+			THROW(("Databank '%s' does not contain a fasta file", db.c_str()));
+		
+		databanks.push_back(dbdir / "fasta");
 	}
-	
+
 	if (vm.count("program"))		program = vm["program"].as<string>();
 	if (vm.count("matrix"))			matrix = vm["matrix"].as<string>();
 	if (vm.count("report-limit"))	reportLimit = vm["report-limit"].as<int32>();
@@ -451,7 +464,7 @@ void M6BlastDriver::Exec(const string& inCommand, po::variables_map& vm)
 		M6Blast::Result* r = M6Blast::Search(databanks, query, program, matrix,
 			wordSize, expect, filter, gapped, gapOpen, gapExtend, reportLimit, threads);
 			
-		r->mDb = dbdesc;
+		r->mDb = db;
 	
 		if (vm.count("output") and vm["output"].as<string>() != "stdout")
 		{
@@ -480,11 +493,8 @@ void M6BuildDriver::Exec(const string& inCommand, po::variables_map& vm)
 	if (nrOfThreads < 1)
 		nrOfThreads = 1;
 	
-	if (inCommand == "update" and
-		M6Config::Instance().FindFirst((boost::format("/m6-config/databank[@id='%1%']/fetch") % databank).str()) != nullptr)
-	{
+	if (inCommand == "update" and M6Config::GetDatabankParam(databank, "fetch").empty() == false)
 		M6Fetch(databank);
-	}
 
 	M6Builder builder(databank);
 	
@@ -532,7 +542,7 @@ bool M6QueryDriver::Validate(po::variables_map& vm)
 
 void M6QueryDriver::Exec(const string& inCommand, po::variables_map& vm)
 {
-	zx::element* config;
+	const zx::element* config;
 	fs::path path;
 	tr1::tie(config, path) = GetDatabank(vm["databank"].as<string>());
 
@@ -572,7 +582,7 @@ void M6QueryDriver::Exec(const string& inCommand, po::variables_map& vm)
 
 void M6InfoDriver::Exec(const string& inCommand, po::variables_map& vm)
 {
-	zx::element* config;
+	const zx::element* config;
 	fs::path path;
 	tr1::tie(config, path) = GetDatabank(vm["databank"].as<string>());
 
@@ -658,7 +668,7 @@ bool M6DumpDriver::Validate(po::variables_map& vm)
 
 void M6DumpDriver::Exec(const string& inCommand, po::variables_map& vm)
 {
-	zx::element* config;
+	const zx::element* config;
 	fs::path path;
 	tr1::tie(config, path) = GetDatabank(vm["databank"].as<string>());
 
@@ -689,7 +699,7 @@ bool M6EntryDriver::Validate(po::variables_map& vm)
 
 void M6EntryDriver::Exec(const string& inCommand, po::variables_map& vm)
 {
-	zx::element* config;
+	const zx::element* config;
 	fs::path path;
 	tr1::tie(config, path) = GetDatabank(vm["databank"].as<string>());
 
@@ -722,7 +732,7 @@ void M6FetchDriver::Exec(const string& inCommand, po::variables_map& vm)
 
 void M6VacuumDriver::Exec(const string& inCommand, po::variables_map& vm)
 {
-	zx::element* config;
+	const zx::element* config;
 	fs::path path;
 	tr1::tie(config, path) = GetDatabank(vm["databank"].as<string>());
 
@@ -736,7 +746,7 @@ void M6VacuumDriver::Exec(const string& inCommand, po::variables_map& vm)
 
 void M6ValidateDriver::Exec(const string& inCommand, po::variables_map& vm)
 {
-	zx::element* config;
+	const zx::element* config;
 	fs::path path;
 	tr1::tie(config, path) = GetDatabank(vm["databank"].as<string>());
 
@@ -771,7 +781,7 @@ bool M6PasswordDriver::Validate(po::variables_map& vm)
 	if (not fs::exists(configFile))
 		THROW(("Configuration file not found (\"%s\")", configFile.string().c_str()));
 		
-	M6Config::SetConfigFile(configFile);
+	M6Config::SetConfigFilePath(configFile);
 
 	return true;
 }
@@ -804,7 +814,12 @@ void M6PasswordDriver::Exec(const string& inCommand, po::variables_map& vm)
 
 	string hash = M6MD5(username + ':' + realm + ':' + password).Finalise();
 
-	M6Config::Instance().SetPassword(realm, username, hash);
+	M6Config::File& config(M6Config::File::Instance());
+	zx::element* user = config.GetUser(username, realm);
+	user->set_attribute("password", hash);
+	config.WriteOut();
+//
+//	M6Config::Instance().SetPassword(realm, username, hash);
 }
 
 // --------------------------------------------------------------------

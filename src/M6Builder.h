@@ -32,7 +32,8 @@ class M6Builder
 
 	void				Parse(const boost::filesystem::path& inFile);
 
-	zeep::xml::element*	mConfig;
+	const zeep::xml::element*
+						mConfig;
 	M6Databank*			mDatabank;
 	M6Lexicon			mLexicon;
 };

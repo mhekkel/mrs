@@ -38,7 +38,6 @@ class M6Server : public zh::webapp
 		M6Databank*				mDatabank;
 		std::string				mID, mName;
 		std::set<std::string>	mAliases;
-		bool					mBlast;
 		M6Parser*				mParser;
 	};
 	typedef std::vector<M6LoadedDatabank> M6DbList;

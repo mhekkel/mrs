@@ -1,46 +1,121 @@
 #pragma once
 
 #include <boost/filesystem/path.hpp>
+#include <boost/format.hpp>
+
 #include <zeep/xml/document.hpp>
 
-class M6Config
+namespace M6Config
+{
+
+class File
 {
   public:
+ 							File();
+ 							~File();								
 
-	static void			SetConfigFile(
-							const boost::filesystem::path& inConfigFile);
-	static M6Config&	Instance();
+	static File&			Instance();
 
-	std::string			FindGlobal(const std::string& inXPath);
-	zeep::xml::element_set
-						Find(const std::string& inXPath);
-	zeep::xml::element*	FindFirst(const std::string& inXPath);
-
-	zeep::xml::element*	LoadDatabank(const std::string& inDatabank);
-	zeep::xml::element_set
-						LoadDatabanks();
-
-	void				ExpandDatabankAlias(const std::string& inAlias,
-							std::vector<std::string>& outDatabanks);
-
-	zeep::xml::element*	LoadParser(const std::string& inParser);
-
-	zeep::xml::element_set
-						LoadServers();
-
-	zeep::xml::element*	LoadFormat(const std::string& inDatabank);
-	std::string			LoadFormatScript(const std::string& inDatabank);
+	void					WriteOut();
 	
-	void				SetPassword(const std::string& inRealm,
-							const std::string& inUser, const std::string& inPassword);
+	zeep::xml::element*		GetDirectory(const std::string& inID);
+	zeep::xml::element*		GetTool(const std::string& inID);
+	zeep::xml::element*		GetUser(const std::string& inName, const std::string& inRealm);
+	zeep::xml::element_set	GetServers();
+	zeep::xml::element*		GetFormat(const std::string& inID);
+	zeep::xml::element*		GetParser(const std::string& inID);
+	zeep::xml::element_set	GetDatabanks();
+	zeep::xml::element_set	GetDatabanks(const std::string& inID);
+	zeep::xml::element*		GetDatabank(const std::string& inID);
 
   private:
-						M6Config();
-						~M6Config();
+	zeep::xml::element_set	Find(const boost::format& inFmt);
+	zeep::xml::element*		FindFirst(const boost::format& inFmt);
 
-	void				WriteOut();
-
-	zeep::xml::document*			mConfig;
-	static boost::filesystem::path	sConfigFile;
+	zeep::xml::document*	mConfig;
 };
 
+void SetConfigFilePath(const boost::filesystem::path& inConfigFile);
+
+// Prototypes
+
+std::string						GetDirectory(const std::string& inID);
+std::string						GetTool(const std::string& inID);
+const zeep::xml::element*		GetUser(const std::string& inName, const std::string& inRealm);
+const zeep::xml::element_set	GetServers();
+const zeep::xml::element*		GetFormat(const std::string& inID);
+const zeep::xml::element*		GetParser(const std::string& inID);
+const zeep::xml::element_set	GetDatabanks();
+const zeep::xml::element*		GetDatabank(const std::string& inID);
+const zeep::xml::element_set	GetDatabanks(const std::string& inID);
+std::string						GetDatabankParam(const std::string& inID, const std::string& inParam);
+
+// Inlines
+
+inline std::string GetDirectory(const std::string& inID)
+{
+	std::string result;
+	zeep::xml::element* e = File::Instance().GetDirectory(inID);
+	if (e != nullptr)
+		result = e->content();
+	return result;
+}
+
+inline std::string M6Config::GetTool(const std::string& inID)
+{
+	std::string result;
+	zeep::xml::element* e = File::Instance().GetDirectory(inID);
+	if (e != nullptr)
+		result = e->content();
+	return result;
+}
+
+inline const zeep::xml::element* M6Config::GetUser(const std::string& inName, const std::string& inRealm)
+{
+	return File::Instance().GetUser(inName, inRealm);
+}
+
+inline const zeep::xml::element_set M6Config::GetServers()
+{
+	return File::Instance().GetServers();
+}
+
+inline const zeep::xml::element* M6Config::GetFormat(const std::string& inID)
+{
+	return File::Instance().GetFormat(inID);
+}
+
+inline const zeep::xml::element* M6Config::GetParser(const std::string& inID)
+{
+	return File::Instance().GetParser(inID);
+}
+
+inline const zeep::xml::element_set M6Config::GetDatabanks()
+{
+	return File::Instance().GetDatabanks();
+}
+
+inline const zeep::xml::element_set	GetDatabanks(const std::string& inID)
+{
+	return File::Instance().GetDatabanks(inID);
+}
+
+inline const zeep::xml::element* M6Config::GetDatabank(const std::string& inID)
+{
+	return File::Instance().GetDatabank(inID);
+}
+
+inline std::string M6Config::GetDatabankParam(const std::string& inID, const std::string& inParam)
+{
+	std::string result;
+	zeep::xml::element* db = File::Instance().GetDatabank(inID);
+	if (db != nullptr)
+	{
+		zeep::xml::element* e = db->find_first(inParam);
+		if (e != nullptr)
+			result = e->str();
+	}
+	return result;
+}
+
+}

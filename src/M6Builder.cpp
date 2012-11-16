@@ -59,7 +59,7 @@ class M6Processor
 
 
 					M6Processor(M6Databank& inDatabank, M6Lexicon& inLexicon,
-						zx::element* inTemplate);
+						const zx::element* inTemplate);
 	virtual			~M6Processor();
 	
 	void			Process(vector<fs::path>& inFiles, M6Progress& inProgress,
@@ -97,7 +97,8 @@ class M6Processor
 	
 	M6Databank&		mDatabank;
 	M6Lexicon&		mLexicon;
-	zx::element*	mConfig;
+	const zx::element*
+					mConfig;
 	M6Parser*		mParser;
 	vector<XMLIndex>mXMLIndexInfo;
 	string			mChunkXPath;
@@ -112,7 +113,7 @@ class M6Processor
 // --------------------------------------------------------------------
 
 M6Processor::M6Processor(M6Databank& inDatabank, M6Lexicon& inLexicon,
-		zx::element* inTemplate)
+		const zx::element* inTemplate)
 	: mDatabank(inDatabank), mLexicon(inLexicon), mConfig(inTemplate), mParser(nullptr)
 {
 	string parser = mConfig->get_attribute("parser");
@@ -120,7 +121,7 @@ M6Processor::M6Processor(M6Databank& inDatabank, M6Lexicon& inLexicon,
 		THROW(("Missing parser attribute"));
 	
 	// see if this is an XML parser
-	zx::element* p = M6Config::Instance().FindFirst((boost::format("/m6-config/parser[@id='%1%']") % parser).str());
+	const zx::element* p = M6Config::GetParser(parser);
 	if (p == nullptr)
 		mParser = new M6Parser(parser);
 	else
@@ -531,7 +532,7 @@ void M6Processor::Process(vector<fs::path>& inFiles, M6Progress& inProgress,
 // --------------------------------------------------------------------
 
 M6Builder::M6Builder(const string& inDatabank)
-	: mConfig(M6Config::Instance().LoadDatabank(inDatabank))
+	: mConfig(M6Config::GetDatabank(inDatabank))
 	, mDatabank(nullptr)
 {
 }
@@ -601,7 +602,7 @@ void M6Builder::Build(uint32 inNrOfThreads)
 	fs::path path = file->content();
 	if (not path.has_root_path())
 	{
-		fs::path mrsdir(M6Config::Instance().FindGlobal("/m6-config/mrsdir"));
+		fs::path mrsdir(M6Config::GetDirectory("mrs"));
 		path = mrsdir / path;
 	}
 	
@@ -628,8 +629,7 @@ void M6Builder::Build(uint32 inNrOfThreads)
 	mDatabank->StartBatchImport(mLexicon);
 	
 	vector<fs::path> files;
-	int64 rawBytes = Glob(M6Config::Instance().FindGlobal("/m6-config/rawdir"),
-		source, files);
+	int64 rawBytes = Glob(M6Config::GetDirectory("raw"), source, files);
 	
 	{
 		M6Progress progress(dbID, rawBytes + 1, "parsing");
@@ -686,8 +686,7 @@ bool M6Builder::NeedsUpdate()
 		
 		vector<fs::path> files;
 
-		Glob(M6Config::Instance().FindGlobal("/m6-config/rawdir"),
-			mConfig->find_first("source"), files);
+		Glob(M6Config::GetDirectory("raw"), mConfig->find_first("source"), files);
 		
 		time_t dbTime = fs::last_write_time(path);
 		

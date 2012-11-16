@@ -8,10 +8,17 @@ Todo
 - verwijder nr als parameter voor entry, gebruik '#0000' constructie
 - integratie SOAP/REST/WWW server
 - GetDocument routine in server die aliases gebruikt
+- REST interface herzien:
+	- /entry/db/id moet naar Accept header kijken
+	- /find/db/query idem
+- SOAP: default waarden in WSDL
+- ForkExec implementatie in Windows
 
 - m6 integration (server/build/password)
 - config file:
-	- blast db specification
+	- herindelen: groepen
+	- DTD schrijven
+	- M6Config interface aanpassen
 
 - Version
 - browse data/index

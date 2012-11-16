@@ -187,7 +187,7 @@ M6Server::M6Server(zx::element* inConfig)
 
 	mBlastEnabled = not mConfig->find("blast-dbs/db").empty();
 	
-	fs::path clustalo(M6Config::Instance().FindGlobal("/m6-config/tools/tool[@name='clustalo']"));
+	fs::path clustalo(M6Config::GetTool("clustalo"));
 	if (fs::exists(clustalo))
 		mAlignEnabled = true;
 		
@@ -241,7 +241,7 @@ M6Server::~M6Server()
 
 void M6Server::LoadAllDatabanks()
 {
-	fs::path mrsDir(M6Config::Instance().FindGlobal("/m6-config/mrsdir"));
+	fs::path mrsDir(M6Config::GetDirectory("mrs"));
 	
 	mLinkMap.clear();
 	
@@ -249,50 +249,45 @@ void M6Server::LoadAllDatabanks()
 	foreach (zx::element* db, dbs)
 	{
 		string databank = db->content();
-
-		zx::element* config = M6Config::Instance().LoadDatabank(databank);
-		if (not config)
-		{
-			if (VERBOSE)
-				cerr << "unknown databank " << databank << endl;
-			continue;
-		}
-		
-		zx::element* file = config->find_first("file");
-		if (file == nullptr)
-		{
-			if (VERBOSE)
-				cerr << "file not specified for databank " << databank << endl;
-			continue;
-		}
-
-		fs::path path = file->content();
-		if (not path.has_root_path())
-			path = mrsDir / path;
-		
-		if (not fs::exists(path))
-		{
-			if (VERBOSE)
-				cerr << "databank " << databank << " not available" << endl;
-			continue;
-		}
 		
 		try
 		{
-			string name = databank;
-			set<string> aliases;
-			bool blast = false;
-			
-			M6Parser* parser = nullptr;
-			zx::element_set dbConfig(M6Config::Instance().Find((boost::format("/m6-config/databank[@id='%1%']") % databank).str()));
-			if (not dbConfig.empty())
+			const zx::element* config = M6Config::GetDatabank(databank);
+			if (not config)
 			{
-				parser = new M6Parser(dbConfig.front()->get_attribute("parser"));
-				blast = dbConfig.front()->get_attribute("blast") == "true";
-				if (zx::element* n = dbConfig.front()->find_first("name"))
-					name = n->content();
+				if (VERBOSE)
+					cerr << "unknown databank " << databank << endl;
+				continue;
 			}
 			
+			zx::element* file = config->find_first("file");
+			if (file == nullptr)
+			{
+				if (VERBOSE)
+					cerr << "file not specified for databank " << databank << endl;
+				continue;
+			}
+		
+			fs::path path = file->content();
+			if (not path.has_root_path())
+				path = mrsDir / path;
+			
+			if (not fs::exists(path))
+			{
+				if (VERBOSE)
+					cerr << "databank " << databank << " not available" << endl;
+				continue;
+			}
+		
+			string name = databank;
+			if (zx::element* n = config->find_first("name"))
+				name = n->content();
+			
+			M6Parser* parser = nullptr;
+			if (not config->get_attribute("parser").empty())
+				parser = new M6Parser(config->get_attribute("parser"));
+
+			set<string> aliases;
 			foreach (zx::element* alias, config->find("aliases/alias"))
 			{
 				string s(alias->content());
@@ -306,7 +301,6 @@ void M6Server::LoadAllDatabanks()
 				databank,
 				name,
 				aliases,
-				blast,
 				parser
 			};
 
@@ -769,7 +763,7 @@ void M6Server::handle_entry(const zh::request& request, const el::scope& scope, 
 	}
 	sub.put("format", el::object(format));
 
-	zx::element* dbConfig = M6Config::Instance().LoadDatabank(db);
+	const zx::element* dbConfig = M6Config::GetDatabank(db);
 
 	// first stuff some data into scope
 	
@@ -797,7 +791,7 @@ void M6Server::handle_entry(const zh::request& request, const el::scope& scope, 
 
 	try
 	{
-		zx::element* format = M6Config::Instance().LoadFormat(db);
+		const zx::element* format = M6Config::GetFormat(dbConfig->get_attribute("format"));
 		
 		if (format != nullptr)
 		{
@@ -1385,13 +1379,13 @@ void M6Server::handle_admin(const zh::request& request,
 
 	// add the global settings
 	el::object global;
-	global["srvdir"] = M6Config::Instance().FindGlobal("/m6-config/srvdir");
-	global["mrsdir"] = M6Config::Instance().FindGlobal("/m6-config/mrsdir");
-	global["rawdir"] = M6Config::Instance().FindGlobal("/m6-config/rawdir");
-	global["scriptdir"] = M6Config::Instance().FindGlobal("/m6-config/scriptdir");
+	global["srvdir"] = M6Config::GetDirectory("srv");
+	global["mrsdir"] = M6Config::GetDirectory("mrs");
+	global["rawdir"] = M6Config::GetDirectory("raw");
+	global["parserdir"] = M6Config::GetDirectory("parser");
 	
 	el::object tools;
-	tools["clustalo"] = M6Config::Instance().FindGlobal("/m6-config/tools/tool[@name='clustalo']");
+	tools["clustalo"] = M6Config::GetTool("clustalo");
 	global["tools"] = tools;
 	
 	sub.put("global", global);
@@ -1407,7 +1401,7 @@ void M6Server::handle_admin(const zh::request& request,
 	{
 		string dbn = db->content();
 
-		zx::element* dbConfig = M6Config::Instance().LoadDatabank(dbn);
+		const zx::element* dbConfig = M6Config::GetDatabank(dbn);
 		zx::element* e;
 		
 		el::object databank;
@@ -2176,22 +2170,6 @@ void M6Server::handle_align(const zh::request& request, const el::scope& scope, 
 			if (mdb == nullptr)
 				THROW(("Databank %s not loaded", t[0].c_str()));
 			fasta += GetEntry(mdb, "fasta", "id", t[1]);
-
-//			CDatabankPtr db = mDbTable[t[0]];
-//			uint32 docNr = db->GetDocumentNr(t[1]);
-//			uint32 seqNr = 0;
-//			if (t.size() == 3)
-//				seqNr = db->GetSequenceNr(docNr, t[2]);
-//			
-//			string seq;
-//			db->GetSequence(docNr, seqNr, seq);
-//			for (uint32 o = 72; o < seq.length(); o += 73)
-//				seq.insert(seq.begin() + o, '\n');
-//			
-//			if (t.size() == 2)
-//				fastaStream << '>' << t[1] << endl << seq << endl;
-//			else
-//				fastaStream << '>' << t[1] << '.' << t[2] << endl << seq << endl;
 		}
 
 		sub.put("input", el::object(fasta));
@@ -2214,7 +2192,7 @@ void M6Server::handle_align_submit_ajax(const zh::request& request, const el::sc
 	{
 		try
 		{
-			string clustalo = M6Config::Instance().FindGlobal("/m6-config/tools/tool[@name='clustalo']");
+			string clustalo = M6Config::GetTool("clustalo");
 			if (clustalo.empty())
 				clustalo = "/usr/bin/clustalo";
 			
@@ -2262,8 +2240,7 @@ void M6Server::handle_status(const zh::request& request, const el::scope& scope,
 		el::object databank;
 		databank["id"] = dbn;
 
-		databank["name"] = M6Config::Instance().FindGlobal(
-			(boost::format("/m6-config/databank[@id='%1%']/name") % dbn).str());
+		databank["name"] = M6Config::GetDatabankParam(dbn, "name");
 		
 		M6DatabankInfo info = {};
 		M6Databank* dbo = Load(dbn);
@@ -2326,7 +2303,7 @@ void M6Server::handle_info(const zh::request& request, const el::scope& scope, z
 		if (ldb.mID != db)
 			continue;
 
-		zx::element* dbConfig = M6Config::Instance().LoadDatabank(db);
+		const zx::element* dbConfig = M6Config::GetDatabank(db);
 		if (dbConfig == nullptr)
 			THROW(("weird error"));
 
@@ -2450,7 +2427,7 @@ void RunMainLoop(uint32 inNrOfThreads)
 		vector<zeep::http::server*> servers;
 		boost::thread_group threads;
 	
-		foreach (zx::element* config, M6Config::Instance().Find("/m6-config/server"))
+		foreach (zx::element* config, M6Config::GetServers())
 		{
 			string addr = config->get_attribute("addr");
 			string port = config->get_attribute("port");
@@ -2530,7 +2507,7 @@ int main(int argc, char* argv[])
 		if (vm.count("threads"))
 			nrOfThreads = vm["threads"].as<uint32>();
 
-		M6Config::SetConfigFile(configFile);
+		M6Config::SetConfigFilePath(configFile);
 		
 		RunMainLoop(nrOfThreads);
 	}

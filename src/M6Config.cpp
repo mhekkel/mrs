@@ -2,7 +2,6 @@
 
 #include <boost/filesystem/fstream.hpp>
 #include <boost/filesystem/operations.hpp>
-#include <boost/format.hpp>
 
 #include <zeep/xml/writer.hpp>
 
@@ -15,20 +14,12 @@ namespace fs = boost::filesystem;
 
 // --------------------------------------------------------------------
 
-fs::path M6Config::sConfigFile = "config/m6-config.xml";
-
-void M6Config::SetConfigFile(const fs::path& inConfigFile)
+namespace M6Config
 {
-	sConfigFile = inConfigFile;
-}
 
-M6Config& M6Config::Instance()
-{
-	static M6Config sInstance;
-	return sInstance;
-}
+fs::path sConfigFile = "config/m6-config.xml";
 
-M6Config::M6Config()
+File::File()
 	: mConfig(nullptr)
 {
 	if (not fs::exists(sConfigFile))
@@ -38,134 +29,23 @@ M6Config::M6Config()
 	mConfig = new zx::document(configFileStream);
 }
 
-M6Config::~M6Config()
+File::~File()
 {
 	delete mConfig;
 }
 
-zx::element* M6Config::LoadDatabank(const string& inDatabank)
+void SetConfigFilePath(const fs::path& inConfigFile)
 {
-	string dbConfigPath = (boost::format("/m6-config/databank[@id='%1%']") % inDatabank).str();
-	auto dbConfig = mConfig->find(dbConfigPath);
-	if (dbConfig.empty())
-		THROW(("databank %s not specified in config file", inDatabank.c_str()));
-	
-	if (dbConfig.size() > 1)
-		THROW(("databank %s specified multiple times in config file", inDatabank.c_str()));
-	
-	return dbConfig.front();
+	sConfigFile = inConfigFile;
 }
 
-zx::element* M6Config::LoadParser(const string& inParser)
+File& File::Instance()
 {
-	string dbConfigPath = (boost::format("/m6-config/parser[@id='%1%']") % inParser).str();
-	auto dbConfig = mConfig->find(dbConfigPath);
-	if (dbConfig.empty())
-		THROW(("parser %s not specified in config file", inParser.c_str()));
-	
-	if (dbConfig.size() > 1)
-		THROW(("parser %s specified multiple times in config file", inParser.c_str()));
-	
-	return dbConfig.front();
+	static File sInstance;
+	return sInstance;
 }
 
-zeep::xml::element_set M6Config::LoadDatabanks()
-{
-	return mConfig->find("/m6-config/databank");
-}
-
-zeep::xml::element_set M6Config::LoadServers()
-{
-	return mConfig->find("/m6-config/server");
-}
-
-zeep::xml::element_set M6Config::Find(const string& inXPath)
-{
-	return mConfig->find(inXPath);
-}
-
-zeep::xml::element* M6Config::FindFirst(const string& inXPath)
-{
-	return mConfig->find_first(inXPath);
-}
-
-string M6Config::FindGlobal(const string& inXPath)
-{
-	zeep::xml::element* e = mConfig->find_first(inXPath);
-	string result;
-	if (e != nullptr)
-		result = e->content();
-	return result;
-}
-
-zeep::xml::element* M6Config::LoadFormat(const string& inDatabank)
-{
-	zeep::xml::element* result = nullptr;
-	
-	for (;;)
-	{
-		string dbConfigPath = (boost::format("/m6-config/databank[@id='%1%']") % inDatabank).str();
-		auto dbConfig = mConfig->find(dbConfigPath);
-		if (dbConfig.empty() or dbConfig.size() > 1)
-			break;
-
-		string format = dbConfig.front()->get_attribute("format");
-		if (format.empty())
-			break;
-		
-		string formatPath = (boost::format("/m6-config/format[@id='%1%']") % format).str();
-		auto formatConfig = mConfig->find(formatPath);
-		if (formatConfig.empty() or formatConfig.size() > 1)
-			break;
-	
-		result = formatConfig.front();
-		break;
-	}
-	
-	return result;
-}
-
-string M6Config::LoadFormatScript(const string& inDatabank)
-{
-	string result;
-	
-	for (;;)
-	{
-		string dbConfigPath = (boost::format("/m6-config/databank[@id='%1%']") % inDatabank).str();
-		auto dbConfig = mConfig->find(dbConfigPath);
-		if (dbConfig.empty() or dbConfig.size() > 1)
-			break;
-		
-		string format = dbConfig.front()->get_attribute("format");
-		if (format.empty())
-			break;
-		
-		string formatPath = (boost::format("/m6-config/format[@id='%1%']/script") % format).str();
-		auto formatConfig = mConfig->find(formatPath);
-		if (formatConfig.empty() or formatConfig.size() > 1)
-			break;
-	
-		result = formatConfig.front()->content();
-	
-		break;	
-	}
-	
-	return result;
-}
-
-void M6Config::SetPassword(const string& inRealm, const string& inUser, const string& inPassword)
-{
-	string xp = (boost::format("/m6-config/users/user[@name = '%1%' and @realm = '%2%']") % inUser % inRealm).str();
-	zx::element* user = mConfig->find_first(xp);
-	if (user == nullptr)
-		THROW(("User not found in config file"));
-
-	user->set_attribute("password", inPassword);
-
-	WriteOut();
-}
-
-void M6Config::WriteOut()
+void File::WriteOut()
 {
 	fs::path dir(sConfigFile.parent_path());
 	boost::format name(sConfigFile.filename().stem().string() + "-%1%" + sConfigFile.filename().extension().string());
@@ -190,3 +70,69 @@ void M6Config::WriteOut()
 
 	mConfig->write(w);
 }	
+
+zx::element_set File::Find(const boost::format& inFmt)
+{
+	zx::element_set result;
+	if (mConfig != nullptr)
+		result = mConfig->find(inFmt.str());
+	return result;
+}
+
+zx::element* File::FindFirst(const boost::format& inFmt)
+{
+	zx::element* result = nullptr;
+	if (mConfig != nullptr)
+		result = mConfig->find_first(inFmt.str());
+	return result;
+}
+
+zx::element* File::GetDirectory(const string& inID)
+{
+	return FindFirst(boost::format("/m6-config/directories/directory[@id='%1%']") % inID);
+}
+
+zx::element* File::GetTool(const string& inID)
+{
+	return FindFirst(boost::format("/m6-config/tools/tool[@id='%1%']") % inID);
+}
+
+zx::element* File::GetUser(const string& inName, const string& inRealm)
+{
+	return FindFirst(boost::format("/m6-config/users/user[@name='%1%' and @realm='%2%']") % inName % inRealm);
+}
+
+zx::element_set File::GetServers()
+{
+	return Find(boost::format("/m6-config/servers/server"));
+}
+
+zx::element* File::GetFormat(const string& inID)
+{
+	return FindFirst(boost::format("/m6-config/formats/format[@id='%1%']") % inID);
+}
+
+zx::element* File::GetParser(const string& inID)
+{
+	return FindFirst(boost::format("/m6-config/parsers/parser[@id='%1%']") % inID);
+}
+
+zx::element_set File::GetDatabanks()
+{
+	return Find(boost::format("/m6-config/databanks/databank"));
+}
+
+zx::element_set File::GetDatabanks(const string& inID)
+{
+	zx::element_set result = Find(boost::format("/m6-config/databanks/databank[@id='%1%']") % inID);
+	if (result.empty())
+		result = Find(boost::format("/m6-config/databanks/databank[aliases/alias='%1%']") % inID);
+	return result;
+}
+
+zx::element* File::GetDatabank(const string& inID)
+{
+	return FindFirst(boost::format("/m6-config/databanks/databank[@id='%1%']") % inID);
+}
+
+}

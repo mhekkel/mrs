@@ -2,517 +2,534 @@
 <!--<!DOCTYPE m6-config SYSTEM "http://mrs.cmbi.ru.nl/dtd/m6-config.dtd">-->
 <m6-config>
 	
-<!--	<srvdir>/srv/mrs</srvdir>-->
-	<srvdir>/data/</srvdir>
-	<mrsdir>/data/mrs/</mrsdir>
-	<rawdir>/data/raw/</rawdir>
-<!--	<scriptdir>/data/parsers</scriptdir>-->
-	<scriptdir>/home/maarten/projects/m6/parsers</scriptdir>
-	<blastdir>/data/blast-cache</blastdir>
+	<!-- Paths where all the data and files are stored -->
+	<directories>
+		<directory id="mrs">/data/mrs</directory>
+		<directory id="raw">/data/raw</directory>
+		<directory id="blast">/data/blast-cache</directory>
+		<directory id="parser">/home/maarten/projects/m6/parsers</directory>
+	</directories>
 
 	<!-- Tools section, specify external executables used by M6 -->
 	<tools>
-		<tool name="clustalo">C:\Users\maarten\bin\clustal-omega\clustalo.exe</tool>
+		<tool id="clustalo">C:\Users\maarten\bin\clustal-omega\clustalo.exe</tool>
 	</tools>
 	
+	<!-- Users section -->
 	<users>
 		<user name="scott" realm="M6 Administrator" password="b92ff7d60b994c8a0d2941ad9349e841"/>
 	</users>
-	
-	<server type="www" addr="0.0.0.0" port="18090">
-		<admin realm="M6 Administrator"/>
-		<base-url>http://lord-jim.cmbi.umcn.nl:18090/</base-url>
-		<web-service service="search" ns="http://mrs.cmbi.ru.nl/mrsws/search" location="mrsws/search" />
-		<web-service service="blast" ns="http://mrs.cmbi.ru.nl/mrsws/blast" location="mrsws/blast" />
-		<docroot>./docroot/</docroot>
-		<dbs>
-			<db>embl</db>
-			<db>enzyme</db>
-			<db>omim</db>
-			<db>pdbfinder</db>
-			<db>sprot</db>
-			<db>trembl</db>
-			<db>genbank</db>
-			<db>refseq</db>
-			<db>taxonomy</db>
-			<db>go</db>
-			<db>interpro</db>
-			<db>pdb</db>
-			<db>dssp</db>
-			<db>hssp</db>
-			<db>gene</db>
-			<db>pfama</db>
-			<db>pfamb</db>
-			<db>pfamseed</db>
-			<db>prints</db>
-			<db>prosite</db>
-			<db>prosite_doc</db>
-			<db>rebase</db>
-			<db>unigene</db>
-			<db>pmc</db>
-		</dbs>
+
+	<!-- Servers section, you can configure multiple servers but their addr/port
+		 should be unique, of course. -->
+	<servers>
+		<server addr="0.0.0.0" port="18090">
+			<admin realm="M6 Administrator"/>
+			<base-url>http://lord-jim.cmbi.umcn.nl:18090/</base-url>
+			<web-service service="search" ns="http://mrs.cmbi.ru.nl/mrsws/search" location="mrsws/search" />
+			<web-service service="blast" ns="http://mrs.cmbi.ru.nl/mrsws/blast" location="mrsws/blast" />
+			<docroot>./docroot/</docroot>
+			<dbs>
+				<db>embl</db>
+				<db>enzyme</db>
+				<db>omim</db>
+				<db>pdbfinder</db>
+				<db>sprot</db>
+				<db>trembl</db>
+				<db>genbank</db>
+				<db>refseq</db>
+				<db>taxonomy</db>
+				<db>go</db>
+				<db>interpro</db>
+				<db>pdb</db>
+				<db>dssp</db>
+				<db>hssp</db>
+				<db>gene</db>
+				<db>pfama</db>
+				<db>pfamb</db>
+				<db>pfamseed</db>
+				<db>prints</db>
+				<db>prosite</db>
+				<db>prosite_doc</db>
+				<db>rebase</db>
+				<db>unigene</db>
+				<db>pmc</db>
+			</dbs>
+			
+			<blast-dbs>
+				<db>sprot</db>
+				<db>trembl</db>
+				<db name="Uniprot">uniprot</db>
+				<db>pdb</db>
+			</blast-dbs>
+		</server>
+	</servers>
+
+	<!-- Formats section, formats are used to add links to entries and
+		 to link a JavaScript pretty printer -->
+	<formats>
+		<format id="omim" script="scripts/omim.js">
+			<link regex="(?&lt;=\()(?:[^();]+?; )?(\d{6})(?:\.(\d{4}))?(?=\))" db="omim" ix="id" id="$1" anchor="$2"/>
+		</format>
 		
-		<blast-dbs>
-			<db>sprot</db>
-			<db>trembl</db>
-			<db name="Uniprot">uniprot</db>
-			<db>pdb</db>
-		</blast-dbs>
-	</server>
-
-	<format id="omim" script="scripts/omim.js">
-		<link regex="(?&lt;=\()(?:[^();]+?; )?(\d{6})(?:\.(\d{4}))?(?=\))" db="omim" ix="id" id="$1" anchor="$2"/>
-	</format>
+		<format id="uniprot" script="scripts/uniprot.js">
+			<link regex="(?&lt;=DR   EMBL; )(\S+)(?=;)" db="embl" ix="id" id="$1"/>
+			<link regex="(?&lt;=DR   PDB; )(\S+)(?=;)" db="pdb" ix="id" id="$1"/>
+			<link regex="(?&lt;=DR   RefSeq; )(?:(\S+)\.\d+)(?=;)" db="refseq" ix="id" id="$1"/>
+			<link regex="(?&lt;=DR   UniGene; )(\S+)(?=;)" db="unigene" ix="id" id="$1"/>
+			<link regex="(?&lt;=DR   GO; )GO:(\S+)(?=;)" db="go" ix="id" id="$1"/>
+			<link regex="(?&lt;=DR   InterPro; )(\S+)(?=;)" db="interpro" ix="id" id="$1"/>
+			<link regex="(?&lt;=DR   Pfam; )(\S+)(?=;)" db="pfama" ix="ac" id="$1"/>
+			<link regex="(?&lt;=DR   PRINTS; )(\S+)(?=;)" db="prints" ix="id" id="$1"/>
+			<link regex="(?&lt;=DR   PROSITE; )(\S+)(?=;)" db="prosite" ix="ac" id="$1"/>
+			<link regex="(?&lt;=DR   MIM; )(\S+)(?=;)" db="omim" ix="id" id="$1"/>
+		</format>
 	
-	<format id="uniprot" script="scripts/uniprot.js">
-		<link regex="(?&lt;=DR   EMBL; )(\S+)(?=;)" db="embl" ix="id" id="$1"/>
-		<link regex="(?&lt;=DR   PDB; )(\S+)(?=;)" db="pdb" ix="id" id="$1"/>
-		<link regex="(?&lt;=DR   RefSeq; )(?:(\S+)\.\d+)(?=;)" db="refseq" ix="id" id="$1"/>
-		<link regex="(?&lt;=DR   UniGene; )(\S+)(?=;)" db="unigene" ix="id" id="$1"/>
-		<link regex="(?&lt;=DR   GO; )GO:(\S+)(?=;)" db="go" ix="id" id="$1"/>
-		<link regex="(?&lt;=DR   InterPro; )(\S+)(?=;)" db="interpro" ix="id" id="$1"/>
-		<link regex="(?&lt;=DR   Pfam; )(\S+)(?=;)" db="pfama" ix="ac" id="$1"/>
-		<link regex="(?&lt;=DR   PRINTS; )(\S+)(?=;)" db="prints" ix="id" id="$1"/>
-		<link regex="(?&lt;=DR   PROSITE; )(\S+)(?=;)" db="prosite" ix="ac" id="$1"/>
-		<link regex="(?&lt;=DR   MIM; )(\S+)(?=;)" db="omim" ix="id" id="$1"/>
-	</format>
-
-	<format id="embl" script="scripts/embl.js"/>
-
-	<format id="enzyme">
-		<link regex="([A-Z]+[A-Z0-9]+)(?=, )" db="sprot" ix="ac" id="$1"/>
-	</format>
-
-	<format id="taxonomy">
-		<link regex="(?&lt;=^PARENT ID                 : )(\d+)" ix="id" id="$1"/>
-	</format>
+		<format id="embl" script="scripts/embl.js"/>
 	
-	<format id="interpro" stylesheet="interpro.xslt"/>
-	<format id="gene" stylesheet="gene.xslt"/>
-	<format id="pmc" stylesheet="ViewNLM-v2.3.xsl"/>
-
-	<format id="stockholm">
-		<link regex="^(?:#=GF DR\s+PFAMA;\s)(\S+)(?=;)" db="pfama" ix="id" id="$1"/>
-		<link regex="^(?:#=GF DR\s+PFAMB;\s)(\S+)(?=;)" db="pfamb" ix="id" id="$1"/>
-		<link regex="^(?:#=GF DR\s+PDB;\s)(\S+)(?=;)" db="pdb" ix="id" id="$1"/>
-		<link regex="^(?:#=GF DR\s+PROSITE;\s)(\S+)(?=;)" db="prosite" ix="id" id="$1"/>
-		<link regex="^(?:#=GF DR\s+INTERPRO;\s)(\S+)(?=;)" db="interpro" ix="id" id="$1"/>
-		<link regex="^(?:#=GS .+?AC )([0-9A-Z]+)" db="uniprot" ix="ac" id="$1"/>
-		<link regex="^(?:#=GS .+?DR PDB; )([0-9A-Z]{4})" db="pdb" ix="id" id="$1"/>
-	</format>
+		<format id="enzyme">
+			<link regex="([A-Z]+[A-Z0-9]+)(?=, )" db="sprot" ix="ac" id="$1"/>
+		</format>
 	
-	<parser id="pmc" chunk="/article">
-		<index name="id" type="string" xpath="/article/front/article-meta/article-id[@pub-id-type=&quot;pmc&quot;]" attr="true"/> <!-- really, in pmc id is not unique...  unique="true"  -->
-		<index name="pmid" type="string" xpath="/article/front/article-meta/article-id[@pub-id-type=&quot;pmid&quot;]"/>
-		<index name="doi" type="string" xpath="/article/front/article-meta/article-id[@pub-id-type=&quot;doi&quot;]"/>
-		<index name="subject" type="text" xpath="/article/front/article-meta/article-categories/subj-group[@subj-group-type=&quot;heading&quot;]/subject"/>
-		<index name="title" type="text" xpath="/article/front/article-meta/title-group/article-title" attr="true"/>
-		<index name="authors" type="text" xpath="/article/front/article-meta/contrib-group/contrib/name/*"/>
-		<index name="aff" type="text" xpath="/article/front/article-meta/aff"/>
-		<index name="abstract" type="text" xpath="/article/front/article-meta/abstract"/>
-		<index name="body" type="text" xpath="/article/body"/>
-	</parser>
-
-<!--	<parser id="gene" chunk="/Entrezgene-Set/Entrezgene">-->
-<!--		<index name='id'		type="string"	xpath='Entrezgene_track-info/Gene-track/Gene-track_geneid'-->
-<!--			   attr="true"		/>-->
-<!--		<index name='title'		type="text"		xpath='Entrezgene_prot/Prot-ref/Prot-ref_name/Prot-ref_name_E'-->
-<!--			   attr="true"	/>-->
-<!--		<index name='text'		type='text'		xpath='.//*' />-->
-<!--	</parser>-->
-
-	<parser id="interpro" chunk="/interprodb/interpro">
-		<index name="id" type="string" xpath="@id" attr="true" unique="true"/>
-		<index name="title" type="text" xpath="name" attr="true"/>
-		<index name="type" type="string" xpath="@type"/>
-		<index name="name" type="string" xpath="@short_name"/>
-
-		<!-- Everything else (all nodes that are not 'name') -->
-		<index name="text" type="text" xpath="*[name() != &quot;name&quot;]"/>
-
-		<!-- All attributes -->
-		<index name="attr" type="text" xpath=".//@*"/>
+		<format id="taxonomy">
+			<link regex="(?&lt;=^PARENT ID                 : )(\d+)" ix="id" id="$1"/>
+		</format>
 		
-		<link xpath="db_xref" db="@db" id="@dbkey"/>
-	</parser>
-
-	<databank id="pdbfinder" parser="pdbfinder">
-		<aliases>
-			<alias>pdbfinder2</alias>
-		</aliases>
-		<name>PDBFINDER</name>
-		<file>pdbfinder.m6</file>
-		<locale>en_US.UTF-8</locale>
-		<source>pdbfinder2/PDBFIND2.TXT.gz</source>
-		<fetch src="ftp://ftp.cmbi.ru.nl/pub/molbio/data/pdbfinder2/PDBFIND2.TXT.gz" dst="pdbfinder2"/>
-	</databank>
+		<format id="interpro" stylesheet="interpro.xslt"/>
+		<format id="gene" stylesheet="gene.xslt"/>
+		<format id="pmc" stylesheet="ViewNLM-v2.3.xsl"/>
 	
-	<!-- omim -->
-	<databank id="omim" parser="omim" format="omim">
-		<aliases>
-			<alias>MIM</alias>
-		</aliases>
-		<name>OMIM - Online Mendelian Inheritance in Man™</name>
-		<info>http://www.ncbi.nlm.nih.gov/entrez/query.fcgi?db=OMIM</info>
-		<file>/data/mrs/omim.m6</file>
-		<locale>en_US.UTF-8</locale>
-		<source>omim/omim.txt.Z</source>
-		<fetch src="ftp://ftp.ncbi.nih.gov/repository/OMIM/ARCHIVE/omim.txt.Z"/>
-	</databank>
+		<format id="stockholm">
+			<link regex="^(?:#=GF DR\s+PFAMA;\s)(\S+)(?=;)" db="pfama" ix="id" id="$1"/>
+			<link regex="^(?:#=GF DR\s+PFAMB;\s)(\S+)(?=;)" db="pfamb" ix="id" id="$1"/>
+			<link regex="^(?:#=GF DR\s+PDB;\s)(\S+)(?=;)" db="pdb" ix="id" id="$1"/>
+			<link regex="^(?:#=GF DR\s+PROSITE;\s)(\S+)(?=;)" db="prosite" ix="id" id="$1"/>
+			<link regex="^(?:#=GF DR\s+INTERPRO;\s)(\S+)(?=;)" db="interpro" ix="id" id="$1"/>
+			<link regex="^(?:#=GS .+?AC )([0-9A-Z]+)" db="uniprot" ix="ac" id="$1"/>
+			<link regex="^(?:#=GS .+?DR PDB; )([0-9A-Z]{4})" db="pdb" ix="id" id="$1"/>
+		</format>
+	</formats>
 	
-	<databank id="embl" parser="embl" format="embl">
-		<name>EMBL</name>
-		<info>http://www.ebi.ac.uk/embl/index.html</info>
-		<file>/data/mrs/embl.m6</file>
-		<source>embl_release/*.dat.gz</source>
-	</databank>
-
-	<databank id="embl-con" parser="embl">
-		<name>EMBL Constructed</name>
-		<info>http://www.ebi.ac.uk/embl/index.html</info>
-		<file>/data/mrs/embl.m6</file>
-		<source>embl/rel_con_*.dat.gz</source>
-	</databank>
-
-	<databank id="embl-est" parser="embl">
-		<name>EMBL Expressed Sequence Tag</name>
-		<info>http://www.ebi.ac.uk/embl/index.html</info>
-		<file>/data/mrs/embl.m6</file>
-		<source>embl/rel_est_*.dat.gz</source>
-	</databank>
-
-	<databank id="embl-gss" parser="embl">
-		<name>EMBL Genome Sequence Scan</name>
-		<info>http://www.ebi.ac.uk/embl/index.html</info>
-		<file>/data/mrs/embl.m6</file>
-		<source>embl/rel_gss_*.dat.gz</source>
-	</databank>
-
-	<databank id="embl-htc" parser="embl">
-		<name>EMBL High Throughput CDNA sequencing</name>
-		<info>http://www.ebi.ac.uk/embl/index.html</info>
-		<file>/data/mrs/embl.m6</file>
-		<source>embl/rel_htc_*.dat.gz</source>
-	</databank>
-
-	<databank id="embl-htg" parser="embl">
-		<name>EMBL High Throughput Genome sequencing</name>
-		<info>http://www.ebi.ac.uk/embl/index.html</info>
-		<file>/data/mrs/embl.m6</file>
-		<source>embl/rel_htg_*.dat.gz</source>
-	</databank>
-
-	<databank id="embl-pat" parser="embl">
-		<name>EMBL Patents</name>
-		<info>http://www.ebi.ac.uk/embl/index.html</info>
-		<file>/data/mrs/embl.m6</file>
-		<source>embl/rel_pat_*.dat.gz</source>
-	</databank>
-
-	<databank id="embl-std" parser="embl">
-		<name>EMBL Standard</name>
-		<info>http://www.ebi.ac.uk/embl/index.html</info>
-		<file>/data/mrs/embl.m6</file>
-		<source>embl/rel_std_*.dat.gz</source>
-	</databank>
-
-	<databank id="embl-sts" parser="embl">
-		<name>EMBL Sequence Tagged Site</name>
-		<info>http://www.ebi.ac.uk/embl/index.html</info>
-		<file>/data/mrs/embl.m6</file>
-		<source>embl/rel_sts_*.dat.gz</source>
-	</databank>
-
-	<databank id="embl-tsa" parser="embl">
-		<name>EMBL Transcriptome Shotgun Assembly</name>
-		<info>http://www.ebi.ac.uk/embl/index.html</info>
-		<file>/data/mrs/embl.m6</file>
-		<source>embl/rel_tsa_*.dat.gz</source>
-	</databank>
-
-	<databank id="embl-wgs" parser="embl">
-		<name>EMBL Whole Genome Shotgun</name>
-		<info>http://www.ebi.ac.uk/embl/index.html</info>
-		<file>/data/mrs/embl.m6</file>
-		<source>embl/rel_wgs_*.dat.gz</source>
-	</databank>
-
-	<databank id="enzyme" parser="enzyme" format="enzyme">
-		<name>Enzyme</name>
-		<info>http://ca.expasy.org/enzyme/</info>
-		<file>/data/mrs/enzyme.m6</file>
-		<source>enzyme/enzyme.dat</source>
-		<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/enzyme/release_with_updates/enzyme.dat"/>
-	</databank>
-
-	<databank id="sprot" parser="uniprot" format="uniprot" blast="true">
-		<aliases>
-			<alias>uniprot</alias>
-		</aliases>
-		<name>SwissProt</name>
-		<info>http://www.uniprot.org/</info>
-		<file>/data/mrs/sprot.m6</file>
-		<source>uniprot/uniprot_sprot.dat.gz</source>
-		<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/uniprot/current_release/knowledgebase/complete/uniprot_sprot.dat.gz" dst="uniprot"/>
-	</databank>
-
-	<databank id="trembl" parser="uniprot" format="uniprot" blast="true">
-		<aliases>
-			<alias>uniprot</alias>
-		</aliases>
-		<name>TrEMBL</name>
-		<info>http://www.uniprot.org/</info>
-		<file>/data/mrs/trembl.m6</file>
-		<source>uniprot/uniprot_trembl.dat.gz</source>
-		<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/uniprot/current_release/knowledgebase/complete/uniprot_trembl.dat.gz" dst="uniprot"/>
-	</databank>
+	<!-- Parsers section, parsers in this section are for XML databanks only
+		 and are XPath based. For huge databanks you're probably better off
+		 writing a Perl parser since XPath processing is relatively bit slow. -->
 	
-	<databank id="genbank" parser="genbank">
-		<name>Genbank</name>
-		<info>http://www.ncbi.nlm.nih.gov/genbank/</info>
-		<file>/data/mrs/genbank.m6</file>
-		<source>genbank/*.seq.gz</source>
-		<fetch delete="true" src="ftp://ftp.ncbi.nih.gov/genbank/*.seq.gz"/>
-	</databank>
-
-	<databank id="refseq" parser="genbank">
-		<name>Refseq</name>
-		<info>http://www.ncbi.nlm.nih.gov/RefSeq/</info>
-		<file>/data/mrs/refseq.m6</file>
-		<source>refseq_release/*gpff.gz;refseq_release/*gbff.gz</source>
-		<fetch delete="true" src="ftp://ftp.ncbi.nih.gov/refseq/release/complete/*gbff.gz"/>
-	</databank>
-
-	<databank id="taxonomy" parser="taxonomy" format="taxonomy">
-		<name>Taxonomy</name>
-		<info>http://www.ncbi.nlm.nih.gov/entrez/query.fcgi?db=Taxonomy</info>
-		<file>/data/mrs/taxonomy.m6</file>
-		<source>taxonomy/taxonomy.dat</source>
-		<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/taxonomy/taxonomy.dat"/>
-	</databank>
-
-	<databank id="nlwiki" parser="mediawiki">
-		<name>Wikipedia - Nederlandstalig</name>
-		<file>/data/mrs/nlwiki.m6</file>
-		<source>nlwiki/nlwiki-latest-pages-articles.xml.bz2</source>
-	</databank>
-
-	<databank id="pdb" parser="pdb" blast="true">
-		<name>PDB</name>
-		<info>http://www.rcsb.org/pdb/</info>
-		<file>pdb.m6</file>
-		<source>pdb/*/pdb*.ent.gz</source>
-		<fetch delete="true" src="ftp://ftp.cmbi.ru.nl/pub/molbio/data/pdb/divided/??/pdb????.ent.gz"/>
-	</databank>
-
-	<databank id="dssp" parser="dssp">
-		<name>DSSP</name>
-		<info>http://www.cmbi.ru.nl/dssp.html</info>
-		<file>dssp.m6</file>
-		<source>dssp/*.dssp</source>
-		<fetch delete="true" src="ftp://ftp.cmbi.ru.nl/pub/molbio/data/dssp/????.dssp"/>
-	</databank>
-
-	<databank id="hssp" parser="hssp">
-		<name>HSSP</name>
-		<info>http://www.cmbi.ru.nl/hssp</info>
-		<file>hssp.m6</file>
-		<source>hssp/????.hssp.bz2</source>
-		<fetch delete="true" src="ftp://ftp.cmbi.ru.nl/pub/molbio/data/hssp/????.hssp.bz2"/>
-	</databank>
-
-	<databank id="gene" parser="gene" format="gene">
-		<name>Entrez Gene</name>
-		<info>http://www.ncbi.nlm.nih.gov/entrez/query.fcgi?db=gene</info>
-		<file>gene.m6</file>
-		<source>gene/All_Data.ags.gz</source>
-		<filter>/usr/bin/gene2xml -bT</filter>
-		<fetch src="ftp://ftp.ncbi.nlm.nih.gov/gene/DATA/ASN_BINARY/All_Data.ags.gz"/>
-	</databank>
-
-	<databank id="go" parser="go">
-		<name>GO</name>
-		<info>http://www.geneontology.org/</info>
-		<file>go.m6</file>
-		<source>go/gene_ontology.obo</source>
-		<fetch src="ftp://ftp.geneontology.org/pub/go/ontology/gene_ontology.obo"/>
-	</databank>
-
-<!--	<databank id="goa" parser="goa">-->
-<!--		<name>GOA</name>-->
-<!--		<file>goa.m6</file>-->
-<!--		<source>goa/gene_association.goa_uniprot.gz</source>-->
-<!--		<fetch-->
-<!--			src="ftp://ftp.ebi.ac.uk//pub/databases/GO/goa/UNIPROT/gene_association.goa_uniprot.gz" />-->
-<!--	</databank>-->
-
-	<databank id="interpro" parser="interpro" format="interpro">
-		<name>Interpro</name>
-		<info>http://www.ebi.ac.uk/interpro/</info>
-		<file>interpro.m6</file>
-		<source>interpro/interpro.xml.gz</source>
-		<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/interpro/interpro.xml.gz"/>
-	</databank>
-
-	<databank id="oxford" parser="oxford">
-		<name>Oxford Human Mouse grid</name>
-		<info>http://www.informatics.jax.org/</info>
-		<file>oxford.m6</file>
-		<source>oxford/HMD_Human3.rpt</source>
-		<fetch src="ftp://ftp.informatics.jax.org/pub/reports/HMD_Human3.rpt"/>
-	</databank>
-
-	<databank id="mimmap" parser="mimmap">
-		<name>Mimmap, our view on genemap from OMIM</name>
-		<file>mimmap.m6</file>
-		<source>omim/genemap</source>
-		<fetch src="ftp://ftp.ncbi.nih.gov/repository/OMIM/ARCHIVE/genemap" dst="omim"/>
-	</databank>
+	<parsers>
+		<parser id="pmc" chunk="/article">
+			<index name="id" type="string" xpath="/article/front/article-meta/article-id[@pub-id-type=&quot;pmc&quot;]" attr="true"/> <!-- really, in pmc id is not unique...  unique="true"  -->
+			<index name="pmid" type="string" xpath="/article/front/article-meta/article-id[@pub-id-type=&quot;pmid&quot;]"/>
+			<index name="doi" type="string" xpath="/article/front/article-meta/article-id[@pub-id-type=&quot;doi&quot;]"/>
+			<index name="subject" type="text" xpath="/article/front/article-meta/article-categories/subj-group[@subj-group-type=&quot;heading&quot;]/subject"/>
+			<index name="title" type="text" xpath="/article/front/article-meta/title-group/article-title" attr="true"/>
+			<index name="authors" type="text" xpath="/article/front/article-meta/contrib-group/contrib/name/*"/>
+			<index name="aff" type="text" xpath="/article/front/article-meta/aff"/>
+			<index name="abstract" type="text" xpath="/article/front/article-meta/abstract"/>
+			<index name="body" type="text" xpath="/article/body"/>
+		</parser>
 	
-	<databank id="dbest" parser="dbest">
-		<name>dbEST</name>
-		<file>dbest.m6</file>
-		<info>http://www.ncbi.nlm.nih.gov/dbEST/</info>
-		<source>dbest/dbEST.reports.*</source>
-		<fetch delete="true" src="ftp://ftp.ncbi.nih.gov/repository/dbEST/dbEST.reports.*.gz"/>
-	</databank>
-
-	<databank id="sprot-fa" parser="fasta">
-		<name>SwissProt-FastA</name>
-		<file>sprot-fa.m6</file>
-		<source>/data/fasta/sprot.fa</source>
-	</databank>
-
-	<databank id="medline" parser="medline">
-		<name>Medline/PubMed</name>
-		<file>medline.m6</file>
-		<source>medline/medline*</source>
-	</databank>
-
-	<databank id="pfama" parser="pfam" format="stockholm">
-		<aliases>
-			<alias>pfam</alias>
-		</aliases>
-		<name>Pfam-A</name>
-		<file>pfama.m6</file>
-		<info>http://pfam.sanger.ac.uk/</info>
-		<source>pfam/Pfam-A.full.gz</source>
-		<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/Pfam/Pfam-A.full.gz"/>
-	</databank>
-
-	<databank id="pfamb" parser="pfam" format="stockholm">
-		<aliases>
-			<alias>pfam</alias>
-		</aliases>
-		<name>Pfam-B</name>
-		<file>pfamb.m6</file>
-		<info>http://pfam.sanger.ac.uk/</info>
-		<source>pfam/Pfam-B.gz</source>
-		<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/Pfam/Pfam-B.gz"/>
-	</databank>
-
-	<databank id="pfamseed" parser="pfam" format="stockholm">
-		<aliases>
-			<alias>pfam</alias>
-		</aliases>
-		<name>Pfam-Seed</name>
-		<file>pfamseed.m6</file>
-		<info>http://pfam.sanger.ac.uk/</info>
-		<source>pfam/Pfam-A.seed.gz</source>
-		<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/Pfam/Pfam-A.seed.gz"/>
-	</databank>
-
-	<databank id="prints" parser="prints">
-		<name>PRINTS</name>
-		<file>prints.m6</file>
-		<info>http://bioinf.man.ac.uk/dbbrowser/PRINTS/</info>
-		<source>prints/prints*.dat.gz</source>
-		<fetch delete="true" src="ftp://ftp.ebi.ac.uk/pub/databases/prints/prints*.dat.gz"/>
-	</databank>
-
-	<databank id="prosite" parser="prosite">
-		<name>Prosite</name>
-		<file>prosite.m6</file>
-		<info>http://www.expasy.org/prosite/</info>
-		<source>prosite/prosite*.dat</source>
-		<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/prosite/prosite*.dat"/>
-	</databank>
-
-	<databank id="prosite_doc" parser="prosite_doc">
-		<name>Prosite Documentation</name>
-		<file>prosite_doc.m6</file>
-		<info>http://www.expasy.org/prosite/</info>
-		<source>prosite/prosite*.doc</source>
-		<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/prosite/prosite*.doc"/>
-	</databank>
-
-	<databank id="rebase" parser="rebase">
-		<name>REBASE</name>
-		<file>rebase.m6</file>
-		<info>http://rebase.neb.com/rebase/rebase.html</info>
-		<source>rebase/bairoch.txt</source>
-		<fetch delete="true" src="ftp://ftp.neb.com/pub/rebase/bairoch.*"/>
-	</databank>
-
-	<databank id="unigene" parser="unigene">
-		<name>Unigene</name>
-		<file>unigene.m6</file>
-		<info>http://www.ncbi.nlm.nih.gov/entrez/query.fcgi?db=unigene</info>
-		<source>unigene/*/*.data.gz</source>
-		<fetch src="ftp://ftp.ncbi.nih.gov/repository/UniGene/*/*.data.gz"/>
-	</databank>
-
-	<databank id="uniref50" parser="uniref">
-		<name>UniRef 50</name>
-		<file>uniref50.m6</file>
-		<info>http://www.uniprot.org/help/uniref</info>
-		<source>uniref50/uniref50.xml.gz</source>
-		<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/uniprot/current_release/uniref/uniref50/*"/>
-	</databank>
-
-	<databank id="uniref90" parser="uniref">
-		<name>UniRef 90</name>
-		<file>uniref90.m6</file>
-		<info>http://www.uniprot.org/help/uniref</info>
-		<source>uniref90/uniref90.xml.gz</source>
-		<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/uniprot/current_release/uniref/uniref90/*"/>
-	</databank>
-
-	<databank id="uniref100" parser="uniref">
-		<name>UniRef 100</name>
-		<file>uniref100.m6</file>
-		<info>http://www.uniprot.org/help/uniref</info>
-		<source>uniref100/uniref100.xml.gz</source>
-		<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/uniprot/current_release/uniref/uniref100/*"/>
-	</databank>
-
-	<databank id="pmc" parser="pmc" format="pmc">
-		<name>PubMed Central</name>
-		<file>pmc.m6</file>
-		<info>http://www.pubmedcentral.nih.gov/</info>
-		<source>pmc/articles*.tar.gz</source> 
-		<fetch src="ftp://ftp.ncbi.nih.gov/pub/pmc/articles*.tar.gz"/>
-	</databank>
-
-	<!-- databanks used in debugging m6 -->
-
-	<databank id="pdb-mini" parser="pdb" blast="true">
-		<name>PDB mini</name>
-		<info>http://www.rcsb.org/pdb/</info>
-		<file>pdb-mini.m6</file>
-		<source>pdb/cr/pdb?cr?.ent.gz</source>
-	</databank>
-
-	<databank id="sprot-mini" parser="uniprot" blast="true">
-		<name>SwissProt mini</name>
-		<file>sprot-mini.m6</file>
-		<source>uniprot/sprot-mini.dat</source>
-	</databank>
+	<!--	<parser id="gene" chunk="/Entrezgene-Set/Entrezgene">-->
+	<!--		<index name='id'		type="string"	xpath='Entrezgene_track-info/Gene-track/Gene-track_geneid'-->
+	<!--			   attr="true"		/>-->
+	<!--		<index name='title'		type="text"		xpath='Entrezgene_prot/Prot-ref/Prot-ref_name/Prot-ref_name_E'-->
+	<!--			   attr="true"	/>-->
+	<!--		<index name='text'		type='text'		xpath='.//*' />-->
+	<!--	</parser>-->
 	
-	<databank id="embl-mini" parser="embl" format="embl">
-		<name>EMBL mini</name>
-		<file>embl-mini.m6</file>
-		<source>embl_release/rel_est_vrl_01_r113.dat.gz</source>
-	</databank>
+		<parser id="interpro" chunk="/interprodb/interpro">
+			<index name="id" type="string" xpath="@id" attr="true" unique="true"/>
+			<index name="title" type="text" xpath="name" attr="true"/>
+			<index name="type" type="string" xpath="@type"/>
+			<index name="name" type="string" xpath="@short_name"/>
 	
+			<!-- Everything else (all nodes that are not 'name') -->
+			<index name="text" type="text" xpath="*[name() != &quot;name&quot;]"/>
+	
+			<!-- All attributes -->
+			<index name="attr" type="text" xpath=".//@*"/>
+			
+			<link xpath="db_xref" db="@db" id="@dbkey"/>
+		</parser>
+	</parsers>
+
+	<!-- And finally, the databanks section -->
+	<databanks>
+		<databank id="pdbfinder" parser="pdbfinder">
+			<aliases>
+				<alias>pdbfinder2</alias>
+			</aliases>
+			<name>PDBFINDER</name>
+			<file>pdbfinder.m6</file>
+			<locale>en_US.UTF-8</locale>
+			<source>pdbfinder2/PDBFIND2.TXT.gz</source>
+			<fetch src="ftp://ftp.cmbi.ru.nl/pub/molbio/data/pdbfinder2/PDBFIND2.TXT.gz" dst="pdbfinder2"/>
+		</databank>
+		
+		<!-- omim -->
+		<databank id="omim" parser="omim" format="omim">
+			<aliases>
+				<alias>MIM</alias>
+			</aliases>
+			<name>OMIM - Online Mendelian Inheritance in Man™</name>
+			<info>http://www.ncbi.nlm.nih.gov/entrez/query.fcgi?db=OMIM</info>
+			<file>/data/mrs/omim.m6</file>
+			<locale>en_US.UTF-8</locale>
+			<source>omim/omim.txt.Z</source>
+			<fetch src="ftp://ftp.ncbi.nih.gov/repository/OMIM/ARCHIVE/omim.txt.Z"/>
+		</databank>
+		
+		<databank id="embl" parser="embl" format="embl">
+			<name>EMBL</name>
+			<info>http://www.ebi.ac.uk/embl/index.html</info>
+			<file>/data/mrs/embl.m6</file>
+			<source>embl_release/*.dat.gz</source>
+		</databank>
+	
+		<databank id="embl-con" parser="embl">
+			<name>EMBL Constructed</name>
+			<info>http://www.ebi.ac.uk/embl/index.html</info>
+			<file>/data/mrs/embl.m6</file>
+			<source>embl/rel_con_*.dat.gz</source>
+		</databank>
+	
+		<databank id="embl-est" parser="embl">
+			<name>EMBL Expressed Sequence Tag</name>
+			<info>http://www.ebi.ac.uk/embl/index.html</info>
+			<file>/data/mrs/embl.m6</file>
+			<source>embl/rel_est_*.dat.gz</source>
+		</databank>
+	
+		<databank id="embl-gss" parser="embl">
+			<name>EMBL Genome Sequence Scan</name>
+			<info>http://www.ebi.ac.uk/embl/index.html</info>
+			<file>/data/mrs/embl.m6</file>
+			<source>embl/rel_gss_*.dat.gz</source>
+		</databank>
+	
+		<databank id="embl-htc" parser="embl">
+			<name>EMBL High Throughput CDNA sequencing</name>
+			<info>http://www.ebi.ac.uk/embl/index.html</info>
+			<file>/data/mrs/embl.m6</file>
+			<source>embl/rel_htc_*.dat.gz</source>
+		</databank>
+	
+		<databank id="embl-htg" parser="embl">
+			<name>EMBL High Throughput Genome sequencing</name>
+			<info>http://www.ebi.ac.uk/embl/index.html</info>
+			<file>/data/mrs/embl.m6</file>
+			<source>embl/rel_htg_*.dat.gz</source>
+		</databank>
+	
+		<databank id="embl-pat" parser="embl">
+			<name>EMBL Patents</name>
+			<info>http://www.ebi.ac.uk/embl/index.html</info>
+			<file>/data/mrs/embl.m6</file>
+			<source>embl/rel_pat_*.dat.gz</source>
+		</databank>
+	
+		<databank id="embl-std" parser="embl">
+			<name>EMBL Standard</name>
+			<info>http://www.ebi.ac.uk/embl/index.html</info>
+			<file>/data/mrs/embl.m6</file>
+			<source>embl/rel_std_*.dat.gz</source>
+		</databank>
+	
+		<databank id="embl-sts" parser="embl">
+			<name>EMBL Sequence Tagged Site</name>
+			<info>http://www.ebi.ac.uk/embl/index.html</info>
+			<file>/data/mrs/embl.m6</file>
+			<source>embl/rel_sts_*.dat.gz</source>
+		</databank>
+	
+		<databank id="embl-tsa" parser="embl">
+			<name>EMBL Transcriptome Shotgun Assembly</name>
+			<info>http://www.ebi.ac.uk/embl/index.html</info>
+			<file>/data/mrs/embl.m6</file>
+			<source>embl/rel_tsa_*.dat.gz</source>
+		</databank>
+	
+		<databank id="embl-wgs" parser="embl">
+			<name>EMBL Whole Genome Shotgun</name>
+			<info>http://www.ebi.ac.uk/embl/index.html</info>
+			<file>/data/mrs/embl.m6</file>
+			<source>embl/rel_wgs_*.dat.gz</source>
+		</databank>
+	
+		<databank id="enzyme" parser="enzyme" format="enzyme">
+			<name>Enzyme</name>
+			<info>http://ca.expasy.org/enzyme/</info>
+			<file>/data/mrs/enzyme.m6</file>
+			<source>enzyme/enzyme.dat</source>
+			<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/enzyme/release_with_updates/enzyme.dat"/>
+		</databank>
+	
+		<databank id="sprot" parser="uniprot" format="uniprot" blast="true">
+			<aliases>
+				<alias>uniprot</alias>
+			</aliases>
+			<name>SwissProt</name>
+			<info>http://www.uniprot.org/</info>
+			<file>/data/mrs/sprot.m6</file>
+			<source>uniprot/uniprot_sprot.dat.gz</source>
+			<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/uniprot/current_release/knowledgebase/complete/uniprot_sprot.dat.gz" dst="uniprot"/>
+		</databank>
+	
+		<databank id="trembl" parser="uniprot" format="uniprot" blast="true">
+			<aliases>
+				<alias>uniprot</alias>
+			</aliases>
+			<name>TrEMBL</name>
+			<info>http://www.uniprot.org/</info>
+			<file>/data/mrs/trembl.m6</file>
+			<source>uniprot/uniprot_trembl.dat.gz</source>
+			<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/uniprot/current_release/knowledgebase/complete/uniprot_trembl.dat.gz" dst="uniprot"/>
+		</databank>
+		
+		<databank id="genbank" parser="genbank">
+			<name>Genbank</name>
+			<info>http://www.ncbi.nlm.nih.gov/genbank/</info>
+			<file>/data/mrs/genbank.m6</file>
+			<source>genbank/*.seq.gz</source>
+			<fetch delete="true" src="ftp://ftp.ncbi.nih.gov/genbank/*.seq.gz"/>
+		</databank>
+	
+		<databank id="refseq" parser="genbank">
+			<name>Refseq</name>
+			<info>http://www.ncbi.nlm.nih.gov/RefSeq/</info>
+			<file>/data/mrs/refseq.m6</file>
+			<source>refseq_release/*gpff.gz;refseq_release/*gbff.gz</source>
+			<fetch delete="true" src="ftp://ftp.ncbi.nih.gov/refseq/release/complete/*gbff.gz"/>
+		</databank>
+	
+		<databank id="taxonomy" parser="taxonomy" format="taxonomy">
+			<name>Taxonomy</name>
+			<info>http://www.ncbi.nlm.nih.gov/entrez/query.fcgi?db=Taxonomy</info>
+			<file>/data/mrs/taxonomy.m6</file>
+			<source>taxonomy/taxonomy.dat</source>
+			<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/taxonomy/taxonomy.dat"/>
+		</databank>
+	
+		<databank id="nlwiki" parser="mediawiki">
+			<name>Wikipedia - Nederlandstalig</name>
+			<file>/data/mrs/nlwiki.m6</file>
+			<source>nlwiki/nlwiki-latest-pages-articles.xml.bz2</source>
+		</databank>
+	
+		<databank id="pdb" parser="pdb" blast="true">
+			<name>PDB</name>
+			<info>http://www.rcsb.org/pdb/</info>
+			<file>pdb.m6</file>
+			<source>pdb/*/pdb*.ent.gz</source>
+			<fetch delete="true" src="ftp://ftp.cmbi.ru.nl/pub/molbio/data/pdb/divided/??/pdb????.ent.gz"/>
+		</databank>
+	
+		<databank id="dssp" parser="dssp">
+			<name>DSSP</name>
+			<info>http://www.cmbi.ru.nl/dssp.html</info>
+			<file>dssp.m6</file>
+			<source>dssp/*.dssp</source>
+			<fetch delete="true" src="ftp://ftp.cmbi.ru.nl/pub/molbio/data/dssp/????.dssp"/>
+		</databank>
+	
+		<databank id="hssp" parser="hssp">
+			<name>HSSP</name>
+			<info>http://www.cmbi.ru.nl/hssp</info>
+			<file>hssp.m6</file>
+			<source>hssp/????.hssp.bz2</source>
+			<fetch delete="true" src="ftp://ftp.cmbi.ru.nl/pub/molbio/data/hssp/????.hssp.bz2"/>
+		</databank>
+	
+		<databank id="gene" parser="gene" format="gene">
+			<name>Entrez Gene</name>
+			<info>http://www.ncbi.nlm.nih.gov/entrez/query.fcgi?db=gene</info>
+			<file>gene.m6</file>
+			<source>gene/All_Data.ags.gz</source>
+			<filter>/usr/bin/gene2xml -bT</filter>
+			<fetch src="ftp://ftp.ncbi.nlm.nih.gov/gene/DATA/ASN_BINARY/All_Data.ags.gz"/>
+		</databank>
+	
+		<databank id="go" parser="go">
+			<name>GO</name>
+			<info>http://www.geneontology.org/</info>
+			<file>go.m6</file>
+			<source>go/gene_ontology.obo</source>
+			<fetch src="ftp://ftp.geneontology.org/pub/go/ontology/gene_ontology.obo"/>
+		</databank>
+	
+	<!--	<databank id="goa" parser="goa">-->
+	<!--		<name>GOA</name>-->
+	<!--		<file>goa.m6</file>-->
+	<!--		<source>goa/gene_association.goa_uniprot.gz</source>-->
+	<!--		<fetch-->
+	<!--			src="ftp://ftp.ebi.ac.uk//pub/databases/GO/goa/UNIPROT/gene_association.goa_uniprot.gz" />-->
+	<!--	</databank>-->
+	
+		<databank id="interpro" parser="interpro" format="interpro">
+			<name>Interpro</name>
+			<info>http://www.ebi.ac.uk/interpro/</info>
+			<file>interpro.m6</file>
+			<source>interpro/interpro.xml.gz</source>
+			<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/interpro/interpro.xml.gz"/>
+		</databank>
+	
+		<databank id="oxford" parser="oxford">
+			<name>Oxford Human Mouse grid</name>
+			<info>http://www.informatics.jax.org/</info>
+			<file>oxford.m6</file>
+			<source>oxford/HMD_Human3.rpt</source>
+			<fetch src="ftp://ftp.informatics.jax.org/pub/reports/HMD_Human3.rpt"/>
+		</databank>
+	
+		<databank id="mimmap" parser="mimmap">
+			<name>Mimmap, our view on genemap from OMIM</name>
+			<file>mimmap.m6</file>
+			<source>omim/genemap</source>
+			<fetch src="ftp://ftp.ncbi.nih.gov/repository/OMIM/ARCHIVE/genemap" dst="omim"/>
+		</databank>
+		
+		<databank id="dbest" parser="dbest">
+			<name>dbEST</name>
+			<file>dbest.m6</file>
+			<info>http://www.ncbi.nlm.nih.gov/dbEST/</info>
+			<source>dbest/dbEST.reports.*</source>
+			<fetch delete="true" src="ftp://ftp.ncbi.nih.gov/repository/dbEST/dbEST.reports.*.gz"/>
+		</databank>
+	
+		<databank id="sprot-fa" parser="fasta">
+			<name>SwissProt-FastA</name>
+			<file>sprot-fa.m6</file>
+			<source>/data/fasta/sprot.fa</source>
+		</databank>
+	
+		<databank id="medline" parser="medline">
+			<name>Medline/PubMed</name>
+			<file>medline.m6</file>
+			<source>medline/medline*</source>
+		</databank>
+	
+		<databank id="pfama" parser="pfam" format="stockholm">
+			<aliases>
+				<alias>pfam</alias>
+			</aliases>
+			<name>Pfam-A</name>
+			<file>pfama.m6</file>
+			<info>http://pfam.sanger.ac.uk/</info>
+			<source>pfam/Pfam-A.full.gz</source>
+			<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/Pfam/Pfam-A.full.gz"/>
+		</databank>
+	
+		<databank id="pfamb" parser="pfam" format="stockholm">
+			<aliases>
+				<alias>pfam</alias>
+			</aliases>
+			<name>Pfam-B</name>
+			<file>pfamb.m6</file>
+			<info>http://pfam.sanger.ac.uk/</info>
+			<source>pfam/Pfam-B.gz</source>
+			<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/Pfam/Pfam-B.gz"/>
+		</databank>
+	
+		<databank id="pfamseed" parser="pfam" format="stockholm">
+			<aliases>
+				<alias>pfam</alias>
+			</aliases>
+			<name>Pfam-Seed</name>
+			<file>pfamseed.m6</file>
+			<info>http://pfam.sanger.ac.uk/</info>
+			<source>pfam/Pfam-A.seed.gz</source>
+			<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/Pfam/Pfam-A.seed.gz"/>
+		</databank>
+	
+		<databank id="prints" parser="prints">
+			<name>PRINTS</name>
+			<file>prints.m6</file>
+			<info>http://bioinf.man.ac.uk/dbbrowser/PRINTS/</info>
+			<source>prints/prints*.dat.gz</source>
+			<fetch delete="true" src="ftp://ftp.ebi.ac.uk/pub/databases/prints/prints*.dat.gz"/>
+		</databank>
+	
+		<databank id="prosite" parser="prosite">
+			<name>Prosite</name>
+			<file>prosite.m6</file>
+			<info>http://www.expasy.org/prosite/</info>
+			<source>prosite/prosite*.dat</source>
+			<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/prosite/prosite*.dat"/>
+		</databank>
+	
+		<databank id="prosite_doc" parser="prosite_doc">
+			<name>Prosite Documentation</name>
+			<file>prosite_doc.m6</file>
+			<info>http://www.expasy.org/prosite/</info>
+			<source>prosite/prosite*.doc</source>
+			<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/prosite/prosite*.doc"/>
+		</databank>
+	
+		<databank id="rebase" parser="rebase">
+			<name>REBASE</name>
+			<file>rebase.m6</file>
+			<info>http://rebase.neb.com/rebase/rebase.html</info>
+			<source>rebase/bairoch.txt</source>
+			<fetch delete="true" src="ftp://ftp.neb.com/pub/rebase/bairoch.*"/>
+		</databank>
+	
+		<databank id="unigene" parser="unigene">
+			<name>Unigene</name>
+			<file>unigene.m6</file>
+			<info>http://www.ncbi.nlm.nih.gov/entrez/query.fcgi?db=unigene</info>
+			<source>unigene/*/*.data.gz</source>
+			<fetch src="ftp://ftp.ncbi.nih.gov/repository/UniGene/*/*.data.gz"/>
+		</databank>
+	
+		<databank id="uniref50" parser="uniref">
+			<name>UniRef 50</name>
+			<file>uniref50.m6</file>
+			<info>http://www.uniprot.org/help/uniref</info>
+			<source>uniref50/uniref50.xml.gz</source>
+			<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/uniprot/current_release/uniref/uniref50/*"/>
+		</databank>
+	
+		<databank id="uniref90" parser="uniref">
+			<name>UniRef 90</name>
+			<file>uniref90.m6</file>
+			<info>http://www.uniprot.org/help/uniref</info>
+			<source>uniref90/uniref90.xml.gz</source>
+			<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/uniprot/current_release/uniref/uniref90/*"/>
+		</databank>
+	
+		<databank id="uniref100" parser="uniref">
+			<name>UniRef 100</name>
+			<file>uniref100.m6</file>
+			<info>http://www.uniprot.org/help/uniref</info>
+			<source>uniref100/uniref100.xml.gz</source>
+			<fetch src="ftp://ftp.ebi.ac.uk/pub/databases/uniprot/current_release/uniref/uniref100/*"/>
+		</databank>
+	
+		<databank id="pmc" parser="pmc" format="pmc">
+			<name>PubMed Central</name>
+			<file>pmc.m6</file>
+			<info>http://www.pubmedcentral.nih.gov/</info>
+			<source>pmc/articles*.tar.gz</source> 
+			<fetch src="ftp://ftp.ncbi.nih.gov/pub/pmc/articles*.tar.gz"/>
+		</databank>
+	
+		<!-- databanks used in debugging m6 -->
+	
+		<databank id="pdb-mini" parser="pdb" blast="true">
+			<name>PDB mini</name>
+			<info>http://www.rcsb.org/pdb/</info>
+			<file>pdb-mini.m6</file>
+			<source>pdb/cr/pdb?cr?.ent.gz</source>
+		</databank>
+	
+		<databank id="sprot-mini" parser="uniprot" blast="true">
+			<name>SwissProt mini</name>
+			<file>sprot-mini.m6</file>
+			<source>uniprot/sprot-mini.dat</source>
+		</databank>
+		
+		<databank id="embl-mini" parser="embl" format="embl">
+			<name>EMBL mini</name>
+			<file>embl-mini.m6</file>
+			<source>embl_release/rel_est_vrl_01_r113.dat.gz</source>
+		</databank>
+	</databanks>
 </m6-config>

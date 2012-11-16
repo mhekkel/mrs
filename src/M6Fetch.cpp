@@ -66,7 +66,7 @@ const boost::regex kM6URLParserRE("ftp://" url_userinfo url_host url_port url_pa
 class M6FTPFetcher
 {
   public:
-						M6FTPFetcher(zx::element* inConfig);
+						M6FTPFetcher(const zx::element* inConfig);
 						~M6FTPFetcher();
 	
 	bool				IsOutOfDate();
@@ -116,7 +116,7 @@ class M6FTPFetcher
 	vector<fs::path>	mFilesToDelete;
 };
 
-M6FTPFetcher::M6FTPFetcher(zx::element* inConfig)
+M6FTPFetcher::M6FTPFetcher(const zx::element* inConfig)
 	: mResolver(mIOService), mSocket(mIOService), mDelete(false)
 {
 	mDatabank = inConfig->get_attribute("id");
@@ -153,7 +153,7 @@ M6FTPFetcher::M6FTPFetcher(zx::element* inConfig)
     if (dst.empty())
         dst = inConfig->get_attribute("id");
 
-    fs::path rawdir = M6Config::Instance().FindGlobal("/m6-config/rawdir");
+    fs::path rawdir = M6Config::GetDirectory("raw");
     mDstDir = rawdir / dst;
 
     if (fs::exists(mDstDir) and not fs::is_directory(mDstDir))
@@ -577,7 +577,7 @@ void M6FTPFetcher::FetchFile(fs::path inRemote, fs::path inLocal, time_t inTime,
 
 void M6Fetch(const string& inDatabank)
 {
-	zx::element* config = M6Config::Instance().LoadDatabank(inDatabank);
+	const zx::element* config = M6Config::GetDatabank(inDatabank);
 	if (not config)
 		THROW(("Configuration for %s is missing", inDatabank.c_str()));
 
@@ -587,7 +587,7 @@ void M6Fetch(const string& inDatabank)
 
 bool M6FetchNeeded(const string& inDatabank)
 {
-	zx::element* config = M6Config::Instance().LoadDatabank(inDatabank);
+	const zx::element* config = M6Config::GetDatabank(inDatabank);
 	if (not config)
 		THROW(("Configuration for %s is missing", inDatabank.c_str()));
 

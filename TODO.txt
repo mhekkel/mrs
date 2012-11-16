@@ -16,9 +16,9 @@ Todo
 
 - m6 integration (server/build/password)
 - config file:
-	- herindelen: groepen
 	- DTD schrijven
-	- M6Config interface aanpassen
+	- Alleen laten werken op kopie van data
+	- verwijder <file> tag, is niet nodig
 
 - Version
 - browse data/index
@@ -27,6 +27,12 @@ Todo
 - link in format-config uitbreiden ?
 - date index
 - near operator, how to implement? new query language?
+
+Parsers:
+
+- PDB toFasta
+- mediawiki :-)
+- mbox
 
 Basic:
 

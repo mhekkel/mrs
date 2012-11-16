@@ -20,12 +20,12 @@
 		<user name="scott" realm="M6 Administrator" password="b92ff7d60b994c8a0d2941ad9349e841"/>
 	</users>
 
-	<!-- Servers section, you can configure multiple servers but their addr/port
+	<!-- Servers section, you can configure multiple servers but their addr+port
 		 should be unique, of course. -->
 	<servers>
 		<server addr="0.0.0.0" port="18090">
 			<admin realm="M6 Administrator"/>
-			<base-url>http://lord-jim.cmbi.umcn.nl:18090/</base-url>
+			<base-url>http://localhost:18090/</base-url>
 			<web-service service="search" ns="http://mrs.cmbi.ru.nl/mrsws/search" location="mrsws/search" />
 			<web-service service="blast" ns="http://mrs.cmbi.ru.nl/mrsws/blast" location="mrsws/blast" />
 			<docroot>./docroot/</docroot>
@@ -159,7 +159,6 @@
 			</aliases>
 			<name>PDBFINDER</name>
 			<file>pdbfinder.m6</file>
-			<locale>en_US.UTF-8</locale>
 			<source>pdbfinder2/PDBFIND2.TXT.gz</source>
 			<fetch src="ftp://ftp.cmbi.ru.nl/pub/molbio/data/pdbfinder2/PDBFIND2.TXT.gz" dst="pdbfinder2"/>
 		</databank>
@@ -172,7 +171,6 @@
 			<name>OMIM - Online Mendelian Inheritance in Man™</name>
 			<info>http://www.ncbi.nlm.nih.gov/entrez/query.fcgi?db=OMIM</info>
 			<file>/data/mrs/omim.m6</file>
-			<locale>en_US.UTF-8</locale>
 			<source>omim/omim.txt.Z</source>
 			<fetch src="ftp://ftp.ncbi.nih.gov/repository/OMIM/ARCHIVE/omim.txt.Z"/>
 		</databank>

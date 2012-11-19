@@ -168,7 +168,7 @@
 			</aliases>
 			<name>OMIM - Online Mendelian Inheritance in Man™</name>
 			<info>http://www.ncbi.nlm.nih.gov/entrez/query.fcgi?db=OMIM</info>
-			<source fetch="ftp://ftp.ncbi.nih.gov/repository/">OMIM/ARCHIVE/omim.txt.Z</source>
+			<source fetch="ftp://ftp.ncbi.nih.gov/repository">OMIM/ARCHIVE/omim.txt.Z</source>
 		</databank>
 		
 		<databank id="embl" parser="embl" format="embl">
@@ -249,7 +249,7 @@
 			</aliases>
 			<name>SwissProt</name>
 			<info>http://www.uniprot.org/</info>
-			<source fetch="ftp://ftp.ebi.ac.uk/pub/databases/">uniprot/current_release/knowledgebase/complete/uniprot_sprot.dat.gz</source>
+			<source fetch="ftp://ftp.ebi.ac.uk/pub/databases">uniprot/current_release/knowledgebase/complete/uniprot_sprot.dat.gz</source>
 		</databank>
 	
 		<databank id="trembl" parser="uniprot" format="uniprot">
@@ -258,7 +258,7 @@
 			</aliases>
 			<name>TrEMBL</name>
 			<info>http://www.uniprot.org/</info>
-			<source fetch="ftp://ftp.ebi.ac.uk/pub/databases/">uniprot/current_release/knowledgebase/complete/uniprot_trembl.dat.gz</source>
+			<source fetch="ftp://ftp.ebi.ac.uk/pub/databases">uniprot/current_release/knowledgebase/complete/uniprot_trembl.dat.gz</source>
 		</databank>
 		
 		<databank id="genbank" parser="genbank">
@@ -276,7 +276,7 @@
 		<databank id="taxonomy" parser="taxonomy" format="taxonomy">
 			<name>Taxonomy</name>
 			<info>http://www.ncbi.nlm.nih.gov/entrez/query.fcgi?db=Taxonomy</info>
-			<source fetch="ftp://ftp.ebi.ac.uk/pub/databases/">taxonomy/taxonomy.dat</source>
+			<source fetch="ftp://ftp.ebi.ac.uk/pub/databases">taxonomy/taxonomy.dat</source>
 		</databank>
 	
 		<databank id="nlwiki" parser="mediawiki">
@@ -287,7 +287,7 @@
 		<databank id="pdb" parser="pdb">
 			<name>PDB</name>
 			<info>http://www.rcsb.org/pdb/</info>
-			<source delete="true" fetch="ftp://ftp.cmbi.ru.nl/pub/molbio/data/">pdb/divided/??/pdb????.ent.gz</source>
+			<source delete="true" fetch="ftp://ftp.cmbi.ru.nl/pub/molbio/data">pdb/divided/??/pdb????.ent.gz</source>
 		</databank>
 	
 		<databank id="dssp" parser="dssp">
@@ -299,7 +299,7 @@
 		<databank id="hssp" parser="hssp">
 			<name>HSSP</name>
 			<info>http://www.cmbi.ru.nl/hssp</info>
-			<source delete="true" fetch="ftp://ftp.cmbi.ru.nl/pub/molbio/data/">hssp/????.hssp.bz2</source>
+			<source delete="true" fetch="ftp://ftp.cmbi.ru.nl/pub/molbio/data">hssp/????.hssp.bz2</source>
 		</databank>
 	
 		<databank id="gene" parser="gene" format="gene">
@@ -312,7 +312,7 @@
 		<databank id="go" parser="go">
 			<name>GO</name>
 			<info>http://www.geneontology.org/</info>
-			<source fetch="ftp://ftp.geneontology.org/pub/">go/ontology/gene_ontology.obo</source>
+			<source fetch="ftp://ftp.geneontology.org/pub">go/ontology/gene_ontology.obo</source>
 		</databank>
 	
 	<!--	<databank id="goa" parser="goa">-->
@@ -325,18 +325,18 @@
 		<databank id="interpro" parser="interpro" format="interpro">
 			<name>Interpro</name>
 			<info>http://www.ebi.ac.uk/interpro/</info>
-			<source fetch="ftp://ftp.ebi.ac.uk/pub/databases/">interpro/interpro.xml.gz</source>
+			<source fetch="ftp://ftp.ebi.ac.uk/pub/databases">interpro/interpro.xml.gz</source>
 		</databank>
 	
 		<databank id="oxford" parser="oxford">
 			<name>Oxford Human Mouse grid</name>
 			<info>http://www.informatics.jax.org/</info>
-			<source fetch="ftp://ftp.informatics.jax.org/pub/">reports/HMD_Human3.rpt</source>
+			<source fetch="ftp://ftp.informatics.jax.org/pub">reports/HMD_Human3.rpt</source>
 		</databank>
 	
 		<databank id="mimmap" parser="mimmap">
 			<name>Mimmap, our view on genemap from OMIM</name>
-			<source fetch="ftp://ftp.ncbi.nih.gov/repository/">OMIM/ARCHIVE/genemap</source>
+			<source fetch="ftp://ftp.ncbi.nih.gov/repository">OMIM/ARCHIVE/genemap</source>
 		</databank>
 		
 		<databank id="dbest" parser="dbest">
@@ -379,7 +379,7 @@
 			</aliases>
 			<name>Pfam-Seed</name>
 			<info>http://pfam.sanger.ac.uk/</info>
-			<source fetch="ftp://ftp.ebi.ac.uk/pub/databases/">Pfam/Pfam-A.seed.gz</source>
+			<source fetch="ftp://ftp.ebi.ac.uk/pub/databases">Pfam/Pfam-A.seed.gz</source>
 		</databank>
 	
 		<databank id="prints" parser="prints">
@@ -415,19 +415,19 @@
 		<databank id="uniref50" parser="uniref">
 			<name>UniRef 50</name>
 			<info>http://www.uniprot.org/help/uniref</info>
-			<source fetch="ftp://ftp.ebi.ac.uk/pub/databases/">uniprot/current_release/uniref/uniref50/uniref50.xml.gz</source>
+			<source fetch="ftp://ftp.ebi.ac.uk/pub/databases">uniprot/current_release/uniref/uniref50/uniref50.xml.gz</source>
 		</databank>
 	
 		<databank id="uniref90" parser="uniref">
 			<name>UniRef 90</name>
 			<info>http://www.uniprot.org/help/uniref</info>
-			<source fetch="ftp://ftp.ebi.ac.uk/pub/databases/">uniprot/current_release/uniref/uniref90/uniref90.xml.gz</source>
+			<source fetch="ftp://ftp.ebi.ac.uk/pub/databases">uniprot/current_release/uniref/uniref90/uniref90.xml.gz</source>
 		</databank>
 	
 		<databank id="uniref100" parser="uniref">
 			<name>UniRef 100</name>
 			<info>http://www.uniprot.org/help/uniref</info>
-			<source fetch="ftp://ftp.ebi.ac.uk/pub/databases/">uniprot/current_release/uniref/uniref100/uniref100.xml.gz</source>
+			<source fetch="ftp://ftp.ebi.ac.uk/pub/databases">uniprot/current_release/uniref/uniref100/uniref100.xml.gz</source>
 		</databank>
 	
 		<databank id="pmc" parser="pmc" format="pmc">

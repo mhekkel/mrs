@@ -33,7 +33,7 @@
 	
 <!ELEMENT formats (format+)>
 <!ELEMENT format (link*)>
-<!ATTLIST format id ID #REQUIRED
+<!ATTLIST format id NMTOKEN #REQUIRED
 				 script CDATA #IMPLIED
 				 stylesheet CDATA #IMPLIED>
 <!ELEMENT link EMPTY>
@@ -45,7 +45,7 @@
 	
 <!ELEMENT parsers (parser+)>
 <!ELEMENT parser (index|add-link)+>
-<!ATTLIST parser id ID #REQUIRED
+<!ATTLIST parser id NMTOKEN #REQUIRED
 				 chunk CDATA #REQUIRED>
 <!ELEMENT index EMPTY>
 <!ATTLIST index name NMTOKEN #REQUIRED

@@ -32,7 +32,10 @@ class File
 	zeep::xml::element_set	Find(const boost::format& inFmt);
 	zeep::xml::element*		FindFirst(const boost::format& inFmt);
 
-	zeep::xml::document*	mConfig;
+	std::istream*			LoadDTD(const std::string& inBase,
+								const std::string& inPublicID, const std::string& inSystemID);
+
+	zeep::xml::document		mConfig;
 };
 
 void SetConfigFilePath(const boost::filesystem::path& inConfigFile);
@@ -49,6 +52,7 @@ const zeep::xml::element_set	GetDatabanks();
 const zeep::xml::element*		GetDatabank(const std::string& inID);
 const zeep::xml::element_set	GetDatabanks(const std::string& inID);
 std::string						GetDatabankParam(const std::string& inID, const std::string& inParam);
+boost::filesystem::path			GetDbDirectory(const std::string& inDatabankID);
 
 // Inlines
 
@@ -64,7 +68,7 @@ inline std::string GetDirectory(const std::string& inID)
 inline std::string M6Config::GetTool(const std::string& inID)
 {
 	std::string result;
-	zeep::xml::element* e = File::Instance().GetDirectory(inID);
+	zeep::xml::element* e = File::Instance().GetTool(inID);
 	if (e != nullptr)
 		result = e->content();
 	return result;
@@ -111,9 +115,9 @@ inline std::string M6Config::GetDatabankParam(const std::string& inID, const std
 	zeep::xml::element* db = File::Instance().GetDatabank(inID);
 	if (db != nullptr)
 	{
-		zeep::xml::element* e = db->find_first(inParam);
-		if (e != nullptr)
-			result = e->str();
+		zeep::xml::node* n = db->find_first_node(inParam.c_str());
+		if (n != nullptr)
+			result = n->str();
 	}
 	return result;
 }

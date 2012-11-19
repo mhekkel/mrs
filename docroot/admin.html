@@ -48,15 +48,14 @@
 			<div id="global" class="section">
 				<table cellspacing="0" cellpadding="0">
 					<caption>Directories</caption>
-					<tr><td>Base directory</td><td id="srvdir" class="admin-edit-text">${global.srvdir ? global.srvdir : 'not set'}</td></tr>
-					<tr><td>MRS-file directory</td><td id="srvdir" class="admin-edit-text">${global.mrsdir ? global.mrsdir : 'not set'}</td></tr>
-					<tr><td>Raw directory</td><td id="srvdir" class="admin-edit-text">${global.rawdir ? global.rawdir : 'not set'}</td></tr>
-					<tr><td>Script directory</td><td id="srvdir" class="admin-edit-text">${global.scriptdir ? global.scriptdir : 'not set'}</td></tr>
+					<tr><td>MRS-file directory</td><td id="mrsdir" class="admin-edit-text">${global.mrsdir ? global.mrsdir : 'not set'}</td></tr>
+					<tr><td>Raw directory</td><td id="rawdir" class="admin-edit-text">${global.rawdir ? global.rawdir : 'not set'}</td></tr>
+					<tr><td>Parser directory</td><td id="parserdir" class="admin-edit-text">${global.parserdir ? global.parserdir : 'not set'}</td></tr>
 				</table>
 
 				<table cellspacing="0" cellpadding="0" style="margin-top: 20px">
 					<caption>Tools</caption>
-					<tr><td>Clustal Omega</td><td id="srvdir" class="admin-edit-text">${global.tools.clustalo ? global.tools.clustalo : 'not set'}</td></tr>
+					<tr><td>Clustal Omega</td><td id="clustalo" class="admin-edit-text">${global.tools.clustalo ? global.tools.clustalo : 'not set'}</td></tr>
 				</table>
 
 			</div>
@@ -66,8 +65,18 @@
 			<div id="formats" class="section" />
 	
 			<div id="databanks" class="section">
+				<div class="admin-left">
+					<table cellspacing="0" cellpadding="0" class="select_db">
+						<caption>Databanks</caption>
+						<mrs:iterate collection="databanks" var="db">
+							<tr id="${db.id}"><td>${db.id}</td></tr>
+						</mrs:iterate>
+					</table>
+				</div>
+				
+				<div class="admin-right">
 				<mrs:iterate collection="databanks" var="db">
-					<table cellspacing="0" cellpadding="0">
+					<table id="config-${db.id}" cellspacing="0" cellpadding="0" class="selectable_db" style="display:none;">
 						<caption>${db.id}</caption>
 						<tr><td>Name</td><td id="${db.id}-name" class="admin-edit-text">${db.name}</td></tr>
 						<tr><td>Info URL</td><td id="${db.id}-info" class="admin-edit-text">${db.info ? db.info : '-'}</td></tr>
@@ -86,6 +95,9 @@
 						
 					</table>
 				</mrs:iterate>
+				</div>
+				
+				<div class="admin-clear" />
 			</div>
 	
 			<div id="blast" class="section" />

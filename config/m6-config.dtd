@@ -1,0 +1,73 @@
+<!ELEMENT m6-config (directories,tools,users,servers,formats,parsers,databanks)>
+
+<!ELEMENT directories (directory+)>
+<!ELEMENT directory (#PCDATA)>
+<!ATTLIST directory id ID #REQUIRED>
+	
+<!ELEMENT tools (tool+)>
+<!ELEMENT tool (#PCDATA)>
+<!ATTLIST tool id ID #REQUIRED>
+	
+<!ELEMENT users (user+)>
+<!ELEMENT user (#PCDATA)>
+<!ATTLIST user name ID #REQUIRED
+			   realm CDATA #REQUIRED
+			   password CDATA #REQUIRED>
+	
+<!ELEMENT servers (server+)>
+<!ELEMENT server (admin?,base-url?,web-service*,docroot?,dbs?,blast-dbs?)+>
+<!ATTLIST server addr NMTOKEN #REQUIRED
+				 port NMTOKEN #REQUIRED>
+<!ELEMENT admin EMPTY>
+<!ATTLIST admin realm CDATA #REQUIRED>
+<!ELEMENT base-url (#PCDATA)>
+<!ELEMENT web-service EMPTY>
+<!ATTLIST web-service service (search|blast) #REQUIRED
+					  ns CDATA #REQUIRED
+					  location CDATA #REQUIRED>
+<!ELEMENT docroot (#PCDATA)>
+<!ELEMENT dbs (db+)>
+<!ELEMENT db (#PCDATA)>
+<!ATTLIST db name CDATA #IMPLIED>
+<!ELEMENT blast-dbs (db+)>
+	
+<!ELEMENT formats (format+)>
+<!ELEMENT format (link*)>
+<!ATTLIST format id ID #REQUIRED
+				 script CDATA #IMPLIED
+				 stylesheet CDATA #IMPLIED>
+<!ELEMENT link EMPTY>
+<!ATTLIST link regex CDATA #REQUIRED
+			   db CDATA #REQUIRED
+			   id CDATA #REQUIRED
+			   ix CDATA #IMPLIED
+			   anchor CDATA #IMPLIED>
+	
+<!ELEMENT parsers (parser+)>
+<!ELEMENT parser (index|add-link)+>
+<!ATTLIST parser id ID #REQUIRED
+				 chunk CDATA #REQUIRED>
+<!ELEMENT index EMPTY>
+<!ATTLIST index name NMTOKEN #REQUIRED
+				type (string|text|number) #REQUIRED
+				xpath CDATA #REQUIRED
+				attr (true|false) #IMPLIED
+				unique (true|false) #IMPLIED>
+<!ELEMENT add-link EMPTY>
+<!ATTLIST add-link xpath CDATA #REQUIRED
+				   db CDATA #REQUIRED
+				   id CDATA #REQUIRED>
+	
+<!ELEMENT databanks (databank+)>
+<!ELEMENT databank (aliases?,name?,info?,source,filter?)>
+<!ATTLIST databank id ID #REQUIRED
+				   parser NMTOKEN #REQUIRED
+				   format NMTOKEN #IMPLIED>
+<!ELEMENT aliases (alias+)>
+<!ELEMENT alias (#PCDATA)>
+<!ELEMENT name (#PCDATA)>
+<!ELEMENT info (#PCDATA)>
+<!ELEMENT source (#PCDATA)>
+<!ATTLIST source fetch CDATA #IMPLIED
+				 delete (true|false) #IMPLIED>
+<!ELEMENT filter (#PCDATA)>

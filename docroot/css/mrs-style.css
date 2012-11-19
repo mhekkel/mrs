@@ -619,6 +619,19 @@ div#globalSelection input, div#globalSelection select {
 	font-weight: bold;
 }
 
+.admin table.select_db td:first-child {
+	font-weight: normal;
+}
+
+.admin table.select_db td.selected {
+	text-decoration: underline;
+}
+
+.admin table.select_db tr:hover {
+	background: #c6d4e1;
+	cursor: pointer;
+}
+
 .admin td + td {
 	width: auto;
 	white-space: nowrap;
@@ -643,13 +656,13 @@ div#globalSelection input, div#globalSelection select {
 
 .admin .admin-left {
 	float: left;
-	width: 30%;
+	width: 10%;
 	vertical-align: top;
 	padding-right: 10px;
 }
 
 .admin .admin-right {
-	margin-left: 30%;
+	margin-left: 10%;
 	padding-left: 10px;
 	vertical-align: top;
 }

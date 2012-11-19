@@ -6,7 +6,6 @@ BUGS:
 Todo
 
 - verwijder nr als parameter voor entry, gebruik '#0000' constructie
-- integratie SOAP/REST/WWW server
 - GetDocument routine in server die aliases gebruikt
 - REST interface herzien:
 	- /entry/db/id moet naar Accept header kijken
@@ -18,7 +17,6 @@ Todo
 - config file:
 	- DTD schrijven
 	- Alleen laten werken op kopie van data
-	- verwijder <file> tag, is niet nodig
 
 - Version
 - browse data/index

@@ -241,8 +241,6 @@ M6Server::~M6Server()
 
 void M6Server::LoadAllDatabanks()
 {
-	fs::path mrsDir(M6Config::GetDirectory("mrs"));
-	
 	mLinkMap.clear();
 	
 	zx::element_set dbs(mConfig->find("dbs/db"));
@@ -260,19 +258,8 @@ void M6Server::LoadAllDatabanks()
 				continue;
 			}
 			
-			zx::element* file = config->find_first("file");
-			if (file == nullptr)
-			{
-				if (VERBOSE)
-					cerr << "file not specified for databank " << databank << endl;
-				continue;
-			}
-		
-			fs::path path = file->content();
-			if (not path.has_root_path())
-				path = mrsDir / path;
-			
-			if (not fs::exists(path))
+			fs::path file = M6Config::GetDbDirectory(databank);
+			if (not fs::exists(file))
 			{
 				if (VERBOSE)
 					cerr << "databank " << databank << " not available" << endl;
@@ -297,7 +284,7 @@ void M6Server::LoadAllDatabanks()
 			
 			M6LoadedDatabank ldb =
 			{
-				new M6Databank(path, eReadOnly),
+				new M6Databank(file, eReadOnly),
 				databank,
 				name,
 				aliases,
@@ -1396,28 +1383,24 @@ void M6Server::handle_admin(const zh::request& request,
 	// add the databank settings
 	vector<el::object> databanks;
 
-	zx::element_set dbs(mConfig->find("dbs/db"));
-	foreach (zx::element* db, dbs)
+	foreach (const zx::element* db, M6Config::GetDatabanks())
 	{
-		string dbn = db->content();
-
-		const zx::element* dbConfig = M6Config::GetDatabank(dbn);
 		zx::element* e;
 		
 		el::object databank;
-		databank["id"] = dbn;
-		databank["format"] = dbConfig->get_attribute("format");
-		databank["parser"] = dbConfig->get_attribute("parser");
-		if ((e = dbConfig->find_first("name")) != nullptr)
+		databank["id"] = db->get_attribute("id");
+		databank["format"] = db->get_attribute("format");
+		databank["parser"] = db->get_attribute("parser");
+		if ((e = db->find_first("name")) != nullptr)
 			databank["name"] = e->content();
-		if ((e = dbConfig->find_first("info")) != nullptr)
+		if ((e = db->find_first("info")) != nullptr)
 			databank["info"] = e->content();
-		if ((e = dbConfig->find_first("source")) != nullptr)
-			databank["source"] = e->content();
-		if ((e = dbConfig->find_first("fetch")) != nullptr)
+		if ((e = db->find_first("source")) != nullptr)
 		{
+			databank["source"] = e->content();
+			
 			el::object fetch;
-			fetch["src"] = e->get_attribute("src");
+			fetch["src"] = e->get_attribute("fetch");
 			fetch["dst"] = e->get_attribute("dst");
 			fetch["delete"] = e->get_attribute("delete");
 			databank["fetch"] = fetch;

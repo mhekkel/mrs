@@ -1926,14 +1926,14 @@ Result* Search(const vector<fs::path>& inDatabanks,
 
 	// regular expression for FastA formatted files
 	boost::regex
-		kFastARE("^>([^| ]+(?:\\|[^| \n\r\t]*)*)(?: (.+))?\n");
+		kFastARE("^>([^| ]+(?:\\|[^| \n\r\t]*)*)(?: ([^\r\n]+))?(?:\r|\n|\r\n)(.+)");
 
 	boost::smatch m;
-	if (regex_search(inQuery, m, kFastARE, boost::match_not_dot_newline))
+	if (regex_search(inQuery, m, kFastARE))
 	{
 		queryID = m[1];
 		queryDef = m[2];
-		query = m.suffix();
+		query = m[3];
 	}
 
 	string q;
@@ -1955,6 +1955,9 @@ Result* Search(const vector<fs::path>& inDatabanks,
 		q += r;
 	}
 	query = q;
+
+	if (query.length() < inWordSize)
+		THROW(("Query length should be at least wordsize"));
 
 	int64 totalLength = accumulate(inDatabanks.begin(), inDatabanks.end(), 0LL,
 		[](int64 l, const fs::path& p) -> int64 { return l + fs::file_size(p); });

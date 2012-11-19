@@ -76,6 +76,7 @@ class M6FTPFetcher
 
 	void				Login();
 
+	int64				CollectFiles();
 	int64				CollectFiles(fs::path inLocalDir, fs::path inRemoteDir,
 							fs::path::iterator p, fs::path::iterator e);
 	
@@ -103,7 +104,8 @@ class M6FTPFetcher
 	bool				mDelete;
 	
 	string				mReply;
-	fs::path			mPath, mDstDir;
+	string				mSource;
+	fs::path			mSrcPath;
 
 	struct FileToFetch
 	{
@@ -120,10 +122,13 @@ M6FTPFetcher::M6FTPFetcher(const zx::element* inConfig)
 	: mResolver(mIOService), mSocket(mIOService), mDelete(false)
 {
 	mDatabank = inConfig->get_attribute("id");
+	
+	zx::element* source = inConfig->find_first("source");
+	if (source == nullptr)
+		THROW(("Missing source?"));
+	mSource = source->content();
 
-	zx::element* fetch = inConfig->find_first("fetch");
-
-	string src = fetch->get_attribute("src");
+	string src = source->get_attribute("fetch");
 	boost::smatch m;
 	if (not boost::regex_match(src, m, kM6URLParserRE))
 		THROW(("Invalid source url: <%s>", src.c_str()));
@@ -135,31 +140,25 @@ M6FTPFetcher::M6FTPFetcher(const zx::element* inConfig)
 	mPort = m[3];
 	if (mPort.empty())
 		mPort = "ftp";
-	mPath = fs::path(m[4].str());
+	mSrcPath = fs::path(m[4].str());
 
-    string dst = fetch->get_attribute("dst");
-    if (dst.empty() and inConfig->find_first("source") != nullptr)
-    {
-		string source = inConfig->find_first("source")->content();
-    	if (not source.empty())
-    	{
-    		fs::path sd(source);
-			do { sd = sd.parent_path(); } while (not sd.empty() and sd.filename().string().find_first_of("*?") != string::npos);
-    		if (not sd.empty())
-    			dst = sd.string();
-    	}
-    }
+//    string dst = source->get_attribute("dst");
+//    if (dst.empty() and inConfig->find_first("source") != nullptr)
+//    {
+//		fs::path sd(inConfig->find_first("source")->content());
+//		while (not sd.empty() and sd.filename().string().find_first_of("*?") != string::npos)
+//			sd = sd.parent_path();
+//		if (not sd.empty())
+//			dst = sd.string();
+//    }
+//    
+//    if (dst.empty())
+//        dst = inConfig->get_attribute("id");
+//
+//    fs::path rawdir = M6Config::GetDirectory("raw");
+//    mDstDir = rawdir / dst;
     
-    if (dst.empty())
-        dst = inConfig->get_attribute("id");
-
-    fs::path rawdir = M6Config::GetDirectory("raw");
-    mDstDir = rawdir / dst;
-
-    if (fs::exists(mDstDir) and not fs::is_directory(mDstDir))
-        THROW(("Destination for fetch should be a directory"));
-    
-    mDelete = fetch->get_attribute("delete") == "true";
+    mDelete = source->get_attribute("delete") == "true";
 
 	// Get a list of endpoints corresponding to the server name.
 	at::tcp::resolver::query query(mServer, mPort);
@@ -221,20 +220,20 @@ fs::path M6FTPFetcher::GetPWD()
 
 void M6FTPFetcher::Mirror()
 {
-	int64 bytesToFetch = CollectFiles(fs::path(), GetPWD(), mPath.begin(), mPath.end());
-
+	int64 bytesToFetch = CollectFiles();
+	
 	if (not mFilesToFetch.empty())
 	{
 		M6Progress progress(mDatabank, bytesToFetch, "Fetching");
 		
-		foreach (auto need, mFilesToFetch)
+		foreach (auto file, mFilesToFetch)
 		{
-			progress.Message(string("Fetching ") + need.remote.filename().string());
+			progress.Message(string("Fetching ") + file.remote.filename().string());
 
 			if (VERBOSE)
-				cerr << "fetching " << need.remote << " => " << need.local << endl;
+				cerr << "fetching " << file.remote << " => " << file.local << endl;
 			
-			FetchFile(need.remote, need.local, need.time, progress);
+			FetchFile(file.remote, file.local, file.time, progress);
 		}
 	}
 	
@@ -252,7 +251,7 @@ void M6FTPFetcher::Mirror()
 
 bool M6FTPFetcher::IsOutOfDate()
 {
-	return CollectFiles(fs::path(), GetPWD(), mPath.begin(), mPath.end()) > 0;
+	return CollectFiles() > 0;
 }
 
 uint32 M6FTPFetcher::SendAndWaitForReply(const string& inCommand, const string& inParam)
@@ -308,6 +307,34 @@ uint32 M6FTPFetcher::WaitForReply()
 	return result;
 }
 
+int64 M6FTPFetcher::CollectFiles()
+{
+	int64 result = 0;
+	
+	foreach (fs::path dir, mSrcPath)
+	{
+		uint32 status = SendAndWaitForReply("cwd", dir.string());
+		if (status != 250)
+			Error((string("Error changing directory to ") + dir.string()).c_str());
+	}
+	
+	vector<string> sources;
+	ba::split(sources, mSource, ba::is_any_of(";"));
+	
+	M6Progress progress(mDatabank, sources.size(), "listing files");
+	
+	foreach (const string& source, sources)
+	{
+		fs::path p(source);
+		
+		result += CollectFiles(M6Config::GetDirectory("raw"), GetPWD(), p.begin(), p.end());
+		
+		progress.Consumed(1);
+	}
+	
+	return result;
+}
+
 int64 M6FTPFetcher::CollectFiles(fs::path inLocalDir, fs::path inRemoteDir, fs::path::iterator p, fs::path::iterator e)
 {
 	string s = p->string();
@@ -319,25 +346,23 @@ int64 M6FTPFetcher::CollectFiles(fs::path inLocalDir, fs::path inRemoteDir, fs::
 
 	if (p == e)
 	{
-		fs::path localDir = mDstDir / inLocalDir;
-
 			// we've reached the end of the url
-		if (not fs::exists(localDir))
-			fs::create_directories(localDir);
+		if (not fs::exists(inLocalDir))
+			fs::create_directories(inLocalDir);
 
 		// Do a listing, regardless the name is a pattern or not
 		vector<fs::path> existing;
 
 		fs::directory_iterator end;
-		for (fs::directory_iterator file(localDir); file != end; ++file)
+		for (fs::directory_iterator file(inLocalDir); file != end; ++file)
 		{
 			if (fs::is_regular_file(*file))
 				existing.push_back(*file);
 		}
 
-		ListFiles(s, [this, &existing, &localDir, &inRemoteDir, &result](char inType, const string& inFile, size_t inSize, time_t inTime)
+		ListFiles(s, [this, &existing, &inLocalDir, &inRemoteDir, &result](char inType, const string& inFile, size_t inSize, time_t inTime)
 		{
-			fs::path file = localDir / inFile;
+			fs::path file = inLocalDir / inFile;
 
 			bool fetch = inType == '-';
 

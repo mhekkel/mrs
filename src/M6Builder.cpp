@@ -595,18 +595,7 @@ void M6Builder::Build(uint32 inNrOfThreads)
 	
 //	boost::timer::auto_cpu_timer t;
 
-	zx::element* file = mConfig->find_first("file");
-	if (not file)
-		THROW(("Invalid config-file, file element is missing for databank %s", dbID.c_str()));
-
-	fs::path path = file->content();
-	if (not path.has_root_path())
-	{
-		fs::path mrsdir(M6Config::GetDirectory("mrs"));
-		path = mrsdir / path;
-	}
-	
-	fs::path dstPath(path);
+	fs::path path = M6Config::GetDbDirectory(dbID), dstPath = path;
 
 	if (fs::exists(path))
 	{
@@ -674,21 +663,15 @@ bool M6Builder::NeedsUpdate()
 {
 	bool result = true;
 	
-	zx::element* file = mConfig->find_first("file");
-	if (not file)
-		THROW(("Invalid config-file, file is missing"));
-
-	fs::path path(file->content());
-	
+	fs::path path = M6Config::GetDbDirectory(mConfig->get_attribute("id"));
 	if (fs::exists(path))
 	{
 		result = false;
 		
-		vector<fs::path> files;
-
-		Glob(M6Config::GetDirectory("raw"), mConfig->find_first("source"), files);
-		
 		time_t dbTime = fs::last_write_time(path);
+		
+		vector<fs::path> files;
+		Glob(M6Config::GetDirectory("raw"), mConfig->find_first("source"), files);
 		
 		foreach (fs::path& file, files)
 		{

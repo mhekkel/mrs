@@ -268,19 +268,12 @@ M6BlastResultPtr M6BlastCache::JobResult(const string& inJobID)
 
 void M6BlastCache::FastaFilesForDatabank(const string& inDatabank, vector<fs::path>& outFiles)
 {
-	fs::path mrsdir(M6Config::GetDirectory("mrs"));
-
 	vector<string> dbs;
 	ba::split(dbs, inDatabank, ba::is_any_of(";"));
 	
 	foreach (string& db, dbs)
 	{
-		fs::path dbdir(M6Config::GetDatabankParam(db, "file"));
-		if (dbdir.empty())
-			THROW(("Databank directory not found for %s", db.c_str()));
-		
-		if (not dbdir.has_root_path())
-			dbdir = mrsdir / dbdir;
+		fs::path dbdir = M6Config::GetDbDirectory(db);
 		
 		if (not fs::exists(dbdir / "fasta"))
 			THROW(("Databank '%s' does not contain a fasta file", db.c_str()));

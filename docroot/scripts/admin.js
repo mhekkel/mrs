@@ -6,6 +6,7 @@
 Admin = {
 	timeout: null,
 	viewing: null,
+	databank: null,
 
 	init: function() {
 
@@ -42,15 +43,34 @@ Admin = {
 			$(this).html(span).append(edit);
 		});
 
-//		Admin.updateStatus();
-		Admin.changeStatsView('global');
+		$("table.select_db tr").each(function() {
+			$(this).click(function() {
+				$("table.select_db tr").removeClass('selected');
+				$(this).addClass('selected');
+				var id = this.id;
+				$("table.selectable_db").hide();
+				$("#config-" + id).show();
+
+				try {
+					Admin.databank = id;
+					sessionStorage.setItem('adminDb', id);
+				} catch (e) {}
+			})
+		});
+
+		try {
+			Admin.databank = sessionStorage.getItem('adminDb');
+			var v = sessionStorage.getItem('adminView');
+			if (v == null) {
+				v = 'databanks';
+			}
+			Admin.changeStatsView(v);
+		} catch (e) { }
 	},
 
 	changeStatsView: function(view) {
 		if (Admin.viewing == view)
 			return;
-		
-		Admin.viewing = view;
 		
 		$("div.section").each(function() {
 			if (this.id != view) { $(this).hide(); }
@@ -62,6 +82,17 @@ Admin = {
 		});
 		
 		$("div #" + view).show();
+		
+		if (view == "databanks" && Admin.databank != null)
+		{
+			$("table.selectable_db").hide();
+			$("#config-" + Admin.databank).show();
+		}
+
+		try {
+			Admin.viewing = view;
+			sessionStorage.setItem('adminView', view);
+		} catch (e) {}
 	},
 	
 	updateStatus: function() {

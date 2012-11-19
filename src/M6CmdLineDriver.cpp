@@ -279,16 +279,7 @@ M6CmdLineDriver::GetDatabank(const string& inDatabank)
 	if (not config)
 		THROW(("Configuration for %s is missing", inDatabank.c_str()));
 
-	zeep::xml::element* file = config->find_first("file");
-	if (not file)
-		THROW(("Invalid config-file, file element is missing for databank %s", inDatabank.c_str()));
-
-	fs::path path = file->content();
-	if (not path.has_root_path())
-	{
-		fs::path mrsdir(M6Config::GetDirectory("mrs"));
-		path = mrsdir / path;
-	}
+	fs::path path = M6Config::GetDbDirectory(inDatabank);
 	
 	return tr1::make_tuple(config, path);
 }
@@ -413,23 +404,12 @@ void M6BlastDriver::Exec(const string& inCommand, po::variables_map& vm)
 		query += line + '\n';
 	}
 
-	fs::path mrsDir(M6Config::GetDirectory("mrs"));
-
 	vector<fs::path> databanks;
 	string db = vm["databank"].as<string>();
 	foreach (const zx::element* dbc, M6Config::GetDatabanks(db))
 	{
-		fs::path dbdir;
+		fs::path dbdir = M6Config::GetDbDirectory(dbc->get_attribute("id"));
 
-		if (zx::element* file = dbc->find_first("file"))
-			dbdir = file->content();
-		
-		if (dbdir.empty())
-			THROW(("Databank directory not found for %s", db.c_str()));
-		
-		if (not dbdir.has_root_path())
-			dbdir = mrsDir / dbdir;
-		
 		if (not fs::exists(dbdir / "fasta"))
 			THROW(("Databank '%s' does not contain a fasta file", db.c_str()));
 		
@@ -493,7 +473,7 @@ void M6BuildDriver::Exec(const string& inCommand, po::variables_map& vm)
 	if (nrOfThreads < 1)
 		nrOfThreads = 1;
 	
-	if (inCommand == "update" and M6Config::GetDatabankParam(databank, "fetch").empty() == false)
+	if (inCommand == "update" and M6Config::GetDatabankParam(databank, "source/@fetch").empty() == false)
 		M6Fetch(databank);
 
 	M6Builder builder(databank);

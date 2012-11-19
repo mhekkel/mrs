@@ -123,9 +123,19 @@ zx::element_set File::GetServers()
 	return Find(boost::format("/m6-config/servers/server"));
 }
 
+zx::element_set File::GetFormats()
+{
+	return Find(boost::format("/m6-config/formats/format"));
+}
+
 zx::element* File::GetFormat(const string& inID)
 {
 	return FindFirst(boost::format("/m6-config/formats/format[@id='%1%']") % inID);
+}
+
+zx::element_set File::GetParsers()
+{
+	return Find(boost::format("/m6-config/parsers/parser"));
 }
 
 zx::element* File::GetParser(const string& inID)

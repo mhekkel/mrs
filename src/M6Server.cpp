@@ -1362,6 +1362,19 @@ void M6Server::handle_admin(const zh::request& request,
 {
 	ValidateAuthentication(request, mAdminRealm);
 
+	zeep::http::parameter_map params;
+	get_parameters(scope, params);
+
+	string submitted = params.get("submit", "").as<string>();
+	if (not submitted.empty())
+	{
+		cerr << submitted << endl;
+		
+		
+		reply = zh::reply::redirect(request.uri);
+		return;
+	}
+
 	el::scope sub(scope);
 
 	// add the global settings
@@ -1379,6 +1392,56 @@ void M6Server::handle_admin(const zh::request& request,
 
 	// add server settings
 	
+	vector<el::object> servers;
+	foreach (const zx::element* e, M6Config::GetServers())
+	{
+		el::object server;
+		
+		server["addr"] = e->get_attribute("addr");
+		server["port"] = e->get_attribute("port");
+
+		zx::node* n;
+		
+		if (n = e->find_first("docroot"))
+			server["docroot"] = n->str();
+		if (n = e->find_first("base-url"))
+			server["baseurl"] = n->str();
+
+		if (n = e->find_first_node("admin/@realm"))
+			server["realm"] = n->str();
+		if (n = e->find_first_node("web-service[@service='search']/@location"))
+			server["search_ws"] = n->str();
+		if (n = e->find_first_node("web-service[@service='search']/@location"))
+			server["search_ws"] = n->str();
+		
+		servers.push_back(server);
+	}
+	sub.put("servers", servers);
+
+	// add parser settings
+	vector<string> parsers;
+	for (auto p = fs::directory_iterator(M6Config::GetDirectory("parser")); p != fs::directory_iterator(); ++p)
+	{
+		fs::path name = p->path().filename();
+		
+		if (name.extension().string() != ".pm" or name.string() == "M6Script.pm")
+			continue;
+		
+		parsers.push_back(name.stem().string());
+	}
+
+	foreach (const zx::element* e, M6Config::GetParsers())
+		parsers.push_back(e->get_attribute("id"));
+	
+	sort(parsers.begin(), parsers.end());
+	sub.put("parsers", parsers.begin(), parsers.end());
+	
+	// add formats
+	vector<string> formats;
+	foreach (const zx::element* e, M6Config::GetFormats())
+		formats.push_back(e->get_attribute("id"));
+	sort(formats.begin(), formats.end());
+	sub.put("formats", formats.begin(), formats.end());
 
 	// add the databank settings
 	vector<el::object> databanks;

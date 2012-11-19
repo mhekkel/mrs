@@ -588,7 +588,6 @@ div#globalSelection input, div#globalSelection select {
 }
 
 .admin table {
-	width: 100%;
 	padding: 0px;
 	margin: 0px;
 }
@@ -615,20 +614,23 @@ div#globalSelection input, div#globalSelection select {
 }
 
 .admin td:first-child {
-	margin: 1px;
 	font-weight: bold;
+}
+
+.admin table.select_db {
+	width: 100px;
 }
 
 .admin table.select_db td:first-child {
 	font-weight: normal;
 }
 
-.admin table.select_db td.selected {
-	text-decoration: underline;
+.admin table.select_db tr.selected {
+	background-color: #c6d4e1;
 }
 
 .admin table.select_db tr:hover {
-	background: #c6d4e1;
+	background: #d4e3f1;
 	cursor: pointer;
 }
 
@@ -645,6 +647,11 @@ div#globalSelection input, div#globalSelection select {
 	border: solid 1px white;
 }
 
+.admin td input[type='text'] {
+	margin: -1px;
+	width: 400px;
+}
+
 .admin td.admin-edit-text span:hover {
 	border: solid 1px #ccc;
 }
@@ -656,14 +663,18 @@ div#globalSelection input, div#globalSelection select {
 
 .admin .admin-left {
 	float: left;
-	width: 10%;
+	width: 100px;
 	vertical-align: top;
 	padding-right: 10px;
+	
+	height: 300px;
+	overflow-x: hidden;
+	overflow-y: scroll;
 }
 
 .admin .admin-right {
-	margin-left: 10%;
-	padding-left: 10px;
+	margin-left: 100px;
+	padding-left: 20px;
 	vertical-align: top;
 }
 
@@ -672,4 +683,48 @@ div#globalSelection input, div#globalSelection select {
 	height: 1px;
 	overflow: hidden;
 	margin: 0;
+}
+
+form.admin_form h3 {
+	background-color: #44749d;
+	color: white;
+	font-weight: bold;
+	text-align: left;
+	padding: 3px 5px 3px 5px;
+}
+
+form.admin_form fieldset {
+	border: 1px solid #9E9E9E;
+}
+
+form.admin_form h3:first-child {
+	margin-top: 2px;
+}
+
+form.admin_form label, form.admin_form input {
+	display: inline-block;
+}
+
+form.admin_form label {
+	font-weight: bold;
+}
+
+form.admin_form input, form.admin_form select {
+	margin: 2px;
+}
+
+form.admin_form input[type='text'] {
+	width: 400px;
+}
+
+form.admin_form label {
+	width: 120px;
+}
+
+form.admin_form hr {
+	margin: 15px 0px;
+	border: 0;
+	color: #9E9E9E;
+	background-color: #9E9E9E;
+	height: 1px;
 }

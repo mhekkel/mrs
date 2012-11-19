@@ -10,46 +10,16 @@ Admin = {
 
 	init: function() {
 
-		var a = 0;
-		$("td.admin-edit-text").each(function() {
-			var text = $(this).text();
-			var id = $(this).attr("id");
-			
-			var span = $("<span/>").append(text);
-			var edit = $("<input type='text'/>").attr("value", text).hide();
-			
-			span.click(function() {
-				$(this).hide();
-				edit.show().focus().select();
-			});
-			
-			edit.blur(function() {
-				this.value = text;
-				$(this).hide();
-				span.show();
-			}).keydown(function(event) {
-				if (event.which == 13) {
-					text = this.value;
-					$(span).text(text);
-					$(this).blur();
-					event.preventDefault();
-				}
-				else if (event.which == 27) {
-					$(this).blur();
-					event.preventDefault();
-				}
-			});
-			
-			$(this).html(span).append(edit);
-		});
-
 		$("table.select_db tr").each(function() {
+			if (this.id == Admin.databank)
+				$(this).addClass('selected');
+		
 			$(this).click(function() {
 				$("table.select_db tr").removeClass('selected');
 				$(this).addClass('selected');
 				var id = this.id;
-				$("table.selectable_db").hide();
-				$("#config-" + id).show();
+				$("#databanks form.admin_form").hide();
+				$("#databank-" + id).show();
 
 				try {
 					Admin.databank = id;
@@ -85,8 +55,8 @@ Admin = {
 		
 		if (view == "databanks" && Admin.databank != null)
 		{
-			$("table.selectable_db").hide();
-			$("#config-" + Admin.databank).show();
+			$("#databanks form.admin_form").hide();
+			$("#databank-" + Admin.databank).show();
 		}
 
 		try {

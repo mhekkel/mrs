@@ -77,6 +77,7 @@ OBJECTS = \
 	$(OBJDIR)/M6Query.o \
 	$(OBJDIR)/M6SequenceFilter.o \
 	$(OBJDIR)/M6Tokenizer.o \
+	$(OBJDIR)/M6Utilities.o \
 
 OBJECTS.m6 = \
 	$(OBJECTS) \
@@ -94,11 +95,7 @@ OBJECTS.m6-server = \
 	$(OBJDIR)/M6WSBlast.o \
 	$(OBJDIR)/M6WSSearch.o \
 
-OBJECTS.m6-passwd = \
-	$(OBJECTS) \
-	$(OBJDIR)/M6Passwd.o
-
-all: m6 m6-server m6-passwd
+all: m6 m6-server
 
 m6: $(OBJECTS.m6)
 	@ echo ">>" $@
@@ -109,10 +106,6 @@ m6-make: $(OBJECTS.m6-make)
 	@ $(CXX) $(BOOST_INC_DIR:%=-I%) -o $@ -I. $^ $(LDFLAGS)
 
 m6-server: $(OBJECTS.m6-server)
-	@ echo ">>" $@
-	@ $(CXX) $(BOOST_INC_DIR:%=-I%) -o $@ -I. $^ $(LDFLAGS)
-
-m6-passwd: $(OBJECTS.m6-passwd)
 	@ echo ">>" $@
 	@ $(CXX) $(BOOST_INC_DIR:%=-I%) -o $@ -I. $^ $(LDFLAGS)
 

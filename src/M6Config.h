@@ -65,7 +65,7 @@ inline std::string GetDirectory(const std::string& inID)
 	return result;
 }
 
-inline std::string M6Config::GetTool(const std::string& inID)
+inline std::string GetTool(const std::string& inID)
 {
 	std::string result;
 	zeep::xml::element* e = File::Instance().GetTool(inID);
@@ -74,27 +74,27 @@ inline std::string M6Config::GetTool(const std::string& inID)
 	return result;
 }
 
-inline const zeep::xml::element* M6Config::GetUser(const std::string& inName, const std::string& inRealm)
+inline const zeep::xml::element* GetUser(const std::string& inName, const std::string& inRealm)
 {
 	return File::Instance().GetUser(inName, inRealm);
 }
 
-inline const zeep::xml::element_set M6Config::GetServers()
+inline const zeep::xml::element_set GetServers()
 {
 	return File::Instance().GetServers();
 }
 
-inline const zeep::xml::element* M6Config::GetFormat(const std::string& inID)
+inline const zeep::xml::element* GetFormat(const std::string& inID)
 {
 	return File::Instance().GetFormat(inID);
 }
 
-inline const zeep::xml::element* M6Config::GetParser(const std::string& inID)
+inline const zeep::xml::element* GetParser(const std::string& inID)
 {
 	return File::Instance().GetParser(inID);
 }
 
-inline const zeep::xml::element_set M6Config::GetDatabanks()
+inline const zeep::xml::element_set GetDatabanks()
 {
 	return File::Instance().GetDatabanks();
 }
@@ -104,12 +104,12 @@ inline const zeep::xml::element_set	GetDatabanks(const std::string& inID)
 	return File::Instance().GetDatabanks(inID);
 }
 
-inline const zeep::xml::element* M6Config::GetDatabank(const std::string& inID)
+inline const zeep::xml::element* GetDatabank(const std::string& inID)
 {
 	return File::Instance().GetDatabank(inID);
 }
 
-inline std::string M6Config::GetDatabankParam(const std::string& inID, const std::string& inParam)
+inline std::string GetDatabankParam(const std::string& inID, const std::string& inParam)
 {
 	std::string result;
 	zeep::xml::element* db = File::Instance().GetDatabank(inID);

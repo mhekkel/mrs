@@ -74,57 +74,44 @@
 			</div>
 	
 			<div id="servers" class="section">
-				<div class="admin-left">
-					<table cellspacing="0" cellpadding="0" class="select_form">
-						<caption>Servers</caption>
-						<mrs:iterate collection="servers" var="server">
-							<tr id="server-${server.nr}"><td>${server.addr}:${server.port}</td></tr>
+				<form id="server-${server.nr}" class="admin_form" method="POST" style="display:none">
+					<input type='hidden' name='submit' value='server'/>
+					<input type='hidden' name='nr' value="${db.nr}"/>
+					<fieldset>
+						<h3>Server configuration</h3>
+						<div><label>Address</label><input type="text" value="${server.addr}" name="addr"/></div>
+						<div><label>Port</label><input type="text" value="${server.port}" name="port"/></div>
+						<div><label>Document root</label><input type="text" value="${server.docroot}" name="docroot"/></div>
+						<div><label>Base URL</label><input type="text" value="${server.baseurl}" name="baseurl"/></div>
+						<div><label>Admin Realm</label><input type="text" value="${server.realm}" name="realm"/></div>
+						
+						<h3>Web Service Locations</h3>
+						<p>Leave empty to disable web service</p>
+						<div><label>Search</label><input type="text" value="${server.search_ws}" name="search_ws"/></div>
+						<div><label>Blast</label><input type="text" value="${server.blast_ws}" name="blast_ws"/></div>
+						
+						<h3>Databanks served</h3>
+						<table cellspacing="0" cellpadding="0">
+							<tr>
+								<th>ID</th>
+								<th>Name</th>
+								<th>Search</th>
+								<th>Blast</th>
+							</tr>
+						<mrs:iterate collection="databanks" var="db">
+							<tr>
+								<td>${db.id}</td>
+								<td>${db.name}</td>
+								<td><mrs:checkbox name="x" checked="${server.dbs[db.id]}"/></td>
+								<td><mrs:checkbox name="x" checked="${server.blast[db.id]}"/></td>
+							</tr>
 						</mrs:iterate>
-					</table>
-				</div>
-				
-				<div class="admin-right">
-				<mrs:iterate collection="servers" var="server">
-					<form id="server-${server.nr}" class="admin_form" method="POST" style="display:none">
-						<input type='hidden' name='submit' value='server'/>
-						<input type='hidden' name='nr' value="${db.nr}"/>
-						<fieldset>
-							<h3>Server configuration</h3>
-							<div><label>Address</label><input type="text" value="${server.addr}" name="addr"/></div>
-							<div><label>Port</label><input type="text" value="${server.port}" name="port"/></div>
-							<div><label>Document root</label><input type="text" value="${server.docroot}" name="docroot"/></div>
-							<div><label>Base URL</label><input type="text" value="${server.baseurl}" name="baseurl"/></div>
-							<div><label>Admin Realm</label><input type="text" value="${server.realm}" name="realm"/></div>
-							
-							<h3>Web Service Locations</h3>
-							<p>Leave empty to disable web service</p>
-							<div><label>Search</label><input type="text" value="${server.search_ws}" name="search_ws"/></div>
-							<div><label>Blast</label><input type="text" value="${server.blast_ws}" name="blast_ws"/></div>
-							
-							<h3>Databanks served</h3>
-							<table cellspacing="0" cellpadding="0" style="${empty server.dbs ? 'display:none' : ''}">
-								<tr>
-									<th/>
-									<th>ID</th>
-									<th>Name</th>
-								</tr>
-							<mrs:iterate collection="${server.dbs}" var="db">
-								<tr>
-									<td style="width: 20px"><mrs:checkbox name="db-search-${db.id}" checked="${db.search}"/></td>
-									<td>${db.id}</td>
-									<td>${db.name}</td>
-								</tr>
-							</mrs:iterate>
-							</table>
-							
-							<hr/>
-							<input type='submit'/><input type='reset'/>
-						</fieldset>
-					</form>
-				</mrs:iterate>
-				</div>
-				
-				<div class="admin-clear" />
+						</table>
+						
+						<hr/>
+						<input type='submit'/><input type='reset'/>
+					</fieldset>
+				</form>
 			</div>
 			
 			<div id="parsers" class="section">

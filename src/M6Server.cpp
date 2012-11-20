@@ -1419,24 +1419,26 @@ void M6Server::handle_admin(const zh::request& request,
 		if (n = e->find_first_node("web-service[@service='blast']/@location"))
 			server["blast_ws"] = n->str();
 		
-		set<string> search;
+		set<string> search, blast;
 		foreach (zx::element* db, e->find("dbs/db"))
 			search.insert(db->content());
+		foreach (zx::element* db, e->find("blast-dbs/db"))
+			blast.insert(db->content());
 
-		vector<el::object> dbs;
+		el::object dbs, blastDbs;
 		foreach (zx::element* d, M6Config::GetDatabanks())
 		{
-			el::object db;
-			db["id"] = d->get_attribute("id");
-			if (n = d->find_first("name"))
-				db["name"] = n->str();
-			db["search"] = search.count(d->get_attribute("id"));
-			dbs.push_back(db);
+			string id = d->get_attribute("id");
+			dbs[id] = search.count(id);
+			blastDbs[id] = blast.count(id);
 		}
 		server["dbs"] = dbs;
+		server["blast"] = blastDbs;
 		
 		servers.push_back(server);
 	}
+	
+	sub.put("server", servers.front());
 	sub.put("servers", servers);
 
 	// add parser settings

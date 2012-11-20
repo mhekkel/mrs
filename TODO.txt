@@ -28,6 +28,8 @@ Todo
 - date index
 - near operator, how to implement? new query language?
 
+- verwijder libarchive dependency
+
 Parsers:
 
 - PDB toFasta

@@ -19,6 +19,7 @@ namespace M6Config
 {
 
 fs::path sConfigFile = "config/m6-config.xml";
+File* sInstance;
 
 File::File()
 {
@@ -59,8 +60,9 @@ istream* File::LoadDTD(const string& inBase, const string& inPublicID, const str
 
 File& File::Instance()
 {
-	static File sInstance;
-	return sInstance;
+	if (sInstance == nullptr)
+		sInstance = new File;
+	return *sInstance;
 }
 
 void File::WriteOut()
@@ -159,6 +161,13 @@ zx::element_set File::GetDatabanks(const string& inID)
 zx::element* File::GetDatabank(const string& inID)
 {
 	return FindFirst(boost::format("/m6-config/databanks/databank[@id='%1%']") % inID);
+}
+
+void Reload()
+{
+	unique_ptr<File> newFile(new File);
+	delete sInstance;
+	sInstance = newFile.release();
 }
 
 fs::path GetDbDirectory(const std::string& inDatabankID)

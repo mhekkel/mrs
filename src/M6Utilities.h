@@ -19,6 +19,8 @@ class M6SignalCatcher
 	
 	int			WaitForSignal();
 
+	static void	Signal(int inSignal);
+
   private:
 				M6SignalCatcher(const M6SignalCatcher&);
 	M6SignalCatcher&

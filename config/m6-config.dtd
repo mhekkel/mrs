@@ -40,7 +40,7 @@
 <!ATTLIST link regex CDATA #REQUIRED
 			   db CDATA #REQUIRED
 			   id CDATA #REQUIRED
-			   ix CDATA #IMPLIED
+			   ix CDATA "id"
 			   anchor CDATA #IMPLIED>
 	
 <!ELEMENT parsers (parser+)>
@@ -51,8 +51,8 @@
 <!ATTLIST index name NMTOKEN #REQUIRED
 				type (string|text|number) #REQUIRED
 				xpath CDATA #REQUIRED
-				attr (true|false) #IMPLIED
-				unique (true|false) #IMPLIED>
+				attr (true|false) "false"
+				unique (true|false) "false">
 <!ELEMENT add-link EMPTY>
 <!ATTLIST add-link xpath CDATA #REQUIRED
 				   db CDATA #REQUIRED
@@ -62,6 +62,7 @@
 <!ELEMENT databank (aliases?,name?,info?,source,filter?)>
 <!ATTLIST databank id ID #REQUIRED
 				   parser NMTOKEN #REQUIRED
+				   update (never|daily|weekly|monthly) "never"
 				   format NMTOKEN #IMPLIED>
 <!ELEMENT aliases (alias+)>
 <!ELEMENT alias (#PCDATA)>
@@ -69,5 +70,5 @@
 <!ELEMENT info (#PCDATA)>
 <!ELEMENT source (#PCDATA)>
 <!ATTLIST source fetch CDATA #IMPLIED
-				 delete (true|false) #IMPLIED>
+				 delete (true|false) "false">
 <!ELEMENT filter (#PCDATA)>

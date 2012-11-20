@@ -40,13 +40,13 @@
 				<li><a href="#" id="parsers" onclick="Admin.changeStatsView('parsers');">Parsers</a></li>
 				<li><a href="#" id="formats" onclick="Admin.changeStatsView('formats');">Formats</a></li>
 				<li><a href="#" id="databanks" onclick="Admin.changeStatsView('databanks');">Databanks</a></li>
-				<li><a href="#" id="blast" onclick="Admin.changeStatsView('blast');">Blast</a></li>
+<!--				<li><a href="#" id="blast" onclick="Admin.changeStatsView('blast');">Blast</a></li>-->
 			</ul>
 		</div>
 
 		<div class="admin">
 			<div id="global" class="section">
-				<form id="global-${db.id}" class="admin_form" method="POST">
+				<form class="admin_form" method="POST">
 					<input type='hidden' name='submit' value='global'/>
 					<fieldset>
 						<h3>Directories</h3>
@@ -59,28 +59,63 @@
 						<input type='submit'/><input type='reset'/>
 					</fieldset>
 				</form>
+				
+				<form class="admin_form" method="POST">
+					<input type="hidden" name="submit" value="restart"/>
+					
+					<fieldset>
+						<h3>Restart</h3>
+						<p>After changing the configuration options you have to restart the server
+						to make sure these changes are taken into effect.</p>
+						<input type='submit'/>
+					</fieldset>
+				</form>
+				
 			</div>
 	
 			<div id="servers" class="section">
 				<div class="admin-left">
-					<table cellspacing="0" cellpadding="0" class="select_db">
+					<table cellspacing="0" cellpadding="0" class="select_form">
 						<caption>Servers</caption>
 						<mrs:iterate collection="servers" var="server">
-							<tr id="${server.addr}:${server.port}"><td>${server.addr}:${server.port}</td></tr>
+							<tr id="server-${server.nr}"><td>${server.addr}:${server.port}</td></tr>
 						</mrs:iterate>
 					</table>
 				</div>
 				
 				<div class="admin-right">
 				<mrs:iterate collection="servers" var="server">
-					<form id="server-${server.addr}:${server.port}" class="admin_form" method="POST">
+					<form id="server-${server.nr}" class="admin_form" method="POST" style="display:none">
 						<input type='hidden' name='submit' value='server'/>
+						<input type='hidden' name='nr' value="${db.nr}"/>
 						<fieldset>
 							<h3>Server configuration</h3>
 							<div><label>Address</label><input type="text" value="${server.addr}" name="addr"/></div>
 							<div><label>Port</label><input type="text" value="${server.port}" name="port"/></div>
+							<div><label>Document root</label><input type="text" value="${server.docroot}" name="docroot"/></div>
 							<div><label>Base URL</label><input type="text" value="${server.baseurl}" name="baseurl"/></div>
+							<div><label>Admin Realm</label><input type="text" value="${server.realm}" name="realm"/></div>
 							
+							<h3>Web Service Locations</h3>
+							<p>Leave empty to disable web service</p>
+							<div><label>Search</label><input type="text" value="${server.search_ws}" name="search_ws"/></div>
+							<div><label>Blast</label><input type="text" value="${server.blast_ws}" name="blast_ws"/></div>
+							
+							<h3>Databanks served</h3>
+							<table cellspacing="0" cellpadding="0" style="${empty server.dbs ? 'display:none' : ''}">
+								<tr>
+									<th/>
+									<th>ID</th>
+									<th>Name</th>
+								</tr>
+							<mrs:iterate collection="${server.dbs}" var="db">
+								<tr>
+									<td style="width: 20px"><mrs:checkbox name="db-search-${db.id}" checked="${db.search}"/></td>
+									<td>${db.id}</td>
+									<td>${db.name}</td>
+								</tr>
+							</mrs:iterate>
+							</table>
 							
 							<hr/>
 							<input type='submit'/><input type='reset'/>
@@ -92,40 +127,84 @@
 				<div class="admin-clear" />
 			</div>
 			
-			<div id="parsers" class="section" />
-			<div id="formats" class="section" />
-	
-			<div id="databanks" class="section">
+			<div id="parsers" class="section">
 				<div class="admin-left">
-					<table cellspacing="0" cellpadding="0" class="select_db">
-						<caption>Databanks</caption>
-						<mrs:iterate collection="databanks" var="db">
-							<tr id="${db.id}"><td>${db.id}</td></tr>
+					<table cellspacing="0" cellpadding="0" class="select_form">
+						<caption>Parsers</caption>
+						<mrs:iterate collection="parsers" var="parser">
+							<tr><td>${parser}</td></tr>
 						</mrs:iterate>
 					</table>
 				</div>
 				
 				<div class="admin-right">
-				<mrs:iterate collection="databanks" var="db">
-					<form id="databank-${db.id}" class="admin_form" method="POST" style="display:none">
+					<mrs:iterate collection="parsers" var="parser">
+					<form id="${parser}" class="admin_form" method="post" style="display:none">
 						<fieldset>
-							<h3>Databank configuration</h3>
-							<input type='hidden' name='submit' value='databank'/>
-							<div><label>ID</label><input type="text" value="${db.id}" name="id"/></div>
-							<div><label>Name</label><input type="text" value="${db.name}" name="name"/></div>
-							<div><label>Info URL</label><input type="text" value="${db.info}" name="info"/></div>
-							<div><label>Parser</label><select name="parser">
-									<mrs:options collection="parsers" selected="${db.parser}"/>
-								</select>
-							</div>
-							<div><label>Formatter</label><select name="format">
-									<option>No format</option>
-									<mrs:options collection="formats" selected="${db.format}"/>
-								</select>
-							</div>
-							<div><label>Source files</label><input type="text" value="${db.source}" name="source"/></div>
-							<div><label>Upstream URL</label><input type="text" value="${db.fetch.src}" name="fetch"/></div>
-							<div><label>Delete stale files</label><mrs:checkbox name="delete" checked="${db.fetch.delete}"/></div>
+							<h3>Parser configuration</h3>
+							<p>XML parsers are not configurable in the admin pages yet, the 
+							Perl based parsers should be edited directly, you can find the
+							file for the <code>${parser}</code> parser at <code style="white-space:nowrap">${global.parserdir + '/' + parser + '.pm'}</code></p>
+						</fieldset>
+					</form>
+					</mrs:iterate>
+				</div>
+				
+				<div class="admin-clear" />
+			</div>
+				
+			<div id="formats" class="section">
+				<div class="admin-left">
+					<table cellspacing="0" cellpadding="0" class="select_form">
+						<caption>Formats</caption>
+						<mrs:iterate collection="formats" var="format">
+							<tr><td>${format.id}</td></tr>
+						</mrs:iterate>
+					</table>
+				</div>
+				
+				<div class="admin-right">
+				<mrs:iterate collection="formats" var="format">
+					<form id="${format.id}" class="admin_form" method="POST" style="display:none">
+						<fieldset>
+							<h3>Format specification</h3>
+							<input type='hidden' name='submit' value='format'/>
+							<div><label>ID</label><input type="text" value="${format.id}" name="id"/></div>
+							<div><label>Script</label><input type="text" value="${format.script}" name="name"/></div>
+							<div><label>Stylesheet</label><input type="text" value="${format.stylesheet}" name="info"/></div>
+							
+							<h3>Links</h3>
+							<p>Create links in documents based on a regular expression. You can reference captures in the
+							regular expression using the variable names $1 for the first capture, $2 for the second, etc.</p>
+							<table cellspacing="0" cellpadding="0" style="${empty format.links ? 'display:none' : ''}">
+								<tr>
+									<th>Regular Expression</th>
+									<th>Target Databank</th>
+									<th>Target ID</th>
+									<th>Index</th>
+									<th>Anchor</th>
+									<th/>
+								</tr>
+							<mrs:iterate collection="${format.links}" var="link">
+								<tr>
+									<td><input type="text" value="${link.regex}" name="link-rx-${link.nr}"/></td>
+									<td><select name="db"><mrs:options collection="aliases" selected="${link.db}" /></select></td>
+									<td><input type="text" value="${link.id}" name="link-id-${link.nr}"/></td>
+									<td><input type="text" value="${link.ix}" name="link-ix-${link.nr}"/></td>
+									<td><input type="text" value="${link.anchor}" name="link-an-${link.nr}"/></td>
+									<td><div class="delete">Delete</div></td>
+								</tr>
+							</mrs:iterate>
+								<tr style="display:none">
+									<td><input type="text" name="link-rx-new"/></td>
+									<td><select name="db"><mrs:options collection="aliases" /></select></td>
+									<td><input type="text" name="link-id-new"/></td>
+									<td><input type="text" name="link-ix-new"/></td>
+									<td><input type="text" name="link-an-new"/></td>
+									<td><div class="delete">Delete</div></td>
+								</tr>
+							</table>
+							<button onclick='Admin.addLinkToFormat("${format.id}"); return false;'>Add link</button>
 							<hr/>
 							<input type='submit'/><input type='reset'/>
 						</fieldset>
@@ -137,9 +216,70 @@
 				<div class="admin-clear" />
 			</div>
 	
-			<div id="blast" class="section" />
+			<div id="databanks" class="section">
+				<div class="admin-left">
+					<table cellspacing="0" cellpadding="0" class="select_form">
+						<caption>Databanks</caption>
+						<mrs:iterate collection="databanks" var="db">
+							<tr><td>${db.id}</td></tr>
+						</mrs:iterate>
+					</table>
+				</div>
+				
+				<div class="admin-right">
+				<mrs:iterate collection="databanks" var="db">
+					<form id="${db.id}" class="admin_form" method="POST" style="display:none">
+						<fieldset>
+							<h3>Databank configuration</h3>
+							<input type='hidden' name='submit' value='databank'/>
+							<div><label>ID</label><input type="text" value="${db.id}" name="id"/></div>
+							<div><label>Aliases</label><input type="text" value="${db.aliases}" name="aliases"/></div>
+							<div><label>Name</label><input type="text" value="${db.name}" name="name"/></div>
+							<div><label>Info URL</label><input type="text" value="${db.info}" name="info"/></div>
+							<div><label>Parser</label><select name="parser">
+									<mrs:options collection="parsers" selected="${db.parser}"/>
+								</select>
+							</div>
+							<div><label>Formatter</label><select name="format">
+									<option value="none">No format</option>
+									<mrs:options collection="formats" value="id" label="id" selected="${db.format}"/>
+								</select>
+							</div>
+							<div><label>Update</label><select name="update">
+								<mrs:option value="never" selected="${db.update}">never</mrs:option>
+								<mrs:option value="daily" selected="${db.update}">daily</mrs:option>
+								<mrs:option value="weekly" selected="${db.update}">weekly</mrs:option>
+								<mrs:option value="monthly" selected="${db.update}">monthly</mrs:option>
+							</select></div>
+							<div><label>Source files</label><input type="text" value="${db.source}" name="source"/></div>
+							<div><label>Upstream URL</label><input type="text" value="${db.fetch.src}" name="fetch"/></div>
+							<div><label>Delete stale files</label><mrs:checkbox name="delete" checked="${db.fetch.delete}"/></div>
+
+							<hr/>
+							<input type='submit'/><input type='reset'/>
+						</fieldset>
+					</form>
+					
+				</mrs:iterate>
+				</div>
+				
+				<div class="admin-clear" />
+			</div>
+	
+<!--			<div id="blast" class="section">-->
+<!--				<form class="admin_form" method="POST">-->
+<!--					<input type='hidden' name='submit' value='blast'/>-->
+<!--					<fieldset>-->
+<!--						<h3>Blast Cache</h3>-->
+<!--						<div><label>Clustal Omega</label><input type="text" value="${global.tools.clustalo}" name="clustalo"/></div>-->
+<!--						<hr/>-->
+<!--						<input type='submit'/><input type='reset'/>-->
+<!--					</fieldset>-->
+<!--				</form>-->
+<!--			</div>-->
 		
 		</div>
+		
 	</div>
 </body>
 </html>

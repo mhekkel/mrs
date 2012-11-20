@@ -32,6 +32,8 @@ struct M6SignalCatcherImpl
 {
 	static BOOL				CtrlHandler(DWORD inCntrlType);
 
+	static void				Signal(int inSignal);
+
 	static int				sSignal;
 	static boost::condition	sCondition;
 	static boost::mutex		sMutex;
@@ -101,6 +103,11 @@ int M6SignalCatcher::WaitForSignal()
 	boost::mutex::scoped_lock lock(M6SignalCatcherImpl::sMutex);
 	M6SignalCatcherImpl::sCondition.wait(lock);
 	return M6SignalCatcherImpl::sSignal;
+}
+
+void M6SignalCatcher::Signal(int inSignal)
+{
+	M6SignalCatcherImpl::CtrlHandler(CTRL_BREAK_EVENT);
 }
 
 #elif defined(linux) || defined(__linux) || defined (__linux__)

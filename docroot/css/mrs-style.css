@@ -5,6 +5,10 @@
 	font-family: sans-serif;
 }
 
+code {
+	font-family: consolas, courier, monospace;
+}
+
 html, body {
 	padding: 0px;
 	margin: 0px;
@@ -617,19 +621,19 @@ div#globalSelection input, div#globalSelection select {
 	font-weight: bold;
 }
 
-.admin table.select_db {
-	width: 100px;
+.admin table.select_form {
+	width: 125px;
 }
 
-.admin table.select_db td:first-child {
+.admin table.select_form td:first-child {
 	font-weight: normal;
 }
 
-.admin table.select_db tr.selected {
+.admin table.select_form tr.selected {
 	background-color: #c6d4e1;
 }
 
-.admin table.select_db tr:hover {
+.admin table.select_form tr:hover {
 	background: #d4e3f1;
 	cursor: pointer;
 }
@@ -647,33 +651,21 @@ div#globalSelection input, div#globalSelection select {
 	border: solid 1px white;
 }
 
-.admin td input[type='text'] {
-	margin: -1px;
-	width: 400px;
-}
-
-.admin td.admin-edit-text span:hover {
-	border: solid 1px #ccc;
-}
-
-.admin td.admin-edit-text input {
-	margin: -2px;
-	width: 100%;
-}
-
 .admin .admin-left {
 	float: left;
-	width: 100px;
+	width: 125px;
 	vertical-align: top;
 	padding-right: 10px;
 	
 	height: 300px;
 	overflow-x: hidden;
 	overflow-y: scroll;
+
+	border: 1px solid #9E9E9E;
 }
 
 .admin .admin-right {
-	margin-left: 100px;
+	margin-left: 125px;
 	padding-left: 20px;
 	vertical-align: top;
 }
@@ -683,6 +675,10 @@ div#globalSelection input, div#globalSelection select {
 	height: 1px;
 	overflow: hidden;
 	margin: 0;
+}
+
+form.admin_form {
+	margin-bottom: 20px;
 }
 
 form.admin_form h3 {
@@ -714,6 +710,45 @@ form.admin_form input, form.admin_form select {
 }
 
 form.admin_form input[type='text'] {
+	width: 400px;
+}
+
+form.admin_form th {
+	background-color: #c6d4e1;
+	color: #2f506c;
+	border-bottom: solid 1px #44749d;
+	font-weight: bold;
+	text-align: left;
+	text-decoration: none;
+	padding: 2px 5px 2px 5px;
+}
+
+form.admin_form th + th {
+	border-left: 1px solid #44749d;
+}
+
+form.admin_form th a {
+	text-decoration: underline;
+}
+
+.admin td input[type='text'], .admin td select {
+	padding: 1px;
+	margin: 0;
+	width: 100px;
+}
+
+.admin td div.delete {
+	padding: 2px;
+	color: #2f506c;
+	text-decoration: none;
+}
+
+.admin td div.delete:hover {
+	text-decoration: underline;
+	cursor: pointer;
+}
+
+.admin td:first-child input[type='text'] {
 	width: 400px;
 }
 

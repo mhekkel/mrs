@@ -13,10 +13,12 @@ Todo
 - SOAP: default waarden in WSDL
 - ForkExec implementatie in Windows
 
-- m6 integration (server/build/password)
-- config file:
-	- DTD schrijven
+- m6 integration (server/build)
+- admin/config file:
 	- Alleen laten werken op kopie van data
+	- een enkele server sectie
+
+- verhogen score als term in unique index?
 
 - Version
 - browse data/index

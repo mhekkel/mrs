@@ -44,6 +44,7 @@ void SetConfigFilePath(const boost::filesystem::path& inConfigFile);
 
 // Prototypes
 
+void							Reload();
 std::string						GetDirectory(const std::string& inID);
 std::string						GetTool(const std::string& inID);
 const zeep::xml::element*		GetUser(const std::string& inName, const std::string& inRealm);

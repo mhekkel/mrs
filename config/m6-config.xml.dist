@@ -176,7 +176,67 @@
 			<info>http://www.ebi.ac.uk/embl/index.html</info>
 			<source>embl_release/*.dat.gz</source>
 		</databank>
-
+	
+		<databank id="embl-con" parser="embl">
+			<name>EMBL Constructed</name>
+			<info>http://www.ebi.ac.uk/embl/index.html</info>
+			<source>embl/rel_con_*.dat.gz</source>
+		</databank>
+	
+		<databank id="embl-est" parser="embl">
+			<name>EMBL Expressed Sequence Tag</name>
+			<info>http://www.ebi.ac.uk/embl/index.html</info>
+			<source>embl/rel_est_*.dat.gz</source>
+		</databank>
+	
+		<databank id="embl-gss" parser="embl">
+			<name>EMBL Genome Sequence Scan</name>
+			<info>http://www.ebi.ac.uk/embl/index.html</info>
+			<source>embl/rel_gss_*.dat.gz</source>
+		</databank>
+	
+		<databank id="embl-htc" parser="embl">
+			<name>EMBL High Throughput CDNA sequencing</name>
+			<info>http://www.ebi.ac.uk/embl/index.html</info>
+			<source>embl/rel_htc_*.dat.gz</source>
+		</databank>
+	
+		<databank id="embl-htg" parser="embl">
+			<name>EMBL High Throughput Genome sequencing</name>
+			<info>http://www.ebi.ac.uk/embl/index.html</info>
+			<source>embl/rel_htg_*.dat.gz</source>
+		</databank>
+	
+		<databank id="embl-pat" parser="embl">
+			<name>EMBL Patents</name>
+			<info>http://www.ebi.ac.uk/embl/index.html</info>
+			<source>embl/rel_pat_*.dat.gz</source>
+		</databank>
+	
+		<databank id="embl-std" parser="embl">
+			<name>EMBL Standard</name>
+			<info>http://www.ebi.ac.uk/embl/index.html</info>
+			<source>embl/rel_std_*.dat.gz</source>
+		</databank>
+	
+		<databank id="embl-sts" parser="embl">
+			<name>EMBL Sequence Tagged Site</name>
+			<info>http://www.ebi.ac.uk/embl/index.html</info>
+			<source>embl/rel_sts_*.dat.gz</source>
+		</databank>
+	
+		<databank id="embl-tsa" parser="embl">
+			<name>EMBL Transcriptome Shotgun Assembly</name>
+			<info>http://www.ebi.ac.uk/embl/index.html</info>
+			<source>embl/rel_tsa_*.dat.gz</source>
+		</databank>
+	
+		<databank id="embl-wgs" parser="embl">
+			<name>EMBL Whole Genome Shotgun</name>
+			<info>http://www.ebi.ac.uk/embl/index.html</info>
+			<source>embl/rel_wgs_*.dat.gz</source>
+		</databank>
+	
 		<databank id="enzyme" parser="enzyme" format="enzyme">
 			<name>Enzyme</name>
 			<info>http://ca.expasy.org/enzyme/</info>
@@ -285,6 +345,16 @@
 			<source delete="true" fetch="ftp://ftp.ncbi.nih.gov/repository">dbEST/dbEST.reports.*.gz</source>
 		</databank>
 	
+		<databank id="sprot-fa" parser="fasta">
+			<name>SwissProt-FastA</name>
+			<source>/data/fasta/sprot.fa</source>
+		</databank>
+	
+		<databank id="medline" parser="medline">
+			<name>Medline/PubMed</name>
+			<source>medline/medline*</source>
+		</databank>
+	
 		<databank id="pfama" parser="pfam" format="stockholm">
 			<aliases>
 				<alias>pfam</alias>
@@ -367,21 +437,21 @@
 		</databank>
 	
 		<!-- databanks used in debugging m6 -->
-<!--	-->
-<!--		<databank id="pdb-mini" parser="pdb">-->
-<!--			<name>PDB mini</name>-->
-<!--			<info>http://www.rcsb.org/pdb/</info>-->
-<!--			<source>pdb/cr/pdb?cr?.ent.gz</source>-->
-<!--		</databank>-->
-<!--	-->
-<!--		<databank id="sprot-mini" parser="uniprot">-->
-<!--			<name>SwissProt mini</name>-->
-<!--			<source>uniprot/sprot-mini.dat</source>-->
-<!--		</databank>-->
-<!--		-->
-<!--		<databank id="embl-mini" parser="embl" format="embl">-->
-<!--			<name>EMBL mini</name>-->
-<!--			<source>embl_release/rel_est_vrl_01_r113.dat.gz</source>-->
-<!--		</databank>-->
+	
+		<databank id="pdb-mini" parser="pdb">
+			<name>PDB mini</name>
+			<info>http://www.rcsb.org/pdb/</info>
+			<source>pdb/cr/pdb?cr?.ent.gz</source>
+		</databank>
+	
+		<databank id="sprot-mini" parser="uniprot">
+			<name>SwissProt mini</name>
+			<source>uniprot/sprot-mini.dat</source>
+		</databank>
+		
+		<databank id="embl-mini" parser="embl" format="embl">
+			<name>EMBL mini</name>
+			<source>embl_release/rel_est_vrl_01_r113.dat.gz</source>
+		</databank>
 	</databanks>
 </m6-config>

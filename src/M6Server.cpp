@@ -1368,9 +1368,13 @@ void M6Server::handle_admin(const zh::request& request,
 	string submitted = params.get("submit", "").as<string>();
 	if (not submitted.empty())
 	{
-		cerr << submitted << endl;
-		
-		
+		if (submitted == "restart")
+		{
+			M6Config::Reload();
+			M6SignalCatcher::Signal(SIGHUP);
+			
+		}
+
 		reply = zh::reply::redirect(request.uri);
 		return;
 	}
@@ -1397,6 +1401,7 @@ void M6Server::handle_admin(const zh::request& request,
 	{
 		el::object server;
 		
+		server["nr"] = el::object(servers.size() + 1);
 		server["addr"] = e->get_attribute("addr");
 		server["port"] = e->get_attribute("port");
 
@@ -1411,8 +1416,24 @@ void M6Server::handle_admin(const zh::request& request,
 			server["realm"] = n->str();
 		if (n = e->find_first_node("web-service[@service='search']/@location"))
 			server["search_ws"] = n->str();
-		if (n = e->find_first_node("web-service[@service='search']/@location"))
-			server["search_ws"] = n->str();
+		if (n = e->find_first_node("web-service[@service='blast']/@location"))
+			server["blast_ws"] = n->str();
+		
+		set<string> search;
+		foreach (zx::element* db, e->find("dbs/db"))
+			search.insert(db->content());
+
+		vector<el::object> dbs;
+		foreach (zx::element* d, M6Config::GetDatabanks())
+		{
+			el::object db;
+			db["id"] = d->get_attribute("id");
+			if (n = d->find_first("name"))
+				db["name"] = n->str();
+			db["search"] = search.count(d->get_attribute("id"));
+			dbs.push_back(db);
+		}
+		server["dbs"] = dbs;
 		
 		servers.push_back(server);
 	}
@@ -1437,14 +1458,38 @@ void M6Server::handle_admin(const zh::request& request,
 	sub.put("parsers", parsers.begin(), parsers.end());
 	
 	// add formats
-	vector<string> formats;
+	vector<el::object> formats;
 	foreach (const zx::element* e, M6Config::GetFormats())
-		formats.push_back(e->get_attribute("id"));
+	{
+		el::object format;
+		format["id"] = e->get_attribute("id");
+		format["script"] = e->get_attribute("script");
+		format["stylesheet"] = e->get_attribute("stylesheet");
+		
+		vector<el::object> links;
+		foreach (const zx::element* l, e->find("link"))
+		{
+			el::object link;
+			link["nr"] = el::object(links.size() + 1);
+			link["regex"] = l->get_attribute("regex");
+			link["db"] = l->get_attribute("db");
+			link["id"] = l->get_attribute("id");
+			link["ix"] = l->get_attribute("ix");
+			link["anchor"] = l->get_attribute("anchor");
+			links.push_back(link);
+		}
+			
+		if (not links.empty())
+			format["links"] = el::object(links);
+		
+		formats.push_back(format);
+	}
 	sort(formats.begin(), formats.end());
-	sub.put("formats", formats.begin(), formats.end());
+	sub.put("formats", formats);
 
 	// add the databank settings
 	vector<el::object> databanks;
+	set<string> aliases;
 
 	foreach (const zx::element* db, M6Config::GetDatabanks())
 	{
@@ -1454,6 +1499,7 @@ void M6Server::handle_admin(const zh::request& request,
 		databank["id"] = db->get_attribute("id");
 		databank["format"] = db->get_attribute("format");
 		databank["parser"] = db->get_attribute("parser");
+		databank["update"] = db->get_attribute("update");
 		if ((e = db->find_first("name")) != nullptr)
 			databank["name"] = e->content();
 		if ((e = db->find_first("info")) != nullptr)
@@ -1469,9 +1515,20 @@ void M6Server::handle_admin(const zh::request& request,
 			databank["fetch"] = fetch;
 		}
 		
+		aliases.insert(db->get_attribute("id"));
+
+		set<string> dbaliases;
+		foreach (const zx::element* a, db->find("aliases/alias"))
+			dbaliases.insert(a->content());
+		aliases.insert(dbaliases.begin(), dbaliases.end());
+		
+		databank["aliases"] = ba::join(dbaliases, ";");
+		
 		databanks.push_back(databank);
 	}
 	sub.put("databanks", el::object(databanks));
+	
+	sub.put("aliases", aliases.begin(), aliases.end());
 
 	create_reply_from_template("admin.html", sub, reply);
 }
@@ -2466,7 +2523,7 @@ void RunMainLoop(uint32 inNrOfThreads)
 	for (;;)
 	{
 		cout << "Restarting services..."; cout.flush();
-	
+		
 		M6SignalCatcher catcher;
 		catcher.BlockSignals();
 	

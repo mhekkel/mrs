@@ -7,12 +7,14 @@
 		<directory id="mrs">/data/mrs</directory>
 		<directory id="raw">/data/raw</directory>
 		<directory id="blast">/data/blast-cache</directory>
-		<directory id="parser">C:\Users\maarten\projects\m6\parsers</directory>
+<!--		<directory id="parser">C:\Users\maarten\projects\m6\parsers</directory>-->
+		<directory id="parser">/home/maarten/projects/m6/parsers</directory>
 	</directories>
 
 	<!-- Tools section, specify external executables used by M6 -->
 	<tools>
-		<tool id="clustalo">C:\Users\maarten\bin\clustal-omega\clustalo.exe</tool>
+<!--		<tool id="clustalo">C:\Users\maarten\bin\clustal-omega\clustalo.exe</tool>-->
+		<tool id="clustalo">/usr/bin/clustalo</tool>
 	</tools>
 	
 	<!-- Users section -->

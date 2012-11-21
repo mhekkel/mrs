@@ -168,6 +168,11 @@ int M6SignalCatcher::WaitForSignal()
 	return sig;
 }
 
+void M6SignalCatcher::Signal(int inSignal)
+{
+	kill(getpid(), SIGHUP);
+}
+
 #else
 #error "OS unknown"
 #endif

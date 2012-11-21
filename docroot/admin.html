@@ -36,7 +36,6 @@
 		<div class="nav">
 			<ul>
 				<li><a href="#" id="global" onclick="Admin.changeStatsView('global');">Main</a></li>
-				<li><a href="#" id="servers" onclick="Admin.changeStatsView('servers');">Servers</a></li>
 				<li><a href="#" id="parsers" onclick="Admin.changeStatsView('parsers');">Parsers</a></li>
 				<li><a href="#" id="formats" onclick="Admin.changeStatsView('formats');">Formats</a></li>
 				<li><a href="#" id="databanks" onclick="Admin.changeStatsView('databanks');">Databanks</a></li>
@@ -60,21 +59,7 @@
 					</fieldset>
 				</form>
 				
-				<form class="admin_form" method="POST">
-					<input type="hidden" name="submit" value="restart"/>
-					
-					<fieldset>
-						<h3>Restart</h3>
-						<p>After changing the configuration options you have to restart the server
-						to make sure these changes are taken into effect.</p>
-						<input type='submit'/>
-					</fieldset>
-				</form>
-				
-			</div>
-	
-			<div id="servers" class="section">
-				<form id="server-${server.nr}" class="admin_form" method="POST" style="display:none">
+				<form id="server-${server.nr}" class="admin_form" method="POST">
 					<input type='hidden' name='submit' value='server'/>
 					<input type='hidden' name='nr' value="${db.nr}"/>
 					<fieldset>
@@ -91,6 +76,7 @@
 						<div><label>Blast</label><input type="text" value="${server.blast_ws}" name="blast_ws"/></div>
 						
 						<h3>Databanks served</h3>
+						<div style="height: 200px; overflow-x: hidden; overflow-y: scroll">
 						<table cellspacing="0" cellpadding="0">
 							<tr>
 								<th>ID</th>
@@ -107,11 +93,23 @@
 							</tr>
 						</mrs:iterate>
 						</table>
-						
+</div>						
 						<hr/>
 						<input type='submit'/><input type='reset'/>
 					</fieldset>
 				</form>
+
+				<form class="admin_form" method="POST">
+					<input type="hidden" name="submit" value="restart"/>
+					
+					<fieldset>
+						<h3>Restart</h3>
+						<p>After changing the configuration options you have to restart the server
+						to make sure these changes are taken into effect.</p>
+						<input type='submit'/>
+					</fieldset>
+				</form>
+				
 			</div>
 			
 			<div id="parsers" class="section">

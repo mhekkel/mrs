@@ -21,7 +21,7 @@ class File
 	zeep::xml::element*		GetDirectory(const std::string& inID);
 	zeep::xml::element*		GetTool(const std::string& inID);
 	zeep::xml::element*		GetUser(const std::string& inName, const std::string& inRealm);
-	zeep::xml::element_set	GetServers();
+	zeep::xml::element*		GetServer();
 	zeep::xml::element_set	GetFormats();
 	zeep::xml::element*		GetFormat(const std::string& inID);
 	zeep::xml::element_set	GetParsers();
@@ -48,7 +48,7 @@ void							Reload();
 std::string						GetDirectory(const std::string& inID);
 std::string						GetTool(const std::string& inID);
 const zeep::xml::element*		GetUser(const std::string& inName, const std::string& inRealm);
-const zeep::xml::element_set	GetServers();
+const zeep::xml::element*		GetServer();
 const zeep::xml::element_set	GetFormats();
 const zeep::xml::element*		GetFormat(const std::string& inID);
 const zeep::xml::element_set	GetParsers();
@@ -84,9 +84,9 @@ inline const zeep::xml::element* GetUser(const std::string& inName, const std::s
 	return File::Instance().GetUser(inName, inRealm);
 }
 
-inline const zeep::xml::element_set GetServers()
+inline const zeep::xml::element* GetServer()
 {
-	return File::Instance().GetServers();
+	return File::Instance().GetServer();
 }
 
 inline const zeep::xml::element_set GetFormats()

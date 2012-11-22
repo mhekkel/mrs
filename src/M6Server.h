@@ -24,7 +24,7 @@ typedef std::vector<M6AuthInfo*> M6AuthInfoList;
 class M6Server : public zh::webapp
 {
   public:
-					M6Server(zx::element* inConfig);
+					M6Server(const zx::element* inConfig);
 	virtual			~M6Server();
 
 	virtual void	handle_request(const zh::request& req, zh::reply& rep);
@@ -38,9 +38,17 @@ class M6Server : public zh::webapp
 		M6Databank*				mDatabank;
 		std::string				mID, mName;
 		std::set<std::string>	mAliases;
+		bool					mBlast;
 		M6Parser*				mParser;
 	};
 	typedef std::vector<M6LoadedDatabank> M6DbList;
+	
+	struct M6BlastDatabank
+	{
+		std::string				mID, mName;
+		std::set<std::string>	mIDs;
+	};
+	typedef std::vector<M6BlastDatabank> M6BlastDbList;
 
 	std::string		GetEntry(M6Databank* inDatabank, const std::string& inFormat, uint32 inDocNr);
 	std::string		GetEntry(M6Databank* inDatabank, const std::string& inFormat,
@@ -61,6 +69,9 @@ class M6Server : public zh::webapp
 	const M6DbList&	GetLoadedDatabanks()						{ return mLoadedDatabanks; }
 
   private:
+					M6Server(const M6Server&);
+	M6Server&		operator=(const M6Server&);
+	  
 	virtual void	init_scope(el::scope& scope);
 
 	void			ValidateAuthentication(const zh::request& request, const std::string& inRealm);
@@ -110,13 +121,14 @@ class M6Server : public zh::webapp
 	const zx::element*
 					mConfig;
 	M6DbList		mLoadedDatabanks;
+	M6BlastDbList	mBlastDatabanks;
 	M6LinkMap		mLinkMap;
 
 	M6AuthInfoList	mAuthInfo;
 	boost::mutex	mAuthMutex;
 	std::string		mAdminRealm;
 	std::string		mBaseURL;
-	bool			mBlastEnabled, mAlignEnabled;
+	bool			mAlignEnabled;
 	
 	std::vector<zeep::dispatcher*>
 					mWebServices;

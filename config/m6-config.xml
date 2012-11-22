@@ -7,8 +7,8 @@
 		<directory id="mrs">/data/mrs</directory>
 		<directory id="raw">/data/raw</directory>
 		<directory id="blast">/data/blast-cache</directory>
-<!--		<directory id="parser">C:\Users\maarten\projects\m6\parsers</directory>-->
-		<directory id="parser">/home/maarten/projects/m6/parsers</directory>
+		<directory id="parser">/data/parsers</directory>
+		<directory id="docroot">/data/docroot</directory>
 	</directories>
 
 	<!-- Tools section, specify external executables used by M6 -->
@@ -22,50 +22,13 @@
 		<user name="scott" realm="M6 Administrator" password="b92ff7d60b994c8a0d2941ad9349e841"/>
 	</users>
 
-	<!-- Servers section, you can configure multiple servers but their addr+port
-		 should be unique, of course. -->
-	<servers>
-		<server addr="0.0.0.0" port="18090">
-			<admin realm="M6 Administrator"/>
-			<base-url>http://localhost:18090/</base-url>
-			<web-service service="search" ns="http://mrs.cmbi.ru.nl/mrsws/search" location="mrsws/search" />
-			<web-service service="blast" ns="http://mrs.cmbi.ru.nl/mrsws/blast" location="mrsws/blast" />
-			<docroot>./docroot/</docroot>
-			<dbs>
-				<db>embl</db>
-				<db>enzyme</db>
-				<db>omim</db>
-				<db>pdbfinder</db>
-				<db>sprot</db>
-				<db>trembl</db>
-				<db>genbank</db>
-				<db>refseq</db>
-				<db>taxonomy</db>
-				<db>go</db>
-				<db>interpro</db>
-				<db>pdb</db>
-				<db>dssp</db>
-				<db>hssp</db>
-				<db>gene</db>
-				<db>pfama</db>
-				<db>pfamb</db>
-				<db>pfamseed</db>
-				<db>prints</db>
-				<db>prosite</db>
-				<db>prosite_doc</db>
-				<db>rebase</db>
-				<db>unigene</db>
-				<db>pmc</db>
-			</dbs>
-			
-			<blast-dbs>
-				<db>sprot</db>
-				<db>trembl</db>
-				<db name="Uniprot">uniprot</db>
-				<db>pdb</db>
-			</blast-dbs>
-		</server>
-	</servers>
+	<!-- Server section -->
+	<server addr="0.0.0.0" port="18090">
+		<admin realm="M6 Administrator"/>
+		<base-url>http://localhost:18090/</base-url>
+		<web-service service="search" ns="http://mrs.cmbi.ru.nl/mrsws/search" location="mrsws/search" />
+		<web-service service="blast" ns="http://mrs.cmbi.ru.nl/mrsws/blast" location="mrsws/blast" />
+	</server>
 
 	<!-- Formats section, formats are used to add links to entries and
 		 to link a JavaScript pretty printer -->
@@ -187,7 +150,7 @@
 	
 		<databank id="sprot" parser="uniprot" format="uniprot" update="daily">
 			<aliases>
-				<alias>uniprot</alias>
+				<alias name="UniProt">uniprot</alias>
 			</aliases>
 			<name>SwissProt</name>
 			<info>http://www.uniprot.org/</info>
@@ -196,7 +159,7 @@
 	
 		<databank id="trembl" parser="uniprot" format="uniprot">
 			<aliases>
-				<alias>uniprot</alias>
+				<alias name="UniProt">uniprot</alias>
 			</aliases>
 			<name>TrEMBL</name>
 			<info>http://www.uniprot.org/</info>

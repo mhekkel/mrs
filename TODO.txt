@@ -11,12 +11,10 @@ Todo
 	- /entry/db/id moet naar Accept header kijken
 	- /find/db/query idem
 - SOAP: default waarden in WSDL
-- ForkExec implementatie in Windows
 
 - m6 integration (server/build)
 - admin/config file:
 	- Alleen laten werken op kopie van data
-	- een enkele server sectie
 
 - verhogen score als term in unique index?
 

@@ -1,4 +1,4 @@
-<!ELEMENT m6-config (directories,tools,users,servers,formats,parsers,databanks)>
+<!ELEMENT m6-config (directories,tools,users,server,formats,parsers,databanks)>
 
 <!ELEMENT directories (directory+)>
 <!ELEMENT directory (#PCDATA)>
@@ -14,8 +14,7 @@
 			   realm CDATA #REQUIRED
 			   password CDATA #REQUIRED>
 	
-<!ELEMENT servers (server+)>
-<!ELEMENT server (admin?,base-url?,web-service*,docroot?,dbs?,blast-dbs?)+>
+<!ELEMENT server (admin?,base-url?,web-service*)+>
 <!ATTLIST server addr NMTOKEN #REQUIRED
 				 port NMTOKEN #REQUIRED>
 <!ELEMENT admin EMPTY>
@@ -25,11 +24,6 @@
 <!ATTLIST web-service service (search|blast) #REQUIRED
 					  ns CDATA #REQUIRED
 					  location CDATA #REQUIRED>
-<!ELEMENT docroot (#PCDATA)>
-<!ELEMENT dbs (db+)>
-<!ELEMENT db (#PCDATA)>
-<!ATTLIST db name CDATA #IMPLIED>
-<!ELEMENT blast-dbs (db+)>
 	
 <!ELEMENT formats (format+)>
 <!ELEMENT format (link*)>
@@ -61,11 +55,13 @@
 <!ELEMENT databanks (databank+)>
 <!ELEMENT databank (aliases?,name?,info?,source,filter?)>
 <!ATTLIST databank id ID #REQUIRED
+				   enabled (true|false) "true"
 				   parser NMTOKEN #REQUIRED
 				   update (never|daily|weekly|monthly) "never"
 				   format NMTOKEN #IMPLIED>
 <!ELEMENT aliases (alias+)>
 <!ELEMENT alias (#PCDATA)>
+<!ATTLIST alias name CDATA #IMPLIED>
 <!ELEMENT name (#PCDATA)>
 <!ELEMENT info (#PCDATA)>
 <!ELEMENT source (#PCDATA)>

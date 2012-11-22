@@ -120,9 +120,9 @@ zx::element* File::GetUser(const string& inName, const string& inRealm)
 	return FindFirst(boost::format("/m6-config/users/user[@name='%1%' and @realm='%2%']") % inName % inRealm);
 }
 
-zx::element_set File::GetServers()
+zx::element* File::GetServer()
 {
-	return Find(boost::format("/m6-config/servers/server"));
+	return FindFirst(boost::format("/m6-config/server"));
 }
 
 zx::element_set File::GetFormats()
@@ -152,15 +152,15 @@ zx::element_set File::GetDatabanks()
 
 zx::element_set File::GetDatabanks(const string& inID)
 {
-	zx::element_set result = Find(boost::format("/m6-config/databanks/databank[@id='%1%']") % inID);
+	zx::element_set result = Find(boost::format("/m6-config/databanks/databank[@id='%1%' and @enabled='true']") % inID);
 	if (result.empty())
-		result = Find(boost::format("/m6-config/databanks/databank[aliases/alias='%1%']") % inID);
+		result = Find(boost::format("/m6-config/databanks/databank[aliases/alias='%1%' and @enabled='true']") % inID);
 	return result;
 }
 
 zx::element* File::GetDatabank(const string& inID)
 {
-	return FindFirst(boost::format("/m6-config/databanks/databank[@id='%1%']") % inID);
+	return FindFirst(boost::format("/m6-config/databanks/databank[@id='%1%' and @enabled='true']") % inID);
 }
 
 void Reload()

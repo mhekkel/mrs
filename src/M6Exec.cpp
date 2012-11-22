@@ -19,6 +19,7 @@
 #include <boost/thread.hpp>
 #include <boost/thread/condition.hpp>
 #include <boost/program_options/parsers.hpp>
+#include <boost/algorithm/string.hpp>
 
 #include "M6Exec.h"
 #include "M6Error.h"
@@ -26,6 +27,7 @@
 using namespace std;
 namespace fs = boost::filesystem;
 namespace po = boost::program_options;
+namespace ba = boost::algorithm;
 
 double system_time()
 {
@@ -76,7 +78,113 @@ double system_time()
 int ForkExec(vector<const char*>& args, double maxRunTime,
 	const string& in, string& out, string& err)
 {
-	THROW(("ForkExec not implemented yet"));
+	if (args.empty() or args.front() == nullptr)
+		THROW(("No arguments to ForkExec"));
+
+	string cmd;
+	for (auto arg = args.begin(); arg != args.end() and *arg != nullptr; ++arg)
+		cmd = cmd + '"' + *arg + "\" ";
+
+	SECURITY_ATTRIBUTES sa = { 0 };
+	sa.nLength = sizeof(sa);
+	sa.bInheritHandle = true;
+	
+	HANDLE hInputWriteTmp, hInputRead, hInputWrite;
+	HANDLE hOutputReadTmp, hOutputRead, hOutputWrite;
+	HANDLE hErrorReadTmp, hErrorRead, hErrorWrite;
+	
+	if (not CreatePipe(&hOutputReadTmp, &hOutputWrite, &sa, 0) or
+		not CreatePipe(&hErrorReadTmp, &hErrorWrite, &sa, 0) or
+		not CreatePipe(&hInputRead, &hInputWriteTmp, &sa, 0) or
+		
+		not DuplicateHandle(GetCurrentProcess(), hOutputReadTmp,
+							GetCurrentProcess(), &hOutputRead,
+							0, false, DUPLICATE_SAME_ACCESS) or
+		not DuplicateHandle(GetCurrentProcess(), hErrorReadTmp,
+							GetCurrentProcess(), &hErrorRead,
+							0, false, DUPLICATE_SAME_ACCESS) or
+		not DuplicateHandle(GetCurrentProcess(), hInputWriteTmp,
+							GetCurrentProcess(), &hInputWrite,
+							0, false, DUPLICATE_SAME_ACCESS) or
+							
+		not CloseHandle(hOutputReadTmp) or
+		not CloseHandle(hErrorReadTmp) or
+		not CloseHandle(hInputWriteTmp))
+	{
+		THROW(("Error creating pipes"));
+	}
+
+	boost::thread thread([&in, hInputWrite]() {
+		DWORD w;
+		if (not WriteFile(hInputWrite, in.c_str(), in.length(), &w, nullptr) or
+			w != in.length())
+		{
+			cerr << "Error writing to pipe";
+		}
+
+		CloseHandle(hInputWrite);
+	});
+	
+	STARTUPINFOA si = { 0 };
+	si.cb = sizeof(si);
+	si.dwFlags = STARTF_USESTDHANDLES;
+	si.hStdInput = hInputRead;
+	si.hStdOutput = hOutputWrite;
+	si.hStdError = hErrorWrite;
+
+	const char* cwd = nullptr;
+
+	PROCESS_INFORMATION pi;
+	bool running = CreateProcessA(nullptr, const_cast<char*>(cmd.c_str()), nullptr, nullptr, true,
+		CREATE_NEW_PROCESS_GROUP, nullptr, const_cast<char*>(cwd), &si, &pi);
+
+	CloseHandle(hOutputWrite);
+	CloseHandle(hErrorWrite);
+	CloseHandle(hInputRead);
+
+	if (running)
+	{
+		CloseHandle(pi.hThread);
+	
+		bool outDone = false, errDone = false;
+		while (not (outDone and errDone))
+		{
+			char buffer[1024];
+			DWORD rr, avail;
+			
+			if (not outDone)
+			{
+				if (not PeekNamedPipe(hOutputRead, nullptr, 0, nullptr, &avail, nullptr))
+				{
+					unsigned int err = GetLastError();
+					if (err == ERROR_HANDLE_EOF or err == ERROR_BROKEN_PIPE)
+						outDone = true;
+				}
+				else if (avail > 0 and ReadFile(hOutputRead, buffer, sizeof(buffer), &rr, nullptr))
+					out.append(buffer, buffer + rr);
+			}
+	
+			if (not errDone)
+			{
+				if (not PeekNamedPipe(hErrorRead, nullptr, 0, nullptr, &avail, nullptr))
+				{
+					unsigned int err = GetLastError();
+					if (err == ERROR_HANDLE_EOF or err == ERROR_BROKEN_PIPE)
+						errDone = true;
+				}
+				else if (avail > 0 and ReadFile(hErrorRead, buffer, sizeof(buffer), &rr, nullptr))
+					err.append(buffer, buffer + rr);
+			}
+		}
+		
+		CloseHandle(pi.hProcess);
+	}
+
+	ba::replace_all(out, "\r\n", "\n");
+	ba::replace_all(err, "\r\n", "\n");
+	
+	CloseHandle(hOutputRead);
+	CloseHandle(hErrorRead);
 }
 
 struct M6ProcessImpl

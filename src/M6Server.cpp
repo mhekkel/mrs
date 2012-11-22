@@ -127,18 +127,14 @@ struct M6Redirect
 
 // --------------------------------------------------------------------
 
-M6Server::M6Server(zx::element* inConfig)
+M6Server::M6Server(const zx::element* inConfig)
 	: webapp(kM6ServerNS)
 	, mConfig(inConfig)
-	, mBlastEnabled(false), mAlignEnabled(false)
+	, mAlignEnabled(false)
 {
 	LoadAllDatabanks();
 
-	string docroot = "docroot";
-	zx::element* e = mConfig->find_first("docroot");
-	if (e != nullptr)
-		docroot = e->content();
-	set_docroot(docroot);
+	set_docroot(M6Config::GetDirectory("docroot"));
 	
 	mount("",				boost::bind(&M6Server::handle_welcome, this, _1, _2, _3));
 	mount("download",		boost::bind(&M6Server::handle_download, this, _1, _2, _3));
@@ -178,15 +174,13 @@ M6Server::M6Server(zx::element* inConfig)
 	if (realm != nullptr)
 		mAdminRealm = realm->str();
 	
-	if ((e = mConfig->find_first("base-url")) != nullptr)
+	if (zx::element* e = mConfig->find_first("base-url"))
 	{
 		mBaseURL = e->content();
 		if (not ba::ends_with(mBaseURL, "/"))
 			mBaseURL += '/';
 	}
 
-	mBlastEnabled = not mConfig->find("blast-dbs/db").empty();
-	
 	fs::path clustalo(M6Config::GetTool("clustalo"));
 	if (fs::exists(clustalo))
 		mAlignEnabled = true;
@@ -242,33 +236,38 @@ M6Server::~M6Server()
 void M6Server::LoadAllDatabanks()
 {
 	mLinkMap.clear();
+
+	map<string,set<string>> blastAliases;
+	map<string,string> names;
 	
-	zx::element_set dbs(mConfig->find("dbs/db"));
-	foreach (zx::element* db, dbs)
+	foreach (zx::element* config, M6Config::GetDatabanks())
 	{
-		string databank = db->content();
-		
 		try
 		{
-			const zx::element* config = M6Config::GetDatabank(databank);
-			if (not config)
-			{
-				if (VERBOSE)
-					cerr << "unknown databank " << databank << endl;
+			if (config->get_attribute("enabled") != "true")
 				continue;
-			}
 			
-			fs::path file = M6Config::GetDbDirectory(databank);
-			if (not fs::exists(file))
+			string databank = config->get_attribute("id");
+			
+			fs::path dbdir = M6Config::GetDbDirectory(databank);
+			if (not fs::exists(dbdir) or not fs::is_directory(dbdir))
 			{
 				if (VERBOSE)
 					cerr << "databank " << databank << " not available" << endl;
 				continue;
 			}
+
+			fs::path fasta(dbdir / "fasta");
+			bool blast = fs::exists(fasta);
+			if (blast)
+				blastAliases[databank].insert(databank);
 		
 			string name = databank;
 			if (zx::element* n = config->find_first("name"))
 				name = n->content();
+			
+			if (names[databank].empty() and not name.empty())
+				names[databank] = name;
 			
 			M6Parser* parser = nullptr;
 			if (not config->get_attribute("parser").empty())
@@ -280,14 +279,19 @@ void M6Server::LoadAllDatabanks()
 				string s(alias->content());
 				M6Tokenizer::CaseFold(s);
 				aliases.insert(s);
+				if (names[s].empty() and not alias->get_attribute("name").empty())
+					names[s] = alias->get_attribute("name");
+				if (blast)
+					blastAliases[s].insert(databank);
 			}
 			
 			M6LoadedDatabank ldb =
 			{
-				new M6Databank(file, eReadOnly),
+				new M6Databank(dbdir, eReadOnly),
 				databank,
 				name,
 				aliases,
+				blast,
 				parser
 			};
 
@@ -299,13 +303,22 @@ void M6Server::LoadAllDatabanks()
 		}
 		catch (exception& e)
 		{
-			cerr << "Error loading databank " << databank << endl
+			cerr << "Error loading databank " << config->get_attribute("id") << endl
 				 << " >> " << e.what() << endl;
 		}
 	}
 	
 	foreach (M6LoadedDatabank& db, mLoadedDatabanks)
 		db.mDatabank->InitLinkMap(mLinkMap);
+
+	// setup the mBlastDatabanks list
+	foreach (auto& blastAlias, blastAliases)
+	{
+		M6BlastDatabank bdb = { blastAlias.first, names[blastAlias.first] };
+		foreach (const string& f, blastAlias.second)
+			bdb.mIDs.insert(f);
+		mBlastDatabanks.push_back(bdb);
+	}
 }
 
 M6Databank* M6Server::Load(const string& inDatabank)
@@ -548,7 +561,7 @@ void M6Server::init_scope(el::scope& scope)
 	}
 	scope.put("databanks", el::object(databanks));
 	
-	scope.put("blastEnabled", el::object(mBlastEnabled));
+	scope.put("blastEnabled", el::object(not mBlastDatabanks.empty()));
 	scope.put("alignEnabled", el::object(mAlignEnabled));
 }
 
@@ -567,6 +580,8 @@ void M6Server::handle_request(const zh::request& req, zh::reply& rep)
 	catch (std::exception& e)
 	{
 		el::scope scope(req);
+		init_scope(scope);
+		
 		scope.put("errormsg", el::object(e.what()));
 
 		create_reply_from_template("error.html", scope, rep);
@@ -1382,64 +1397,42 @@ void M6Server::handle_admin(const zh::request& request,
 	el::scope sub(scope);
 
 	// add the global settings
-	el::object global;
-	global["srvdir"] = M6Config::GetDirectory("srv");
-	global["mrsdir"] = M6Config::GetDirectory("mrs");
-	global["rawdir"] = M6Config::GetDirectory("raw");
-	global["parserdir"] = M6Config::GetDirectory("parser");
+	el::object global, dirs, tools;
 	
-	el::object tools;
+	dirs["mrs"] = M6Config::GetDirectory("mrs");
+	dirs["raw"] = M6Config::GetDirectory("raw");
+	dirs["blast"] = M6Config::GetDirectory("blast");
+	dirs["docroot"] = M6Config::GetDirectory("docroot");
+	dirs["parser"] = M6Config::GetDirectory("parser");
+	global["dirs"] = dirs;
+	
 	tools["clustalo"] = M6Config::GetTool("clustalo");
 	global["tools"] = tools;
 	
 	sub.put("global", global);
 
 	// add server settings
-	
-	vector<el::object> servers;
-	foreach (const zx::element* e, M6Config::GetServers())
+	const zx::element* serverConfig = M6Config::GetServer();
+	if (serverConfig != nullptr)
 	{
 		el::object server;
 		
-		server["nr"] = el::object(servers.size() + 1);
-		server["addr"] = e->get_attribute("addr");
-		server["port"] = e->get_attribute("port");
+		server["addr"] = serverConfig->get_attribute("addr");
+		server["port"] = serverConfig->get_attribute("port");
 
 		zx::node* n;
 		
-		if (n = e->find_first("docroot"))
-			server["docroot"] = n->str();
-		if (n = e->find_first("base-url"))
+		if (n = serverConfig->find_first("base-url"))
 			server["baseurl"] = n->str();
-
-		if (n = e->find_first_node("admin/@realm"))
+		if (n = serverConfig->find_first_node("admin/@realm"))
 			server["realm"] = n->str();
-		if (n = e->find_first_node("web-service[@service='search']/@location"))
+		if (n = serverConfig->find_first_node("web-service[@service='search']/@location"))
 			server["search_ws"] = n->str();
-		if (n = e->find_first_node("web-service[@service='blast']/@location"))
+		if (n = serverConfig->find_first_node("web-service[@service='blast']/@location"))
 			server["blast_ws"] = n->str();
 		
-		set<string> search, blast;
-		foreach (zx::element* db, e->find("dbs/db"))
-			search.insert(db->content());
-		foreach (zx::element* db, e->find("blast-dbs/db"))
-			blast.insert(db->content());
-
-		el::object dbs, blastDbs;
-		foreach (zx::element* d, M6Config::GetDatabanks())
-		{
-			string id = d->get_attribute("id");
-			dbs[id] = search.count(id);
-			blastDbs[id] = blast.count(id);
-		}
-		server["dbs"] = dbs;
-		server["blast"] = blastDbs;
-		
-		servers.push_back(server);
+		sub.put("server", server);
 	}
-	
-	sub.put("server", servers.front());
-	sub.put("servers", servers);
 
 	// add parser settings
 	vector<string> parsers;
@@ -1502,6 +1495,7 @@ void M6Server::handle_admin(const zh::request& request,
 		databank["format"] = db->get_attribute("format");
 		databank["parser"] = db->get_attribute("parser");
 		databank["update"] = db->get_attribute("update");
+		databank["enabled"] = db->get_attribute("enabled") == "true";
 		if ((e = db->find_first("name")) != nullptr)
 			databank["name"] = e->content();
 		if ((e = db->find_first("info")) != nullptr)
@@ -1842,23 +1836,11 @@ void M6Server::handle_blast(const zeep::http::request& request, const el::scope&
 	el::scope sub(scope);
 
 	vector<el::object> blastdatabanks;
-	foreach (zx::element* bdb, mConfig->find("blast-dbs/db"))
+	foreach (M6BlastDatabank& ldb, mBlastDatabanks)
 	{
-		string db = bdb->content();
-		
 		el::object databank;
-		databank["id"] = db;
-		
-		string name = bdb->get_attribute("name");
-		if (name.empty())
-		{
-			foreach (M6LoadedDatabank& ldb, mLoadedDatabanks)
-				if (ldb.mID == db) { name = ldb.mName; break; }
-		}
-		if (name.empty())
-			name = db;
-		
-		databank["name"] = name;
+		databank["id"] = ldb.mID;
+		databank["name"] = ldb.mName;
 		blastdatabanks.push_back(databank);
 	}
 		
@@ -2165,18 +2147,20 @@ void M6Server::handle_blast_submit_ajax(
 	filter = params.get("filter", true).as<bool>();
 	
 	// validate and unalias the databank
-	vector<string> dbs(UnAlias(db));
-	if (dbs.empty())
+	bool found = false;
+	foreach (M6BlastDatabank& bdb, mBlastDatabanks)
+	{
+		if (bdb.mID == db)
+		{
+			db = ba::join(bdb.mIDs, ";");
+			found = true;
+			break;
+		}
+	}
+
+	if (not found)
 		THROW(("Databank '%s' not configured", db.c_str()));
 
-	foreach (string adb, dbs)
-	{
-		M6Databank* mdb = Load(adb);
-		if (not fs::exists(mdb->GetDbDirectory() / "fasta"))
-			THROW(("Databank does not have blastable sequences (%s/%s)", db.c_str(), adb.c_str()));
-	}
-	db = ba::join(dbs, ";");
-	
 	// first parse the query (in case it is in FastA format)
 	ba::replace_all(query, "\r\n", "\n");
 	ba::replace_all(query, "\r", "\n");
@@ -2337,18 +2321,20 @@ void M6Server::handle_status(const zh::request& request, const el::scope& scope,
 	vector<el::object> databanks;
 //	foreach (M6LoadedDatabank& db, mLoadedDatabanks)
 
-	zx::element_set dbs(mConfig->find("dbs/db"));
-	foreach (zx::element* db, dbs)
+	foreach (zx::element* db, M6Config::GetDatabanks())
 	{
-		string dbn = db->content();
+		if (db->get_attribute("enabled") == "false")
+			continue;
+		
+		string id = db->get_attribute("id");
 
 		el::object databank;
-		databank["id"] = dbn;
-
-		databank["name"] = M6Config::GetDatabankParam(dbn, "name");
+		databank["id"] = id;
+		if (zx::element* n = db->find_first("name"))
+			databank["name"] = n->content();
 		
 		M6DatabankInfo info = {};
-		M6Databank* dbo = Load(dbn);
+		M6Databank* dbo = Load(id);
 
 		if (dbo != nullptr)
 			dbo->GetInfo(info);
@@ -2360,7 +2346,7 @@ void M6Server::handle_status(const zh::request& request, const el::scope& scope,
 		
 		databanks.push_back(databank);
 	}
-	sub.put("databanks", el::object(databanks));
+	sub.put("statusDatabanks", el::object(databanks));
 
 	create_reply_from_template("status.html", sub, reply);
 }
@@ -2369,9 +2355,11 @@ void M6Server::handle_status_ajax(const zh::request& request, const el::scope& s
 {
 	vector<el::object> databanks;
 
-	zx::element_set dbs(mConfig->find("dbs/db"));
-	foreach (zx::element* db, dbs)
+	foreach (zx::element* db, M6Config::GetDatabanks())
 	{
+		if (db->get_attribute("enabled") == "false")
+			continue;
+		
 		el::object databank;
 		databank["name"] = db->content();
 		
@@ -2529,31 +2517,22 @@ void RunMainLoop(uint32 inNrOfThreads)
 		M6SignalCatcher catcher;
 		catcher.BlockSignals();
 	
-		vector<zeep::http::server*> servers;
-		boost::thread_group threads;
+		const zx::element* config = M6Config::GetServer();
+		if (config == nullptr)
+			THROW(("Missing server configuration"));
+		
+		string addr = config->get_attribute("addr");
+		string port = config->get_attribute("port");
+		if (port.empty())
+			port = "80";
+		
+		if (VERBOSE)
+			cout << "listening at " << addr << ':' << port << endl;
+		
+		M6Server server(config);
 	
-		foreach (zx::element* config, M6Config::GetServers())
-		{
-			string addr = config->get_attribute("addr");
-			string port = config->get_attribute("port");
-			if (port.empty())
-				port = "80";
-			
-			if (VERBOSE)
-				cout << "listening at " << addr << ':' << port << endl;
-			
-			unique_ptr<zeep::http::server> server(new M6Server(config));
-	
-			server->bind(addr, boost::lexical_cast<uint16>(port));
-			threads.create_thread(boost::bind(&zeep::http::server::run, server.get(), inNrOfThreads));
-			servers.push_back(server.release());
-		}
-	
-		if (servers.empty())
-		{
-			cerr << "No servers configured" << endl;
-			exit(1);
-		}
+		server.bind(addr, boost::lexical_cast<uint16>(port));
+		boost::thread thread(boost::bind(&zeep::http::server::run, boost::ref(server), inNrOfThreads));
 	
 		if (not VERBOSE)
 			cout << " done" << endl;
@@ -2562,13 +2541,9 @@ void RunMainLoop(uint32 inNrOfThreads)
 		
 		int sig = catcher.WaitForSignal();
 		
-		for_each(servers.begin(), servers.end(), [](zeep::http::server* server) { server->stop(); });
-		
-		threads.join_all();
+		server.stop();
+		thread.join();
 	
-		foreach (zeep::http::server* server, servers)
-			delete server;
-
 		if (sig == SIGHUP)
 			continue;
 		

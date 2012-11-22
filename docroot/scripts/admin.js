@@ -55,6 +55,12 @@ Admin = {
 		$("div.delete").click(function() {
 			$(this).parent().parent().remove();
 		});
+		
+
+		$("select[name='format']").each(function() {
+			if ($(this).val() == 'xml')
+				$(this).next().show();
+		});
 	},
 
 	changeStatsView: function(view) {
@@ -82,6 +88,16 @@ Admin = {
 		
 		lastRow.before(newRow);
 		newRow.show();
+	},
+	
+	changeFormat: function(db) {
+		var selected = $('#' + db + " select[name='format']").val();
+		var stylesheetrow = $('#' + db + " input[name='stylesheet']");
+		
+		if (selected == 'xml')
+			stylesheetrow.show('fast');
+		else
+			stylesheetrow.hide('fast');
 	}
 }
 

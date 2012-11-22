@@ -734,7 +734,7 @@ form.admin_form th a {
 .admin td input[type='text'], .admin td select {
 	padding: 1px;
 	margin: 0;
-	width: 100px;
+	width: 80px;
 }
 
 .admin td div.delete {
@@ -749,7 +749,7 @@ form.admin_form th a {
 }
 
 .admin td:first-child input[type='text'] {
-	width: 400px;
+	width: 300px;
 }
 
 form.admin_form label {

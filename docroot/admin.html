@@ -14,12 +14,8 @@
 	<meta http-equiv="content-type" content="text/html; charset=utf-8" />
 
 	<link rel="stylesheet" type="text/css" href="css/mrs-style.css" />
-	<link rel="stylesheet" type="text/css" href="css/jquery-ui.css" />
 
 	<script src="scripts/jquery.js" type="text/javascript">
-	</script>
-	
-	<script src="scripts/jquery-ui.js" type="text/javascript">
 	</script>
 	
 	<script src="scripts/mrs.js" type="text/javascript">
@@ -50,16 +46,26 @@
 					<input type='hidden' name='submit' value='global'/>
 					<fieldset>
 						<h3>Directories</h3>
-						<div><label>MRS files</label><input type="text" value="${global.dirs['mrs']}" name="mrsdir"/></div>
-						<div><label>Raw files</label><input type="text" value="${global.dirs['raw']}" name="rawdir"/></div>
-						<div><label>Parser</label><input type="text" value="${global.dirs['parser']}" name="parserdir"/></div>
+						<div><label>MRS files</label><input type="text" value="${global.dirs['mrs']}" name="mrs"/></div>
+						<div><label>Raw files</label><input type="text" value="${global.dirs['raw']}" name="raw"/></div>
+						<div><label>Parser</label><input type="text" value="${global.dirs['parser']}" name="parser"/></div>
 						<div><label>Docroot</label><input type="text" value="${global.dirs['docroot']}" name="docroot"/></div>
 						<div><label>Blast cache</label><input type="text" value="${global.dirs['blast']}" name="blast"/></div>
-						<div><label>Docroot directory</label><input type="text" value="${global.docroot}" name="docroot"/></div>
 						<h3>Tools</h3>
 						<div><label>Clustal Omega</label><input type="text" value="${global.tools.clustalo}" name="clustalo"/></div>
 						<hr/>
-						<input type='submit'/><input type='reset'/>
+						<input type='submit' value='Submit'/><input type='reset' value='Reset'/>
+					</fieldset>
+				</form>
+
+				<form class="admin_form" method="POST">
+					<input type="hidden" name="submit" value="restart"/>
+					
+					<fieldset>
+						<h3>Restart</h3>
+						<p>After changing the configuration options you have to restart the server
+						to make sure these changes are taken into effect.</p>
+						<input type='submit' value='Restart'/>
 					</fieldset>
 				</form>
 			</div>
@@ -77,24 +83,14 @@
 						
 						<h3>Web Service Locations</h3>
 						<p>Leave empty to disable web service</p>
-						<div><label>Search</label><input type="text" value="${server.search_ws}" name="search_ws"/></div>
-						<div><label>Blast</label><input type="text" value="${server.blast_ws}" name="blast_ws"/></div>
+						<div><label>Search</label><input type="text" value="${server.ws['search']}" name="search"/></div>
+						<div><label>Blast</label><input type="text" value="${server.ws['blast']}" name="blast"/></div>
+						<div><label>Clustal</label><input type="text" value="${server.ws['align']}" name="align"/></div>
 						<hr/>
-						<input type='submit'/><input type='reset'/>
+						<input type='submit' value='Submit'/><input type='reset' value='Reset'/>
 					</fieldset>
 				</form>
 
-				<form class="admin_form" method="POST">
-					<input type="hidden" name="submit" value="restart"/>
-					
-					<fieldset>
-						<h3>Restart</h3>
-						<p>After changing the configuration options you have to restart the server
-						to make sure these changes are taken into effect.</p>
-						<input type='submit'/>
-					</fieldset>
-				</form>
-				
 			</div>
 			
 			<div id="parsers" class="section">
@@ -114,7 +110,7 @@
 							<h3>Parser configuration</h3>
 							<p>XML parsers are not configurable in the admin pages yet, the 
 							Perl based parsers should be edited directly, you can find the
-							file for the <code>${parser}</code> parser at <code style="white-space:nowrap">${global.parserdir + '/' + parser + '.pm'}</code></p>
+							file for the <code>${parser}</code> parser at <code style="white-space:nowrap">${global.dirs['parser'] + '/' + parser + '.pm'}</code></p>
 						</fieldset>
 					</form>
 					</mrs:iterate>
@@ -139,12 +135,12 @@
 						<fieldset>
 							<h3>Format specification</h3>
 							<input type='hidden' name='submit' value='format'/>
+
 							<div><label>ID</label><input type="text" value="${format.id}" name="id"/></div>
 							<div><label>Script</label><input type="text" value="${format.script}" name="name"/></div>
-							<div><label>Stylesheet</label><input type="text" value="${format.stylesheet}" name="info"/></div>
 							
 							<h3>Links</h3>
-							<p>Create links in documents based on a regular expression. You can reference captures in the
+							<p>Create 'live' links in documents based on a regular expression. You can reference captures in the
 							regular expression using the variable names $1 for the first capture, $2 for the second, etc.</p>
 							<table cellspacing="0" cellpadding="0" style="${empty format.links ? 'display:none' : ''}">
 								<tr>
@@ -175,8 +171,9 @@
 								</tr>
 							</table>
 							<button onclick='Admin.addLinkToFormat("${format.id}"); return false;'>Add link</button>
+							
 							<hr/>
-							<input type='submit'/><input type='reset'/>
+							<input type='submit' value='Submit'/><input type='reset' value='Reset'/>
 						</fieldset>
 					</form>
 					
@@ -210,10 +207,12 @@
 									<mrs:options collection="parsers" selected="${db.parser}"/>
 								</select>
 							</div>
-							<div><label>Formatter</label><select name="format">
+							<div><label>Formatter</label><select name="format" onchange="Admin.changeFormat('${db.id}');">
 									<option value="none">No format</option>
+									<mrs:option value="xml" selected="${db.format}">XML Stylesheet</mrs:option>
 									<mrs:options collection="formats" value="id" label="id" selected="${db.format}"/>
 								</select>
+								<input type="text" value="${db.stylesheet}" name="stylesheet" style="display:none; width: 250px"/>
 							</div>
 							<div><label>Update</label><select name="update">
 								<mrs:option value="never" selected="${db.update}">never</mrs:option>
@@ -226,7 +225,7 @@
 							<div><label>Delete stale files</label><mrs:checkbox name="delete" checked="${db.fetch.delete}"/></div>
 
 							<hr/>
-							<input type='submit'/><input type='reset'/>
+							<input type='submit' value='Submit'/><input type='reset' value='Reset'/>
 						</fieldset>
 					</form>
 					
@@ -243,7 +242,7 @@
 <!--						<h3>Blast Cache</h3>-->
 <!--						<div><label>Clustal Omega</label><input type="text" value="${global.tools.clustalo}" name="clustalo"/></div>-->
 <!--						<hr/>-->
-<!--						<input type='submit'/><input type='reset'/>-->
+<!--						<input type='submit' value='Submit'/><input type='reset' value='Reset'/>-->
 <!--					</fieldset>-->
 <!--				</form>-->
 <!--			</div>-->

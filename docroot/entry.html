@@ -20,7 +20,7 @@
 	<script src="scripts/mrs.js" type="text/javascript" />
 	<script src="scripts/format.js" type="text/javascript"/>
 	<mrs:if test="${formatXSLT}"><script type="text/javascript">Format.xslt = '${formatXSLT}';</script></mrs:if>
-	<mrs:if test="${formatScript}"><script type="text/javascript" src="${formatScript}"></script></mrs:if>
+	<mrs:if test="${formatScript}"><script type="text/javascript" src="scripts/${formatScript}"></script></mrs:if>
 </head>
 <body>
 	<mrs:include file="menu.html" />

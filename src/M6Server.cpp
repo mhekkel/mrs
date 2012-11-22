@@ -1487,11 +1487,19 @@ void M6Server::handle_admin(const zh::request& request,
 			
 			M6Config::Reload();
 			M6SignalCatcher::Signal(SIGHUP);
+			
+			el::scope sub(scope);
+			zx::element* n;
+			if (n = mConfigCopy->GetServer()->find_first("base-url"))
+				sub.put("baseurl", n->content());
+			
+			create_reply_from_template("restarting.html", sub, reply);
 		}
 		else
+		{
 			ProcessNewConfig(submitted, params);
-
-		reply = zh::reply::redirect(request.uri);
+			reply = zh::reply::redirect(request.uri);
+		}
 		return;
 	}
 
@@ -1609,6 +1617,8 @@ void M6Server::handle_admin(const zh::request& request,
 		databank["parser"] = db->get_attribute("parser");
 		databank["update"] = db->get_attribute("update");
 		databank["enabled"] = db->get_attribute("enabled") == "true";
+		if ((e = db->find_first("filter")) != nullptr)
+			databank["filter"] = e->content();
 		if ((e = db->find_first("name")) != nullptr)
 			databank["name"] = e->content();
 		if ((e = db->find_first("info")) != nullptr)
@@ -1635,7 +1645,7 @@ void M6Server::handle_admin(const zh::request& request,
 		
 		databanks.push_back(databank);
 	}
-	sub.put("databanks", el::object(databanks));
+	sub.put("config-databanks", el::object(databanks));
 	
 	sub.put("aliases", aliases.begin(), aliases.end());
 
@@ -2006,19 +2016,8 @@ void M6Server::handle_blast_results_ajax(const zeep::http::request& request, con
 	el::object result;
 	
 	M6BlastResultPtr job(M6BlastCache::Instance().JobResult(id));
-	
-//	// try to fetch the job
-//	CBlastJobPtr job = CBlastJobProcessor::Instance()->Find(id);
-//	const CBlastResult* result;
-//	if (job != nullptr)
-//		result = job->Result();
-	
 	if (not job)
 		result["error"] = "Job expired";
-//	else if (job->Status() != bj_Finished)
-//		json << "{\"error\":\"Invalid job status\"}";
-//	else if (result == nullptr)
-//		json << "{\"error\":\"Internal error (no result?)\"}";
 	else if (hitNr > 0)	// we need to return the hsps for this hit
 	{
 		const list<M6Blast::Hit>& hits(job->mHits);

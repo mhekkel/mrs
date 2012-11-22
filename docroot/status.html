@@ -51,12 +51,12 @@
 	        <th colspan="2">Status</th>
 		</tr>
 
-		<mrs:iterate collection="databanks" var="db">
+		<mrs:iterate collection="statusDatabanks" var="db">
 		<tr id="db-${db.id}" m2:keys="s=${db.id}|s=${db.name}|i=${db.entries}|i=${db.size}||s=${db.buildDate}">
 			<td><a href="info?db=${db.id}">${db.id}</a></td>
 			<td><a href="info?db=${db.id}">${db.name}</a></td>
-			<td style="text-align:right"><mrs:number f='#,##0' n='${db.entries}'/></td>
-			<td style="text-align:right; white-space: nowrap;"><mrs:number f='#,##0B' n='${db.size}'/></td>
+			<td style="text-align:right"><mrs:if test="${db.entries}"><mrs:number f='#,##0' n='${db.entries}'/></mrs:if></td>
+			<td style="text-align:right; white-space: nowrap;"><mrs:if test="${db.size}"><mrs:number f='#,##0B' n='${db.size}'/></mrs:if></td>
 			<td>${db.version}</td>
 			<td>${db.buildDate}</td>
 			<td><canvas id='update-progress' width="100" height="10" style="display:none;" /></td>

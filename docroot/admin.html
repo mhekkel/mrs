@@ -36,6 +36,7 @@
 		<div class="nav">
 			<ul>
 				<li><a href="#" id="global" onclick="Admin.changeStatsView('global');">Main</a></li>
+				<li><a href="#" id="server" onclick="Admin.changeStatsView('server');">Server</a></li>
 				<li><a href="#" id="parsers" onclick="Admin.changeStatsView('parsers');">Parsers</a></li>
 				<li><a href="#" id="formats" onclick="Admin.changeStatsView('formats');">Formats</a></li>
 				<li><a href="#" id="databanks" onclick="Admin.changeStatsView('databanks');">Databanks</a></li>
@@ -49,9 +50,11 @@
 					<input type='hidden' name='submit' value='global'/>
 					<fieldset>
 						<h3>Directories</h3>
-						<div><label>MRS-file directory</label><input type="text" value="${global.mrsdir}" name="mrsdir"/></div>
-						<div><label>Raw directory</label><input type="text" value="${global.rawdir}" name="rawdir"/></div>
-						<div><label>Parser directory</label><input type="text" value="${global.parserdir}" name="parserdir"/></div>
+						<div><label>MRS files</label><input type="text" value="${global.dirs['mrs']}" name="mrsdir"/></div>
+						<div><label>Raw files</label><input type="text" value="${global.dirs['raw']}" name="rawdir"/></div>
+						<div><label>Parser</label><input type="text" value="${global.dirs['parser']}" name="parserdir"/></div>
+						<div><label>Docroot</label><input type="text" value="${global.dirs['docroot']}" name="docroot"/></div>
+						<div><label>Blast cache</label><input type="text" value="${global.dirs['blast']}" name="blast"/></div>
 						<div><label>Docroot directory</label><input type="text" value="${global.docroot}" name="docroot"/></div>
 						<h3>Tools</h3>
 						<div><label>Clustal Omega</label><input type="text" value="${global.tools.clustalo}" name="clustalo"/></div>
@@ -59,7 +62,9 @@
 						<input type='submit'/><input type='reset'/>
 					</fieldset>
 				</form>
-				
+			</div>
+			
+			<div id="server" class="section">
 				<form id="server-${server.nr}" class="admin_form" method="POST">
 					<input type='hidden' name='submit' value='server'/>
 					<input type='hidden' name='nr' value="${db.nr}"/>
@@ -74,26 +79,6 @@
 						<p>Leave empty to disable web service</p>
 						<div><label>Search</label><input type="text" value="${server.search_ws}" name="search_ws"/></div>
 						<div><label>Blast</label><input type="text" value="${server.blast_ws}" name="blast_ws"/></div>
-						
-						<h3>Databanks served</h3>
-						<div style="height: 200px; overflow-x: hidden; overflow-y: scroll">
-						<table cellspacing="0" cellpadding="0">
-							<tr>
-								<th>ID</th>
-								<th>Name</th>
-								<th>Search</th>
-								<th>Blast</th>
-							</tr>
-						<mrs:iterate collection="databanks" var="db">
-							<tr>
-								<td>${db.id}</td>
-								<td>${db.name}</td>
-								<td><mrs:checkbox name="x" checked="${server.dbs[db.id]}"/></td>
-								<td><mrs:checkbox name="x" checked="${server.blast[db.id]}"/></td>
-							</tr>
-						</mrs:iterate>
-						</table>
-</div>						
 						<hr/>
 						<input type='submit'/><input type='reset'/>
 					</fieldset>

@@ -6,6 +6,8 @@
 #include <zeep/http/webapp/el.hpp>
 #include <zeep/dispatcher.hpp>
 
+#include "M6Config.h"
+
 namespace zh = zeep::http;
 namespace zx = zeep::xml;
 namespace el = zeep::http::el;
@@ -75,6 +77,7 @@ class M6Server : public zh::webapp
 	virtual void	init_scope(el::scope& scope);
 
 	void			ValidateAuthentication(const zh::request& request, const std::string& inRealm);
+	void			ProcessNewConfig(const std::string& inPage, zh::parameter_map& inParams);
 
 	void			handle_download(const zh::request& request, const el::scope& scope, zh::reply& reply);
 	void			handle_entry(const zh::request& request, const el::scope& scope, zh::reply& reply);
@@ -129,6 +132,8 @@ class M6Server : public zh::webapp
 	std::string		mAdminRealm;
 	std::string		mBaseURL;
 	bool			mAlignEnabled;
+
+	M6Config::File*	mConfigCopy;
 	
 	std::vector<zeep::dispatcher*>
 					mWebServices;

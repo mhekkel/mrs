@@ -9,7 +9,7 @@ var Format = {
 	
 		if (Format.xslt != null) {
 			var text = $("#entrytext").text();
-			var xslt = Format.loadXMLDoc("scripts/" + Format.xslt);
+			var xslt = Format.loadXMLDoc(Format.xslt);
 		
 			var result;
 			if (window.ActiveXObject) // Internet Explorer

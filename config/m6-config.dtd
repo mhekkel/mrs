@@ -21,15 +21,14 @@
 <!ATTLIST admin realm CDATA #REQUIRED>
 <!ELEMENT base-url (#PCDATA)>
 <!ELEMENT web-service EMPTY>
-<!ATTLIST web-service service (search|blast) #REQUIRED
+<!ATTLIST web-service service (search|blast|align) #REQUIRED
 					  ns CDATA #REQUIRED
 					  location CDATA #REQUIRED>
 	
 <!ELEMENT formats (format+)>
 <!ELEMENT format (link*)>
 <!ATTLIST format id NMTOKEN #REQUIRED
-				 script CDATA #IMPLIED
-				 stylesheet CDATA #IMPLIED>
+				 script CDATA #IMPLIED>
 <!ELEMENT link EMPTY>
 <!ATTLIST link regex CDATA #REQUIRED
 			   db CDATA #REQUIRED
@@ -58,7 +57,8 @@
 				   enabled (true|false) "true"
 				   parser NMTOKEN #REQUIRED
 				   update (never|daily|weekly|monthly) "never"
-				   format NMTOKEN #IMPLIED>
+				   format NMTOKEN #IMPLIED
+				   stylesheet CDATA #IMPLIED>
 <!ELEMENT aliases (alias+)>
 <!ELEMENT alias (#PCDATA)>
 <!ATTLIST alias name CDATA #IMPLIED>

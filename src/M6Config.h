@@ -16,6 +16,7 @@ class File
 
 	static File&			Instance();
 
+	void					Validate();
 	void					WriteOut();
 	
 	zeep::xml::element*		GetDirectory(const std::string& inID);

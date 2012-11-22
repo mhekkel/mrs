@@ -1,5 +1,7 @@
 #include "M6Lib.h"
 
+#include <sstream>
+
 #include <boost/filesystem/fstream.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <boost/bind.hpp>
@@ -65,6 +67,21 @@ File& File::Instance()
 	return *sInstance;
 }
 
+void File::Validate()
+{
+	stringstream xml;
+	
+	zx::writer w(xml, true);
+	w.xml_decl(false);
+	w.doctype("m6-config", "", "http://mrs.cmbi.ru.nl/dtd/m6-config.dtd");
+	mConfig.write(w);
+	
+	zx::document doc;
+	doc.external_entity_ref_handler = boost::bind(&File::LoadDTD, this, _1, _2, _3);
+	doc.set_validating(true);
+	xml >> doc;
+}	
+
 void File::WriteOut()
 {
 	fs::path dir(sConfigFile.parent_path());
@@ -85,13 +102,9 @@ void File::WriteOut()
 
 	fs::ofstream configFileStream(sConfigFile, ios::binary);
 	
-	zx::writer w(configFileStream);
-	w.set_xml_decl(true);
-	w.set_indent(false);
-	w.set_trim(false);
-	w.set_escape_whitespace(false);
-	w.set_wrap(false);
-
+	zx::writer w(configFileStream, true);
+	w.xml_decl(false);
+	w.doctype("m6-config", "", "http://mrs.cmbi.ru.nl/dtd/m6-config.dtd");
 	mConfig.write(w);
 }	
 
@@ -107,12 +120,34 @@ zx::element* File::FindFirst(const boost::format& inFmt)
 
 zx::element* File::GetDirectory(const string& inID)
 {
-	return FindFirst(boost::format("/m6-config/directories/directory[@id='%1%']") % inID);
+	zx::element* e = FindFirst(boost::format("/m6-config/directories/directory[@id='%1%']") % inID);
+	if (e == nullptr)
+	{
+		e = new zx::element("directory");
+		e->set_attribute("id", inID);
+		
+		zx::element* p = mConfig.find_first("/m6-config/directories");
+		// p exists, otherwise the configfile would not validate
+		p->append(e);
+	}
+	
+	return e;
 }
 
 zx::element* File::GetTool(const string& inID)
 {
-	return FindFirst(boost::format("/m6-config/tools/tool[@id='%1%']") % inID);
+	zx::element* e = FindFirst(boost::format("/m6-config/tools/tool[@id='%1%']") % inID);
+	if (e == nullptr)
+	{
+		e = new zx::element("tool");
+		e->set_attribute("id", inID);
+		
+		zx::element* p = mConfig.find_first("/m6-config/tools");
+		// p exists, otherwise the configfile would not validate
+		p->append(e);
+	}
+	
+	return e;
 }
 
 zx::element* File::GetUser(const string& inName, const string& inRealm)

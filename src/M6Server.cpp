@@ -131,6 +131,7 @@ M6Server::M6Server(const zx::element* inConfig)
 	: webapp(kM6ServerNS)
 	, mConfig(inConfig)
 	, mAlignEnabled(false)
+	, mConfigCopy(nullptr)
 {
 	LoadAllDatabanks();
 
@@ -231,6 +232,8 @@ M6Server::~M6Server()
 	
 	foreach (zeep::dispatcher* ws, mWebServices)
 		delete ws;
+
+	delete mConfigCopy;
 }
 
 void M6Server::LoadAllDatabanks()
@@ -794,12 +797,10 @@ void M6Server::handle_entry(const zh::request& request, const el::scope& scope, 
 	try
 	{
 		const zx::element* format = M6Config::GetFormat(dbConfig->get_attribute("format"));
-		
 		if (format != nullptr)
-		{
-			sub["formatXSLT"] = format->get_attribute("stylesheet");
 			sub["formatScript"] = format->get_attribute("script");
-		}
+		else if (not dbConfig->get_attribute("stylesheet").empty())
+			sub["formatXSLT"] = dbConfig->get_attribute("stylesheet");
 	
 		process_xml(root, sub, "/");
 		
@@ -1372,10 +1373,107 @@ void M6Server::handle_similar(const zh::request& request, const el::scope& scope
 	create_reply_from_template("results.html", sub, reply);
 }
 
+void M6Server::ProcessNewConfig(const string& inPage, zeep::http::parameter_map& inParams)
+{
+	if (inPage == "global")
+	{
+		const char* dirs[] = { "mrs", "raw", "parser", "docroot", "blast" };
+		foreach (const char* dir, dirs)
+		{
+			fs::path p = inParams.get(dir, "").as<string>();
+			if (not fs::is_directory(p))
+				THROW(("%s directory does not exist", dir));
+			mConfigCopy->GetDirectory(dir)->content(p.string());
+		}
+
+		const char* tools[] = { "clustalo" };
+		foreach (const char* tool, tools)
+		{
+			fs::path p = inParams.get(tool, "").as<string>();
+			if (not fs::exists(p))
+				THROW(("The %s tool does not exist", tool));
+			mConfigCopy->GetTool(tool)->content(p.string());
+		}
+	}
+	else if (inPage == "server")
+	{
+		zx::element* server = mConfigCopy->GetServer();
+		server->set_attribute("addr", inParams.get("addr", "").as<string>());
+		server->set_attribute("port", inParams.get("port", "").as<string>());
+		
+		zx::element* e = server->find_first("admin");
+		string s = inParams.get("realm", "").as<string>();
+		
+		if (s.empty())
+		{
+			if (e != nullptr)
+				server->remove(e);
+		}
+		else
+		{
+			if (e == nullptr)
+			{
+				e = new zx::element("admin");
+				server->append(e);
+			}
+			e->set_attribute("realm", s);
+		}
+		
+		e = server->find_first("base-url");
+		s = inParams.get("baseurl", "").as<string>();
+		
+		if (s.empty())
+		{
+			if (e != nullptr)
+				server->remove(e);
+		}
+		else
+		{
+			if (e == nullptr)
+			{
+				e = new zx::element("base-url");
+				server->append(e);
+			}
+			e->content(s);
+		}
+		
+		const char* wss[] = { "search", "blast", "align" };
+		foreach (const char* ws, wss)
+		{
+			e = server->find_first((boost::format("web-service[@service='%1%']") % ws).str());
+			s = inParams.get(ws, "").as<string>();
+			
+			if (s.empty())
+			{
+				if (e != nullptr)
+					server->remove(e);
+			}
+			else
+			{
+				if (e == nullptr)
+				{
+					e = new zx::element("web-service");
+					e->set_attribute("service", ws);
+					e->set_attribute("ns", string("http://mrs.cmbi.ru.nl/mrsws/") + ws);
+					server->append(e);
+				}
+				e->set_attribute("location", s);
+			}
+		}
+		
+		server->set_attribute("addr", inParams.get("addr", "").as<string>());
+	}
+	
+	mConfigCopy->Validate();
+}
+
 void M6Server::handle_admin(const zh::request& request,
 	const el::scope& scope, zh::reply& reply)
 {
 	ValidateAuthentication(request, mAdminRealm);
+
+	if (mConfigCopy == nullptr)
+		mConfigCopy = new M6Config::File();
 
 	zeep::http::parameter_map params;
 	get_parameters(scope, params);
@@ -1385,10 +1483,13 @@ void M6Server::handle_admin(const zh::request& request,
 	{
 		if (submitted == "restart")
 		{
+			mConfigCopy->WriteOut();
+			
 			M6Config::Reload();
 			M6SignalCatcher::Signal(SIGHUP);
-			
 		}
+		else
+			ProcessNewConfig(submitted, params);
 
 		reply = zh::reply::redirect(request.uri);
 		return;
@@ -1399,20 +1500,20 @@ void M6Server::handle_admin(const zh::request& request,
 	// add the global settings
 	el::object global, dirs, tools;
 	
-	dirs["mrs"] = M6Config::GetDirectory("mrs");
-	dirs["raw"] = M6Config::GetDirectory("raw");
-	dirs["blast"] = M6Config::GetDirectory("blast");
-	dirs["docroot"] = M6Config::GetDirectory("docroot");
-	dirs["parser"] = M6Config::GetDirectory("parser");
+	dirs["mrs"] = mConfigCopy->GetDirectory("mrs")->content();
+	dirs["raw"] = mConfigCopy->GetDirectory("raw")->content();
+	dirs["blast"] = mConfigCopy->GetDirectory("blast")->content();
+	dirs["docroot"] = mConfigCopy->GetDirectory("docroot")->content();
+	dirs["parser"] = mConfigCopy->GetDirectory("parser")->content();
 	global["dirs"] = dirs;
 	
-	tools["clustalo"] = M6Config::GetTool("clustalo");
+	tools["clustalo"] = mConfigCopy->GetTool("clustalo")->content();
 	global["tools"] = tools;
 	
 	sub.put("global", global);
 
 	// add server settings
-	const zx::element* serverConfig = M6Config::GetServer();
+	const zx::element* serverConfig = mConfigCopy->GetServer();
 	if (serverConfig != nullptr)
 	{
 		el::object server;
@@ -1426,17 +1527,24 @@ void M6Server::handle_admin(const zh::request& request,
 			server["baseurl"] = n->str();
 		if (n = serverConfig->find_first_node("admin/@realm"))
 			server["realm"] = n->str();
-		if (n = serverConfig->find_first_node("web-service[@service='search']/@location"))
-			server["search_ws"] = n->str();
-		if (n = serverConfig->find_first_node("web-service[@service='blast']/@location"))
-			server["blast_ws"] = n->str();
+			
+		const char* wss[] = { "search", "blast", "align" };
+		el::object wsc;
+
+		foreach (const char* ws, wss)
+		{
+			if (n = serverConfig->find_first_node((boost::format("web-service[@service='%1%']/@location") % ws).str().c_str()))
+				wsc[ws] = n->str();
+		}
+		server["ws"] = wsc;
 		
 		sub.put("server", server);
 	}
 
 	// add parser settings
 	vector<string> parsers;
-	for (auto p = fs::directory_iterator(M6Config::GetDirectory("parser")); p != fs::directory_iterator(); ++p)
+	fs::path parserDir(mConfigCopy->GetDirectory("parser")->content());
+	for (auto p = fs::directory_iterator(parserDir); p != fs::directory_iterator(); ++p)
 	{
 		fs::path name = p->path().filename();
 		
@@ -1446,7 +1554,7 @@ void M6Server::handle_admin(const zh::request& request,
 		parsers.push_back(name.stem().string());
 	}
 
-	foreach (const zx::element* e, M6Config::GetParsers())
+	foreach (const zx::element* e, mConfigCopy->GetParsers())
 		parsers.push_back(e->get_attribute("id"));
 	
 	sort(parsers.begin(), parsers.end());
@@ -1454,12 +1562,11 @@ void M6Server::handle_admin(const zh::request& request,
 	
 	// add formats
 	vector<el::object> formats;
-	foreach (const zx::element* e, M6Config::GetFormats())
+	foreach (const zx::element* e, mConfigCopy->GetFormats())
 	{
 		el::object format;
 		format["id"] = e->get_attribute("id");
 		format["script"] = e->get_attribute("script");
-		format["stylesheet"] = e->get_attribute("stylesheet");
 		
 		vector<el::object> links;
 		foreach (const zx::element* l, e->find("link"))
@@ -1486,13 +1593,19 @@ void M6Server::handle_admin(const zh::request& request,
 	vector<el::object> databanks;
 	set<string> aliases;
 
-	foreach (const zx::element* db, M6Config::GetDatabanks())
+	foreach (const zx::element* db, mConfigCopy->GetDatabanks())
 	{
 		zx::element* e;
 		
 		el::object databank;
 		databank["id"] = db->get_attribute("id");
-		databank["format"] = db->get_attribute("format");
+		if (db->get_attribute("stylesheet").empty())
+			databank["format"] = db->get_attribute("format");
+		else
+		{
+			databank["stylesheet"] = db->get_attribute("stylesheet");
+			databank["format"] = "xml";
+		}
 		databank["parser"] = db->get_attribute("parser");
 		databank["update"] = db->get_attribute("update");
 		databank["enabled"] = db->get_attribute("enabled") == "true";

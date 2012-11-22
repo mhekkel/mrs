@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE xhtml
+	PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/1999/xhtml">
+
+<html xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:mrs="http://mrs.cmbi.ru.nl/mrs-web/ml"
+	xml:lang="en" lang="en">
+<head>
+    <title>M6 Administration</title>
+
+    <meta name="author" content="Maarten L. Hekkelman" />
+    <meta name="generator" content="Japi" />
+	<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+
+	<link rel="stylesheet" type="text/css" href="css/mrs-style.css" />
+
+	<script src="scripts/jquery.js" type="text/javascript">
+	</script>
+	
+	<script src="scripts/mrs.js" type="text/javascript">
+	</script>
+
+<script language="JavaScript">
+function reloadNewUrl() {
+	var seconds = 5;
+	window.setInterval(function() {
+		if (--seconds == 0)
+			window.location = "${baseurl}";
+		else
+			$('#seconds').text('' + seconds);
+	}, 1000);
+}
+
+addLoadEvent(reloadNewUrl);
+</script>
+
+</head>
+<body>
+	<mrs:include file="menu.html" />
+	<div id="main">
+		<h3>mrs is restarting</h3>
+		<p>please wait a few seconds, the new site should open in <span id='seconds'>5</span> seconds.</p>
+	</div>
+</body>
+</html>
+

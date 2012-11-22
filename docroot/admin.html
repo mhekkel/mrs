@@ -85,7 +85,7 @@
 						<p>Leave empty to disable web service</p>
 						<div><label>Search</label><input type="text" value="${server.ws['search']}" name="search"/></div>
 						<div><label>Blast</label><input type="text" value="${server.ws['blast']}" name="blast"/></div>
-						<div><label>Clustal</label><input type="text" value="${server.ws['align']}" name="align"/></div>
+<!--						<div><label>Align</label><input type="text" value="${server.ws['align']}" name="align"/></div>-->
 						<hr/>
 						<input type='submit' value='Submit'/><input type='reset' value='Reset'/>
 					</fieldset>
@@ -187,33 +187,25 @@
 				<div class="admin-left">
 					<table cellspacing="0" cellpadding="0" class="select_form">
 						<caption>Databanks</caption>
-						<mrs:iterate collection="databanks" var="db">
+						<mrs:iterate collection="config-databanks" var="db">
 							<tr><td>${db.id}</td></tr>
 						</mrs:iterate>
 					</table>
 				</div>
 				
 				<div class="admin-right">
-				<mrs:iterate collection="databanks" var="db">
+				<mrs:iterate collection="config-databanks" var="db">
 					<form id="${db.id}" class="admin_form" method="POST" style="display:none">
 						<fieldset>
-							<h3>Databank configuration</h3>
+							<h3>Databank information</h3>
 							<input type='hidden' name='submit' value='databank'/>
 							<div><label>ID</label><input type="text" value="${db.id}" name="id"/></div>
+							<div><label>Enabled</label><mrs:checkbox name="enabled" checked="${db.enabled}"/></div>
 							<div><label>Aliases</label><input type="text" value="${db.aliases}" name="aliases"/></div>
 							<div><label>Name</label><input type="text" value="${db.name}" name="name"/></div>
 							<div><label>Info URL</label><input type="text" value="${db.info}" name="info"/></div>
-							<div><label>Parser</label><select name="parser">
-									<mrs:options collection="parsers" selected="${db.parser}"/>
-								</select>
-							</div>
-							<div><label>Formatter</label><select name="format" onchange="Admin.changeFormat('${db.id}');">
-									<option value="none">No format</option>
-									<mrs:option value="xml" selected="${db.format}">XML Stylesheet</mrs:option>
-									<mrs:options collection="formats" value="id" label="id" selected="${db.format}"/>
-								</select>
-								<input type="text" value="${db.stylesheet}" name="stylesheet" style="display:none; width: 250px"/>
-							</div>
+
+							<h3>Data retrieval</h3>
 							<div><label>Update</label><select name="update">
 								<mrs:option value="never" selected="${db.update}">never</mrs:option>
 								<mrs:option value="daily" selected="${db.update}">daily</mrs:option>
@@ -223,6 +215,20 @@
 							<div><label>Source files</label><input type="text" value="${db.source}" name="source"/></div>
 							<div><label>Upstream URL</label><input type="text" value="${db.fetch.src}" name="fetch"/></div>
 							<div><label>Delete stale files</label><mrs:checkbox name="delete" checked="${db.fetch.delete}"/></div>
+							
+							<h3>Data processing</h3>
+							<div><label>Parser</label><select name="parser">
+									<mrs:options collection="parsers" selected="${db.parser}"/>
+								</select>
+							</div>
+							<div><label>Filter</label><input type="text" value="${db.filter}" name="filter"/></div>
+							<div><label>Formatter</label><select name="format" onchange="Admin.changeFormat('${db.id}');">
+									<option value="none">No format</option>
+									<mrs:option value="xml" selected="${db.format}">XML Stylesheet</mrs:option>
+									<mrs:options collection="formats" value="id" label="id" selected="${db.format}"/>
+								</select>
+								<input type="text" value="${db.stylesheet}" name="stylesheet" style="display:none; width: 250px"/>
+							</div>
 
 							<hr/>
 							<input type='submit' value='Submit'/><input type='reset' value='Reset'/>

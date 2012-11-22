@@ -257,7 +257,7 @@ td.right {
 
 .list td.delete img {
 	visibility: hidden;
-	vertical-align: center;
+	vertical-align: middle;
 	cursor: pointer;
 }
 
@@ -267,25 +267,6 @@ td.right {
 
 .list a img {
 	border: none 0px;
-}
-
-/* inline editing */
-.list input.edit {
-    width: 100%;
-    padding: 0px;
-    margin: -1px;
-	font-size: normal;
-}
-
-.list span.editable {
-    display: block;
-    width: 100%;
-}
-
-.list span.editable:hover {
-    margin: -1px;
-    border: 1px dotted #44749d;
-    background: #d7e7f5;
 }
 
 span.reference {
@@ -735,6 +716,10 @@ form.admin_form th a {
 	padding: 1px;
 	margin: 0;
 	width: 80px;
+}
+
+.admin label {
+	height: 1.8em;
 }
 
 .admin td div.delete {

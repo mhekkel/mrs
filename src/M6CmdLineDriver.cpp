@@ -25,6 +25,7 @@
 #include "M6Fetch.h"
 #include "M6MD5.h"
 #include "M6Utilities.h"
+#include "M6Server.h"
 
 #if defined _MSC_VER
 #define WIN32_LEAN_AND_MEAN   
@@ -169,6 +170,17 @@ class M6PasswordDriver : public M6CmdLineDriver
 	virtual void	Exec(const string& inCommand, po::variables_map& vm);
 };
 
+class M6ServerDriver : public M6CmdLineDriver
+{
+  public:
+					M6ServerDriver() {};
+
+	virtual void	AddOptions(po::options_description& desc,
+						unique_ptr<po::positional_options_description>& p);
+	virtual bool	Validate(po::variables_map& vm);
+	virtual void	Exec(const string& inCommand, po::variables_map& vm);
+};
+
 // --------------------------------------------------------------------
 // Code for base class driver
 
@@ -202,6 +214,8 @@ void M6CmdLineDriver::Exec(int argc, char* const argv[])
 		driver.reset(new M6ValidateDriver());
 	else if (strcmp(argv[1], "password") == 0)
 		driver.reset(new M6PasswordDriver());
+	else if (strcmp(argv[1], "server") == 0)
+		driver.reset(new M6ServerDriver());
 	else
 	{
 		cout << "Unknown command " << argv[1] << endl
@@ -800,6 +814,54 @@ void M6PasswordDriver::Exec(const string& inCommand, po::variables_map& vm)
 	config.WriteOut();
 //
 //	M6Config::Instance().SetPassword(realm, username, hash);
+}
+
+// --------------------------------------------------------------------
+//	Server
+
+void M6ServerDriver::AddOptions(po::options_description& desc,
+						unique_ptr<po::positional_options_description>& p)
+{
+	desc.add_options()
+		("config-file,c", po::value<string>(),	"Configuration file")
+		("command", po::value<string>(),		"Command, one of start, restart, status or stop") 
+		;
+
+	p.reset(new po::positional_options_description());
+	p->add("command", 1);
+}
+
+bool M6ServerDriver::Validate(po::variables_map& vm)
+{
+	fs::path configFile("config/m6-config.xml");
+	if (vm.count("config-file"))
+		configFile = vm["config-file"].as<string>();
+		
+	if (not fs::exists(configFile))
+		THROW(("Configuration file not found (\"%s\")", configFile.string().c_str()));
+		
+	M6Config::SetConfigFilePath(configFile);
+	
+	return vm.count("command") > 0;
+}
+
+void M6ServerDriver::Exec(const string& inCommand, po::variables_map& vm)
+{
+	string command = vm["command"].as<string>();
+	
+	if (command == "start")
+		M6Server::Start();
+	else if (command == "restart")
+	{
+		M6Server::Stop();
+		M6Server::Start();
+	}
+	else if (command == "stop")
+		M6Server::Stop();
+	//else if (command == "status")
+	//	M6Server::Status();
+	else
+		THROW(("Invalid command '%s'", command.c_str()));
 }
 
 // --------------------------------------------------------------------

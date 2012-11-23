@@ -29,6 +29,9 @@ class M6Server : public zh::webapp
 					M6Server(const zx::element* inConfig);
 	virtual			~M6Server();
 
+	static void		Start();
+	static void		Stop();
+
 	virtual void	handle_request(const zh::request& req, zh::reply& rep);
 	virtual void	create_unauth_reply(bool stale, const std::string& realm, zh::reply& rep);
 

@@ -81,41 +81,26 @@ OBJECTS = \
 
 OBJECTS.m6 = \
 	$(OBJECTS) \
-	$(OBJDIR)/M6CmdLineDriver.o
+	$(OBJDIR)/M6BlastCache.o \
+	$(OBJDIR)/M6CmdLineDriver.o \
+	$(OBJDIR)/M6Server.o \
+	$(OBJDIR)/M6WSBlast.o \
+	$(OBJDIR)/M6WSSearch.o \
 
 OBJECTS.m6-test = \
 	$(OBJECTS) \
 	$(OBJDIR)/M6TestMain.o \
 	$(OBJDIR)/M6TestDocStore.o 
 
-OBJECTS.m6-server = \
-	$(OBJECTS) \
-	$(OBJDIR)/M6BlastCache.o \
-	$(OBJDIR)/M6Server.o \
-	$(OBJDIR)/M6WSBlast.o \
-	$(OBJDIR)/M6WSSearch.o \
-
-all: m6 m6-server
+all: m6
 
 m6: $(OBJECTS.m6)
-	@ echo ">>" $@
-	@ $(CXX) $(BOOST_INC_DIR:%=-I%) -o $@ -I. $^ $(LDFLAGS)
-
-m6-make: $(OBJECTS.m6-make)
-	@ echo ">>" $@
-	@ $(CXX) $(BOOST_INC_DIR:%=-I%) -o $@ -I. $^ $(LDFLAGS)
-
-m6-server: $(OBJECTS.m6-server)
 	@ echo ">>" $@
 	@ $(CXX) $(BOOST_INC_DIR:%=-I%) -o $@ -I. $^ $(LDFLAGS)
 
 m6-test: $(OBJECTS.m6-test)
 	@ echo ">>" $@
 	@ $(CXX) $(BOOST_INC_DIR:%=-I%) -o $@ -I. $^ $(LDFLAGS) $(BOOST_LIB_DIR)/libboost_unit_test_framework.a
-
-m6-blast: $(OBJECTS.m6-blast)
-	@ echo ">>" $@
-	@ $(CXX) $(BOOST_INC_DIR:%=-I%) -o $@ -I. $^ $(LDFLAGS)
 
 $(OBJDIR)/%.o: %.cpp | $(OBJDIR)
 	@ echo ">>" $<
@@ -129,4 +114,4 @@ $(OBJDIR):
 	@ test -d $@ || mkdir -p $@
 
 clean:
-	rm -rf $(OBJDIR)/* m6-build m6-create m6-test
+	rm -rf $(OBJDIR)/* m6 m6-test

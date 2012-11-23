@@ -11,9 +11,17 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\..\sqlite-amalgamation\sqlite3.c" />
+    <ClCompile Include="..\..\src\M6BlastCache.cpp" />
     <ClCompile Include="..\..\src\M6CmdLineDriver.cpp" />
     <ClCompile Include="..\..\src\M6Fetch.cpp" />
     <ClCompile Include="..\..\src\M6MD5.cpp" />
+    <ClCompile Include="..\..\src\M6Server.cpp" />
+    <ClCompile Include="..\..\src\M6WSBlast.cpp" />
+    <ClCompile Include="..\..\src\M6WSSearch.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\..\sqlite-amalgamation\sqlite3.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{9E5E7747-2076-4E8C-8DCE-71C09ADD1B06}</ProjectGuid>
@@ -45,16 +53,18 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <OutDir>$(SolutionDir)$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(Platform)\$(Configuration)\</IntDir>
+    <TargetName>m6</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <OutDir>$(SolutionDir)$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(Platform)\$(Configuration)\</IntDir>
+    <TargetName>m6</TargetName>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>C:\Boost\include\boost-1_48;$(SolutionDir)..\..\libzeep;$(SolutionDir)..\src;C:\perl\lib\CORE;$(SolutionDir)..\..\curl\include;$(SolutionDir)libcurl\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Boost\include\boost-1_48;$(SolutionDir)..\..\libzeep;$(SolutionDir)..\src;C:\perl\lib\CORE;$(SolutionDir)..\..\sqlite-amalgamation;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <PreprocessorDefinitions>CURL_STATICLIB;_UNICODE;UNICODE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
@@ -71,7 +81,7 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>C:\Boost\include\boost-1_48;$(SolutionDir)..\..\libzeep;$(SolutionDir)..\src;C:\perl\lib\CORE;$(SolutionDir)..\..\curl\include;$(SolutionDir)libcurl\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Boost\include\boost-1_48;$(SolutionDir)..\..\libzeep;$(SolutionDir)..\src;C:\perl\lib\CORE;$(SolutionDir)..\..\sqlite-amalgamation;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <PreprocessorDefinitions>CURL_STATICLIB;NDEBUG;_UNICODE;UNICODE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>

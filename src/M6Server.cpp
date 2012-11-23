@@ -45,8 +45,6 @@ namespace po = boost::program_options;
 
 const string kM6ServerNS = "http://mrs.cmbi.ru.nl/mrs-web/ml";
 
-int VERBOSE;
-
 // --------------------------------------------------------------------
 
 struct M6AuthInfo
@@ -1401,26 +1399,8 @@ void M6Server::ProcessNewConfig(const string& inPage, zeep::http::parameter_map&
 		server->set_attribute("addr", inParams.get("addr", "").as<string>());
 		server->set_attribute("port", inParams.get("port", "").as<string>());
 		
-		zx::element* e = server->find_first("admin");
-		string s = inParams.get("realm", "").as<string>();
-		
-		if (s.empty())
-		{
-			if (e != nullptr)
-				server->remove(e);
-		}
-		else
-		{
-			if (e == nullptr)
-			{
-				e = new zx::element("admin");
-				server->append(e);
-			}
-			e->set_attribute("realm", s);
-		}
-		
-		e = server->find_first("base-url");
-		s = inParams.get("baseurl", "").as<string>();
+		zx::element* e = server->find_first("base-url");
+		string s = inParams.get("baseurl", "").as<string>();
 		
 		if (s.empty())
 		{
@@ -1533,8 +1513,6 @@ void M6Server::handle_admin(const zh::request& request,
 		
 		if (n = serverConfig->find_first("base-url"))
 			server["baseurl"] = n->str();
-		if (n = serverConfig->find_first_node("admin/@realm"))
-			server["realm"] = n->str();
 			
 		const char* wss[] = { "search", "blast", "align" };
 		el::object wsc;
@@ -1550,20 +1528,27 @@ void M6Server::handle_admin(const zh::request& request,
 	}
 
 	// add parser settings
-	vector<string> parsers;
+	vector<el::object> parsers;
 	fs::path parserDir(mConfigCopy->GetDirectory("parser")->content());
 	for (auto p = fs::directory_iterator(parserDir); p != fs::directory_iterator(); ++p)
 	{
-		fs::path name = p->path().filename();
+		fs::path path = p->path();
 		
-		if (name.extension().string() != ".pm" or name.string() == "M6Script.pm")
+		if (path.extension().string() != ".pm" or path.filename().string() == "M6Script.pm")
 			continue;
 		
-		parsers.push_back(name.stem().string());
+		el::object parser;
+		parser["id"] = path.filename().stem().string();
+		parser["script"] = path.string();
+		parsers.push_back(parser);
 	}
 
 	foreach (const zx::element* e, mConfigCopy->GetParsers())
-		parsers.push_back(e->get_attribute("id"));
+	{
+		el::object parser;
+		parser["id"] = e->get_attribute("id");
+		parsers.push_back(parser);
+	}
 	
 	sort(parsers.begin(), parsers.end());
 	sub.put("parsers", parsers.begin(), parsers.end());
@@ -2663,60 +2648,74 @@ void RunMainLoop(uint32 inNrOfThreads)
 	}
 }
 
-int main(int argc, char* argv[])
+void M6Server::Start()
 {
-	try
-	{
-		po::options_description desc("m6-server");
-		desc.add_options()
-			("config-file,c", po::value<string>(),	"Configuration file")
-			("verbose,v",							"Be verbose")
-			("threads,a", po::value<uint32>(),		"Nr of threads")
-			("help,h",								"Display help message")
-			;
+	uint32 nrOfThreads = boost::thread::hardware_concurrency();
+	//if (vm.count("threads"))
+	//	nrOfThreads = vm["threads"].as<uint32>();
 	
-		po::variables_map vm;
-		po::store(po::command_line_parser(argc, argv).options(desc).run(), vm);
-		po::notify(vm);
-	
-		if (vm.count("help"))
-		{
-			cout << desc << "\n";
-			exit(1);
-		}
-		
-		if (vm.count("verbose"))
-			VERBOSE = 1;
-
-		fs::path configFile("config/m6-config.xml");
-		if (vm.count("config-file"))
-			configFile = vm["config-file"].as<string>();
-		
-		if (not fs::exists(configFile))
-			THROW(("Configuration file not found (\"%s\")", configFile.string().c_str()));
-
-		uint32 nrOfThreads = boost::thread::hardware_concurrency();
-		if (vm.count("threads"))
-			nrOfThreads = vm["threads"].as<uint32>();
-
-		M6Config::SetConfigFilePath(configFile);
-		
-		RunMainLoop(nrOfThreads);
-	}
-	catch (exception& e)
-	{
-		cerr << endl
-			 << "m6-builder exited with an exception:" << endl
-			 << e.what() << endl;
-		exit(1);
-	}
-	catch (...)
-	{
-		cerr << endl
-			 << "m6-builder exited with an uncaught exception" << endl;
-		exit(1);
-	}
-	
-	return 0;
+	RunMainLoop(nrOfThreads);
 }
+
+void M6Server::Stop()
+{
+	
+}
+
+//int main(int argc, char* argv[])
+//{
+//	try
+//	{
+//		po::options_description desc("m6-server");
+//		desc.add_options()
+//			("config-file,c", po::value<string>(),	"Configuration file")
+//			("verbose,v",							"Be verbose")
+//			("threads,a", po::value<uint32>(),		"Nr of threads")
+//			("help,h",								"Display help message")
+//			;
+//	
+//		po::variables_map vm;
+//		po::store(po::command_line_parser(argc, argv).options(desc).run(), vm);
+//		po::notify(vm);
+//	
+//		if (vm.count("help"))
+//		{
+//			cout << desc << "\n";
+//			exit(1);
+//		}
+//		
+//		if (vm.count("verbose"))
+//			VERBOSE = 1;
+//
+//		fs::path configFile("config/m6-config.xml");
+//		if (vm.count("config-file"))
+//			configFile = vm["config-file"].as<string>();
+//		
+//		if (not fs::exists(configFile))
+//			THROW(("Configuration file not found (\"%s\")", configFile.string().c_str()));
+//
+//		uint32 nrOfThreads = boost::thread::hardware_concurrency();
+//		if (vm.count("threads"))
+//			nrOfThreads = vm["threads"].as<uint32>();
+//
+//		M6Config::SetConfigFilePath(configFile);
+//		
+//		RunMainLoop(nrOfThreads);
+//	}
+//	catch (exception& e)
+//	{
+//		cerr << endl
+//			 << "m6-builder exited with an exception:" << endl
+//			 << e.what() << endl;
+//		exit(1);
+//	}
+//	catch (...)
+//	{
+//		cerr << endl
+//			 << "m6-builder exited with an uncaught exception" << endl;
+//		exit(1);
+//	}
+//	
+//	return 0;
+//}
 

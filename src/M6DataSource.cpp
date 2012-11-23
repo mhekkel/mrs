@@ -3,10 +3,6 @@
 #include <iostream>
 #include <numeric>
 
-#define LIBARCHIVE_STATIC
-#include <archive.h>
-#include <archive_entry.h>
-
 #include <boost/iostreams/char_traits.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/fstream.hpp>
@@ -16,6 +12,7 @@
 #include <boost/iostreams/filter/zlib.hpp>
 #include <boost/iostreams/filter/bzip2.hpp>
 #include <boost/iostreams/filter/gzip.hpp>
+#include <boost/algorithm/string.hpp>
 
 #include "M6DataSource.h"
 #include "M6Error.h"
@@ -23,14 +20,10 @@
 #include "M6File.h"
 #include "M6Exec.h"
 
-#if defined(_MSC_VER)
-#pragma comment(lib, "libarchive")
-#pragma comment(lib, "libbz2")
-#endif
-
 using namespace std;
 namespace fs = boost::filesystem;
 namespace io = boost::iostreams;
+namespace ba = boost::algorithm;
 
 // --------------------------------------------------------------------
 // class compress_decompressor is based on code in libarchive, see below
@@ -168,63 +161,72 @@ M6DataSource::iterator& M6DataSource::iterator::operator++()
 
 // --------------------------------------------------------------------
 
+namespace
+{
+
+struct m6file_device : public io::source
+{
+	typedef char			char_type;
+	typedef io::source_tag	category;
+
+				m6file_device(const fs::path inFile, M6Progress& inProgress)
+					: mFile(inFile, eReadOnly), mSize(fs::file_size(inFile)), mProgress(inProgress) {}
+
+	streamsize	read(char* s, streamsize n)
+				{
+					if (n > mSize)
+						n = mSize;
+					if (n > 0)
+					{
+						mFile.Read(s, n);
+						mProgress.Consumed(n);
+						mSize -= n;
+					}
+					else
+						n = -1;
+					return n;
+				}
+
+	M6File		mFile;
+	streamsize	mSize;
+	M6Progress&	mProgress;
+};
+
+}
+
+// --------------------------------------------------------------------
+
 struct M6PlainTextDataSourceImpl : public M6DataSourceImpl
 {
-					M6PlainTextDataSourceImpl(const fs::path& inFile, M6Progress& inProgress)
-						: M6DataSourceImpl(inProgress), mFile(inFile) {}
-	
-	struct device : public io::source
-	{
-		typedef char			char_type;
-		typedef io::source_tag	category;
-	
-					device(const fs::path inFile, M6Progress& inProgress)
-						: mFile(inFile, eReadOnly), mProgress(inProgress) {}
+	typedef M6DataSource::M6DataFile M6DataFile;
 
-		streamsize	read(char* s, streamsize n)
-					{
-						if (n > mFile.Size() - mFile.Tell())
-							n = mFile.Size() - mFile.Tell();
-						if (n > 0)
-						{
-							mFile.Read(s, n);
-							mProgress.Consumed(n);
-						}
-						else
-							n = -1;
-						return n;
-					}
-	
-		M6File		mFile;
-		M6Progress&	mProgress;
-	};
+							M6PlainTextDataSourceImpl(const fs::path& inFile, M6Progress& inProgress);
 
-	virtual M6DataSource::M6DataFile*
-					Next()
-					{
-						M6DataSource::M6DataFile* result = nullptr;
-						if (not mFile.empty())
-						{
-							result = new M6DataSource::M6DataFile;
-							result->mFilename = mFile.filename().string();
+	virtual M6DataFile*		Next()	{ return mNext.release(); }
 
-							if (mFile.extension() == ".gz")
-								result->mStream.push(io::gzip_decompressor());
-							else if (mFile.extension() == ".bz2")
-								result->mStream.push(io::bzip2_decompressor());
-							else if (mFile.extension() == ".Z")
-								result->mStream.push(compress_decompressor());
-							
-							result->mStream.push(device(mFile, mProgress));
-							
-							mProgress.Message(mFile.filename().string());
-							mFile.clear();
-						}
-						return result;
-					}
-
-	fs::path		mFile;
+	unique_ptr<M6DataFile>	mNext;
 };
+
+M6PlainTextDataSourceImpl::M6PlainTextDataSourceImpl(const fs::path& inFile, M6Progress& inProgress)
+	: M6DataSourceImpl(inProgress)
+{
+	if (not inFile.empty())
+	{
+		mNext.reset(new M6DataSource::M6DataFile);
+		mNext->mFilename = inFile.filename().string();
+
+		if (inFile.extension() == ".gz")
+			mNext->mStream.push(io::gzip_decompressor());
+		else if (inFile.extension() == ".bz2")
+			mNext->mStream.push(io::bzip2_decompressor());
+		else if (inFile.extension() == ".Z")
+			mNext->mStream.push(compress_decompressor());
+		
+		mNext->mStream.push(m6file_device(inFile, mProgress));
+		
+		mProgress.Message(inFile.filename().string());
+	}
+}
 
 // --------------------------------------------------------------------
 // Read U Star archive files
@@ -280,12 +282,12 @@ struct M6TarDataSourceImpl : public M6DataSourceImpl
 
 	virtual M6DataFile*	Next();
 
-	fs::ifstream	mFile;
 	istream_type	mStream;
+	M6Progress&		mProgress;
 };
 
 M6TarDataSourceImpl::M6TarDataSourceImpl(const fs::path& inArchive, M6Progress& inProgress)
-	: M6DataSourceImpl(inProgress), mFile(inArchive, ios::binary)
+	: M6DataSourceImpl(inProgress), mProgress(inProgress)
 {
 	if (inArchive.extension() == ".gz" or inArchive.extension() == ".tgz")
 		mStream.push(io::gzip_decompressor());
@@ -294,7 +296,7 @@ M6TarDataSourceImpl::M6TarDataSourceImpl(const fs::path& inArchive, M6Progress& 
 	else if (inArchive.extension() == ".Z")
 		mStream.push(compress_decompressor());
 	
-	mStream.push(mFile);
+	mStream.push(m6file_device(inArchive, inProgress));
 }
 
 M6TarDataSourceImpl::~M6TarDataSourceImpl()
@@ -305,8 +307,10 @@ M6TarDataSourceImpl::M6DataFile* M6TarDataSourceImpl::Next()
 {
 	M6DataFile* result = nullptr;
 
-	if (not mFile.eof())
+	if (not mStream.eof())
 	{
+		uint32 nullBlocks = 0;
+		
 		for (;;)
 		{
 			char block[512];
@@ -321,7 +325,7 @@ M6TarDataSourceImpl::M6DataFile* M6TarDataSourceImpl::Next()
 			for (int i = 148, j = 0; i < 148 + 8; ++i)
 			{
 				if (block[i] == ' ') continue;
-				if (block[i] == 0 and j == 6)
+				if (block[i] == 0)
 					block[i] = ' ';
 				else if (block[i] < '0' or block[i] > '7')
 					THROW(("Invalid checksum"));
@@ -333,8 +337,15 @@ M6TarDataSourceImpl::M6DataFile* M6TarDataSourceImpl::Next()
 				}
 			}
 			
-			int32 scksum = accumulate(block, block + 512, 0);		
-			uint32 ucksum = accumulate(ublock, ublock + 512, 0);
+			if (cksum == 0 and accumulate(ublock, ublock + 512, 0UL) == 8 * ' ')
+			{
+				if (++nullBlocks == 2)
+					break;
+				continue;
+			}
+			
+			int32 scksum = accumulate(block, block + 512, 0L);
+			uint32 ucksum = accumulate(ublock, ublock + 512, 0UL);
 			
 			if (scksum != cksum and ucksum != cksum)
 				THROW(("Checksum invalid"));
@@ -377,139 +388,18 @@ M6TarDataSourceImpl::M6DataFile* M6TarDataSourceImpl::Next()
 				}
 				continue;
 			}
-			
+
 			result = new M6DataFile;
-			result->mFilename = filename;
+			result->mFilename = fs::path(filename).filename().string();
 			result->mStream.push(device(mStream, fileSize, mProgress));
+			
+			mProgress.Message(result->mFilename);
 
 			break;
 		}
-		
-//
-//		for (;;)
-//		{
-//			archive_entry* entry;
-//			int err = archive_read_next_header(mArchive, &entry);
-//			if (err == ARCHIVE_EOF)
-//			{
-//				archive_read_finish(mArchive);
-//				mArchive = nullptr;
-//				break;
-//			}
-//			
-//			if (err != ARCHIVE_OK)
-//				THROW((archive_error_string(mArchive)));
-//			
-//			// skip over non files
-//			if (archive_entry_filetype(entry) != AE_IFREG)
-//				continue;
-//			
-//			result = new M6DataFile;
-//			const char* path = archive_entry_pathname(entry);
-//			result->mFilename = path;
-//			result->mStream.push(device(mArchive, entry, mProgress));
-//			mProgress.Message(path);
-//			
-//			break;
-//		}
 	}
 	
 	return result;
-}
-
-// --------------------------------------------------------------------
-
-struct M6ArchiveDataSourceImpl : public M6DataSourceImpl
-{
-	typedef M6DataSource::M6DataFile M6DataFile;
-	
-						M6ArchiveDataSourceImpl(struct archive* inArchive, M6Progress& inProgress)
-							: M6DataSourceImpl(inProgress), mArchive(inArchive) {}
-						~M6ArchiveDataSourceImpl();
-	
-	struct device : public io::source
-	{
-		typedef char			char_type;
-		typedef io::source_tag	category;
-	
-						device(struct archive* inArchive, struct archive_entry* inEntry,
-								M6Progress& inProgress)
-							: mArchive(inArchive), mEntry(inEntry), mProgress(inProgress)
-							, mLastPosition(archive_position_compressed(mArchive))
-						{
-						}
-
-		streamsize		read(char* s, streamsize n)
-						{
-							streamsize result = -1;
-							if (mEntry != nullptr)
-							{
-								result = archive_read_data(mArchive, s, n);
-								if (result == 0)
-									mEntry = nullptr;
-							}
-							
-							if (result >= 0)
-							{
-								int64 p = archive_position_compressed(mArchive);
-								mProgress.Consumed(p - mLastPosition);
-								mLastPosition = p;
-							}
-
-							return result;
-						}
-	
-		struct archive*	mArchive;
-		struct archive_entry*
-						mEntry;
-		M6Progress&		mProgress;
-		int64			mLastPosition;
-	};
-
-	virtual M6DataFile*	Next()
-					{
-						M6DataFile* result = nullptr;
-
-						if (mArchive != nullptr)
-						{
-							for (;;)
-							{
-								archive_entry* entry;
-								int err = archive_read_next_header(mArchive, &entry);
-								if (err == ARCHIVE_EOF)
-								{
-									archive_read_finish(mArchive);
-									mArchive = nullptr;
-									break;
-								}
-								
-								if (err != ARCHIVE_OK)
-									THROW((archive_error_string(mArchive)));
-								
-								// skip over non files
-								if (archive_entry_filetype(entry) != AE_IFREG)
-									continue;
-								
-								result = new M6DataFile;
-								const char* path = archive_entry_pathname(entry);
-								result->mFilename = path;
-								result->mStream.push(device(mArchive, entry, mProgress));
-								mProgress.Message(path);
-								
-								break;
-							}
-						}
-						
-						return result;
-					}
-
-	struct archive*	mArchive;
-};
-
-M6ArchiveDataSourceImpl::~M6ArchiveDataSourceImpl()
-{
-	if (mArchive != nullptr)
-		archive_read_finish(mArchive);
 }
 
 // --------------------------------------------------------------------
@@ -518,33 +408,18 @@ M6DataSourceImpl* M6DataSourceImpl::Create(const fs::path& inFile, M6Progress& i
 {
 	M6DataSourceImpl* result = nullptr;
 
-	result = new M6TarDataSourceImpl(inFile, inProgress);
-
-//	const uint32 kBufferSize = 4096;
-//	
-//	struct archive* archive = archive_read_new();
-//	
-//	if (archive == nullptr)
-//		THROW(("Failed to initialize libarchive"));
-//	
-//	int err = archive_read_support_compression_all(archive);
-//
-//	if (err == ARCHIVE_OK)
-//		err = archive_read_support_format_all(archive);
-//	
-//	if (err == ARCHIVE_OK)
-//		err = archive_read_open_filename(archive, inFile.string().c_str(), kBufferSize);
-//	
-//	if (err == ARCHIVE_OK)	// a supported archive
-//		result = new M6ArchiveDataSourceImpl(archive, inProgress);
-//	else
-//	{
-//		if (VERBOSE)
-//			cerr << archive_error_string(archive) << endl;
-//
-//		archive_read_finish(archive);
-//		result = new M6PlainTextDataSourceImpl(inFile, inProgress);
-//	}
+	string name = inFile.filename().string();
+	if (ba::ends_with(name, ".tar") or 
+		ba::ends_with(name, ".tgz") or 
+		ba::ends_with(name, ".tbz") or 
+		ba::ends_with(name, ".tar.gz") or 
+		ba::ends_with(name, ".tar.bz2") or
+		ba::ends_with(name, ".tar.Z"))
+	{
+		result = new M6TarDataSourceImpl(inFile, inProgress);
+	}
+	else
+		result = new M6PlainTextDataSourceImpl(inFile, inProgress);
 	
 	return result;
 }

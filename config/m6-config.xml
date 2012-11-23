@@ -279,6 +279,12 @@
       <source fetch="ftp://ftp.ncbi.nih.gov/pub" delete="false">pmc/articles*.tar.gz</source>
     </databank>
     <!-- databanks used in debugging m6 -->
+
+	<databank id="enzyme-tar" parser="enzyme">
+		<name>Enzyme tarred</name>
+		<source>enzyme/enzyme.tgz</source>
+	</databank>
+
     <!--	-->
     <!--		<databank id="pdb-mini" parser="pdb">-->
     <!--			<name>PDB mini</name>-->

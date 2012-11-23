@@ -1,7 +1,7 @@
 package M6::Script::gene;
 
-#use XML::LibXSLT;
-#use XML::LibXML;
+use strict;
+use warnings;
 
 our @ISA = "M6::Script";
 

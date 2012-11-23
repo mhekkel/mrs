@@ -15,8 +15,6 @@ our $VERSION = '6.0';
 
 use strict;
 #use warnings;
-use CGI;
-use Data::Dumper;
 
 my %scripts;
 
@@ -81,8 +79,6 @@ sub load_script
 package M6::Script;
 
 use strict;
-use Data::Dumper;
-use File::stat;
 
 require Exporter;
 require DynaLoader;
@@ -114,13 +110,13 @@ sub TIEHASH
 sub version
 {
 	my ($self, $source) = @_;
-	croak("version not implemented");
+	die("version not implemented");
 }
 
 sub to_fasta
 {
 	my ($self, $doc) = @_;
-	croak("to_fasta not implemented");
+	die("to_fasta not implemented");
 }
 
 sub index_name

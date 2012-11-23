@@ -2623,16 +2623,13 @@ void RunMainLoop(uint32 inNrOfThreads)
 		if (port.empty())
 			port = "80";
 		
-		if (VERBOSE)
-			cout << "listening at " << addr << ':' << port << endl;
-		
 		M6Server server(config);
 	
 		server.bind(addr, boost::lexical_cast<uint16>(port));
 		boost::thread thread(boost::bind(&zeep::http::server::run, boost::ref(server), inNrOfThreads));
 	
-		if (not VERBOSE)
-			cout << " done" << endl;
+		cout << " done" << endl
+			 << "listening at " << addr << ':' << port << endl;
 		
 		catcher.UnblockSignals();
 		
@@ -2661,61 +2658,3 @@ void M6Server::Stop()
 {
 	
 }
-
-//int main(int argc, char* argv[])
-//{
-//	try
-//	{
-//		po::options_description desc("m6-server");
-//		desc.add_options()
-//			("config-file,c", po::value<string>(),	"Configuration file")
-//			("verbose,v",							"Be verbose")
-//			("threads,a", po::value<uint32>(),		"Nr of threads")
-//			("help,h",								"Display help message")
-//			;
-//	
-//		po::variables_map vm;
-//		po::store(po::command_line_parser(argc, argv).options(desc).run(), vm);
-//		po::notify(vm);
-//	
-//		if (vm.count("help"))
-//		{
-//			cout << desc << "\n";
-//			exit(1);
-//		}
-//		
-//		if (vm.count("verbose"))
-//			VERBOSE = 1;
-//
-//		fs::path configFile("config/m6-config.xml");
-//		if (vm.count("config-file"))
-//			configFile = vm["config-file"].as<string>();
-//		
-//		if (not fs::exists(configFile))
-//			THROW(("Configuration file not found (\"%s\")", configFile.string().c_str()));
-//
-//		uint32 nrOfThreads = boost::thread::hardware_concurrency();
-//		if (vm.count("threads"))
-//			nrOfThreads = vm["threads"].as<uint32>();
-//
-//		M6Config::SetConfigFilePath(configFile);
-//		
-//		RunMainLoop(nrOfThreads);
-//	}
-//	catch (exception& e)
-//	{
-//		cerr << endl
-//			 << "m6-builder exited with an exception:" << endl
-//			 << e.what() << endl;
-//		exit(1);
-//	}
-//	catch (...)
-//	{
-//		cerr << endl
-//			 << "m6-builder exited with an uncaught exception" << endl;
-//		exit(1);
-//	}
-//	
-//	return 0;
-//}
-

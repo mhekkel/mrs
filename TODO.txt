@@ -10,23 +10,28 @@ Todo
 - REST interface herzien:
 	- /entry/db/id moet naar Accept header kijken
 	- /find/db/query idem
-- SOAP: default waarden in WSDL
 
-- m6 integration (server/build)
 - admin/config file:
-	- Alleen laten werken op kopie van data
+	- Log file in server sectie
+
+- Windows: Service Control Manager ondersteuning voor server mode
+- Linux: Daemon en control implementatie
 
 - verhogen score als term in unique index?
 
 - Version
 - browse data/index
 
-- SOAP services (alleen clustal nog)
+- SOAP:
+	- default waarden in WSDL
+	- clustal?
+
 - link in format-config uitbreiden ?
 - date index
 - near operator, how to implement? new query language?
 
 - verwijder libarchive dependency
+- Windows: Perl als statische library
 
 Parsers:
 

@@ -1,7 +1,5 @@
 package M6::Script::uniprot;
 
-use utf8;
-
 our @ISA = "M6::Script";
 
 use strict;

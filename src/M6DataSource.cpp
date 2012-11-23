@@ -360,18 +360,7 @@ M6TarDataSourceImpl::M6DataFile* M6TarDataSourceImpl::Next()
 
 			if (strncmp(block + 257, "ustar", 5) == 0)	// ustar format
 			{
-				switch (block[156])
-				{
-					case '0': 		// normal file
-						break;
-					case '5':
-						cerr << "directory: " << block << endl;
-						skip = true;
-						break;
-					default:
-						skip = true;
-						break;
-				}
+				skip = block[156] != '0';
 
 				if (block[345] != 0)
 					filename = string(block + 345) + filename;

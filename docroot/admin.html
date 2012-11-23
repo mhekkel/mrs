@@ -79,7 +79,6 @@
 						<div><label>Address</label><input type="text" value="${server.addr}" name="addr"/></div>
 						<div><label>Port</label><input type="text" value="${server.port}" name="port"/></div>
 						<div><label>Base URL</label><input type="text" value="${server.baseurl}" name="baseurl"/></div>
-						<div><label>Admin Realm</label><input type="text" value="${server.realm}" name="realm"/></div>
 						
 						<h3>Web Service Locations</h3>
 						<p>Leave empty to disable web service</p>
@@ -98,19 +97,23 @@
 					<table cellspacing="0" cellpadding="0" class="select_form">
 						<caption>Parsers</caption>
 						<mrs:iterate collection="parsers" var="parser">
-							<tr><td>${parser}</td></tr>
+							<tr><td>${parser.id}</td></tr>
 						</mrs:iterate>
 					</table>
 				</div>
 				
 				<div class="admin-right">
 					<mrs:iterate collection="parsers" var="parser">
-					<form id="${parser}" class="admin_form" method="post" style="display:none">
+					<form id="${parser.id}" class="admin_form" method="post" style="display:none">
 						<fieldset>
 							<h3>Parser configuration</h3>
-							<p>XML parsers are not configurable in the admin pages yet, the 
-							Perl based parsers should be edited directly, you can find the
-							file for the <code>${parser}</code> parser at <code style="white-space:nowrap">${global.dirs['parser'] + '/' + parser + '.pm'}</code></p>
+							<mrs:if test="${empty parser.script}">
+							<p>XML parsers are not configurable in the admin pages yet</p>	
+							</mrs:if>
+							<mrs:if test="${parser.script}">
+							<p>Perl based parsers should be edited directly, you can find the
+							file for the <code>${parser.id}</code> parser at <code style="white-space:nowrap">${parser.script}</code></p>
+							</mrs:if>
 						</fieldset>
 					</form>
 					</mrs:iterate>
@@ -218,7 +221,7 @@
 							
 							<h3>Data processing</h3>
 							<div><label>Parser</label><select name="parser">
-									<mrs:options collection="parsers" selected="${db.parser}"/>
+									<mrs:options collection="parsers" value="id" label="id" selected="${db.parser}"/>
 								</select>
 							</div>
 							<div><label>Filter</label><input type="text" value="${db.filter}" name="filter"/></div>

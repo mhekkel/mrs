@@ -632,12 +632,14 @@ div#globalSelection input, div#globalSelection select {
 	border: solid 1px white;
 }
 
-.admin .admin-left {
+.admin-left {
 	float: left;
 	width: 125px;
 	vertical-align: top;
 	padding-right: 10px;
-	
+}
+
+.tablebox {
 	height: 300px;
 	overflow-x: hidden;
 	overflow-y: scroll;

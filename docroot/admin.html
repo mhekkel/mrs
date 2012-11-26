@@ -94,12 +94,19 @@
 			
 			<div id="parsers" class="section">
 				<div class="admin-left">
-					<table cellspacing="0" cellpadding="0" class="select_form">
-						<caption>Parsers</caption>
-						<mrs:iterate collection="parsers" var="parser">
-							<tr><td>${parser.id}</td></tr>
-						</mrs:iterate>
-					</table>
+					<div class="tablebox">
+						<table cellspacing="0" cellpadding="0" class="select_form">
+							<caption>Parsers</caption>
+							<mrs:iterate collection="parsers" var="parser">
+								<tr><td>${parser.id}</td></tr>
+							</mrs:iterate>
+						</table>
+					</div>
+					<form method='post'>
+						<input type='hidden' name='submit' value='parsers-add-del'/>
+						<input type='submit' value='add' name='btn'/>
+						<input type='submit' value='delete' name='btn'/>
+					</form>
 				</div>
 				
 				<div class="admin-right">
@@ -125,23 +132,34 @@
 				
 			<div id="formats" class="section">
 				<div class="admin-left">
-					<table cellspacing="0" cellpadding="0" class="select_form">
-						<caption>Formats</caption>
-						<mrs:iterate collection="formats" var="format">
-							<tr><td>${format.id}</td></tr>
-						</mrs:iterate>
-					</table>
+					<div class="tablebox">
+						<table cellspacing="0" cellpadding="0" class="select_form">
+							<caption>Formats</caption>
+							<mrs:iterate collection="formats" var="format">
+								<tr><td>${format.id}</td></tr>
+							</mrs:iterate>
+						</table>
+					</div>
+					<form method='post'>
+						<input type='hidden' name='submit' value='formats-add-del'/>
+						<input type='submit' value='add' name='btn'/>
+						<input type='submit' value='delete' name='btn'/>
+					</form>
 				</div>
 				
 				<div class="admin-right">
 				<mrs:iterate collection="formats" var="format">
 					<form id="${format.id}" class="admin_form" method="POST" style="display:none">
 						<fieldset>
-							<h3>Format specification — ${format.id}</h3>
+							<h3>Format specification</h3>
 							<input type='hidden' name='submit' value='formats'/>
 							<input type='hidden' name='fmt' value='${format.id}'/>
 
-							<p>Formatting a document is done using JavaScript plugins. To specify a script for the ${format.id}
+							<div><label>ID</label><input type="text" value="${format.id}" disabled='disabled'/></div>
+
+							<h3>Document layout</h3>
+
+							<p>Formatting a document can be done using JavaScript plugins. To specify a script for the ${format.id}
 							format choose one from the list here which is based on the files found in
 							<code>${global.dirs['docroot']}/formats</code>.</p>
 
@@ -195,12 +213,19 @@
 	
 			<div id="databanks" class="section">
 				<div class="admin-left">
-					<table cellspacing="0" cellpadding="0" class="select_form">
-						<caption>Databanks</caption>
-						<mrs:iterate collection="config-databanks" var="db">
-							<tr><td>${db.id}</td></tr>
-						</mrs:iterate>
-					</table>
+					<div class="tablebox">
+						<table cellspacing="0" cellpadding="0" class="select_form">
+							<caption>Databanks</caption>
+							<mrs:iterate collection="config-databanks" var="db">
+								<tr><td>${db.id}</td></tr>
+							</mrs:iterate>
+						</table>
+					</div>
+					<form method='post'>
+						<input type='hidden' name='submit' value='databanks-add-del'/>
+						<input type='submit' value='add' name='btn'/>
+						<input type='submit' value='delete' name='btn'/>
+					</form>
 				</div>
 				
 				<div class="admin-right">
@@ -209,7 +234,8 @@
 						<fieldset>
 							<h3>Databank information</h3>
 							<input type='hidden' name='submit' value='databanks'/>
-							<div><label>ID</label><input type="text" value="${db.id}" name="id"/></div>
+							<input type='hidden' name='id' value='${db.id}'/>
+							<div><label>ID</label><input type="text" value="${db.id}" disabled='disabled'/></div>
 							<div><label>Enabled</label><mrs:checkbox name="enabled" checked="${db.enabled}"/></div>
 							<div><label>Aliases</label><input type="text" value="${db.aliases}" name="aliases"/></div>
 							<div><label>Name</label><input type="text" value="${db.name}" name="name"/></div>
@@ -227,11 +253,19 @@
 							<div><label>Delete stale files</label><mrs:checkbox name="delete" checked="${db.fetch.delete}"/></div>
 							
 							<h3>Data processing</h3>
+<!--							<p>Parsing data is done using Perl based parser scripts. These are located in the -->
+<!--							directory <code>${global.dirs['parser']}</code>.</p>-->
 							<div><label>Parser</label><select name="parser">
 									<mrs:options collection="parsers" value="id" label="id" selected="${db.parser}"/>
 								</select>
 							</div>
+<!--							<p>Filters are optional programs through which the raw data is fed, for the Gene databank-->
+<!--							you could e.g. enter <code>/usr/bin/gene2xml -bT</code> to convert ASN.1 into XML on the fly.</p>-->
 							<div><label>Filter</label><input type="text" value="${db.filter}" name="filter"/></div>
+							
+<!--							<p>Formatting can be done with one of the defined formatters, or for XML databanks, with-->
+<!--							an XML Stylesheet.</p>-->
+							
 							<div><label>Formatter</label><select name="format" onchange="Admin.changeFormat('${db.id}');">
 									<option value="none">No format</option>
 									<mrs:option value="xml" selected="${db.format}">XML Stylesheet</mrs:option>

@@ -30,11 +30,11 @@
 <!ATTLIST format id NMTOKEN #REQUIRED
 				 script CDATA #IMPLIED>
 <!ELEMENT link EMPTY>
-<!ATTLIST link regex CDATA #REQUIRED
+<!ATTLIST link rx CDATA #REQUIRED
 			   db CDATA #REQUIRED
 			   id CDATA #REQUIRED
 			   ix CDATA "id"
-			   anchor CDATA #IMPLIED>
+			   an CDATA #IMPLIED>
 	
 <!ELEMENT parsers (parser+)>
 <!ELEMENT parser (index|add-link)+>

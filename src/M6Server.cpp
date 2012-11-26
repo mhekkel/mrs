@@ -143,6 +143,7 @@ M6Server::M6Server(const zx::element* inConfig)
 	mount("search",			boost::bind(&M6Server::handle_search, this, _1, _2, _3));
 	mount("similar",		boost::bind(&M6Server::handle_similar, this, _1, _2, _3));
 	mount("scripts",		boost::bind(&M6Server::handle_file, this, _1, _2, _3));
+	mount("formats",		boost::bind(&M6Server::handle_file, this, _1, _2, _3));
 	mount("css",			boost::bind(&M6Server::handle_file, this, _1, _2, _3));
 //	mount("man",			boost::bind(&M6Server::handle_file, this, _1, _2, _3));
 	mount("images",			boost::bind(&M6Server::handle_file, this, _1, _2, _3));
@@ -812,12 +813,12 @@ void M6Server::handle_entry(const zh::request& request, const el::scope& scope, 
 					string ldb = link->get_attribute("db");
 					string id = link->get_attribute("id");
 					string ix = link->get_attribute("ix");
-					string anchor = link->get_attribute("anchor");
+					string anchor = link->get_attribute("an");
 					if (ldb.empty())
 						ldb = db;
 					if (id.empty())
 						continue;
-					boost::regex re(link->get_attribute("regex"));
+					boost::regex re(link->get_attribute("rx"));
 					create_link_tags(root, re, ldb, ix, id, anchor);
 				}
 				catch (...) {}
@@ -1443,6 +1444,61 @@ void M6Server::ProcessNewConfig(const string& inPage, zeep::http::parameter_map&
 		
 		server->set_attribute("addr", inParams.get("addr", "").as<string>());
 	}
+	else if (inPage == "parsers")
+	{
+		
+	}
+	else if (inPage == "formats")
+	{
+		string formatID = inParams.get("fmt", "").as<string>();
+		
+		zx::element* fmt = mConfigCopy->GetFormat(formatID, true);
+		
+		string script = inParams.get("script", "").as<string>();
+		fmt->set_attribute("script", script);
+		
+		typedef zh::parameter_map::iterator iter;
+		typedef pair<iter,iter> range;
+		range r[5] = {
+			inParams.equal_range("rx"),
+			inParams.equal_range("db"),
+			inParams.equal_range("id"),
+			inParams.equal_range("ix"),
+			inParams.equal_range("an")
+		};
+		
+		for_each(r, boost::end(r), [](range& ri) {
+			if (ri.first == ri.second) THROW(("invalid data"));
+			--ri.second;
+		});
+		
+		zx::container::iterator l = fmt->begin();
+
+		while (r[0].first != r[0].second)
+		{
+			if (l == fmt->end())
+				l = fmt->insert(l, new zx::element("link"));
+			
+			zx::element* link = *l;
+			++l;
+			
+			for_each(r, boost::end(r), [link](range& ri) {
+				string v = ri.first->second.as<string>();
+				if (v.empty())
+					link->remove_attribute(ri.first->first);
+				else
+					link->set_attribute(ri.first->first, v);
+				++ri.first;
+			});
+		}
+		
+		if (l != fmt->end())
+			fmt->erase(l, fmt->end());
+	}
+	else if (inPage == "databanks")
+	{
+		
+	}
 	
 	mConfigCopy->Validate();
 }
@@ -1484,6 +1540,8 @@ void M6Server::handle_admin(const zh::request& request,
 	}
 
 	el::scope sub(scope);
+	
+	auto sortByID = [](el::object& a, el::object& b ) -> bool { return a["id"] < b["id"]; };
 
 	// add the global settings
 	el::object global, dirs, tools;
@@ -1550,7 +1608,7 @@ void M6Server::handle_admin(const zh::request& request,
 		parsers.push_back(parser);
 	}
 	
-	sort(parsers.begin(), parsers.end());
+	sort(parsers.begin(), parsers.end(), sortByID);
 	sub.put("parsers", parsers.begin(), parsers.end());
 	
 	// add formats
@@ -1566,11 +1624,11 @@ void M6Server::handle_admin(const zh::request& request,
 		{
 			el::object link;
 			link["nr"] = el::object(links.size() + 1);
-			link["regex"] = l->get_attribute("regex");
+			link["rx"] = l->get_attribute("rx");
 			link["db"] = l->get_attribute("db");
 			link["id"] = l->get_attribute("id");
 			link["ix"] = l->get_attribute("ix");
-			link["anchor"] = l->get_attribute("anchor");
+			link["an"] = l->get_attribute("an");
 			links.push_back(link);
 		}
 			
@@ -1579,8 +1637,26 @@ void M6Server::handle_admin(const zh::request& request,
 		
 		formats.push_back(format);
 	}
-	sort(formats.begin(), formats.end());
+	sort(formats.begin(), formats.end(), sortByID);
 	sub.put("formats", formats);
+
+	vector<el::object> scripts;
+	fs::path scriptDir(mConfigCopy->GetDirectory("docroot")->content());
+	for (auto p = fs::directory_iterator(scriptDir / "formats"); p != fs::directory_iterator(); ++p)
+	{
+		fs::path path = p->path();
+		
+		if (path.extension().string() != ".js")
+			continue;
+		
+		el::object script;
+		script["id"] = path.filename().string();
+		script["script"] = path.string();
+		scripts.push_back(script);
+	}
+	
+	sort(parsers.begin(), parsers.end(), sortByID);
+	sub.put("scripts", scripts.begin(), scripts.end());
 
 	// add the databank settings
 	vector<el::object> databanks;
@@ -1630,6 +1706,8 @@ void M6Server::handle_admin(const zh::request& request,
 		
 		databanks.push_back(databank);
 	}
+	
+	sort(databanks.begin(), databanks.end(), sortByID);
 	sub.put("config-databanks", el::object(databanks));
 	
 	sub.put("aliases", aliases.begin(), aliases.end());

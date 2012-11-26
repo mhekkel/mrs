@@ -105,6 +105,7 @@
 				<div class="admin-right">
 					<mrs:iterate collection="parsers" var="parser">
 					<form id="${parser.id}" class="admin_form" method="post" style="display:none">
+						<input type='hidden' name='submit' value='parsers'/>
 						<fieldset>
 							<h3>Parser configuration</h3>
 							<mrs:if test="${empty parser.script}">
@@ -136,12 +137,18 @@
 				<mrs:iterate collection="formats" var="format">
 					<form id="${format.id}" class="admin_form" method="POST" style="display:none">
 						<fieldset>
-							<h3>Format specification</h3>
-							<input type='hidden' name='submit' value='format'/>
+							<h3>Format specification — ${format.id}</h3>
+							<input type='hidden' name='submit' value='formats'/>
+							<input type='hidden' name='fmt' value='${format.id}'/>
 
-							<div><label>ID</label><input type="text" value="${format.id}" name="id"/></div>
-							<div><label>Script</label><input type="text" value="${format.script}" name="name"/></div>
-							
+							<p>Formatting a document is done using JavaScript plugins. To specify a script for the ${format.id}
+							format choose one from the list here which is based on the files found in
+							<code>${global.dirs['docroot']}/formats</code>.</p>
+
+								<div><label>JavaScript</label><select name="script">
+									<option value="">No script</option>
+									<mrs:options collection="scripts" value="id" label="id" selected="${format.script}"/>
+								</select></div>
 							<h3>Links</h3>
 							<p>Create 'live' links in documents based on a regular expression. You can reference captures in the
 							regular expression using the variable names $1 for the first capture, $2 for the second, etc.</p>
@@ -156,20 +163,20 @@
 								</tr>
 							<mrs:iterate collection="${format.links}" var="link">
 								<tr>
-									<td><input type="text" value="${link.regex}" name="link-rx-${link.nr}"/></td>
+									<td><input type="text" value="${link.rx}" name="rx"/></td>
 									<td><select name="db"><mrs:options collection="aliases" selected="${link.db}" /></select></td>
-									<td><input type="text" value="${link.id}" name="link-id-${link.nr}"/></td>
-									<td><input type="text" value="${link.ix}" name="link-ix-${link.nr}"/></td>
-									<td><input type="text" value="${link.anchor}" name="link-an-${link.nr}"/></td>
+									<td><input type="text" value="${link.id}" name="id"/></td>
+									<td><input type="text" value="${link.ix}" name="ix"/></td>
+									<td><input type="text" value="${link.an}" name="an"/></td>
 									<td><div class="delete">Delete</div></td>
 								</tr>
 							</mrs:iterate>
 								<tr style="display:none">
-									<td><input type="text" name="link-rx-new"/></td>
+									<td><input type="text" name="rx"/></td>
 									<td><select name="db"><mrs:options collection="aliases" /></select></td>
-									<td><input type="text" name="link-id-new"/></td>
-									<td><input type="text" name="link-ix-new"/></td>
-									<td><input type="text" name="link-an-new"/></td>
+									<td><input type="text" name="id"/></td>
+									<td><input type="text" name="ix"/></td>
+									<td><input type="text" name="an"/></td>
 									<td><div class="delete">Delete</div></td>
 								</tr>
 							</table>
@@ -201,7 +208,7 @@
 					<form id="${db.id}" class="admin_form" method="POST" style="display:none">
 						<fieldset>
 							<h3>Databank information</h3>
-							<input type='hidden' name='submit' value='databank'/>
+							<input type='hidden' name='submit' value='databanks'/>
 							<div><label>ID</label><input type="text" value="${db.id}" name="id"/></div>
 							<div><label>Enabled</label><mrs:checkbox name="enabled" checked="${db.enabled}"/></div>
 							<div><label>Aliases</label><input type="text" value="${db.aliases}" name="aliases"/></div>

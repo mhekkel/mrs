@@ -24,7 +24,7 @@ class File
 	zeep::xml::element*		GetUser(const std::string& inName, const std::string& inRealm);
 	zeep::xml::element*		GetServer();
 	zeep::xml::element_set	GetFormats();
-	zeep::xml::element*		GetFormat(const std::string& inID);
+	zeep::xml::element*		GetFormat(const std::string& inID, bool inCreate = false);
 	zeep::xml::element_set	GetParsers();
 	zeep::xml::element*		GetParser(const std::string& inID);
 	zeep::xml::element_set	GetDatabanks();

@@ -7,12 +7,12 @@
     <directory id="raw">/data/raw</directory>
     <directory id="blast">/data/blast-cache</directory>
     <directory id="parser">/data/parsers</directory>
-    <directory id="docroot">/data/docroot</directory>
+    <directory id="docroot">C:\Users\maarten\projects\m6\docroot</directory>
   </directories>
   <!-- Tools section, specify external executables used by M6 -->
   <tools>
     <!--		<tool id="clustalo">C:\Users\maarten\bin\clustal-omega\clustalo.exe</tool>-->
-    <tool id="clustalo">/usr/bin/clustalo</tool>
+    <tool id="clustalo">C:\Users\maarten\bin\clustal-omega\clustalo.exe</tool>
   </tools>
   <!-- Users section -->
   <users>
@@ -29,35 +29,35 @@
 		 to link a JavaScript pretty printer -->
   <formats>
     <format id="omim" script="omim.js">
-      <link regex="(?&lt;=\()(?:[^();]+?; )?(\d{6})(?:\.(\d{4}))?(?=\))" db="omim" ix="id" id="$1" anchor="$2"/>
+      <link rx="(?&lt;=\()(?:[^();]+?; )?(\d{6})(?:\.(\d{4}))?(?=\))" db="omim" ix="id" id="$1" an="$2"/>
     </format>
     <format id="uniprot" script="uniprot.js">
-      <link regex="(?&lt;=DR   EMBL; )(\S+)(?=;)" db="embl" ix="id" id="$1"/>
-      <link regex="(?&lt;=DR   PDB; )(\S+)(?=;)" db="pdb" ix="id" id="$1"/>
-      <link regex="(?&lt;=DR   RefSeq; )(?:(\S+)\.\d+)(?=;)" db="refseq" ix="id" id="$1"/>
-      <link regex="(?&lt;=DR   UniGene; )(\S+)(?=;)" db="unigene" ix="id" id="$1"/>
-      <link regex="(?&lt;=DR   GO; )GO:(\S+)(?=;)" db="go" ix="id" id="$1"/>
-      <link regex="(?&lt;=DR   InterPro; )(\S+)(?=;)" db="interpro" ix="id" id="$1"/>
-      <link regex="(?&lt;=DR   Pfam; )(\S+)(?=;)" db="pfama" ix="ac" id="$1"/>
-      <link regex="(?&lt;=DR   PRINTS; )(\S+)(?=;)" db="prints" ix="id" id="$1"/>
-      <link regex="(?&lt;=DR   PROSITE; )(\S+)(?=;)" db="prosite" ix="ac" id="$1"/>
-      <link regex="(?&lt;=DR   MIM; )(\S+)(?=;)" db="omim" ix="id" id="$1"/>
+      <link rx="(?&lt;=DR   EMBL; )(\S+)(?=;)" db="embl" ix="id" id="$1"/>
+      <link rx="(?&lt;=DR   PDB; )(\S+)(?=;)" db="pdb" ix="id" id="$1"/>
+      <link rx="(?&lt;=DR   RefSeq; )(?:(\S+)\.\d+)(?=;)" db="refseq" ix="id" id="$1"/>
+      <link rx="(?&lt;=DR   UniGene; )(\S+)(?=;)" db="unigene" ix="id" id="$1"/>
+      <link rx="(?&lt;=DR   GO; )GO:(\S+)(?=;)" db="go" ix="id" id="$1"/>
+      <link rx="(?&lt;=DR   InterPro; )(\S+)(?=;)" db="interpro" ix="id" id="$1"/>
+      <link rx="(?&lt;=DR   Pfam; )(\S+)(?=;)" db="pfama" ix="ac" id="$1"/>
+      <link rx="(?&lt;=DR   PRINTS; )(\S+)(?=;)" db="prints" ix="id" id="$1"/>
+      <link rx="(?&lt;=DR   PROSITE; )(\S+)(?=;)" db="prosite" ix="ac" id="$1"/>
+      <link rx="(?&lt;=DR   MIM; )(\S+)(?=;)" db="omim" ix="id" id="$1"/>
     </format>
     <format id="embl" script="embl.js"/>
     <format id="enzyme">
-      <link regex="([A-Z]+[A-Z0-9]+)(?=, )" db="sprot" ix="ac" id="$1"/>
+      <link rx="([A-Z]+[A-Z0-9]+)(?=, )" db="sprot" ix="ac" id="$1"/>
     </format>
     <format id="taxonomy">
-      <link regex="(?&lt;=^PARENT ID                 : )(\d+)" ix="id" id="$1" db="taxonomy"/>
+      <link rx="(?&lt;=^PARENT ID                 : )(\d+)" ix="id" id="$1" db="taxonomy"/>
     </format>
     <format id="stockholm">
-      <link regex="^(?:#=GF DR\s+PFAMA;\s)(\S+)(?=;)" db="pfama" ix="id" id="$1"/>
-      <link regex="^(?:#=GF DR\s+PFAMB;\s)(\S+)(?=;)" db="pfamb" ix="id" id="$1"/>
-      <link regex="^(?:#=GF DR\s+PDB;\s)(\S+)(?=;)" db="pdb" ix="id" id="$1"/>
-      <link regex="^(?:#=GF DR\s+PROSITE;\s)(\S+)(?=;)" db="prosite" ix="id" id="$1"/>
-      <link regex="^(?:#=GF DR\s+INTERPRO;\s)(\S+)(?=;)" db="interpro" ix="id" id="$1"/>
-      <link regex="^(?:#=GS .+?AC )([0-9A-Z]+)" db="uniprot" ix="ac" id="$1"/>
-      <link regex="^(?:#=GS .+?DR PDB; )([0-9A-Z]{4})" db="pdb" ix="id" id="$1"/>
+      <link rx="^(?:#=GF DR\s+PFAMA;\s)(\S+)(?=;)" db="pfama" ix="id" id="$1"/>
+      <link rx="^(?:#=GF DR\s+PFAMB;\s)(\S+)(?=;)" db="pfamb" ix="id" id="$1"/>
+      <link rx="^(?:#=GF DR\s+PDB;\s)(\S+)(?=;)" db="pdb" ix="id" id="$1"/>
+      <link rx="^(?:#=GF DR\s+PROSITE;\s)(\S+)(?=;)" db="prosite" ix="id" id="$1"/>
+      <link rx="^(?:#=GF DR\s+INTERPRO;\s)(\S+)(?=;)" db="interpro" ix="id" id="$1"/>
+      <link rx="^(?:#=GS .+?AC )([0-9A-Z]+)" db="uniprot" ix="ac" id="$1"/>
+      <link rx="^(?:#=GS .+?DR PDB; )([0-9A-Z]{4})" db="pdb" ix="id" id="$1"/>
     </format>
   </formats>
   <!-- Parsers section, parsers in this section are for XML databanks only
@@ -279,12 +279,10 @@
       <source fetch="ftp://ftp.ncbi.nih.gov/pub" delete="false">pmc/articles*.tar.gz</source>
     </databank>
     <!-- databanks used in debugging m6 -->
-
-	<databank id="enzyme-tar" parser="enzyme">
-		<name>Enzyme tarred</name>
-		<source>enzyme/enzyme.tgz</source>
-	</databank>
-
+    <databank id="enzyme-tar" parser="enzyme" enabled="true" update="never">
+      <name>Enzyme tarred</name>
+      <source delete="false">enzyme/enzyme.tgz</source>
+    </databank>
     <!--	-->
     <!--		<databank id="pdb-mini" parser="pdb">-->
     <!--			<name>PDB mini</name>-->

@@ -88,6 +88,7 @@ Admin = {
 		
 		lastRow.before(newRow);
 		newRow.show();
+		$('#' + form + " table").show();
 	},
 	
 	changeFormat: function(db) {

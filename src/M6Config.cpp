@@ -165,9 +165,19 @@ zx::element_set File::GetFormats()
 	return Find(boost::format("/m6-config/formats/format"));
 }
 
-zx::element* File::GetFormat(const string& inID)
+zx::element* File::GetFormat(const string& inID, bool inCreate)
 {
-	return FindFirst(boost::format("/m6-config/formats/format[@id='%1%']") % inID);
+	zx::element* format = FindFirst(boost::format("/m6-config/formats/format[@id='%1%']") % inID);
+	if (format == nullptr and inCreate)
+	{
+		format = new zx::element("format");
+		format->set_attribute("id", inID);
+		
+		zx::element* formats = mConfig.find_first("/m6-config/formats");
+		formats->append(format);
+	}
+		
+	return format;
 }
 
 zx::element_set File::GetParsers()

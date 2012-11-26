@@ -1596,8 +1596,7 @@ void M6Server::handle_admin(const zh::request& request,
 			continue;
 		
 		el::object parser;
-		parser["id"] = path.filename().stem().string();
-		parser["script"] = path.string();
+		parser["id"] = parser["script"] = path.filename().stem().string();
 		parsers.push_back(parser);
 	}
 
@@ -1650,8 +1649,7 @@ void M6Server::handle_admin(const zh::request& request,
 			continue;
 		
 		el::object script;
-		script["id"] = path.filename().string();
-		script["script"] = path.string();
+		script["id"] = script["script"] = path.filename().stem().string();
 		scripts.push_back(script);
 	}
 	

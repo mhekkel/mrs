@@ -28,22 +28,22 @@
   <!-- Formats section, formats are used to add links to entries and
 		 to link a JavaScript pretty printer -->
   <formats>
-    <format id="omim" script="omim.js">
+    <format id="omim" script="omim">
       <link rx="(?&lt;=\()(?:[^();]+?; )?(\d{6})(?:\.(\d{4}))?(?=\))" db="omim" ix="id" id="$1" an="$2"/>
     </format>
-    <format id="uniprot" script="uniprot.js">
+    <format id="uniprot" script="uniprot">
       <link rx="(?&lt;=DR   EMBL; )(\S+)(?=;)" db="embl" ix="id" id="$1"/>
       <link rx="(?&lt;=DR   PDB; )(\S+)(?=;)" db="pdb" ix="id" id="$1"/>
       <link rx="(?&lt;=DR   RefSeq; )(?:(\S+)\.\d+)(?=;)" db="refseq" ix="id" id="$1"/>
       <link rx="(?&lt;=DR   UniGene; )(\S+)(?=;)" db="unigene" ix="id" id="$1"/>
       <link rx="(?&lt;=DR   GO; )GO:(\S+)(?=;)" db="go" ix="id" id="$1"/>
       <link rx="(?&lt;=DR   InterPro; )(\S+)(?=;)" db="interpro" ix="id" id="$1"/>
-      <link rx="(?&lt;=DR   Pfam; )(\S+)(?=;)" db="pfama" ix="ac" id="$1"/>
+      <link rx="(?&lt;=DR   Pfam; )(\S+)(?=;)" db="pfam" ix="ac" id="$1"/>
       <link rx="(?&lt;=DR   PRINTS; )(\S+)(?=;)" db="prints" ix="id" id="$1"/>
       <link rx="(?&lt;=DR   PROSITE; )(\S+)(?=;)" db="prosite" ix="ac" id="$1"/>
       <link rx="(?&lt;=DR   MIM; )(\S+)(?=;)" db="omim" ix="id" id="$1"/>
     </format>
-    <format id="embl" script="embl.js"/>
+    <format id="embl" script="embl"/>
     <format id="enzyme">
       <link rx="([A-Z]+[A-Z0-9]+)(?=, )" db="sprot" ix="ac" id="$1"/>
     </format>

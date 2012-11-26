@@ -513,7 +513,26 @@ void M6Server::GetLinkedDbs(const string& inDb, const string& inId,
 			foreach (const auto& l, doc->GetLinks())
 			{
 				vector<string> aliases(UnAlias(l.first));
-				dbs.insert(aliases.begin(), aliases.end());
+				
+				foreach (const string& alias, aliases)
+				{
+					if (dbs.count(alias))
+						continue;
+					
+					M6Databank* db = Load(alias);
+
+					foreach (const string& id, l.second)
+					{
+						bool exists;
+						uint32 docNr;
+						tr1::tie(exists, docNr) = db->Exists("id", id);
+						if (exists)
+						{
+							dbs.insert(alias);
+							break;
+						}
+					}
+				}
 			}
 		}
 	}

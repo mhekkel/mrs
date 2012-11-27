@@ -13,7 +13,7 @@ package M6;
 
 our $VERSION = '6.0';
 
-use strict;
+#use strict;
 #use warnings;
 
 my %scripts;
@@ -78,7 +78,7 @@ sub load_script
 
 package M6::Script;
 
-use strict;
+#use strict;
 
 require Exporter;
 require DynaLoader;

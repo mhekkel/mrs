@@ -6,7 +6,7 @@
     <directory id="mrs">/data/mrs</directory>
     <directory id="raw">/data/raw</directory>
     <directory id="blast">/data/blast-cache</directory>
-    <directory id="parser">/data/parsers</directory>
+    <directory id="parser">C:\Users\maarten\projects\m6\parsers</directory>
     <directory id="docroot">C:\Users\maarten\projects\m6\docroot</directory>
   </directories>
   <!-- Tools section, specify external executables used by M6 -->
@@ -258,20 +258,20 @@
       <info>http://www.ncbi.nlm.nih.gov/entrez/query.fcgi?db=unigene</info>
       <source fetch="ftp://ftp.ncbi.nih.gov/repository" delete="false">UniGene/*/*.data.gz</source>
     </databank>
-    <databank id="uniref50" parser="uniref" enabled="true" update="never">
+    <databank id="uniref50" parser="uniref" enabled="false" update="never">
       <name>UniRef 50</name>
       <info>http://www.uniprot.org/help/uniref</info>
       <source fetch="ftp://ftp.ebi.ac.uk/pub/databases" delete="false">uniprot/current_release/uniref/uniref50/uniref50.xml.gz</source>
     </databank>
-    <databank id="uniref90" parser="uniref" enabled="true" update="never">
+    <databank id="uniref90" parser="uniref" enabled="false" update="never">
       <name>UniRef 90</name>
       <info>http://www.uniprot.org/help/uniref</info>
-      <source fetch="ftp://ftp.ebi.ac.uk/pub/databases" delete="false">uniprot/current_release/uniref/uniref90/uniref90.xml.gz</source>
+      <source fetch="ftp://ftp.ebi.ac.uk/pub/databases">uniprot/current_release/uniref/uniref90/uniref90.xml.gz</source>
     </databank>
-    <databank id="uniref100" parser="uniref" enabled="true" update="never">
+    <databank id="uniref100" parser="uniref" enabled="false" update="never">
       <name>UniRef 100</name>
       <info>http://www.uniprot.org/help/uniref</info>
-      <source fetch="ftp://ftp.ebi.ac.uk/pub/databases" delete="false">uniprot/current_release/uniref/uniref100/uniref100.xml.gz</source>
+      <source fetch="ftp://ftp.ebi.ac.uk/pub/databases">uniprot/current_release/uniref/uniref100/uniref100.xml.gz</source>
     </databank>
     <databank id="pmc" parser="pmc" stylesheet="ViewNLM-v2.3.xsl" enabled="true" update="never">
       <name>PubMed Central</name>
@@ -279,22 +279,15 @@
       <source fetch="ftp://ftp.ncbi.nih.gov/pub" delete="false">pmc/articles*.tar.gz</source>
     </databank>
     <!-- databanks used in debugging m6 -->
-    <databank id="enzyme-tar" parser="enzyme" enabled="true" update="never">
-      <name>Enzyme tarred</name>
-      <source delete="false">enzyme/enzyme.tgz</source>
-    </databank>
-    <!--	-->
     <!--		<databank id="pdb-mini" parser="pdb">-->
     <!--			<name>PDB mini</name>-->
     <!--			<info>http://www.rcsb.org/pdb/</info>-->
     <!--			<source>pdb/cr/pdb?cr?.ent.gz</source>-->
     <!--		</databank>-->
-    <!--	-->
     <!--		<databank id="sprot-mini" parser="uniprot">-->
     <!--			<name>SwissProt mini</name>-->
     <!--			<source>uniprot/sprot-mini.dat</source>-->
     <!--		</databank>-->
-    <!--		-->
     <!--		<databank id="embl-mini" parser="embl" format="embl">-->
     <!--			<name>EMBL mini</name>-->
     <!--			<source>embl_release/rel_est_vrl_01_r113.dat.gz</source>-->

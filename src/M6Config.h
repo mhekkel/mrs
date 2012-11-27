@@ -12,6 +12,7 @@ class File
 {
   public:
  							File();
+ 							File(const File& inOther);
  							~File();								
 
 	static File&			Instance();
@@ -30,6 +31,7 @@ class File
 	zeep::xml::element_set	GetDatabanks();
 	zeep::xml::element_set	GetDatabanks(const std::string& inID);
 	zeep::xml::element*		GetDatabank(const std::string& inID);
+	zeep::xml::element*		GetDatabank(const std::string& inID, bool inCreate);
 
   private:
 	zeep::xml::element_set	Find(const boost::format& inFmt);

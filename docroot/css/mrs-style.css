@@ -639,14 +639,6 @@ div#globalSelection input, div#globalSelection select {
 	padding-right: 10px;
 }
 
-.tablebox {
-	height: 300px;
-	overflow-x: hidden;
-	overflow-y: scroll;
-
-	border: 1px solid #9E9E9E;
-}
-
 .admin .admin-right {
 	margin-left: 125px;
 	padding-left: 20px;
@@ -658,6 +650,18 @@ div#globalSelection input, div#globalSelection select {
 	height: 1px;
 	overflow: hidden;
 	margin: 0;
+}
+
+.tablebox {
+	height: 300px;
+	overflow-x: hidden;
+	overflow-y: scroll;
+
+	border: 1px solid #9E9E9E;
+}
+
+.add-del input {
+	margin-top: 0.4em;
 }
 
 form.admin_form {
@@ -749,4 +753,8 @@ form.admin_form hr {
 	color: #9E9E9E;
 	background-color: #9E9E9E;
 	height: 1px;
+}
+
+.test {
+	background-color: red;
 }

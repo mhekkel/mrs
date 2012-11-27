@@ -163,7 +163,7 @@ M6Server::M6Server(const zx::element* inConfig)
 	mount("info",			boost::bind(&M6Server::handle_info, this, _1, _2, _3));
 
 	mount("admin",			boost::bind(&M6Server::handle_admin, this, _1, _2, _3));
-	mount("admin/rename",	boost::bind(&M6Server::handle_admin_rename_ajax, this, _1, _2, _3));
+//	mount("admin/rename",	boost::bind(&M6Server::handle_admin_rename_ajax, this, _1, _2, _3));
 
 	add_processor("entry",	boost::bind(&M6Server::process_mrs_entry, this, _1, _2, _3));
 	add_processor("link",	boost::bind(&M6Server::process_mrs_link, this, _1, _2, _3));
@@ -1393,6 +1393,10 @@ void M6Server::handle_similar(const zh::request& request, const el::scope& scope
 
 void M6Server::ProcessNewConfig(const string& inPage, zeep::http::parameter_map& inParams)
 {
+	unique_ptr<M6Config::File> config(new M6Config::File(*mConfigCopy));
+	
+	string btn = inParams.get("btn", "").as<string>();
+	
 	if (inPage == "global")
 	{
 		const char* dirs[] = { "mrs", "raw", "parser", "docroot", "blast" };
@@ -1401,7 +1405,7 @@ void M6Server::ProcessNewConfig(const string& inPage, zeep::http::parameter_map&
 			fs::path p = inParams.get(dir, "").as<string>();
 			if (not fs::is_directory(p))
 				THROW(("%s directory does not exist", dir));
-			mConfigCopy->GetDirectory(dir)->content(p.string());
+			config->GetDirectory(dir)->content(p.string());
 		}
 
 		const char* tools[] = { "clustalo" };
@@ -1410,12 +1414,12 @@ void M6Server::ProcessNewConfig(const string& inPage, zeep::http::parameter_map&
 			fs::path p = inParams.get(tool, "").as<string>();
 			if (not fs::exists(p))
 				THROW(("The %s tool does not exist", tool));
-			mConfigCopy->GetTool(tool)->content(p.string());
+			config->GetTool(tool)->content(p.string());
 		}
 	}
 	else if (inPage == "server")
 	{
-		zx::element* server = mConfigCopy->GetServer();
+		zx::element* server = config->GetServer();
 		server->set_attribute("addr", inParams.get("addr", "").as<string>());
 		server->set_attribute("port", inParams.get("port", "").as<string>());
 		
@@ -1465,61 +1469,182 @@ void M6Server::ProcessNewConfig(const string& inPage, zeep::http::parameter_map&
 	}
 	else if (inPage == "parsers")
 	{
-		
+		if (btn == "delete")
+		{
+			string parserID = inParams.get("selected", "").as<string>();
+			zx::element* parser = config->GetParser(parserID);
+			if (parser != nullptr)
+			{
+				parser->parent()->remove(parser);
+				delete parser;
+			}
+		}
+		else if (btn == "add")
+		{
+			
+		}
+		else
+		{
+			
+		}
 	}
 	else if (inPage == "formats")
 	{
-		string formatID = inParams.get("fmt", "").as<string>();
-		
-		zx::element* fmt = mConfigCopy->GetFormat(formatID, true);
-		
-		string script = inParams.get("script", "").as<string>();
-		fmt->set_attribute("script", script);
-		
-		typedef zh::parameter_map::iterator iter;
-		typedef pair<iter,iter> range;
-		range r[5] = {
-			inParams.equal_range("rx"),
-			inParams.equal_range("db"),
-			inParams.equal_range("id"),
-			inParams.equal_range("ix"),
-			inParams.equal_range("an")
-		};
-		
-		for_each(r, boost::end(r), [](range& ri) {
-			if (ri.first == ri.second) THROW(("invalid data"));
-			--ri.second;
-		});
-		
-		zx::container::iterator l = fmt->begin();
-
-		while (r[0].first != r[0].second)
+		if (btn == "delete")
 		{
-			if (l == fmt->end())
-				l = fmt->insert(l, new zx::element("link"));
-			
-			zx::element* link = *l;
-			++l;
-			
-			for_each(r, boost::end(r), [link](range& ri) {
-				string v = ri.first->second.as<string>();
-				if (v.empty())
-					link->remove_attribute(ri.first->first);
-				else
-					link->set_attribute(ri.first->first, v);
-				++ri.first;
-			});
+			string formatID = inParams.get("selected", "").as<string>();
+			zx::element* fmt = config->GetFormat(formatID);
+			if (fmt != nullptr)
+			{
+				fmt->parent()->remove(fmt);
+				delete fmt;
+			}
 		}
-		
-		if (l != fmt->end())
-			fmt->erase(l, fmt->end());
+		else if (btn == "add")
+		{
+			
+		}
+		else
+		{
+			string formatID = inParams.get("fmt", "").as<string>();
+			zx::element* fmt = config->GetFormat(formatID, true);
+			
+			string script = inParams.get("script", "").as<string>();
+			fmt->set_attribute("script", script);
+			
+			typedef zh::parameter_map::iterator iter;
+			typedef pair<iter,iter> range;
+			range r[5] = {
+				inParams.equal_range("rx"),
+				inParams.equal_range("db"),
+				inParams.equal_range("id"),
+				inParams.equal_range("ix"),
+				inParams.equal_range("an")
+			};
+			
+			for_each(r, boost::end(r), [](range& ri) {
+				if (ri.first == ri.second) THROW(("invalid data"));
+				--ri.second;
+			});
+			
+			zx::container::iterator l = fmt->begin();
+	
+			while (r[0].first != r[0].second)
+			{
+				if (l == fmt->end())
+					l = fmt->insert(l, new zx::element("link"));
+				
+				zx::element* link = *l;
+				++l;
+				
+				for_each(r, boost::end(r), [link](range& ri) {
+					string v = ri.first->second.as<string>();
+					if (v.empty())
+						link->remove_attribute(ri.first->first);
+					else
+						link->set_attribute(ri.first->first, v);
+					++ri.first;
+				});
+			}
+			
+			if (l != fmt->end())
+				fmt->erase(l, fmt->end());
+		}
 	}
 	else if (inPage == "databanks")
 	{
-		
+		if (btn == "delete")
+		{
+			string dbID = inParams.get("selected", "").as<string>();
+			zx::element* db = config->GetDatabank(dbID);
+			if (db != nullptr)
+			{
+				db->parent()->remove(db);
+				delete db;
+			}
+		}
+		else
+		{
+			string dbID = inParams.get("id", "").as<string>();
+			zx::element* db = config->GetDatabank(dbID, true);
+			
+			db->set_attribute("enabled",
+				inParams.get("enabled", false).as<bool>() ? "true" : "false");
+			db->set_attribute("parser", inParams.get("parser", "").as<string>());
+			db->set_attribute("update", inParams.get("update", "never").as<string>());
+			
+			string format = inParams.get("format", "none").as<string>();
+			if (format == "none")
+				db->remove_attribute("format");
+			else if (format == "xml")
+			{
+				db->remove_attribute("format");
+				db->set_attribute("stylesheet", inParams.get("stylesheet", "").as<string>());
+			}
+			else
+				db->set_attribute("format", format);
+			
+			string s = inParams.get("aliases", "").as<string>();
+			zx::element* e = db->find_first("aliases");
+
+			if (s.empty())
+			{
+				if (e != nullptr)
+					db->remove(e);
+				delete e;
+			}
+			else
+			{
+				vector<string> aliases;
+				ba::split(aliases, s, ba::is_any_of(";"));
+				if (e == nullptr)
+					db->append(e = new zx::element("aliases"));
+				e->erase(e->begin(), e->end());
+				for_each(aliases.begin(), aliases.end(), [e](const string& alias) {
+					zx::element* a = new zx::element("alias");
+					a->content(alias);
+					e->append(a);
+				});
+			}
+			
+			const char* fields[] = { "name", "info", "filter", "source" };
+			foreach (const char* field, fields)
+			{
+				s = inParams.get(field, "").as<string>();
+				e = db->find_first(field);
+				if (s.empty())
+				{
+					if (e != nullptr)
+						db->remove(e);
+					delete e;
+				}
+				else
+				{
+					if (e == nullptr)
+						db->append(e = new zx::element(field));
+					e->content(s);
+				}
+			}
+
+			zx::element* source = db->find_first("source");
+			string fetch = inParams.get("fetch", "").as<string>();
+			
+			if (not fetch.empty() and source == nullptr)
+				THROW(("invalid: fetch contains text but source is empty"));
+			
+			if (not fetch.empty())
+				source->set_attribute("fetch", fetch);
+			
+			if (inParams.get("delete", false).as<bool>())
+				source->set_attribute("delete", "true");
+			else
+				source->remove_attribute("delete");
+		}
 	}
 	
-	mConfigCopy->Validate();
+	config->Validate();
+	delete mConfigCopy;
+	mConfigCopy = config.release();
 }
 
 void M6Server::handle_admin(const zh::request& request,
@@ -1707,7 +1832,6 @@ void M6Server::handle_admin(const zh::request& request,
 			
 			el::object fetch;
 			fetch["src"] = e->get_attribute("fetch");
-			fetch["dst"] = e->get_attribute("dst");
 			fetch["delete"] = e->get_attribute("delete");
 			databank["fetch"] = fetch;
 		}
@@ -1732,24 +1856,24 @@ void M6Server::handle_admin(const zh::request& request,
 	create_reply_from_template("admin.html", sub, reply);
 }
 
-void M6Server::handle_admin_rename_ajax(const zh::request& request,
-	const el::scope& scope, zh::reply& reply)
-{
-	ValidateAuthentication(request, mAdminRealm);
-	
-	zeep::http::parameter_map params;
-	get_parameters(scope, params);
-
-	string db = params.get("db", "").as<string>();
-	string prop = params.get("prop", "").as<string>();
-	string value = params.get("value", "").as<string>();
-
-	el::object result;
-
-	result["value"] = value;
-
-	reply.set_content(result.toJSON(), "text/javascript");
-}
+//void M6Server::handle_admin_rename_ajax(const zh::request& request,
+//	const el::scope& scope, zh::reply& reply)
+//{
+//	ValidateAuthentication(request, mAdminRealm);
+//	
+//	zeep::http::parameter_map params;
+//	get_parameters(scope, params);
+//
+//	string db = params.get("db", "").as<string>();
+//	string prop = params.get("prop", "").as<string>();
+//	string value = params.get("value", "").as<string>();
+//
+//	el::object result;
+//
+//	result["value"] = value;
+//
+//	reply.set_content(result.toJSON(), "text/javascript");
+//}
 
 // --------------------------------------------------------------------
 

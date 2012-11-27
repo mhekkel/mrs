@@ -535,6 +535,8 @@ M6Builder::M6Builder(const string& inDatabank)
 	: mConfig(M6Config::GetDatabank(inDatabank))
 	, mDatabank(nullptr)
 {
+	if (mConfig == nullptr)
+		THROW(("Unknown databank %s", inDatabank.c_str()));
 }
 
 M6Builder::~M6Builder()

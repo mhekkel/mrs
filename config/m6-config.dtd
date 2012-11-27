@@ -52,7 +52,7 @@
 				   id CDATA #REQUIRED>
 	
 <!ELEMENT databanks (databank+)>
-<!ELEMENT databank (aliases?,name?,info?,source,filter?)>
+<!ELEMENT databank (aliases|name|info|source|filter)+>
 <!ATTLIST databank id ID #REQUIRED
 				   enabled (true|false) "true"
 				   parser NMTOKEN #REQUIRED

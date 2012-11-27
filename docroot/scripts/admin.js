@@ -6,83 +6,98 @@
 Admin = {
 	timeout: null,
 
-	init: function() {
-		$("table.select_form tr").each(function() {
+	init: function()
+	{
+		$("div.nav a").each(function()
+		{
 			$(this).click(function()
 			{
-				var id = this.id;
-			
-				this.section.find("form").hide();
-				this.section.find("#" + id).show();
-				
-				this.section.find("tr").removeClass('selected');
-				$(this).addClass('selected');
-
-				try {
-					sessionStorage.setItem("selected-" + this.section.attr("id"), id);
-				} catch (e) {}
-			})
+				var section = this.id;
+				Admin.selectSection(section);
+			});
 		});
 
-		var v = sessionStorage.getItem('selected-adminpage');
-
-		$("div.section").each(function() {
+		$("div.section").each(function()
+		{
 			var section = $(this);
-			var id = section.attr("id");
+			var sectionId = section.attr("id");
 
-			var s = sessionStorage.getItem('selected-' + id);
-
-			$(this).find("tr").each(function() {
-				this.section = section;
-
+			$(this).find("table.select_form tr").each(function()
+			{
 				if (this.id == null || this.id.length == 0)
 					this.id = $(this).text();
-				
-				if (this.id == s)
-					$(this).addClass('selected');
+				var rowId = this.id;
+				$(this).click(function() {
+					Admin.selectForm(sectionId, rowId);
+				});
 			});
-
-			$(this).find("form").each(function() {
-				this.section = section;
-				if (this.id == s)
-					$(this).show();
-			});
-			
-			if (id != v)
-				section.hide();
 		});
 		
-		$("div.delete").click(function() {
+		$("div.delete").click(function()
+		{
 			$(this).parent().parent().remove();
 		});
-		
 
-		$("select[name='format']").each(function() {
+		$("select[name='format']").each(function()
+		{
 			if ($(this).val() == 'xml')
 				$(this).next().show();
 		});
-	},
-
-	changeStatsView: function(view) {
 		
-		$("div.section").each(function() {
-			if (this.id == view)	{ $(this).show(); }
+		var v = sessionStorage.getItem('selected-adminpage');
+		if (v == null)
+			v = 'global';
+		Admin.selectSection(v);
+	},
+	
+	selectSection: function(section)
+	{
+		$("div.section").each(function()
+		{
+			if (this.id == section)	{ $(this).show(); }
 			else					{ $(this).hide(); }
 		});
 
-		$("div.nav li a").each(function() {
-			if (this.id == view)	{ $(this).addClass("selected"); }
+		$("div.nav li a").each(function()
+		{
+			if (this.id == section)	{ $(this).addClass("selected"); }
 			else					{ $(this).removeClass("selected"); }
 		});
 		
-		sessionStorage.setItem('selected-adminpage', view);
+		sessionStorage.setItem('selected-adminpage', section);
+		
+		var f = Admin.selectedForm(section);
+		if (f != '')
+			Admin.selectForm(section, f);
 	},
 	
-	addLinkToFormat: function(form) {
+	selectForm: function(section, id)
+	{
+		var sect = $("#" + section + ".section");
+	
+		sect.find("form.admin_form").hide();
+		sect.find("#" + id).show();
+		
+		sect.find("table.select_form tr").each(function()
+		{
+			if (this.id == id)		{ $(this).addClass('selected'); }
+			else					{ $(this).removeClass('selected'); }
+		});
+		
+		sect.find("form.add-del input[name='selected']").attr("value", id);
+		
+		try {
+			sessionStorage.setItem("selected-" + section, id);
+		} catch (e) {}
+	},
+
+	addLinkToFormat: function(form)
+	{
 		var lastRow = $('#' + form + " table tr:last");
 		var newRow = lastRow.clone();
 		
-		newRow.find("div.delete").click(function() {
+		newRow.find("div.delete").click(function()
+		{
 			$(this).parent().parent().remove();
 		});
 		
@@ -91,7 +106,8 @@ Admin = {
 		$('#' + form + " table").show();
 	},
 	
-	changeFormat: function(db) {
+	changeFormat: function(db)
+	{
 		var selected = $('#' + db + " select[name='format']").val();
 		var stylesheetrow = $('#' + db + " input[name='stylesheet']");
 		
@@ -99,6 +115,17 @@ Admin = {
 			stylesheetrow.show('fast');
 		else
 			stylesheetrow.hide('fast');
+	},
+	
+	selectedForm: function(section)
+	{
+		var result = sessionStorage.getItem("selected-" + section);
+		if (result == null)
+		{
+			var sect = $('#' + section + '.section');
+			result = sect.find("table.select_form tr:first td:first").text();
+		}
+		return result;
 	}
 }
 

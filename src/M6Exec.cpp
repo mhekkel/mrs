@@ -185,6 +185,8 @@ int ForkExec(vector<const char*>& args, double maxRunTime,
 	
 	CloseHandle(hOutputRead);
 	CloseHandle(hErrorRead);
+
+	return 0;
 }
 
 struct M6ProcessImpl

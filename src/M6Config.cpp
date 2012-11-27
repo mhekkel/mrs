@@ -40,6 +40,12 @@ File::File()
 	configFileStream >> mConfig;
 }
 
+File::File(const File& inFile)
+{
+	zx::element* config = inFile.mConfig.child();
+	mConfig.child(static_cast<zx::element*>(config->clone()));
+}
+
 File::~File()
 {
 }
@@ -176,7 +182,6 @@ zx::element* File::GetFormat(const string& inID, bool inCreate)
 		zx::element* formats = mConfig.find_first("/m6-config/formats");
 		formats->append(format);
 	}
-		
 	return format;
 }
 
@@ -206,6 +211,20 @@ zx::element_set File::GetDatabanks(const string& inID)
 zx::element* File::GetDatabank(const string& inID)
 {
 	return FindFirst(boost::format("/m6-config/databanks/databank[@id='%1%' and @enabled='true']") % inID);
+}
+
+zx::element* File::GetDatabank(const string& inID, bool inCreate)
+{
+	zx::element* result = FindFirst(boost::format("/m6-config/databanks/databank[@id='%1%']") % inID);
+	if (result == nullptr and inCreate)
+	{
+		result = new zx::element("databank");
+		result->set_attribute("id", inID);
+		
+		zx::element* dbs = mConfig.find_first("/m6-config/databanks");
+		dbs->append(result);
+	}
+	return result;
 }
 
 void Reload()

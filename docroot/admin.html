@@ -31,11 +31,11 @@
 		<mrs:include file="form.html" />
 		<div class="nav">
 			<ul>
-				<li><a href="#" id="global" onclick="Admin.changeStatsView('global');">Main</a></li>
-				<li><a href="#" id="server" onclick="Admin.changeStatsView('server');">Server</a></li>
-				<li><a href="#" id="parsers" onclick="Admin.changeStatsView('parsers');">Parsers</a></li>
-				<li><a href="#" id="formats" onclick="Admin.changeStatsView('formats');">Formats</a></li>
-				<li><a href="#" id="databanks" onclick="Admin.changeStatsView('databanks');">Databanks</a></li>
+				<li><a href="#" id="global">Main</a></li>
+				<li><a href="#" id="server">Server</a></li>
+				<li><a href="#" id="parsers">Parsers</a></li>
+				<li><a href="#" id="formats">Formats</a></li>
+				<li><a href="#" id="databanks">Databanks</a></li>
 <!--				<li><a href="#" id="blast" onclick="Admin.changeStatsView('blast');">Blast</a></li>-->
 			</ul>
 		</div>
@@ -102,10 +102,11 @@
 							</mrs:iterate>
 						</table>
 					</div>
-					<form method='post'>
-						<input type='hidden' name='submit' value='parsers-add-del'/>
-						<input type='submit' value='add' name='btn'/>
-						<input type='submit' value='delete' name='btn'/>
+					<form id="add-del-parsers" class="add-del" method='post'>
+						<input type='hidden' name='submit' value='parsers'/>
+						<input type='hidden' name='selected' value='' />
+						<input type='submit' value='add' name='btn' disabled='disabled'/>
+						<input type='submit' value='delete' name='btn' disabled='disabled'/>
 					</form>
 				</div>
 				
@@ -140,8 +141,9 @@
 							</mrs:iterate>
 						</table>
 					</div>
-					<form method='post'>
-						<input type='hidden' name='submit' value='formats-add-del'/>
+					<form id="add-del-formats" class="add-del" method='post'>
+						<input type='hidden' name='submit' value='formats'/>
+						<input type='hidden' name='selected' value='' />
 						<input type='submit' value='add' name='btn'/>
 						<input type='submit' value='delete' name='btn'/>
 					</form>
@@ -221,8 +223,9 @@
 							</mrs:iterate>
 						</table>
 					</div>
-					<form method='post'>
-						<input type='hidden' name='submit' value='databanks-add-del'/>
+					<form id="add-del-databanks" class="add-del" method='post'>
+						<input type='hidden' name='submit' value='databanks'/>
+						<input type='hidden' name='selected' value='' />
 						<input type='submit' value='add' name='btn'/>
 						<input type='submit' value='delete' name='btn'/>
 					</form>

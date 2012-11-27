@@ -1678,14 +1678,14 @@ void M6Server::handle_admin(const zh::request& request,
 		else
 		{
 			ProcessNewConfig(submitted, params);
-			reply = zh::reply::redirect(request.uri);
+			reply = zh::reply::redirect("admin");
 		}
 		return;
 	}
 
 	el::scope sub(scope);
 	
-	auto sortByID = [](el::object& a, el::object& b ) -> bool { return a["id"] < b["id"]; };
+	auto sortByID = [](const el::object& a, const el::object& b ) -> bool { return a["id"] < b["id"]; };
 
 	// add the global settings
 	el::object global, dirs, tools;
@@ -2676,12 +2676,14 @@ void M6Server::handle_status_ajax(const zh::request& request, const el::scope& s
 		if (db->get_attribute("enabled") == "false")
 			continue;
 		
+		string id = db->get_attribute("id");
+		
 		el::object databank;
-		databank["name"] = db->content();
+		databank["id"] = id;
 		
 		string stage;
 		float progress;
-		if (M6Status::Instance().GetUpdateStatus(db->content(), stage, progress))
+		if (M6Status::Instance().GetUpdateStatus(id, stage, progress))
 		{
 			el::object update;
 			update["progress"] = progress;

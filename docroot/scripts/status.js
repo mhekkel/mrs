@@ -31,7 +31,7 @@ Status = {
 		for (i in stat) {
 			var db = stat[i];
 			
-			var row = document.getElementById("db-" + db.name);
+			var row = document.getElementById("db-" + db.id);
 			if (row == null) continue;
 
 			if (db.update != null)
@@ -75,47 +75,6 @@ Status = {
 		}
 	},
 
-/*	
-	updateUpdate: function(stat) {
-		if (stat.length + 1 != document.getElementById('update').rows.length) {
-			window.location.reload();
-			return;
-		}
-
-		for (i in stat) {
-			var db = stat[i];
-			var row = document.getElementById("update-" + db.name);
-			if (row == null) continue;
-
-			row.cells[1].innerHTML = db.fetchDate;
-			row.cells[3].innerHTML = db.buildDate;
-			
-			if (db.failed) {
-				row.className = 'error';
-			} else if (db.building || db.fetching) {
-				row.className = 'active';
-			} else {
-				row.className = '';
-			}
-			
-			if (db.fetching) {
-				row.cells[1].className = 'active';
-				row.cells[2].className = 'active';
-			} else {
-				row.cells[1].className = '';
-				row.cells[2].className = '';
-			}
-
-			if (db.building) {
-				row.cells[3].className = 'active';
-				row.cells[4].className = 'active';
-			} else {
-				row.cells[3].className = '';
-				row.cells[4].className = '';
-			}
-		}
-	},
-*/	
 	sortTable: function(table, column) {
 		var t = document.getElementById(table);
 		var rows = t.rows;

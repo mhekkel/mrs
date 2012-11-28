@@ -3,6 +3,8 @@ BUGS:
 - embl CO section in format is missing
 - blast knop, invullen sequentie (sprot entry)
 
+- links: in OMIM records staan geen links naar swissprot, zou wel moeten
+
 Todo
 
 - verwijder nr als parameter voor entry, gebruik '#0000' constructie

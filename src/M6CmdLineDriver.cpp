@@ -289,9 +289,7 @@ bool M6CmdLineDriver::Validate(po::variables_map& vm)
 tr1::tuple<const zx::element*,fs::path>
 M6CmdLineDriver::GetDatabank(const string& inDatabank)
 {
-	const zx::element* config = M6Config::GetDatabank(inDatabank);
-	if (not config)
-		THROW(("Configuration for %s is missing", inDatabank.c_str()));
+	const zx::element* config = M6Config::GetEnabledDatabank(inDatabank);
 
 	fs::path path = M6Config::GetDbDirectory(inDatabank);
 	

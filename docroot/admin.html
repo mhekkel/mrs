@@ -155,9 +155,9 @@
 						<fieldset>
 							<h3>Format specification</h3>
 							<input type='hidden' name='submit' value='formats'/>
-							<input type='hidden' name='fmt' value='${format.id}'/>
+							<input type='hidden' name='original-id' value='${format.id}'/>
 
-							<div><label>ID</label><input type="text" value="${format.id}" disabled='disabled'/></div>
+							<div><label>ID</label><input type="text" name="id" value="${format.id}"/></div>
 
 							<h3>Document layout</h3>
 
@@ -237,8 +237,8 @@
 						<fieldset>
 							<h3>Databank information</h3>
 							<input type='hidden' name='submit' value='databanks'/>
-							<input type='hidden' name='id' value='${db.id}'/>
-							<div><label>ID</label><input type="text" value="${db.id}" disabled='disabled'/></div>
+							<input type='hidden' name='original-id' value='${db.id}'/>
+							<div><label>ID</label><input type="text" name="id" value="${db.id}"/></div>
 							<div><label>Enabled</label><mrs:checkbox name="enabled" checked="${db.enabled}"/></div>
 							<div><label>Aliases</label><input type="text" value="${db.aliases}" name="aliases"/></div>
 							<div><label>Name</label><input type="text" value="${db.name}" name="name"/></div>

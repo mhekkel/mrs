@@ -25,13 +25,15 @@ class File
 	zeep::xml::element*		GetUser(const std::string& inName, const std::string& inRealm);
 	zeep::xml::element*		GetServer();
 	zeep::xml::element_set	GetFormats();
-	zeep::xml::element*		GetFormat(const std::string& inID, bool inCreate = false);
+	zeep::xml::element*		GetFormat(const std::string& inID);
+	zeep::xml::element*		CreateFormat();
 	zeep::xml::element_set	GetParsers();
 	zeep::xml::element*		GetParser(const std::string& inID);
 	zeep::xml::element_set	GetDatabanks();
 	zeep::xml::element_set	GetDatabanks(const std::string& inID);
-	zeep::xml::element*		GetDatabank(const std::string& inID);
-	zeep::xml::element*		GetDatabank(const std::string& inID, bool inCreate);
+	zeep::xml::element*		GetEnabledDatabank(const std::string& inID);
+	zeep::xml::element*		GetConfiguredDatabank(const std::string& inID);
+	zeep::xml::element*		CreateDatabank();
 
   private:
 	zeep::xml::element_set	Find(const boost::format& inFmt);
@@ -122,15 +124,20 @@ inline const zeep::xml::element_set	GetDatabanks(const std::string& inID)
 	return File::Instance().GetDatabanks(inID);
 }
 
-inline const zeep::xml::element* GetDatabank(const std::string& inID)
+inline const zeep::xml::element* GetEnabledDatabank(const std::string& inID)
 {
-	return File::Instance().GetDatabank(inID);
+	return File::Instance().GetEnabledDatabank(inID);
+}
+
+inline const zeep::xml::element* GetConfiguredDatabank(const std::string& inID)
+{
+	return File::Instance().GetConfiguredDatabank(inID);
 }
 
 inline std::string GetDatabankParam(const std::string& inID, const std::string& inParam)
 {
 	std::string result;
-	zeep::xml::element* db = File::Instance().GetDatabank(inID);
+	zeep::xml::element* db = File::Instance().GetEnabledDatabank(inID);
 	if (db != nullptr)
 	{
 		zeep::xml::node* n = db->find_first_node(inParam.c_str());

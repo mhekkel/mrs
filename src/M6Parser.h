@@ -20,7 +20,7 @@ class M6Parser
 						const std::string& inSourceConfig);
 
 	void			ParseDocument(M6InputDocument* inDoc,
-						const std::string& inDbHeader);
+						const std::string& inFileName, const std::string& inDbHeader);
 	std::string		GetValue(const std::string& inName);
 
 	void			ToFasta(const std::string& inDoc, const std::string& inID,

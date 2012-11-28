@@ -8,6 +8,7 @@
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/foreach.hpp>
 #define foreach BOOST_FOREACH
+#include <boost/regex.hpp>
 
 #include "M6File.h"
 #include "M6Error.h"
@@ -415,17 +416,26 @@ bool Match(const char* inPattern, const char* inName)
 				return *inName == 0;
 			case '*':
 			{
-				if (inPattern[1] == 0)	// last '*' matches all 
-					return true;
-
-				const char* n = inName;
-				while (*n)
+				if (inPattern[1] == 0)
 				{
-					if (Match(inPattern + 1, n))
-						return true;
-					++n;
+					while (*inName)
+					{
+						if (*inName == '/' or *inName == '\\')
+							return false;
+						++inName;
+					}
+					return true;
 				}
-				return false;
+				else
+				{
+					while (*inName)
+					{
+						if (Match(inPattern + 1, inName))
+							return true;
+						++inName;
+					}
+					return false;
+				}
 			}
 			case '?':
 				if (*inName)
@@ -447,6 +457,27 @@ bool Match(const char* inPattern, const char* inName)
 	}
 }
 
+void expand_group(const string& inPattern, vector<string>& outExpanded)
+{
+	static boost::regex rx("\\{([^{},]+,[^{}]*)\\}");
+	
+	boost::smatch m;
+	if (boost::regex_search(inPattern, m, rx))
+	{
+		vector<string> options;
+		ba::split(options, m[1].str(), ba::is_any_of(","));
+		
+		foreach (string& option, options)
+		{
+			vector<string> expanded;
+			expand_group(m.prefix() + option + m.suffix(), expanded);
+			outExpanded.insert(outExpanded.end(), expanded.begin(), expanded.end());
+		}
+	}
+	else
+		outExpanded.push_back(inPattern);
+}
+
 }
 
 bool M6FilePathNameMatches(const fs::path& inPath, const string inGlobPattern)
@@ -457,7 +488,14 @@ bool M6FilePathNameMatches(const fs::path& inPath, const string inGlobPattern)
 	{
 		vector<string> patterns;
 		ba::split(patterns, inGlobPattern, ba::is_any_of(";"));
-		foreach (string& pat, patterns)
+		
+		vector<string> expandedpatterns;
+		for_each(patterns.begin(), patterns.end(), [&expandedpatterns](string& pattern)
+		{
+			expand_group(pattern, expandedpatterns);
+		});
+		
+		foreach (string& pat, expandedpatterns)
 		{
 			if (Match(pat.c_str(), inPath.string().c_str()))
 			{

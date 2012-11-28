@@ -171,18 +171,26 @@ zx::element_set File::GetFormats()
 	return Find(boost::format("/m6-config/formats/format"));
 }
 
-zx::element* File::GetFormat(const string& inID, bool inCreate)
+zx::element* File::GetFormat(const string& inID)
 {
-	zx::element* format = FindFirst(boost::format("/m6-config/formats/format[@id='%1%']") % inID);
-	if (format == nullptr and inCreate)
-	{
-		format = new zx::element("format");
-		format->set_attribute("id", inID);
-		
-		zx::element* formats = mConfig.find_first("/m6-config/formats");
-		formats->append(format);
-	}
-	return format;
+	return FindFirst(boost::format("/m6-config/formats/format[@id='%1%']") % inID);
+}
+
+zx::element* File::CreateFormat()
+{
+	zx::element* result = new zx::element("format");
+
+	boost::format testId("/m6-config/formats/format[id='format-%1%']");
+	uint32 nr = 1;
+	while (FindFirst(testId % nr) != nullptr)
+		++nr;
+
+	result->set_attribute("id", (boost::format("format-%1%") % nr).str());
+
+	zx::element* formats = mConfig.find_first("/m6-config/formats");
+	formats->append(result);
+
+	return result;
 }
 
 zx::element_set File::GetParsers()
@@ -208,22 +216,38 @@ zx::element_set File::GetDatabanks(const string& inID)
 	return result;
 }
 
-zx::element* File::GetDatabank(const string& inID)
+zx::element* File::GetEnabledDatabank(const string& inID)
 {
-	return FindFirst(boost::format("/m6-config/databanks/databank[@id='%1%' and @enabled='true']") % inID);
+	zx::element* db = GetConfiguredDatabank(inID);
+	if (db == nullptr)
+		THROW(("Databank %s not configured", inID.c_str()));
+	
+	if (db->get_attribute("enabled") != "true")
+		THROW(("Databank %s not enabled", inID.c_str()));
+	
+	return db;
 }
 
-zx::element* File::GetDatabank(const string& inID, bool inCreate)
+zx::element* File::GetConfiguredDatabank(const string& inID)
 {
-	zx::element* result = FindFirst(boost::format("/m6-config/databanks/databank[@id='%1%']") % inID);
-	if (result == nullptr and inCreate)
-	{
-		result = new zx::element("databank");
-		result->set_attribute("id", inID);
-		
-		zx::element* dbs = mConfig.find_first("/m6-config/databanks");
-		dbs->append(result);
-	}
+	return FindFirst(boost::format("/m6-config/databanks/databank[@id='%1%']") % inID);
+}
+
+zx::element* File::CreateDatabank()
+{
+	zx::element* result = new zx::element("databank");
+
+	boost::format testId("/m6-config/databanks/databank[id='databank-%1%']");
+	uint32 nr = 1;
+	while (FindFirst(testId % nr) != nullptr)
+		++nr;
+
+	result->set_attribute("id", (boost::format("databank-%1%") % nr).str());
+	result->set_attribute("parser", "generic");
+
+	zx::element* dbs = mConfig.find_first("/m6-config/databanks");
+	dbs->append(result);
+
 	return result;
 }
 

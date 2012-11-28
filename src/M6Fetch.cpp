@@ -602,20 +602,14 @@ void M6FTPFetcher::FetchFile(fs::path inRemote, fs::path inLocal, time_t inTime,
 
 void M6Fetch(const string& inDatabank)
 {
-	const zx::element* config = M6Config::GetDatabank(inDatabank);
-	if (not config)
-		THROW(("Configuration for %s is missing", inDatabank.c_str()));
-
+	const zx::element* config = M6Config::GetEnabledDatabank(inDatabank);
 	M6FTPFetcher fetch(config);
 	fetch.Mirror();
 }
 
 bool M6FetchNeeded(const string& inDatabank)
 {
-	const zx::element* config = M6Config::GetDatabank(inDatabank);
-	if (not config)
-		THROW(("Configuration for %s is missing", inDatabank.c_str()));
-
+	const zx::element* config = M6Config::GetEnabledDatabank(inDatabank);
 	M6FTPFetcher fetch(config);
 	return fetch.IsOutOfDate();
 }

@@ -786,7 +786,7 @@ void M6Server::handle_entry(const zh::request& request, const el::scope& scope, 
 	}
 	sub.put("format", el::object(format));
 
-	const zx::element* dbConfig = M6Config::GetDatabank(db);
+	const zx::element* dbConfig = M6Config::GetEnabledDatabank(db);
 
 	// first stuff some data into scope
 	
@@ -1338,7 +1338,12 @@ void M6Server::handle_similar(const zh::request& request, const el::scope& scope
 
 	vector<string> queryTerms;
 	M6Builder builder(db);
-	builder.IndexDocument(GetEntry(mdb, "entry", boost::lexical_cast<uint32>(nr)), queryTerms);
+	
+	unique_ptr<M6Document> doc(mdb->Fetch(boost::lexical_cast<uint32>(nr)));
+	if (not doc)
+		THROW(("Unable to fetch document"));
+	
+	builder.IndexDocument(doc->GetText(), doc->GetAttribute("filename"), queryTerms);
 
 	M6Iterator* filter = nullptr;
 	unique_ptr<M6Iterator> results(mdb->Find(queryTerms, filter, false, resultoffset + maxresultcount));
@@ -1502,12 +1507,18 @@ void M6Server::ProcessNewConfig(const string& inPage, zeep::http::parameter_map&
 		}
 		else if (btn == "add")
 		{
-			
+			config->CreateFormat();
 		}
 		else
 		{
-			string formatID = inParams.get("fmt", "").as<string>();
-			zx::element* fmt = config->GetFormat(formatID, true);
+			string formatID = inParams.get("original-id", "").as<string>();
+			zx::element* fmt = config->GetFormat(formatID);
+			if (fmt == nullptr)
+				THROW(("Unknown format %s", formatID.c_str()));
+			
+			string id = inParams.get("id", "").as<string>();
+			if (id != formatID)
+				fmt->set_attribute("id", id);
 			
 			string script = inParams.get("script", "").as<string>();
 			fmt->set_attribute("script", script);
@@ -1556,17 +1567,23 @@ void M6Server::ProcessNewConfig(const string& inPage, zeep::http::parameter_map&
 		if (btn == "delete")
 		{
 			string dbID = inParams.get("selected", "").as<string>();
-			zx::element* db = config->GetDatabank(dbID);
-			if (db != nullptr)
-			{
-				db->parent()->remove(db);
-				delete db;
-			}
+			zx::element* db = config->GetConfiguredDatabank(dbID);
+
+			db->parent()->remove(db);
+			delete db;
+		}
+		else if (btn == "add")
+		{
+			config->CreateDatabank();
 		}
 		else
 		{
-			string dbID = inParams.get("id", "").as<string>();
-			zx::element* db = config->GetDatabank(dbID, true);
+			string dbID = inParams.get("original-id", "").as<string>();
+			zx::element* db = config->GetConfiguredDatabank(dbID);
+			
+			string id = inParams.get("id", "").as<string>();
+			if (id != dbID)
+				db->set_attribute("id", id);
 			
 			db->set_attribute("enabled",
 				inParams.get("enabled", false).as<bool>() ? "true" : "false");
@@ -2714,9 +2731,7 @@ void M6Server::handle_info(const zh::request& request, const el::scope& scope, z
 		if (ldb.mID != db)
 			continue;
 
-		const zx::element* dbConfig = M6Config::GetDatabank(db);
-		if (dbConfig == nullptr)
-			THROW(("weird error"));
+		const zx::element* dbConfig = M6Config::GetEnabledDatabank(db);
 
 		M6DatabankInfo info;
 		ldb.mDatabank->GetInfo(info);

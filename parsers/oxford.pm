@@ -18,7 +18,7 @@ sub new
 
 sub parse
 {
-	my ($self, $text, $header) = @_;
+	my ($self, $text, $filename, $header) = @_;
 
 	unless (defined $self->{offsets})
 	{

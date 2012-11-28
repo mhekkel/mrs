@@ -41,7 +41,8 @@ struct M6ParserImpl
 						M6ParserImpl(const string& inScriptName);
 						~M6ParserImpl();
 
-	void				Parse(M6InputDocument* inDoc, const string& inDbHeader);
+	void				Parse(M6InputDocument* inDoc,
+							const string& inFileName, const string& inDbHeader);
 	string				GetVersion(const string& inSourceConfig);
 	void				ToFasta(const string& inDoc, const string& inDb, const string& inID,
 							const string& inTitle, string& outFasta);
@@ -209,7 +210,8 @@ M6ParserImpl::~M6ParserImpl()
 	perl_free(mPerl);
 }
 
-void M6ParserImpl::Parse(M6InputDocument* inDocument, const string& inDbHeader)
+void M6ParserImpl::Parse(M6InputDocument* inDocument,
+	const string& inFileName, const string& inDbHeader)
 {
 	mDocument = inDocument;
 	
@@ -224,6 +226,7 @@ void M6ParserImpl::Parse(M6InputDocument* inDocument, const string& inDbHeader)
 	
 	XPUSHs(SvRV(mParser));
 	XPUSHs(sv_2mortal(newSVpv(text.c_str(), text.length())));
+	XPUSHs(sv_2mortal(newSVpv(inFileName.c_str(), inFileName.length())));
 	if (not inDbHeader.empty())
 		XPUSHs(sv_2mortal(newSVpv(inDbHeader.c_str(), inDbHeader.length())));
 
@@ -983,9 +986,10 @@ string M6Parser::GetVersion(const string& inName, const string& inSourceConfig)
 	return result;
 }
 
-void M6Parser::ParseDocument(M6InputDocument* inDoc, const string& inDbHeader)
+void M6Parser::ParseDocument(M6InputDocument* inDoc,
+	const string& inFileName, const string& inDbHeader)
 {
-	Impl()->Parse(inDoc, inDbHeader);
+	Impl()->Parse(inDoc, inFileName, inDbHeader);
 }
 
 string M6Parser::GetValue(const string& inName)

@@ -22,6 +22,7 @@ class M6Builder
 	bool				NeedsUpdate();
 
 	void				IndexDocument(const std::string& inText,
+							const std::string& inFileName,
 							std::vector<std::string>& outTerms);
 
   private:

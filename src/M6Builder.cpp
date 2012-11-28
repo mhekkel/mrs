@@ -54,8 +54,8 @@ namespace io = boost::iostreams;
 class M6Processor
 {
   public:
-	typedef M6Queue<fs::path>	M6FileQueue;
-	typedef M6Queue<string>		M6DocQueue;
+	typedef M6Queue<fs::path>					M6FileQueue;
+	typedef M6Queue<tr1::tuple<string,string>>	M6DocQueue;
 
 
 					M6Processor(M6Databank& inDatabank, M6Lexicon& inLexicon,
@@ -66,7 +66,7 @@ class M6Processor
 						uint32 inNrOfThreads);
 	
 	M6InputDocument*
-					IndexDocument(const string& inText);
+					IndexDocument(const string& inText, const string& inFileName);
 	
   private:
 	void			ProcessFile(const string& inFileName, istream& inFileStream);
@@ -81,7 +81,7 @@ class M6Processor
 	void			PutDocument(const string& inDoc)
 					{
 						if (mUseDocQueue)
-							mDocQueue.Put(inDoc);
+							mDocQueue.Put(make_tuple(inDoc, *mFileName));
 						else
 							ProcessDocument(inDoc);
 					}
@@ -108,6 +108,8 @@ class M6Processor
 	bool			mWriteFasta;
 	fs::ofstream	mFastaFile;
 	string			mDbHeader;
+	boost::thread_specific_ptr<string>
+					mFileName;
 };
 
 // --------------------------------------------------------------------
@@ -189,6 +191,8 @@ struct M6LineMatcher
 
 void M6Processor::ProcessFile(const string& inFileName, istream& inFileStream)
 {
+	mFileName.reset(new string(inFileName));
+	
 	io::filtering_stream<io::input> in;
 
 	if (mConfig->find_first("filter"))
@@ -364,7 +368,7 @@ void M6Processor::ProcessDocument(const string& inDoc)
 {
 	M6InputDocument* doc = new M6InputDocument(mDatabank, inDoc);
 	
-	mParser->ParseDocument(doc, mDbHeader);
+	mParser->ParseDocument(doc, *mFileName, mDbHeader);
 	if (mWriteFasta)
 	{
 		string fasta;
@@ -380,11 +384,11 @@ void M6Processor::ProcessDocument(const string& inDoc)
 	mDatabank.Store(doc);
 }
 
-M6InputDocument* M6Processor::IndexDocument(const string& inDoc)
+M6InputDocument* M6Processor::IndexDocument(const string& inDoc, const string& inFileName)
 {
 	M6InputDocument* doc = new M6InputDocument(mDatabank, inDoc);
 	
-	mParser->ParseDocument(doc, mDbHeader);
+	mParser->ParseDocument(doc, inFileName, mDbHeader);
 	
 	doc->Tokenize(mLexicon, 0);
 	return doc;
@@ -399,7 +403,8 @@ void M6Processor::ProcessDocument(exception_ptr& ex)
 		
 		for (;;)
 		{
-			string text = mDocQueue.Get();
+			string text, filename;
+			tr1::tie(text, filename) = mDocQueue.Get();
 			
 			if (text.empty() or docs.size() == 100)
 			{
@@ -448,7 +453,7 @@ void M6Processor::ProcessDocument(exception_ptr& ex)
 	
 			M6InputDocument* doc = new M6InputDocument(mDatabank, text);
 			
-			mParser->ParseDocument(doc, mDbHeader);
+			mParser->ParseDocument(doc, filename, mDbHeader);
 			if (mWriteFasta)
 			{
 				string fasta;
@@ -465,7 +470,7 @@ void M6Processor::ProcessDocument(exception_ptr& ex)
 		
 		assert(docs.empty());
 		
-		mDocQueue.Put(string());
+		mDocQueue.Put(tr1::make_tuple("", ""));
 	}
 	catch (exception& e)
 	{
@@ -521,7 +526,7 @@ void M6Processor::Process(vector<fs::path>& inFiles, M6Progress& inProgress,
 	
 	if (mUseDocQueue)
 	{
-		mDocQueue.Put(string());
+		mDocQueue.Put(tr1::make_tuple("", ""));
 		docThreads.join_all();
 	}
 
@@ -532,11 +537,11 @@ void M6Processor::Process(vector<fs::path>& inFiles, M6Progress& inProgress,
 // --------------------------------------------------------------------
 
 M6Builder::M6Builder(const string& inDatabank)
-	: mConfig(M6Config::GetDatabank(inDatabank))
+	: mConfig(M6Config::GetEnabledDatabank(inDatabank))
 	, mDatabank(nullptr)
 {
 	if (mConfig == nullptr)
-		THROW(("Unknown databank %s", inDatabank.c_str()));
+		THROW(("Databank %s not known or not enabled", inDatabank.c_str()));
 }
 
 M6Builder::~M6Builder()
@@ -555,40 +560,46 @@ int64 M6Builder::Glob(boost::filesystem::path inRawDir,
 	string source = inSource->content();
 	ba::trim(source);
 
-	fs::path dir = fs::path(source).parent_path();
-	if (not dir.has_root_path())
+	vector<string> paths;
+	ba::split(paths, source, ba::is_any_of(";"));
+	
+	foreach (string& source, paths)
 	{
-		dir = (inRawDir / dir).make_preferred();
-		source = (inRawDir / fs::path(source)).make_preferred().string();
-	}
-
-	while (not dir.empty() and (ba::contains(dir.filename().string(), "?") or ba::contains(dir.filename().string(), "*")))
-		dir = dir.parent_path();
-
-	stack<fs::path> ds;
-	ds.push(dir);
-	while (not ds.empty())
-	{
-		fs::path dir = ds.top();
-		ds.pop();
-		
-		if (not fs::is_directory(dir))
-			THROW(("'%s' is not a directory", dir.string().c_str()));
-		
-		fs::directory_iterator end;
-		for (fs::directory_iterator i(dir); i != end; ++i)
+		fs::path dir = fs::path(source).parent_path();
+		if (not dir.has_root_path())
 		{
-			if (fs::is_directory(*i))
-				ds.push(*i);
-			else if (M6FilePathNameMatches(*i, source))
+			dir = (inRawDir / dir).make_preferred();
+			source = (inRawDir / fs::path(source)).make_preferred().string();
+		}
+	
+		while (not dir.empty() and (ba::contains(dir.filename().string(), "?") or ba::contains(dir.filename().string(), "*")))
+			dir = dir.parent_path();
+	
+		stack<fs::path> ds;
+		ds.push(dir);
+		while (not ds.empty())
+		{
+			fs::path dir = ds.top();
+			ds.pop();
+			
+			if (not fs::is_directory(dir))
+				THROW(("'%s' is not a directory", dir.string().c_str()));
+			
+			fs::directory_iterator end;
+			for (fs::directory_iterator i(dir); i != end; ++i)
 			{
-				result += fs::file_size(*i);
-				outFiles.push_back(*i);
+				if (fs::is_directory(*i))
+					ds.push(*i);
+				else if (M6FilePathNameMatches(*i, source))
+				{
+					result += fs::file_size(*i);
+					outFiles.push_back(*i);
+				}
 			}
 		}
 	}
 	
-	return result;
+ 	return result;
 }
 
 void M6Builder::Build(uint32 inNrOfThreads)
@@ -646,10 +657,11 @@ void M6Builder::Build(uint32 inNrOfThreads)
 	cout << "done" << endl;
 }
 
-void M6Builder::IndexDocument(const string& inText, vector<string>& outTerms)
+void M6Builder::IndexDocument(const string& inText, const string& inFileName,
+	vector<string>& outTerms)
 {
 	M6Processor processor(*mDatabank, mLexicon, mConfig);
-	unique_ptr<M6InputDocument> doc(processor.IndexDocument(inText));
+	unique_ptr<M6InputDocument> doc(processor.IndexDocument(inText, inFileName));
 	
 	foreach (auto& list, doc->GetIndexTokens())
 	{

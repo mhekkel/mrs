@@ -219,7 +219,7 @@
 						<table cellspacing="0" cellpadding="0" class="select_form">
 							<caption>Databanks</caption>
 							<mrs:iterate collection="config-databanks" var="db">
-								<tr><td>${db.id}</td></tr>
+								<tr><td><mrs:if test="${db.enabled}">${db.id}</mrs:if><mrs:if test="${not db.enabled}"><em>${db.id}</em></mrs:if></td></tr>
 							</mrs:iterate>
 						</table>
 					</div>

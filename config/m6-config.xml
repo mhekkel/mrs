@@ -113,10 +113,10 @@
       <info>http://www.ncbi.nlm.nih.gov/entrez/query.fcgi?db=OMIM</info>
       <source fetch="ftp://ftp.ncbi.nih.gov/repository" delete="false">OMIM/ARCHIVE/omim.txt.Z</source>
     </databank>
-    <databank id="embl" parser="embl" format="embl" enabled="true" update="never">
+    <databank id="embl" parser="embl" format="embl" enabled="false" update="never">
       <name>EMBL</name>
       <info>http://www.ebi.ac.uk/embl/index.html</info>
-      <source delete="false">embl_release/*.dat.gz</source>
+      <source>embl_release/*.dat.gz</source>
     </databank>
     <databank id="enzyme" parser="enzyme" format="enzyme" enabled="true" update="never">
       <name>Enzyme</name>
@@ -139,7 +139,7 @@
       <info>http://www.uniprot.org/</info>
       <source fetch="ftp://ftp.ebi.ac.uk/pub/databases" delete="false">uniprot/current_release/knowledgebase/complete/uniprot_trembl.dat.gz</source>
     </databank>
-    <databank id="genbank" parser="genbank" enabled="true" update="never">
+    <databank id="genbank" parser="genbank" enabled="false" update="never">
       <name>Genbank</name>
       <info>http://www.ncbi.nlm.nih.gov/genbank/</info>
       <source delete="true" fetch="ftp://ftp.ncbi.nih.gov/">genbank/*.seq.gz</source>
@@ -154,9 +154,9 @@
       <info>http://www.ncbi.nlm.nih.gov/entrez/query.fcgi?db=Taxonomy</info>
       <source fetch="ftp://ftp.ebi.ac.uk/pub/databases" delete="false">taxonomy/taxonomy.dat</source>
     </databank>
-    <databank id="nlwiki" parser="mediawiki" enabled="true" update="never">
+    <databank id="nlwiki" parser="dbest" enabled="false" update="never">
       <name>Wikipedia - Nederlandstalig</name>
-      <source delete="false">nlwiki/nlwiki-latest-pages-articles.xml.bz2</source>
+      <source>nlwiki/nlwiki-latest-pages-articles.xml.bz2</source>
     </databank>
     <databank id="pdb" parser="pdb" enabled="true" update="never">
       <name>PDB</name>
@@ -173,16 +173,16 @@
       <info>http://www.cmbi.ru.nl/hssp</info>
       <source delete="true" fetch="ftp://ftp.cmbi.ru.nl/pub/molbio/data">hssp/????.hssp.bz2</source>
     </databank>
-    <databank id="gene" parser="gene" stylesheet="gene.xslt" enabled="true" update="never">
+    <databank id="gene" parser="gene" stylesheet="gene.xslt" enabled="false" update="never">
       <name>Entrez Gene</name>
       <info>http://www.ncbi.nlm.nih.gov/entrez/query.fcgi?db=gene</info>
-      <source fetch="ftp://ftp.ncbi.nlm.nih.gov" delete="false">gene/DATA/ASN_BINARY/All_Data.ags.gz</source>
+      <source fetch="ftp://ftp.ncbi.nlm.nih.gov">gene/DATA/ASN_BINARY/All_Data.ags.gz</source>
       <filter>/usr/bin/gene2xml -bT</filter>
     </databank>
-    <databank id="go" parser="go" enabled="true" update="never">
+    <databank id="go" parser="go" enabled="false" update="never">
       <name>GO</name>
       <info>http://www.geneontology.org/</info>
-      <source fetch="ftp://ftp.geneontology.org/pub" delete="false">go/ontology/gene_ontology.obo</source>
+      <source fetch="ftp://ftp.geneontology.org/pub">go/ontology/gene_ontology.obo</source>
     </databank>
     <!--	<databank id="goa" parser="goa">-->
     <!--		<name>GOA</name>-->
@@ -204,7 +204,7 @@
       <name>Mimmap, our view on genemap from OMIM</name>
       <source fetch="ftp://ftp.ncbi.nih.gov/repository" delete="false">OMIM/ARCHIVE/genemap</source>
     </databank>
-    <databank id="dbest" parser="dbest" enabled="true" update="never">
+    <databank id="dbest" parser="dbest" enabled="false" update="never">
       <name>dbEST</name>
       <info>http://www.ncbi.nlm.nih.gov/dbEST/</info>
       <source delete="true" fetch="ftp://ftp.ncbi.nih.gov/repository">dbEST/dbEST.reports.*.gz</source>
@@ -266,12 +266,12 @@
     <databank id="uniref90" parser="uniref" enabled="false" update="never">
       <name>UniRef 90</name>
       <info>http://www.uniprot.org/help/uniref</info>
-      <source fetch="ftp://ftp.ebi.ac.uk/pub/databases">uniprot/current_release/uniref/uniref90/uniref90.xml.gz</source>
+      <source fetch="ftp://ftp.ebi.ac.uk/pub/databases" delete="false">uniprot/current_release/uniref/uniref90/uniref90.xml.gz</source>
     </databank>
     <databank id="uniref100" parser="uniref" enabled="false" update="never">
       <name>UniRef 100</name>
       <info>http://www.uniprot.org/help/uniref</info>
-      <source fetch="ftp://ftp.ebi.ac.uk/pub/databases">uniprot/current_release/uniref/uniref100/uniref100.xml.gz</source>
+      <source fetch="ftp://ftp.ebi.ac.uk/pub/databases" delete="false">uniprot/current_release/uniref/uniref100/uniref100.xml.gz</source>
     </databank>
     <databank id="pmc" parser="pmc" stylesheet="ViewNLM-v2.3.xsl" enabled="true" update="never">
       <name>PubMed Central</name>

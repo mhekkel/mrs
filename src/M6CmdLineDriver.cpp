@@ -475,8 +475,6 @@ void M6BlastDriver::Exec(const string& inCommand, po::variables_map& vm)
 
 void M6BuildDriver::Exec(const string& inCommand, po::variables_map& vm)
 {
-	string databank = vm["databank"].as<string>();
-
 	uint32 nrOfThreads = boost::thread::hardware_concurrency();
 	if (nrOfThreads > 4)
 		nrOfThreads = 4;
@@ -485,29 +483,47 @@ void M6BuildDriver::Exec(const string& inCommand, po::variables_map& vm)
 	if (nrOfThreads < 1)
 		nrOfThreads = 1;
 	
-	if (inCommand == "update" and M6Config::GetDatabankParam(databank, "source/@fetch").empty() == false)
-		M6Fetch(databank);
-
-	M6Builder builder(databank);
-	
-	if (inCommand == "build" or builder.NeedsUpdate())
+	vector<string> databanks;
+	if (sDatabank == "all" or sDatabank == "daily" or sDatabank == "weekly" or sDatabank == "monthly")
 	{
-		try
+		foreach (zx::element* db, M6Config::GetDatabanks())
 		{
-			builder.Build(nrOfThreads);
-		}
-		catch (exception& e)
-		{
-			cerr << endl
-				 << "Error" << endl
-				 << e.what() << endl;
-			M6Status::Instance().SetError(databank, e.what());
+			if (db->get_attribute("enabled") != "true")
+				continue;
+			
+			if (sDatabank == "all" or db->get_attribute("update") == sDatabank)
+				databanks.push_back(db->get_attribute("id"));
 		}
 	}
 	else
+		databanks.push_back(sDatabank);
+
+	foreach (string databank, databanks)
 	{
-		cout << databank << " is up-to-date" << endl;
-		M6Status::Instance().Cleanup(databank);
+		if (inCommand == "update" and M6Config::GetDatabankParam(databank, "source/@fetch").empty() == false)
+			M6Fetch(databank);
+	
+		M6Builder builder(databank);
+		
+		if (inCommand == "build" or builder.NeedsUpdate())
+		{
+			try
+			{
+				builder.Build(nrOfThreads);
+			}
+			catch (exception& e)
+			{
+				cerr << endl
+					 << "Error" << endl
+					 << e.what() << endl;
+				M6Status::Instance().SetError(databank, e.what());
+			}
+		}
+		else
+		{
+			cout << databank << " is up-to-date" << endl;
+			M6Status::Instance().Cleanup(databank);
+		}
 	}
 }
 

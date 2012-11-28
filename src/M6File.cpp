@@ -465,7 +465,9 @@ void expand_group(const string& inPattern, vector<string>& outExpanded)
 	if (boost::regex_search(inPattern, m, rx))
 	{
 		vector<string> options;
-		ba::split(options, m[1].str(), ba::is_any_of(","));
+		
+		string group = m[1].str();
+		ba::split(options, group, ba::is_any_of(","));
 		
 		foreach (string& option, options)
 		{

@@ -458,7 +458,7 @@ void M6FTPFetcher::ListFiles(const string& inPattern,
 		
 	time_t now;
 	time(&now);
-	struct tm t = {}, n;
+	struct tm n;
 #ifdef _MSC_VER
 	gmtime_s(&n, &now);
 #else
@@ -477,7 +477,7 @@ void M6FTPFetcher::ListFiles(const string& inPattern,
 		
 		if (boost::regex_match(line, m, kM6LineParserRE))
 		{
-			t = n;
+			struct tm t = {};
 			
 			t.tm_mday = boost::lexical_cast<int>(m[4]);
 			for (t.tm_mon = 0; t.tm_mon < 12; ++t.tm_mon)
@@ -490,6 +490,7 @@ void M6FTPFetcher::ListFiles(const string& inPattern,
 				t.tm_year = boost::lexical_cast<int>(m[5]) - 1900;
 			else
 			{
+				t.tm_year = n.tm_year;
 				t.tm_hour = boost::lexical_cast<int>(m[5]);
 				t.tm_min = boost::lexical_cast<int>(m[6]);
 			}

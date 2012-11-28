@@ -57,6 +57,7 @@ class M6Processor
 	typedef M6Queue<fs::path>					M6FileQueue;
 	typedef M6Queue<tr1::tuple<string,string>>	M6DocQueue;
 
+	static const tr1::tuple<string,string> kSentinel;
 
 					M6Processor(M6Databank& inDatabank, M6Lexicon& inLexicon,
 						const zx::element* inTemplate);
@@ -81,7 +82,7 @@ class M6Processor
 	void			PutDocument(const string& inDoc)
 					{
 						if (mUseDocQueue)
-							mDocQueue.Put(make_tuple(inDoc, *mFileName));
+							mDocQueue.Put(tr1::make_tuple(inDoc, *mFileName));
 						else
 							ProcessDocument(inDoc);
 					}
@@ -111,6 +112,8 @@ class M6Processor
 	boost::thread_specific_ptr<string>
 					mFileName;
 };
+
+const tr1::tuple<string,string> M6Processor::kSentinel;
 
 // --------------------------------------------------------------------
 
@@ -470,7 +473,7 @@ void M6Processor::ProcessDocument(exception_ptr& ex)
 		
 		assert(docs.empty());
 		
-		mDocQueue.Put(tr1::make_tuple("", ""));
+		mDocQueue.Put(kSentinel);
 	}
 	catch (exception& e)
 	{
@@ -526,7 +529,7 @@ void M6Processor::Process(vector<fs::path>& inFiles, M6Progress& inProgress,
 	
 	if (mUseDocQueue)
 	{
-		mDocQueue.Put(tr1::make_tuple("", ""));
+		mDocQueue.Put(kSentinel);
 		docThreads.join_all();
 	}
 

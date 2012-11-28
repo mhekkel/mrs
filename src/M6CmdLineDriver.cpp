@@ -500,6 +500,8 @@ void M6BuildDriver::Exec(const string& inCommand, po::variables_map& vm)
 
 	foreach (string databank, databanks)
 	{
+		cout << inCommand << " " << databank << endl;
+		
 		if (inCommand == "update" and M6Config::GetDatabankParam(databank, "source/@fetch").empty() == false)
 			M6Fetch(databank);
 	
@@ -524,6 +526,8 @@ void M6BuildDriver::Exec(const string& inCommand, po::variables_map& vm)
 			cout << databank << " is up-to-date" << endl;
 			M6Status::Instance().Cleanup(databank);
 		}
+		
+		cout << endl;
 	}
 }
 

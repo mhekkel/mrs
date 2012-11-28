@@ -1131,6 +1131,8 @@ void M6Server::handle_search(const zh::request& request,
 	AnalyseQuery(q, terms);
 	if (not terms.empty())
 	{
+		M6Tokenizer::CaseFold(q);
+
 		// add some spelling suggestions
 		sort(terms.begin(), terms.end());
 		terms.erase(unique(terms.begin(), terms.end()), terms.end());

@@ -7,6 +7,7 @@
 #include <boost/filesystem/operations.hpp>
 #include <boost/foreach.hpp>
 #define foreach BOOST_FOREACH
+#include <boost/bind.hpp>
 
 #include "M6Dictionary.h"
 #include "M6Error.h"
@@ -530,94 +531,121 @@ M6Dictionary::~M6Dictionary()
 	delete mAutomaton;
 }
 
-void M6Dictionary::Create(M6BasicIndex& inIndex, uint32 inDocCount,
-	M6File& inFile, M6Progress& inProgress)
+struct M6DictionaryCreator
 {
-	vector<M6Transition> automaton;
-	
-	unsigned char s0[kMaxStringLength] = "";
-	
-	M6Transition larval_state[kMaxStringLength + 1][kMaxChars];
-	uint32 l_state_len[kMaxStringLength + 1] = {};
-	bool is_terminal[kMaxStringLength];
-	uint16 df[kMaxStringLength];	// document frequency
-	
-	M6HashTable ht;
-	uint32 i = 0, p, q, nr = 0;
+							M6DictionaryCreator(M6Progress& inProgress);
 
-	for (M6BasicIndex::iterator iter = inIndex.begin(); iter != inIndex.end(); ++iter)
+	bool					Visit(const char* inKey, uint32 inKeyLength, uint32 inCount);
+
+	void					Finish(M6File& inFile, uint32 inDocCount);
+
+	M6Progress&				mProgress;
+	vector<M6Transition>	mAutomaton;
+	unsigned char			mS0[kMaxStringLength];
+	M6Transition			mLarvalState[kMaxStringLength + 1][kMaxChars];
+	uint32					mLStateLen[kMaxStringLength + 1];
+	bool					mIsTerminal[kMaxStringLength];
+	uint16					mDF[kMaxStringLength];	// document frequency
+	M6HashTable				mHT;
+	uint32					mI, mP, mNr;
+};
+
+M6DictionaryCreator::M6DictionaryCreator(M6Progress& inProgress)
+	: mProgress(inProgress)
+	, mI(0), mP(0), mNr(0)
+{
+	fill(mS0, boost::end(mS0), 0);
+	fill(mLStateLen, boost::end(mLStateLen), 0);
+	fill(mIsTerminal, boost::end(mIsTerminal), false);
+	fill(mDF, boost::end(mDF), 0);
+}
+
+bool M6DictionaryCreator::Visit(const char* inKey, uint32 inKeyLength, uint32 inCount)
+{
+	if (++mNr % 10000 == 0)
+		mProgress.Progress(mNr);
+
+	if (inCount >= kM6MinWordOccurrence and inKeyLength >= kM6MinWordLength)
 	{
-		if (++nr % 10000 == 0)
-			inProgress.Progress(nr);
-
-		uint32 dfI = iter.GetCount();
-		if (dfI < kM6MinWordOccurrence)
-			continue;
-		
-		string s = *iter;
-		q = static_cast<uint32>(s.length());
-		if (q < kM6MinWordLength)
-			continue;
-		
 		// calculate the document frequency for this term
-		if (dfI > numeric_limits<uint16>::max())
-			dfI = numeric_limits<uint16>::max();
+		if (inCount > numeric_limits<uint16>::max())
+			inCount = numeric_limits<uint16>::max();
 		
-		for (p = 0; s[p] == s0[p]; ++p)
+		string s(inKey, inKeyLength);
+		uint32 q = inKeyLength, p;
+		
+		for (p = 0; s[p] == mS0[p]; ++p)
 			;
 		
-		if (uint8(s[p]) < uint8(s0[p]))
-			THROW(("error, strings are unsorted: '%s' >= '%s'", s.c_str(), s0));
+		if (uint8(s[p]) < uint8(mS0[p]))
+			THROW(("error, strings are unsorted: '%s' >= '%s'", s.c_str(), mS0));
 		
-		while (i > p)
+		while (mI > p)
 		{
 			M6Transition new_trans = {};
 
-			new_trans.b.dest = ht.Lookup(larval_state[i], l_state_len[i], automaton);
-			new_trans.b.term = is_terminal[i];
-			new_trans.b.df = df[i];
-			new_trans.b.attr = s0[--i];
+			new_trans.b.dest = mHT.Lookup(mLarvalState[mI], mLStateLen[mI], mAutomaton);
+			new_trans.b.term = mIsTerminal[mI];
+			new_trans.b.df = mDF[mI];
+			new_trans.b.attr = mS0[--mI];
 			
-			larval_state[i][l_state_len[i]++] = new_trans;
+			mLarvalState[mI][mLStateLen[mI]++] = new_trans;
 		}
 		
-		while (i < q)
+		while (mI < q)
 		{
-			s0[i] = s[i];
-			is_terminal[++i] = 0;
-			df[i] = 0;
-			l_state_len[i] = 0;
+			mS0[mI] = s[mI];
+			mIsTerminal[++mI] = 0;
+			mDF[mI] = 0;
+			mLStateLen[mI] = 0;
 		}
 		
-		s0[q] = 0;
-		is_terminal[q] = 1;
-		df[q] = static_cast<uint16>(dfI);
+		mS0[q] = 0;
+		mIsTerminal[q] = 1;
+		mDF[q] = static_cast<uint16>(inCount);
 	}
-	
-	while (i > 0)
+
+	return true;
+};
+
+void M6DictionaryCreator::Finish(M6File& inFile, uint32 inDocCount)
+{
+	while (mI > 0)
 	{
 		M6Transition new_trans = {};
 
-		new_trans.b.dest = ht.Lookup(larval_state[i], l_state_len[i], automaton);
-		new_trans.b.term = is_terminal[i];
-		new_trans.b.df = df[i];
-		new_trans.b.attr = s0[--i];
+		new_trans.b.dest = mHT.Lookup(mLarvalState[mI], mLStateLen[mI], mAutomaton);
+		new_trans.b.term = mIsTerminal[mI];
+		new_trans.b.df = mDF[mI];
+		new_trans.b.attr = mS0[--mI];
 		
-		larval_state[i][l_state_len[i]++] = new_trans;
+		mLarvalState[mI][mLStateLen[mI]++] = new_trans;
 	}
 	
-	uint32 start_state = ht.Lookup(larval_state[0], l_state_len[0], automaton);
+	uint32 start_state = mHT.Lookup(mLarvalState[0], mLStateLen[0], mAutomaton);
 	
 	M6Transition t = {};
 	t.b.dest = start_state;
-	automaton.push_back(t);
-	
-	inProgress.Progress(inIndex.size());
+	mAutomaton.push_back(t);
 
 	inFile.Write(&inDocCount, sizeof(uint32));
-	uint32 size = automaton.size();
+	uint32 size = mAutomaton.size();
 	inFile.Write(&size, sizeof(uint32));
-	inFile.Write(&automaton[0], automaton.size() * sizeof(M6Transition));
+	inFile.Write(&mAutomaton[0], mAutomaton.size() * sizeof(M6Transition));
+}
+
+void M6Dictionary::Create(M6BasicIndex& inIndex, uint32 inDocCount,
+	M6File& inFile, M6Progress& inProgress)
+{
+	M6DictionaryCreator creator(inProgress);
+	inIndex.VisitKeys([&creator](const char* inKey, uint32 inKeyLength, uint32 inCount) -> bool
+	{
+		return creator.Visit(inKey, inKeyLength, inCount);
+	});
+
+	inProgress.Progress(inIndex.size());
+
+	creator.Finish(inFile, inDocCount);
 }
 
 void M6Dictionary::SuggestCorrection(const string& inWord, vector<pair<string,uint16>>& outCorrections)

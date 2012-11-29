@@ -807,7 +807,13 @@ BlastJobs = {
 	jobs: null,
 	t: null,
 	
-	init: function() {
+	init: function()
+	{
+		$("p.hideOptions").click(function()
+		{
+			$(this).hide();
+			$("#advancedoptions").show("fast");
+		});
 		
 		if (typeof(localStorage) == 'undefined') {
 			if (! mrsCookie.warnedForOlderBrowser) {

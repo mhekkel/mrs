@@ -21,6 +21,12 @@
 	<script src="scripts/format.js" type="text/javascript"/>
 	<mrs:if test="${formatXSLT}"><script type="text/javascript">Format.xslt = 'formats/${formatXSLT}';</script></mrs:if>
 	<mrs:if test="${formatScript}"><script type="text/javascript" src="formats/${formatScript}.js"></script></mrs:if>
+
+	<script language="JavaScript">
+		Format.db = '${db}';
+		Format.id = '${id}';
+	</script>
+
 </head>
 <body>
 	<mrs:include file="menu.html" />
@@ -39,11 +45,15 @@
 			<ul>
 				<li>
 					View
-					<select id="formatSelector" disabled="true">
-						<option value="entry" disabled="true">Entry</option>
-						<option value="plain" selected="selected">Plain text</option>
-						<option value="fasta" disabled="true">FastA</option>
-					</select>
+					<form id="downloadForm" action="download">
+						<input type="hidden" name="db" value="${db}"/>
+						<input type="hidden" name="nr" value="${nr}"/>
+						<select id="formatSelector" disabled="true" name="format">
+							<option value="entry" disabled="true">Entry</option>
+							<option value="plain" selected="selected">Plain text</option>
+							<option value="fasta" disabled="true">FastA</option>
+						</select>
+					</form>
 				</li>
 				<li>
 					<form id="similarForm" method="get" action="similar">
@@ -55,15 +65,14 @@
 				</li>
 				<li>
 					<form id="blastForm" method="post" action="blast">
-						<input type="hidden" name="query" />
-						<input type="button" name="blast" value="Blast"
-							   disabled="true" class="submit"
-							   onclick="document.getElementById('blastForm').submit();" />
+						<input type="hidden" name="db" value="${db}" />
+						<input type="hidden" name="nr" value="${nr}" />
+						<input type="submit" name="blast" value="Blast"
+							   disabled="disabled" class="submit" />
 					</form>
 				</li>
 				<li>
-					<input value="Download" type="button" class="submit"
-						   onclick="window.location='download?db=${db}&amp;nr=${nr}&amp;format=${format}';" />
+					<input value="Download" type="button" class="submit" onclick="document.getElementById('downloadForm').submit();" />
 				</li>
 				<li class="linksource">
 					Data provided by <a href="${databank.url}">${databank.url}</a>
@@ -81,8 +90,10 @@
 			</ul>
 		</div>
 		
-		<div class="highlightwords entry" id="entry">
-			<mrs:entry db="${db}" nr="${nr}" format="${format}" />
+		<div id="data">
+			<pre><div class="highlightwords entry" id="entrytext">${text}</div></pre>
+			<div id="entryhtml" class="highlightwords entry" style="display:none"/>
+			<div id="entryfasta" style="display:none"/>
 		</div>
 	</div>
 </body>

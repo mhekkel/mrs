@@ -85,6 +85,7 @@
     <ClCompile Include="..\..\..\libzeep\src\parser.cpp" />
     <ClCompile Include="..\..\..\libzeep\src\preforked-http-server.cpp" />
     <ClCompile Include="..\..\..\libzeep\src\reply.cpp" />
+    <ClCompile Include="..\..\..\libzeep\src\request.cpp" />
     <ClCompile Include="..\..\..\libzeep\src\request_parser.cpp" />
     <ClCompile Include="..\..\..\libzeep\src\soap-envelope.cpp" />
     <ClCompile Include="..\..\..\libzeep\src\soap-server.cpp" />

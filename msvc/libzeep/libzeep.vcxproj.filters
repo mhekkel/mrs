@@ -71,6 +71,9 @@
     <ClCompile Include="..\..\..\libzeep\src\xpath.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\libzeep\src\request.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\libzeep\src\document-imp.hpp">

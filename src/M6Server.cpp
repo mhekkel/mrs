@@ -147,6 +147,9 @@ M6Server::M6Server(const zx::element* inConfig)
 	mount("css",			boost::bind(&M6Server::handle_file, this, _1, _2, _3));
 //	mount("man",			boost::bind(&M6Server::handle_file, this, _1, _2, _3));
 	mount("images",			boost::bind(&M6Server::handle_file, this, _1, _2, _3));
+
+	mount("rest",			boost::bind(&M6Server::handle_rest, this, _1, _2, _3));
+
 	mount("favicon.ico",	boost::bind(&M6Server::handle_file, this, _1, _2, _3));
 	mount("robots.txt",		boost::bind(&M6Server::handle_file, this, _1, _2, _3));
 
@@ -165,10 +168,7 @@ M6Server::M6Server(const zx::element* inConfig)
 	mount("admin",			boost::bind(&M6Server::handle_admin, this, _1, _2, _3));
 //	mount("admin/rename",	boost::bind(&M6Server::handle_admin_rename_ajax, this, _1, _2, _3));
 
-	add_processor("entry",	boost::bind(&M6Server::process_mrs_entry, this, _1, _2, _3));
 	add_processor("link",	boost::bind(&M6Server::process_mrs_link, this, _1, _2, _3));
-	add_processor("redirect",
-							boost::bind(&M6Server::process_mrs_redirect, this, _1, _2, _3));
 
 	zx::node* realm = mConfig->find_first_node("admin/@realm");
 	if (realm != nullptr)
@@ -647,7 +647,6 @@ void M6Server::handle_download(const zh::request& request, const el::scope& scop
 	get_parameters(scope, params);
 
 	string format = params.get("format", "entry").as<string>();
-
 	string db = params.get("db", "").as<string>();
 
 	M6Databank* mdb = Load(db);
@@ -719,7 +718,7 @@ void M6Server::handle_entry(const zh::request& request, const el::scope& scope, 
 		reply = zh::reply::redirect(mBaseURL);
 		return;
 	}
-
+	
 	M6Databank* mdb = Load(db);
 	uint32 docNr = 0;
 
@@ -762,9 +761,13 @@ void M6Server::handle_entry(const zh::request& request, const el::scope& scope, 
 		id = doc->GetAttribute("id");
 	}
 	
+	unique_ptr<M6Document> document(mdb->Fetch(docNr));
+	
 	el::scope sub(scope);
 	sub.put("db", el::object(db));
+	sub.put("id", document->GetAttribute("id"));
 	sub.put("nr", el::object(docNr));
+	sub.put("text", document->GetText());
 	
 	vector<string> linkedDbs;
 	GetLinkedDbs(db, id, linkedDbs);
@@ -1895,50 +1898,96 @@ void M6Server::handle_admin(const zh::request& request,
 //}
 
 // --------------------------------------------------------------------
+//	REST calls
 
-void M6Server::process_mrs_entry(zx::element* node, const el::scope& scope, fs::path dir)
+void M6Server::handle_rest(const zh::request& request, const el::scope& scope, zh::reply& reply)
 {
-	// evaluate attributes first
-	foreach (zx::attribute& a, boost::iterator_range<zx::element::attribute_iterator>(node->attr_begin(), node->attr_end()))
-	{
-		string s = a.value();
-		if (process_el(scope, s))
-			a.value(s);
-	}
-
-	// fetch the entry
-	string db = node->get_attribute("db");
-	string nr = node->get_attribute("nr");
-	string format = node->get_attribute("format");
+	reply = zh::reply::stock_reply(zh::not_found);
 	
-	M6Databank* mdb = Load(db);
-	if (mdb == nullptr)
-		THROW(("databank not loaded"));
-	unique_ptr<M6Document> doc(mdb->Fetch(boost::lexical_cast<uint32>(nr)));
-	if (not doc)
-		THROW(("Document %s not found", nr.c_str()));
+	fs::path path(scope["baseuri"].as<string>());
+	fs::path::iterator p = path.begin();
 
-	zx::node* replacement = nullptr;
-	
-	if (format == "title")
-		replacement = new zx::text(doc->GetAttribute("title"));
-	else // if (format == "plain")
+	if ((p++)->string() == "rest")
 	{
-		zx::element* pre = new zx::element("pre");
-		pre->set_attribute("id", "entrytext");
-		pre->add_text(doc->GetText());
-		replacement = pre;
-	}
-	
-	if (replacement != nullptr)
-	{
-		zx::container* parent = node->parent();
-		assert(parent);
-		parent->insert(node, replacement);
-
-		process_xml(replacement, scope, dir);
+		string call = (p++)->string();
+		
+		if (call == "entry")
+			handle_rest_entry(request, scope, reply);
+		else if (call == "find")
+			handle_rest_find(request, scope, reply);
 	}
 }
+
+void M6Server::handle_rest_entry(const zh::request& request, const el::scope& scope, zh::reply& reply)
+{
+	string db, id;
+
+	zh::parameter_map params;
+	get_parameters(scope, params);
+
+	string format = params.get("format", "entry").as<string>();
+
+	fs::path path(scope["baseuri"].as<string>());
+	fs::path::iterator p = path.begin();
+
+	if ((p++)->string() == "rest" and
+		(p++)->string() == "entry" and
+		p != path.end())
+	{
+		db = (p++)->string();
+		if (p != path.end())
+			id = (p++)->string();
+	}
+	
+	if (id.empty())
+		THROW(("No id specified"));
+
+	if (db.empty())
+		THROW(("No db specified"));
+
+	M6Databank* mdb = Load(db);
+	uint32 docNr = 0;
+
+	if (mdb == nullptr and not id.empty())
+	{
+		foreach (string adb, UnAlias(db))
+		{
+			mdb = Load(adb);
+			if (mdb != nullptr)
+			{
+				bool exists;
+				tr1::tie(exists, docNr) = mdb->Exists("id", id);
+				if (exists)
+				{
+					db = adb;
+					break;
+				}
+			}
+		}
+	}
+	
+	if (mdb == nullptr)
+		THROW(("Databank %s not loaded", db.c_str()));
+
+	if (docNr == 0)
+	{
+		bool exists;
+		tr1::tie(exists, docNr) = mdb->Exists("id", id);
+		if (not exists)
+			THROW(("Entry %s does not exist in databank %s", id.c_str(), db.c_str()));
+		if (docNr == 0)
+			THROW(("Multiple entries with ID %s in databank %s", id.c_str(), db.c_str()));
+	}
+
+	reply.set_content(GetEntry(mdb, format, docNr), "text/plain");
+}
+
+void M6Server::handle_rest_find(const zh::request& request, const el::scope& scope, zh::reply& reply)
+{
+	reply.set_content("no hits found", "text/plain");
+}
+
+// --------------------------------------------------------------------
 
 void M6Server::process_mrs_link(zx::element* node, const el::scope& scope, fs::path dir)
 {
@@ -2011,10 +2060,6 @@ void M6Server::process_mrs_link(zx::element* node, const el::scope& scope, fs::p
 		a->push_back(clone);
 		process_xml(clone, scope, dir);
 	}
-}
-
-void M6Server::process_mrs_redirect(zx::element* node, const el::scope& scope, fs::path dir)
-{
 }
 
 // --------------------------------------------------------------------
@@ -2192,7 +2237,12 @@ void M6Server::handle_blast(const zeep::http::request& request, const el::scope&
 		
 	// fetch some parameters, if any
 	string db = params.get("db", "sprot").as<string>();
-	string query = params.get("query", "").as<string>();
+	uint32 nr = params.get("nr", "0").as<uint32>();
+	
+//	string query = params.get("query", "").as<string>();
+	string query;
+	if (nr != 0 and not db.empty() and Load(db) != nullptr)
+		query = GetEntry(Load(db), "fasta", nr);
 	
 	sub.put("blastdatabanks", el::object(blastdatabanks));
 	sub.put("blastdb", db);
@@ -2202,7 +2252,7 @@ void M6Server::handle_blast(const zeep::http::request& request, const el::scope&
 	sub.put("expectRange", expectRange, boost::end(expectRange));
 	sub.put("expect", expect);
 
-	uint32 wordSizeRange[] = { 0, 2, 3, 4 };
+	uint32 wordSizeRange[] = { 2, 3, 4 };
 	sub.put("wordSizeRange", wordSizeRange, boost::end(wordSizeRange));
 	sub.put("wordSize", wordSize);
 
@@ -2210,11 +2260,11 @@ void M6Server::handle_blast(const zeep::http::request& request, const el::scope&
 	sub.put("matrices", matrices, boost::end(matrices));
 	sub.put("matrix", matrix);
 
-	int32 gapOpenRange[] = { -1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14 };
+	int32 gapOpenRange[] = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14 };
 	sub.put("gapOpenRange", gapOpenRange, boost::end(gapOpenRange));
 	sub.put("gapOpen", gapOpen);
 
-	int32 gapExtendRange[] = { -1, 1, 2, 3, 4 };
+	int32 gapExtendRange[] = { 1, 2, 3, 4 };
 	sub.put("gapExtendRange", gapExtendRange, boost::end(gapExtendRange));
 	sub.put("gapExtend", gapExtend);
 

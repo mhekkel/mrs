@@ -1,8 +1,11 @@
 var Format = {
 	name: { value: "generic" },
 	
+	db: null,
+	id: null,
+	fasta: null,
+	
 	toHtml: null,
-	toFasta: null,
 	
 	init: function() {
 		var html = null;
@@ -32,7 +35,7 @@ var Format = {
 			}
 		
 			var div = $("<div/>").append(result);
-			html = $('<div id="entryhtml"/>').append(div.html());
+			html = div.html();
 		}
 		
 		if (html == null && Format.toHtml != null) {
@@ -40,10 +43,8 @@ var Format = {
 		}
 
 		if (html != null) {
-			html.prop("id", "entryhtml");
-
-			$("#entry").prepend(html);
 			$("#entrytext").hide();
+			$("#entryhtml").html(html).show();
 			$("#formatSelector").prop("disabled", false);
 			$("#formatSelector option[value='entry']").prop("disabled", false);
 			$("#formatSelector option").each(function() {
@@ -81,6 +82,8 @@ var Format = {
 				case "fasta":
 					$("#entrytext").hide();
 					$("#entryhtml").hide();
+					if (Format.fasta == null)
+						Format.loadFasta();
 					$("#entryfasta").show();
 					break;
 				
@@ -120,6 +123,13 @@ var Format = {
 		}
 		
 		return result;
+	},
+	
+	loadFasta: function()
+	{
+		jQuery.get("rest/entry/" + Format.db + '/' + Format.id + "?format=fasta", function(data) {
+			$("#entryfasta").show().html($("<pre/>").append(data));
+		});
 	}
 };
 

@@ -676,11 +676,11 @@ form.admin_form h3 {
 	padding: 3px 5px 3px 5px;
 }
 
-form.admin_form fieldset {
+fieldset {
 	border: 1px solid #9E9E9E;
 }
 
-form.admin_form h3:first-child {
+form h3:first-child {
 	margin-top: 2px;
 }
 
@@ -755,6 +755,61 @@ form.admin_form hr {
 	height: 1px;
 }
 
-.test {
-	background-color: red;
+/*
+	Blast Form
+*/
+
+form.blast_form {
+	display: inline-block;
+	padding-right:1em;
+	vertical-align: top;
 }
+
+form.blast_form p:first-child {
+	margin: 3px 0px;
+}
+
+form.blast_form h3 {
+	background-color: #44749d;
+	color: white;
+	font-weight: bold;
+	text-align: left;
+	margin-top: 5px;
+	padding: 3px 5px 3px 5px;
+}
+
+form.blast_form label {
+	width: 160px;
+}
+
+form.blast_form p.reformatted {
+	color: red;
+	display: none;
+}
+
+form.blast_form label, form.blast_form input {
+	display: inline-block;
+}
+
+form.blast_form td select {
+	padding: 1px;
+	margin: 0;
+	width: 80px;
+}
+
+form.blast_form label {
+	height: 1.8em;
+}
+
+form.blast_form p.hideOptions {
+	color: #2f506c;
+	margin: 0px;
+	margin-top: 3px;
+	padding: 0px;
+}
+
+form.blast_form p.hideOptions:hover {
+	text-decoration: underline;
+	cursor: pointer;
+}
+

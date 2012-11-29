@@ -58,7 +58,7 @@ class M6Server : public zh::webapp
 	std::string		GetEntry(M6Databank* inDatabank, const std::string& inFormat, uint32 inDocNr);
 	std::string		GetEntry(M6Databank* inDatabank, const std::string& inFormat,
 						const std::string& inIndex, const std::string& inValue);
-	
+
 	void			Find(const std::string& inDatabank, const std::string& inQuery,
 						bool inAllTermsRequired, uint32 inResultOffset,
 						uint32 inMaxResultCount, bool inAddLinks,
@@ -91,6 +91,10 @@ class M6Server : public zh::webapp
 	void			handle_similar(const zh::request& request, const el::scope& scope, zh::reply& reply);
 	void			handle_welcome(const zh::request& request, const el::scope& scope, zh::reply& reply);
 
+	void			handle_rest(const zh::request& request, const el::scope& scope, zh::reply& reply);
+	void			handle_rest_entry(const zh::request& request, const el::scope& scope, zh::reply& reply);
+	void			handle_rest_find(const zh::request& request, const el::scope& scope, zh::reply& reply);
+
 	void			handle_blast(const zh::request& request, const el::scope& scope, zh::reply& reply);
 	void			handle_blast_submit_ajax(const zh::request& request, const el::scope& scope, zh::reply& reply);
 	void			handle_blast_status_ajax(const zh::request& request, const el::scope& scope, zh::reply& reply);
@@ -106,9 +110,7 @@ class M6Server : public zh::webapp
 	void			handle_admin(const zh::request& request, const el::scope& scope, zh::reply& reply);
 //	void			handle_admin_ajax(const zh::request& request, const el::scope& scope, zh::reply& reply);
 	
-	void			process_mrs_entry(zx::element* node, const el::scope& scope, boost::filesystem::path dir);
 	void			process_mrs_link(zx::element* node, const el::scope& scope, boost::filesystem::path dir);
-	void			process_mrs_redirect(zx::element* node, const el::scope& scope, boost::filesystem::path dir);
 
 	void			create_redirect(const std::string& databank, const std::string& inIndex, const std::string& inValue,
 						const std::string& q, bool redirectForQuery, const zh::request& req, zh::reply& rep);

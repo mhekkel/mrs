@@ -1593,9 +1593,9 @@ void M6Server::ProcessNewConfig(const string& inPage, zeep::http::parameter_map&
 			if (id != dbID)
 				db->set_attribute("id", id);
 			
-			db->set_attribute("enabled",
-				inParams.get("enabled", false).as<bool>() ? "true" : "false");
+			db->set_attribute("enabled", inParams.get("enabled", false).as<bool>() ? "true" : "false");
 			db->set_attribute("parser", inParams.get("parser", "").as<string>());
+			db->set_attribute("fasta", inParams.get("fasta", false).as<bool>() ? "true" : "false");
 			db->set_attribute("update", inParams.get("update", "never").as<string>());
 			
 			string format = inParams.get("format", "none").as<string>();
@@ -1845,6 +1845,7 @@ void M6Server::handle_admin(const zh::request& request,
 		databank["parser"] = db->get_attribute("parser");
 		databank["update"] = db->get_attribute("update");
 		databank["enabled"] = db->get_attribute("enabled") == "true";
+		databank["fasta"] = db->get_attribute("fasta") == "true";
 		if ((e = db->find_first("filter")) != nullptr)
 			databank["filter"] = e->content();
 		if ((e = db->find_first("name")) != nullptr)

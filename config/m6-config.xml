@@ -97,12 +97,12 @@
   </parsers>
   <!-- And finally, the databanks section -->
   <databanks>
-    <databank id="pdbfinder" parser="pdbfinder" enabled="true" update="never">
+    <databank id="pdbfinder" parser="pdbfinder" enabled="true" update="never" fasta="true">
       <aliases>
         <alias>pdbfinder2</alias>
       </aliases>
       <name>PDBFINDER</name>
-      <source fetch="ftp://ftp.cmbi.ru.nl/pub/molbio/data" delete="false">pdbfinder2/PDBFIND2.TXT.gz</source>
+      <source fetch="ftp://ftp.cmbi.ru.nl/pub/molbio/data">pdbfinder2/PDBFIND2.TXT.gz</source>
     </databank>
     <!-- omim -->
     <databank id="omim" parser="omim" format="omim" enabled="true" update="never">
@@ -116,28 +116,28 @@
     <databank id="embl" parser="embl" format="embl" enabled="false" update="never">
       <name>EMBL</name>
       <info>http://www.ebi.ac.uk/embl/index.html</info>
-      <source>embl_release/*.dat.gz</source>
+      <source delete="false">embl_release/*.dat.gz</source>
     </databank>
     <databank id="enzyme" parser="enzyme" format="enzyme" enabled="true" update="never">
       <name>Enzyme</name>
       <info>http://ca.expasy.org/enzyme/</info>
       <source fetch="ftp://ftp.ebi.ac.uk/pub/databases" delete="false">enzyme/enzyme.dat</source>
     </databank>
-    <databank id="sprot" parser="uniprot" format="uniprot" update="daily" enabled="true">
+    <databank id="sprot" parser="uniprot" format="uniprot" update="daily" enabled="true" fasta="true">
       <aliases>
-        <alias name="UniProt">uniprot</alias>
+        <alias>uniprot</alias>
       </aliases>
       <name>SwissProt</name>
       <info>http://www.uniprot.org/</info>
-      <source fetch="ftp://ftp.ebi.ac.uk/pub/databases" delete="false">uniprot/current_release/knowledgebase/complete/uniprot_sprot.dat.gz</source>
+      <source fetch="ftp://ftp.ebi.ac.uk/pub/databases">uniprot/current_release/knowledgebase/complete/uniprot_sprot.dat.gz</source>
     </databank>
-    <databank id="trembl" parser="uniprot" format="uniprot" enabled="true" update="never">
+    <databank id="trembl" parser="uniprot" format="uniprot" enabled="true" update="never" fasta="true">
       <aliases>
-        <alias name="UniProt">uniprot</alias>
+        <alias>uniprot</alias>
       </aliases>
       <name>TrEMBL</name>
       <info>http://www.uniprot.org/</info>
-      <source fetch="ftp://ftp.ebi.ac.uk/pub/databases" delete="false">uniprot/current_release/knowledgebase/complete/uniprot_trembl.dat.gz</source>
+      <source fetch="ftp://ftp.ebi.ac.uk/pub/databases">uniprot/current_release/knowledgebase/complete/uniprot_trembl.dat.gz</source>
     </databank>
     <databank id="genbank" parser="genbank" enabled="false" update="never">
       <name>Genbank</name>
@@ -156,9 +156,9 @@
     </databank>
     <databank id="nlwiki" parser="dbest" enabled="false" update="never">
       <name>Wikipedia - Nederlandstalig</name>
-      <source>nlwiki/nlwiki-latest-pages-articles.xml.bz2</source>
+      <source delete="false">nlwiki/nlwiki-latest-pages-articles.xml.bz2</source>
     </databank>
-    <databank id="pdb" parser="pdb" enabled="true" update="never">
+    <databank id="pdb" parser="pdb" enabled="true" update="never" fasta="true">
       <name>PDB</name>
       <info>http://www.rcsb.org/pdb/</info>
       <source delete="true" fetch="ftp://ftp.cmbi.ru.nl/pub/molbio/data">pdb/divided/??/pdb????.ent.gz</source>
@@ -176,13 +176,13 @@
     <databank id="gene" parser="gene" stylesheet="gene.xslt" enabled="false" update="never">
       <name>Entrez Gene</name>
       <info>http://www.ncbi.nlm.nih.gov/entrez/query.fcgi?db=gene</info>
-      <source fetch="ftp://ftp.ncbi.nlm.nih.gov">gene/DATA/ASN_BINARY/All_Data.ags.gz</source>
+      <source fetch="ftp://ftp.ncbi.nlm.nih.gov" delete="false">gene/DATA/ASN_BINARY/All_Data.ags.gz</source>
       <filter>/usr/bin/gene2xml -bT</filter>
     </databank>
     <databank id="go" parser="go" enabled="false" update="never">
       <name>GO</name>
       <info>http://www.geneontology.org/</info>
-      <source fetch="ftp://ftp.geneontology.org/pub">go/ontology/gene_ontology.obo</source>
+      <source fetch="ftp://ftp.geneontology.org/pub" delete="false">go/ontology/gene_ontology.obo</source>
     </databank>
     <!--	<databank id="goa" parser="goa">-->
     <!--		<name>GOA</name>-->
@@ -277,6 +277,9 @@
       <name>PubMed Central</name>
       <info>http://www.pubmedcentral.nih.gov/</info>
       <source fetch="ftp://ftp.ncbi.nih.gov/pub" delete="false">pmc/articles*.tar.gz</source>
+    </databank>
+    <databank id="m6-source" parser="generic" enabled="true" update="never">
+      <source delete="false">C:/Users/maarten/projects/m6/src/*.{h,cpp}</source>
     </databank>
     <!-- databanks used in debugging m6 -->
     <!--		<databank id="pdb-mini" parser="pdb">-->

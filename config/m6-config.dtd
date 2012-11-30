@@ -56,6 +56,7 @@
 <!ATTLIST databank id ID #REQUIRED
 				   enabled (true|false) "true"
 				   parser NMTOKEN #REQUIRED
+				   fasta (true|false) "true"
 				   update (never|daily|weekly|monthly) "never"
 				   format NMTOKEN #IMPLIED
 				   stylesheet CDATA #IMPLIED>

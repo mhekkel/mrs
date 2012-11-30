@@ -262,6 +262,7 @@
 									<mrs:options collection="parsers" value="id" label="id" selected="${db.parser}"/>
 								</select>
 							</div>
+							<div><label>Create FastA</label><mrs:checkbox name="fasta" checked="${db.fasta}"/></div>
 <!--							<p>Filters are optional programs through which the raw data is fed, for the Gene databank-->
 <!--							you could e.g. enter <code>/usr/bin/gene2xml -bT</code> to convert ASN.1 into XML on the fly.</p>-->
 							<div><label>Filter</label><input type="text" value="${db.filter}" name="filter"/></div>

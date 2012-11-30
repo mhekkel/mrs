@@ -7,6 +7,10 @@ class M6Progress
   public:
 				M6Progress(const std::string& inDatabank,
 					int64 inMax, const std::string& inAction);
+
+				// indefinite version, shows ascii spinner
+				M6Progress(const std::string& inDatabank,
+					const std::string& inAction);
 	virtual		~M6Progress();
 	
 	void		Consumed(int64 inConsumed);	// consumed is relative

@@ -78,7 +78,7 @@ class M6FTPFetcher
 
 	int64				CollectFiles();
 	int64				CollectFiles(fs::path inLocalDir, fs::path inRemoteDir,
-							fs::path::iterator p, fs::path::iterator e);
+							fs::path::iterator p, fs::path::iterator e, M6Progress& inProgress);
 	
 	uint32				WaitForReply(); 
 	uint32				SendAndWaitForReply(const string& inCommand, const string& inParam); 
@@ -321,13 +321,13 @@ int64 M6FTPFetcher::CollectFiles()
 	vector<string> sources;
 	ba::split(sources, mSource, ba::is_any_of(";"));
 	
-	M6Progress progress(mDatabank, sources.size(), "listing files");
+	M6Progress progress(mDatabank, "listing files");
 	
 	foreach (const string& source, sources)
 	{
 		fs::path p(source);
 		
-		result += CollectFiles(M6Config::GetDirectory("raw"), GetPWD(), p.begin(), p.end());
+		result += CollectFiles(M6Config::GetDirectory("raw"), GetPWD(), p.begin(), p.end(), progress);
 		
 		progress.Consumed(1);
 	}
@@ -335,7 +335,8 @@ int64 M6FTPFetcher::CollectFiles()
 	return result;
 }
 
-int64 M6FTPFetcher::CollectFiles(fs::path inLocalDir, fs::path inRemoteDir, fs::path::iterator p, fs::path::iterator e)
+int64 M6FTPFetcher::CollectFiles(fs::path inLocalDir, fs::path inRemoteDir, fs::path::iterator p, fs::path::iterator e,
+	M6Progress& inProgress)
 {
 	string s = p->string();
 	bool isPattern = ba::contains(s, "*") or ba::contains(s, "?");
@@ -346,6 +347,8 @@ int64 M6FTPFetcher::CollectFiles(fs::path inLocalDir, fs::path inRemoteDir, fs::
 
 	if (p == e)
 	{
+		inProgress.Consumed(1);
+
 			// we've reached the end of the url
 		if (not fs::exists(inLocalDir))
 			fs::create_directories(inLocalDir);
@@ -360,7 +363,8 @@ int64 M6FTPFetcher::CollectFiles(fs::path inLocalDir, fs::path inRemoteDir, fs::
 				existing.push_back(*file);
 		}
 
-		ListFiles(s, [this, &existing, &inLocalDir, &inRemoteDir, &result](char inType, const string& inFile, size_t inSize, time_t inTime)
+		ListFiles(s, [this, &existing, &inLocalDir, &inRemoteDir, &result, &inProgress]
+			(char inType, const string& inFile, size_t inSize, time_t inTime)
 		{
 			fs::path file = inLocalDir / inFile;
 
@@ -384,6 +388,8 @@ int64 M6FTPFetcher::CollectFiles(fs::path inLocalDir, fs::path inRemoteDir, fs::
 				this->mFilesToFetch.push_back(need);
 				result += inSize;
 			}
+
+			inProgress.Consumed(1);
 		});
 		
 		// but only delete files if the name was a pattern
@@ -418,7 +424,7 @@ int64 M6FTPFetcher::CollectFiles(fs::path inLocalDir, fs::path inRemoteDir, fs::
 		else if (isPattern)
 			localDir = dir;
 		
-		result += CollectFiles(localDir, remoteDir, p, e);
+		result += CollectFiles(localDir, remoteDir, p, e, inProgress);
 		status = SendAndWaitForReply("cdup", "");
 		if (status != 200 and status != 250)
 			Error("Error changing directory");

@@ -235,7 +235,8 @@ struct M6ProgressImpl
 {
 					M6ProgressImpl(string inDatabank, int64 inMax, const string& inAction)
 						: mDatabank(inDatabank)
-						, mMax(inMax), mConsumed(0), mAction(inAction), mMessage(inAction)
+						, mMax(inMax), mLast(0), mConsumed(0)
+						, mAction(inAction), mMessage(inAction), mSpinner(0)
 						, mThread(boost::bind(&M6ProgressImpl::Run, this)) {}
 					~M6ProgressImpl();
 
@@ -245,9 +246,10 @@ struct M6ProgressImpl
 	void			PrintDone();
 
 	string			mDatabank;
-	int64			mMax;
+	int64			mMax, mLast;
 	M6Counter		mConsumed;
 	string			mAction, mMessage;
+	uint32			mSpinner;
 	boost::mutex	mMutex;
 	boost::thread	mThread;
 #if BOOST_VERSION >= 104800
@@ -274,7 +276,11 @@ void M6ProgressImpl::Run()
 			if (mConsumed == mMax)
 				break;
 			
+			if (mConsumed == mLast)
+				continue;
+			
 			PrintProgress();
+			mLast = mConsumed;
 		}
 	}
 	catch (...) {}
@@ -285,6 +291,7 @@ void M6ProgressImpl::Run()
 void M6ProgressImpl::PrintProgress()
 {
 	int width = 80;
+	float progress = -1.0f;
 	
 	string msg;
 	msg.reserve(width + 1);
@@ -296,23 +303,35 @@ void M6ProgressImpl::PrintProgress()
 	}
 	else
 		msg = mMessage.substr(0, 17) + "...";
-	
-	msg += " [";
-	
-	float progress = static_cast<float>(mConsumed) / mMax;
-	int tw = width - 28;
-	int twd = static_cast<int>(tw * progress + 0.5f);
-	msg.append(twd, '=');
-	msg.append(tw - twd, ' ');
-	msg.append("] ");
-	
-	int perc = static_cast<int>(100 * progress);
-	if (perc < 100)
+
+	if (mMax == numeric_limits<int64>::max())
+	{
+		const char kSpinner[] = { '|', '/', '-', '\\' };
+		
+		mSpinner = (mSpinner + 1) % 4;
+		
 		msg += ' ';
-	if (perc < 10)
-		msg += ' ';
-	msg += boost::lexical_cast<string>(perc);
-	msg += '%';
+		msg += kSpinner[mSpinner];
+	}
+	else
+	{
+		msg += " [";
+		
+		progress = static_cast<float>(mConsumed) / mMax;
+		int tw = width - 28;
+		int twd = static_cast<int>(tw * progress + 0.5f);
+		msg.append(twd, '=');
+		msg.append(tw - twd, ' ');
+		msg.append("] ");
+		
+		int perc = static_cast<int>(100 * progress);
+		if (perc < 100)
+			msg += ' ';
+		if (perc < 10)
+			msg += ' ';
+		msg += boost::lexical_cast<string>(perc);
+		msg += '%';
+	}
 	
 	cout << '\r' << msg;
 	cout.flush();
@@ -336,8 +355,15 @@ void M6ProgressImpl::PrintDone()
 	M6Status::Instance().SetUpdateStatus(mDatabank, mAction, 1.0f);
 }
 
+// --------------------------------------------------------------------
+
 M6Progress::M6Progress(const string& inDatabank, int64 inMax, const string& inAction)
 	: mImpl(new M6ProgressImpl(inDatabank, inMax, inAction))
+{
+}
+
+M6Progress::M6Progress(const string& inDatabank, const string& inAction)
+	: mImpl(new M6ProgressImpl(inDatabank, numeric_limits<int64>::max(), inAction))
 {
 }
 

@@ -1,18 +1,14 @@
 BUGS:
 
 - embl CO section in format is missing
-- blast knop, invullen sequentie (sprot entry)
-
 - links: in OMIM records staan geen links naar swissprot, zou wel moeten
 
 Todo
 
-- verwijder nr als parameter voor entry, gebruik '#0000' constructie
-- GetDocument routine in server die aliases gebruikt
 - REST interface herzien:
-	- /entry/db/id moet naar Accept header kijken
-	- /find/db/query idem
+	- /find/db/query
 
+- admin page voor automatische update
 - admin/config file:
 	- Log file in server sectie
 
@@ -34,7 +30,6 @@ Todo
 
 Parsers:
 
-- PDB toFasta
 - mediawiki :-)
 - mbox
 

@@ -92,9 +92,12 @@ sub parse
 		
 		$self->index_string('seqid', $id);
 		$self->add_link('uniprot', $id);
-		$self->index_string('strid', $id) unless $strid eq '    ';
-		$self->add_link('pdb', $id);
-		$self->index_string('seqacc', $id);
+		unless ($strid eq '    ')
+		{
+			$self->index_string('strid', $strid);
+			$self->add_link('pdb', $strid);
+		}
+		$self->index_string('seqacc', $acc);
 	}
 }
 

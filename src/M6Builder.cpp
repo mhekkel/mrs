@@ -156,7 +156,7 @@ M6Processor::M6Processor(M6Databank& inDatabank, M6Lexicon& inLexicon,
 		}
 	}
 	
-	mWriteFasta = mConfig->get_attribute("blast") == "true";
+	mWriteFasta = mConfig->get_attribute("fasta") == "true";
 }
 
 M6Processor::~M6Processor()

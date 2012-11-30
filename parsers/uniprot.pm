@@ -80,7 +80,7 @@ sub parse
 		{
 			while ($value =~ m/(.+);/g)
 			{
-				$self->index_string('oc', $1);
+				$self->index_string(lc $key, $1);
 			}
 		}
 		elsif ($key eq 'CC')

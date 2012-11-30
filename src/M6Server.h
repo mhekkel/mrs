@@ -111,6 +111,7 @@ class M6Server : public zh::webapp
 //	void			handle_admin_ajax(const zh::request& request, const el::scope& scope, zh::reply& reply);
 	
 	void			process_mrs_link(zx::element* node, const el::scope& scope, boost::filesystem::path dir);
+	void			process_mrs_enable(zx::element* node, const el::scope& scope, boost::filesystem::path dir);
 
 	void			create_redirect(const std::string& databank, const std::string& inIndex, const std::string& inValue,
 						const std::string& q, bool redirectForQuery, const zh::request& req, zh::reply& rep);

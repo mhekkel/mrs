@@ -52,24 +52,6 @@ var Format = {
 			});
 		}
 		
-		if (Format.toFastA != null) {
-			var fasta = Format.toFastA($("#entrytext").html());
-			if (html != null) {
-				var query = '>' + fasta.id + ' ' + fasta.de + '\n' + fasta.seq;
-			
-				var html = $('<div id="entryfasta" style="display:none" />').html(
-						$("<pre/>").text(query)
-					);
-				$("#entry").append(html);
-			
-				$("#formatSelector").prop("disabled", false);
-				$("#formatSelector option[value='fasta']").prop("disabled", false);
-
-				$("#blastForm input[name='blast']").prop("disabled", false);
-				$("#blastForm input[name='query']").prop("value", query);
-			}
-		}
-
 		$("#formatSelector").change(function() {
 			var fmt = $("#formatSelector option:selected");
 			switch ($(fmt).prop("value")) {

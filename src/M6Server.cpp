@@ -169,6 +169,7 @@ M6Server::M6Server(const zx::element* inConfig)
 //	mount("admin/rename",	boost::bind(&M6Server::handle_admin_rename_ajax, this, _1, _2, _3));
 
 	add_processor("link",	boost::bind(&M6Server::process_mrs_link, this, _1, _2, _3));
+	add_processor("enable",	boost::bind(&M6Server::process_mrs_enable, this, _1, _2, _3));
 
 	zx::node* realm = mConfig->find_first_node("admin/@realm");
 	if (realm != nullptr)
@@ -768,6 +769,8 @@ void M6Server::handle_entry(const zh::request& request, const el::scope& scope, 
 	sub.put("id", document->GetAttribute("id"));
 	sub.put("nr", el::object(docNr));
 	sub.put("text", document->GetText());
+	sub.put("blastable", el::object(find_if(mBlastDatabanks.begin(), mBlastDatabanks.end(),
+			[&db](M6BlastDatabank& bdb) -> bool { return bdb.mID == db; }) != mBlastDatabanks.end()));
 	
 	vector<string> linkedDbs;
 	GetLinkedDbs(db, id, linkedDbs);
@@ -2058,6 +2061,32 @@ void M6Server::process_mrs_link(zx::element* node, const el::scope& scope, fs::p
 	{
 		zx::node* clone = c->clone();
 		a->push_back(clone);
+		process_xml(clone, scope, dir);
+	}
+}
+
+void M6Server::process_mrs_enable(zx::element* node, const el::scope& scope, fs::path dir)
+{
+	string test = node->get_attribute("test");
+	bool enabled = evaluate_el(scope, test);
+	
+	foreach (zx::node* c, node->nodes())
+	{
+		zx::node* clone = c->clone();
+		zx::element* e = dynamic_cast<zx::element*>(clone);
+		
+		if (e != nullptr and (e->name() == "input" or e->name() == "option" or e->name() == "select"))
+		{
+			if (enabled)
+				e->remove_attribute("disabled");
+			else
+				e->set_attribute("disabled", "disabled");
+		}
+			
+		zx::container* parent = node->parent();
+		assert(parent);
+
+		parent->insert(node, clone);	// insert before processing, to assign namespaces
 		process_xml(clone, scope, dir);
 	}
 }

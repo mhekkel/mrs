@@ -629,34 +629,6 @@ UniProt = {
 		});
 		
 		return table;
-	},
-	
-	toFastA: function(text) {
-		var id, de, seq;
-	
-		var re = /^(([A-Z]{2})   ).+\n(\2.+\n)*/gm;
-		
-		var m;
-		while ((m = re.exec(text)) != null) {
-			if (m[2] == 'ID') {
-				id = m[0].replace(/ID\s+((<[^<>]+>|[^ <])+)\s+(.+)/, "$1").replace(/\s+$/, "");
-			}
-			else if (m[2] == "DE" && de == null) {
-				var parser = UniProt.parser;
-				parser.parse(m[0].replace(/^DE   /gm, ''));
-
-				if (parser.name != null && parser.name.name != null)
-					de = $("<span/>").text(parser.name.name).text();  // strip out tags
-			}
-			else if (m[2] == 'SQ') {
-				var rx = /^SQ   .*\n((     .+\n)+)/m;
-				if ((m = rx.exec(text)) != null) {
-					seq = m[1].replace(/\s+/g, "").replace(/.{72}/g, "$&\n");
-				}
-			}
-		}
-		
-		return { id: id, de: de, seq: seq };
 	}
 }
 
@@ -664,6 +636,3 @@ Format.toHtml = function(text) {
 	return UniProt.toHtml(text);
 }
 
-Format.toFastA = function(text) {
-	return UniProt.toFastA(text);
-}

@@ -48,11 +48,11 @@
 					<form id="downloadForm" action="download">
 						<input type="hidden" name="db" value="${db}"/>
 						<input type="hidden" name="nr" value="${nr}"/>
-						<select id="formatSelector" disabled="true" name="format">
+						<mrs:enable test="${blastable}"><select id="formatSelector" name="format">
 							<option value="entry" disabled="true">Entry</option>
 							<option value="plain" selected="selected">Plain text</option>
-							<option value="fasta" disabled="true">FastA</option>
-						</select>
+							<mrs:enable test="${blastable}"><option value="fasta">FastA</option></mrs:enable>
+						</select></mrs:enable>
 					</form>
 				</li>
 				<li>
@@ -67,8 +67,9 @@
 					<form id="blastForm" method="post" action="blast">
 						<input type="hidden" name="db" value="${db}" />
 						<input type="hidden" name="nr" value="${nr}" />
-						<input type="submit" name="blast" value="Blast"
-							   disabled="disabled" class="submit" />
+						<mrs:enable test="${blastable}">
+							<input type="submit" name="blast" value="Blast" class="submit" />
+						</mrs:enable>
 					</form>
 				</li>
 				<li>

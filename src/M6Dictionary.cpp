@@ -1,6 +1,8 @@
 #include "M6Lib.h"
 
 #include <set>
+#include <cmath>
+#include <numeric>
 
 #include <boost/static_assert.hpp>
 #include <boost/algorithm/string.hpp>
@@ -533,13 +535,15 @@ M6Dictionary::~M6Dictionary()
 
 struct M6DictionaryCreator
 {
-							M6DictionaryCreator(M6Progress& inProgress);
+							M6DictionaryCreator(M6Progress& inProgress, uint32 inDocCount,
+								uint32 inIndexSize);
 
 	bool					Visit(const char* inKey, uint32 inKeyLength, uint32 inCount);
 
 	void					Finish(M6File& inFile, uint32 inDocCount);
 
 	M6Progress&				mProgress;
+	uint32					mMinWordOccurrence;
 	vector<M6Transition>	mAutomaton;
 	unsigned char			mS0[kMaxStringLength];
 	M6Transition			mLarvalState[kMaxStringLength + 1][kMaxChars];
@@ -550,10 +554,14 @@ struct M6DictionaryCreator
 	uint32					mI, mP, mNr;
 };
 
-M6DictionaryCreator::M6DictionaryCreator(M6Progress& inProgress)
+M6DictionaryCreator::M6DictionaryCreator(M6Progress& inProgress, uint32 inDocCount, uint32 inIndexSize)
 	: mProgress(inProgress)
 	, mI(0), mP(0), mNr(0)
 {
+	mMinWordOccurrence = static_cast<uint32>(log10(static_cast<float>(inDocCount)));
+	if (mMinWordOccurrence < kM6MinWordOccurrence)
+		mMinWordOccurrence = kM6MinWordOccurrence;
+	
 	fill(mS0, boost::end(mS0), 0);
 	fill(mLStateLen, boost::end(mLStateLen), 0);
 	fill(mIsTerminal, boost::end(mIsTerminal), false);
@@ -565,7 +573,14 @@ bool M6DictionaryCreator::Visit(const char* inKey, uint32 inKeyLength, uint32 in
 	if (++mNr % 10000 == 0)
 		mProgress.Progress(mNr);
 
-	if (inCount >= kM6MinWordOccurrence and inKeyLength >= kM6MinWordLength)
+	uint32 digits = accumulate(inKey, inKey + inKeyLength, 0UL, [](uint32 cnt, char ch) -> uint32
+	{
+		if (isdigit(ch))
+			++cnt;
+		return cnt;
+	});
+
+	if (inCount >= mMinWordOccurrence and inKeyLength >= kM6MinWordLength and digits < 2)
 	{
 		// calculate the document frequency for this term
 		if (inCount > numeric_limits<uint16>::max())
@@ -637,7 +652,7 @@ void M6DictionaryCreator::Finish(M6File& inFile, uint32 inDocCount)
 void M6Dictionary::Create(M6BasicIndex& inIndex, uint32 inDocCount,
 	M6File& inFile, M6Progress& inProgress)
 {
-	M6DictionaryCreator creator(inProgress);
+	M6DictionaryCreator creator(inProgress, inDocCount, inIndex.size());
 	inIndex.VisitKeys([&creator](const char* inKey, uint32 inKeyLength, uint32 inCount) -> bool
 	{
 		return creator.Visit(inKey, inKeyLength, inCount);

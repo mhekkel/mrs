@@ -241,6 +241,12 @@
 							<div><label>ID</label><input type="text" name="id" value="${db.id}"/></div>
 							<div><label>Enabled</label><mrs:checkbox name="enabled" checked="${db.enabled}"/></div>
 
+							<div><label>Name</label><input type="text" value="${db.name}" name="name"/></div>
+							<div><label>Info URL</label><input type="text" value="${db.info}" name="info"/></div>
+							
+							<p>Aliases are used in the Blast form and in creating links between databanks based on
+							the values found in e.g. db_xref records. The <em>name</em> is used in the blast databank popup menu.</p>
+							
 							<div><label>Aliases</label><div class="aliases">
 								<table id="${db.id}-aliases" cellspacing="0" cellpadding="0"
 												style="${empty db.aliases ? 'display:none;' : ''}">
@@ -265,9 +271,6 @@
 								<span class="clickable" onclick='Admin.addAliasToDb("${db.id}"); return false;'>Add alias</span>
 							</div>
 							</div>
-<!--							<div><label>Aliases</label><input type="text" value="${db.aliases}" name="aliases"/></div>-->
-							<div><label>Name</label><input type="text" value="${db.name}" name="name"/></div>
-							<div><label>Info URL</label><input type="text" value="${db.info}" name="info"/></div>
 
 							<h3>Data retrieval</h3>
 							<div><label>Update</label><select name="update">

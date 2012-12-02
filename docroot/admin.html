@@ -184,7 +184,7 @@
 							<mrs:iterate collection="${format.links}" var="link">
 								<tr>
 									<td><input type="text" value="${link.rx}" name="rx"/></td>
-									<td><select name="db"><mrs:options collection="aliases" selected="${link.db}" /></select></td>
+									<td><select name="db"><mrs:options collection="aliases" value="id" label="name" selected="${link.db}" /></select></td>
 									<td><input type="text" value="${link.id}" name="id"/></td>
 									<td><input type="text" value="${link.ix}" name="ix"/></td>
 									<td><input type="text" value="${link.an}" name="an"/></td>
@@ -193,7 +193,7 @@
 							</mrs:iterate>
 								<tr style="display:none">
 									<td><input type="text" name="rx"/></td>
-									<td><select name="db"><mrs:options collection="aliases" /></select></td>
+									<td><select name="db"><mrs:options collection="aliases" value="id" label="name" /></select></td>
 									<td><input type="text" name="id"/></td>
 									<td><input type="text" name="ix"/></td>
 									<td><input type="text" name="an"/></td>
@@ -240,7 +240,32 @@
 							<input type='hidden' name='original-id' value='${db.id}'/>
 							<div><label>ID</label><input type="text" name="id" value="${db.id}"/></div>
 							<div><label>Enabled</label><mrs:checkbox name="enabled" checked="${db.enabled}"/></div>
-							<div><label>Aliases</label><input type="text" value="${db.aliases}" name="aliases"/></div>
+
+							<div><label>Aliases</label><div class="aliases">
+								<table id="${db.id}-aliases" cellspacing="0" cellpadding="0"
+												style="${empty db.aliases ? 'display:none;' : ''}">
+									<tr>
+										<th>ID</th>
+										<th>Name</th>
+										<th/>
+									</tr>
+								<mrs:iterate collection="${db.aliases}" var="alias">
+									<tr>
+										<td><input type="text" value="${alias.id}" name="alias-id"/></td>
+										<td><input type="text" value="${alias.name}" name="alias-name"/></td>
+										<td><div class="delete">Delete</div></td>
+									</tr>
+								</mrs:iterate>
+									<tr style="display:none">
+										<td><input type="text" value="" name="alias-id"/></td>
+										<td><input type="text" value="" name="alias-name"/></td>
+										<td><div class="delete">Delete</div></td>
+									</tr>
+								</table>
+								<span class="clickable" onclick='Admin.addAliasToDb("${db.id}"); return false;'>Add alias</span>
+							</div>
+							</div>
+<!--							<div><label>Aliases</label><input type="text" value="${db.aliases}" name="aliases"/></div>-->
 							<div><label>Name</label><input type="text" value="${db.name}" name="name"/></div>
 							<div><label>Info URL</label><input type="text" value="${db.info}" name="info"/></div>
 

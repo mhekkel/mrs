@@ -106,6 +106,22 @@ Admin = {
 		$('#' + form + " table").show();
 	},
 	
+	addAliasToDb: function(db)
+	{
+		var table = $('#' + db + "-aliases");
+		var lastRow = table.find("tr:last");
+		var newRow = lastRow.clone();
+		
+		newRow.find("div.delete").click(function()
+		{
+			$(this).parent().parent().remove();
+		});
+		
+		lastRow.before(newRow);
+		newRow.show();
+		table.show();
+	},
+	
 	changeFormat: function(db)
 	{
 		var selected = $('#' + db + " select[name='format']").val();

@@ -16,13 +16,15 @@ sub new
 sub parse
 {
 	my ($self, $text) = @_;
-	
+
 	# watch out, recursion in subexpressions is limited to 32k lines.
 	# that's not enough for genbank records containing complete genomes...
-	while ($text =~ m/^(\w+)\s+(.+?)(?=\n\S)/msg)
+	foreach my $part (split(m/\n(?=\w)/, $text))
 	{
+		next unless ($part =~ m/^(\w+)\s+/);
+		
 		my $key = lc $1;
-		my $value = $2;
+		my $value = substr($part, $+[0]);
 
 		if ($key eq 'locus')
 		{
@@ -73,9 +75,8 @@ sub parse
 		}
 		elsif ($key eq 'features')
 		{
-			while ($value =~ m/^\s{5}\w+\s+((?:\S.+)(?:\n\s{20,}.+)*)/gm)
+			foreach my $feature (split(m/\n {5}(?=\w)/, $part))
 			{
-				my $feature = $1;
 				while ($feature =~ m'/(\w+)=(?|([^"].+)|"((?:[^"]++|"")*)")\n?'gm)
 				{
 					my $fkey = $1;

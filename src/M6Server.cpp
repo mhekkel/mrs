@@ -1406,6 +1406,9 @@ void M6Server::handle_similar(const zh::request& request, const el::scope& scope
 
 void M6Server::ProcessNewConfig(const string& inPage, zeep::http::parameter_map& inParams)
 {
+	typedef zh::parameter_map::iterator iter;
+	typedef pair<iter,iter> range;
+
 	unique_ptr<M6Config::File> config(new M6Config::File(*mConfigCopy));
 	
 	string btn = inParams.get("btn", "").as<string>();
@@ -1531,8 +1534,6 @@ void M6Server::ProcessNewConfig(const string& inPage, zeep::http::parameter_map&
 			string script = inParams.get("script", "").as<string>();
 			fmt->set_attribute("script", script);
 			
-			typedef zh::parameter_map::iterator iter;
-			typedef pair<iter,iter> range;
 			range r[5] = {
 				inParams.equal_range("rx"),
 				inParams.equal_range("db"),
@@ -1609,34 +1610,61 @@ void M6Server::ProcessNewConfig(const string& inPage, zeep::http::parameter_map&
 			else
 				db->set_attribute("format", format);
 			
-			string s = inParams.get("aliases", "").as<string>();
-			zx::element* e = db->find_first("aliases");
-
-			if (s.empty())
+			range r[] = {
+				inParams.equal_range("alias-id"),
+				inParams.equal_range("alias-name")
+			};
+			
+			for_each(r, boost::end(r), [](range& ri) {
+				if (ri.first == ri.second) THROW(("invalid data"));
+				--ri.second;
+			});
+			
+			zx::element* a = db->find_first("aliases");
+			if (r[0].first == r[0].second)		// no aliases
 			{
-				if (e != nullptr)
-					db->remove(e);
-				delete e;
+				if (a != nullptr)
+				{
+					db->remove(a);
+					delete a;
+				}
 			}
 			else
 			{
-				vector<string> aliases;
-				ba::split(aliases, s, ba::is_any_of(";"));
-				if (e == nullptr)
-					db->append(e = new zx::element("aliases"));
-				e->erase(e->begin(), e->end());
-				for_each(aliases.begin(), aliases.end(), [e](const string& alias) {
-					zx::element* a = new zx::element("alias");
-					a->content(alias);
-					e->append(a);
-				});
+				zx::container::iterator ai = a->begin();
+				
+				while (r[0].first != r[0].second)
+				{
+					string id = r[0].first->second.as<string>();
+					++r[0].first;
+					string name = r[1].first->second.as<string>();
+					++r[1].first;
+					
+					if (id.empty())
+						continue;
+
+					if (ai == a->end())
+						ai = a->insert(ai, new zx::element("alias"));
+					
+					zx::element* alias = *ai;
+					++ai;
+
+					alias->content(id);
+					if (name.empty())
+						alias->remove_attribute("name");
+					else
+						alias->set_attribute("name", name);
+				}
+				
+				if (ai != a->end())
+					a->erase(ai, a->end());
 			}
-			
+
 			const char* fields[] = { "name", "info", "filter", "source" };
 			foreach (const char* field, fields)
 			{
-				s = inParams.get(field, "").as<string>();
-				e = db->find_first(field);
+				string s = inParams.get(field, "").as<string>();
+				zx::element* e = db->find_first(field);
 				if (s.empty())
 				{
 					if (e != nullptr)
@@ -1828,13 +1856,17 @@ void M6Server::handle_admin(const zh::request& request,
 	// add the databank settings
 	vector<el::object> databanks;
 	set<string> aliases;
+	map<string,string> aliasnames;
 
 	foreach (const zx::element* db, mConfigCopy->GetDatabanks())
 	{
 		zx::element* e;
 		
+		string id = db->get_attribute("id");
+		string name = id;
+
 		el::object databank;
-		databank["id"] = db->get_attribute("id");
+		databank["id"] = id;
 		if (db->get_attribute("stylesheet").empty())
 			databank["format"] = db->get_attribute("format");
 		else
@@ -1849,7 +1881,7 @@ void M6Server::handle_admin(const zh::request& request,
 		if ((e = db->find_first("filter")) != nullptr)
 			databank["filter"] = e->content();
 		if ((e = db->find_first("name")) != nullptr)
-			databank["name"] = e->content();
+			databank["name"] = name = e->content();
 		if ((e = db->find_first("info")) != nullptr)
 			databank["info"] = e->content();
 		if ((e = db->find_first("source")) != nullptr)
@@ -1862,14 +1894,23 @@ void M6Server::handle_admin(const zh::request& request,
 			databank["fetch"] = fetch;
 		}
 		
-		aliases.insert(db->get_attribute("id"));
+		aliases.insert(id);
+		aliasnames[id] = name;
 
-		set<string> dbaliases;
+		vector<el::object> dbaliases;
 		foreach (const zx::element* a, db->find("aliases/alias"))
-			dbaliases.insert(a->content());
-		aliases.insert(dbaliases.begin(), dbaliases.end());
+		{
+			el::object alias;
+			alias["name"] = alias["id"] = a->content();
+			if (not a->get_attribute("name").empty())
+				alias["name"] = a->get_attribute("name");
+			dbaliases.push_back(alias);
+
+			aliases.insert(a->content());
+			aliasnames[a->content()] = alias["name"].as<string>();
+		}
 		
-		databank["aliases"] = ba::join(dbaliases, ";");
+		databank["aliases"] = dbaliases;
 		
 		databanks.push_back(databank);
 	}
@@ -1877,7 +1918,15 @@ void M6Server::handle_admin(const zh::request& request,
 	sort(databanks.begin(), databanks.end(), sortByID);
 	sub.put("config-databanks", el::object(databanks));
 	
-	sub.put("aliases", aliases.begin(), aliases.end());
+	vector<el::object> aliasobjects;
+	foreach (const string& alias, aliases)
+	{
+		el::object aliasobject;
+		aliasobject["id"] = alias;
+		aliasobject["name"] = aliasnames[alias].empty() ? alias : aliasnames[alias];
+		aliasobjects.push_back(aliasobject);
+	}
+	sub.put("aliases", aliasobjects.begin(), aliasobjects.end());
 
 	create_reply_from_template("admin.html", sub, reply);
 }

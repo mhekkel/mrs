@@ -5,6 +5,7 @@ BUGS:
 
 Todo
 
+- rsync, toch maar
 - name parameter voor alias in admin pagina
 - REST interface herzien:
 	- /find/db/query

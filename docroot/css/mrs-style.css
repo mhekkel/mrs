@@ -728,13 +728,14 @@ form.admin_form th a {
 	height: 1.8em;
 }
 
-.admin td div.delete {
+.admin td div.delete, .aliases span.clickable {
 	padding: 2px;
+	margin: 3px;
 	color: #2f506c;
 	text-decoration: none;
 }
 
-.admin td div.delete:hover {
+.admin td div.delete:hover, .aliases span.clickable:hover {
 	text-decoration: underline;
 	cursor: pointer;
 }
@@ -753,6 +754,21 @@ form.admin_form hr {
 	color: #9E9E9E;
 	background-color: #9E9E9E;
 	height: 1px;
+}
+
+.admin div.aliases {
+	margin-left: 120px;
+	margin-top: -1.9em;
+	padding: 1px; 
+}
+
+.admin div.aliases th {
+	background-color: white;
+	border-width: 0px;
+}
+
+.admin div.aliases input, .admin div.aliases td:first-child input {
+	width: auto;
 }
 
 /*

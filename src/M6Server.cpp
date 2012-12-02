@@ -1685,7 +1685,9 @@ void M6Server::ProcessNewConfig(const string& inPage, zeep::http::parameter_map&
 			if (not fetch.empty() and source == nullptr)
 				THROW(("invalid: fetch contains text but source is empty"));
 			
-			if (not fetch.empty())
+			if (fetch.empty())
+				source->remove_attribute("fetch");
+			else
 				source->set_attribute("fetch", fetch);
 			
 			if (inParams.get("delete", false).as<bool>())

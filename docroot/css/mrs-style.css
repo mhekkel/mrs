@@ -514,6 +514,10 @@ table.status tr.error td.active {
 	background-color: #ec9a9a;
 }
 
+table.status tr.scheduled {
+	background-color: #dfeeff;
+}
+
 table.status tr.active td {
 	background-color: #d9ecc3;
 }

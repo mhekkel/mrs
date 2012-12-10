@@ -33,3 +33,4 @@ class M6SignalCatcher
 
 void SetStdinEcho(bool inEnable);
 boost::filesystem::path GetExecutablePath();
+bool IsaTTY();

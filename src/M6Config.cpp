@@ -279,8 +279,6 @@ void GetSchedule(bool& outEnabled, boost::posix_time::ptime& outTime, string& ou
 	else
 	{
 		using namespace boost::gregorian; 
-	    using namespace boost::date_time;
-	    using namespace boost::local_time;
 	    using namespace boost::posix_time;
 
 		outEnabled = schedule->get_attribute("enabled") == "true";
@@ -294,8 +292,8 @@ void GetSchedule(bool& outEnabled, boost::posix_time::ptime& outTime, string& ou
 		
 		int updateHour = boost::lexical_cast<int>(m[1].str());
 		int updateMinute = boost::lexical_cast<int>(m[2].str());
-		outTime = boost::posix_time::second_clock::local_time() + hours(updateHour) + minutes(updateMinute);
 
+		outTime = ptime(second_clock::local_time().date()) + hours(updateHour) + minutes(updateMinute);
 		outWeekDay = schedule->get_attribute("weekday");
 	}
 }

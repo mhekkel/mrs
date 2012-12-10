@@ -36,7 +36,13 @@ Status = {
 
 			if (db.update != null)
 			{
-				if (db.update.progress < 0)
+				if (db.update.stage == 'scheduled')
+				{
+					row.className = 'scheduled';
+					row.cells[7].innerHTML = db.update.stage;
+					row.cells[6].children[0].style.display = 'none';
+				}
+				else if (db.update.progress < 0)
 				{
 					row.className = 'error';
 					row.cells[7].innerHTML = db.update.stage;

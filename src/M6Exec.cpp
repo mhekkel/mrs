@@ -457,7 +457,7 @@ int ForkExec(vector<const char*>& args, double maxRunTime,
 				break;
 		}
 
-		if (not errDone and not outDone and not killed and startTime + maxRunTime < system_time())
+		if (not errDone and not outDone and not killed and maxRunTime > 0 and startTime + maxRunTime < system_time())
 		{
 			kill(pid, SIGINT);
 

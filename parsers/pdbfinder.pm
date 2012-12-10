@@ -49,4 +49,44 @@ sub parse
 	}
 }
 
+sub to_fasta
+{
+	my ($self, $text, $db, $id, $title) = @_;
+
+	open(my $h, "<", \$text);
+	my ($state, $id, $chainid, %seq);
+	
+	$state = 0;
+
+	while (my $line = <$h>)
+	{
+		chomp($line);
+		
+		last if (substr($line, 0, 2) eq '//');
+		
+		if ($line =~ /^Chain\s*:\s*(\S)/)
+		{
+			$chainid = $1;
+		}
+		elsif ($line =~ /^\s*Sequence\s*:\s*(\w+)/)
+		{
+			my $seq = uc $1;
+			$seq =~ tr/ARNDCQEGHILKMFPSTWYVBZX//dc;
+			$seq{$chainid} = $seq;
+		}
+	}
+
+	my $result = '';
+	if (scalar keys %seq)
+	{
+		foreach my $chain (keys %seq)
+		{
+			my $seq = $seq{$chain};
+			$result .= ">gnl|$db|$id|$chain $title\n$seq\n";
+		}
+	}
+	
+	return $result;
+}
+
 1;

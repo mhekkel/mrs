@@ -22,6 +22,8 @@
 #include <boost/timer/timer.hpp>
 #endif
 
+#include "M6Utilities.h"
+
 #if defined(__linux__) || defined(__INTEL_COMPILER_BUILD_DATE)
 #include <atomic>
 
@@ -333,8 +335,11 @@ void M6ProgressImpl::PrintProgress()
 		msg += '%';
 	}
 	
-	cout << '\r' << msg;
-	cout.flush();
+	if (IsaTTY())
+	{
+		cout << '\r' << msg;
+		cout.flush();
+	}
 
 	M6Status::Instance().SetUpdateStatus(mDatabank, mMessage, progress);
 }
@@ -350,7 +355,10 @@ void M6ProgressImpl::PrintDone()
 	if (msg.length() < width)
 		msg += string(width - msg.length(), ' ');
 	
-	cout << '\r' << msg << endl;
+	if (IsaTTY())
+		cout << '\r' << msg << endl;
+	else
+		cout << msg << endl;
 
 	M6Status::Instance().SetUpdateStatus(mDatabank, mAction, 1.0f);
 }

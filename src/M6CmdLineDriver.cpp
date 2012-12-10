@@ -500,34 +500,43 @@ void M6BuildDriver::Exec(const string& inCommand, po::variables_map& vm)
 
 	foreach (string databank, databanks)
 	{
-		cout << inCommand << " " << databank << endl;
-		
-		if (inCommand == "update" and M6Config::GetDatabankParam(databank, "source/@fetch").empty() == false)
-			M6Fetch(databank);
-	
-		M6Builder builder(databank);
-		
-		if (inCommand == "build" or builder.NeedsUpdate())
+		try
 		{
-			try
-			{
-				builder.Build(nrOfThreads);
-			}
-			catch (exception& e)
-			{
-				cerr << endl
-					 << "Error" << endl
-					 << e.what() << endl;
-				M6Status::Instance().SetError(databank, e.what());
-			}
-		}
-		else
-		{
-			cout << databank << " is up-to-date" << endl;
-			M6Status::Instance().Cleanup(databank);
-		}
+			cout << inCommand << " " << databank << endl;
+			
+			if (inCommand == "update" and M6Config::GetDatabankParam(databank, "source/@fetch").empty() == false)
+				M6Fetch(databank);
 		
-		cout << endl;
+			M6Builder builder(databank);
+			
+			if (inCommand == "build" or builder.NeedsUpdate())
+			{
+				try
+				{
+					builder.Build(nrOfThreads);
+				}
+				catch (exception& e)
+				{
+					cerr << endl
+						 << "Error" << endl
+						 << e.what() << endl;
+					M6Status::Instance().SetError(databank, e.what());
+				}
+			}
+			else
+			{
+				cout << databank << " is up-to-date" << endl;
+				M6Status::Instance().Cleanup(databank);
+			}
+			
+			cout << endl;
+		}
+		catch (exception& e)
+		{
+			cout << endl
+				 << inCommand << " failed: " << e.what() << endl
+				 << endl;
+		}
 	}
 }
 

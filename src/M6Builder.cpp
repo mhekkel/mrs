@@ -83,13 +83,16 @@ class M6Processor
 
 	void			PutDocument(const string& inDoc)
 					{
+						if (not (mException == exception_ptr()))
+							rethrow_exception(mException);
+						
 						if (mUseDocQueue)
 							mDocQueue.Put(tr1::make_tuple(inDoc, *mFileName));
 						else
 							ProcessDocument(inDoc);
 					}
 
-	void			Error(exception_ptr& e);
+	void			Error(exception_ptr e);
 
 	struct XMLIndex
 	{
@@ -169,7 +172,7 @@ M6Processor::~M6Processor()
 	delete mParser;
 }
 
-void M6Processor::Error(exception_ptr& e)
+void M6Processor::Error(exception_ptr e)
 {
 	mException = e;
 	mFileThreads.interrupt_all();
@@ -742,7 +745,7 @@ void M6Scheduler::Schedule(const string& inDatabank, const char* inAction)
 	if (find_if(mScheduled.begin(), mScheduled.end(), [inDatabank](tr1::tuple<string,string>& s) -> bool
 			{ return tr1::get<0>(s) == inDatabank; }) == mScheduled.end())
 	{
-		mScheduled.push_back(make_tuple(inDatabank, inAction));
+		mScheduled.push_back(tr1::make_tuple(inDatabank, inAction));
 	}
 }
 
@@ -782,9 +785,16 @@ void M6Scheduler::Run()
     if (start < now)
     	start += hours(24);
 	time_iterator update(start, hours(24));		// daily 
+	bool writeNextUpdateTime = true;
 
 	for (;;)
 	{
+		if (writeNextUpdateTime)
+		{
+			log << "Next update at " << *update << endl;
+			writeNextUpdateTime = false;
+		}
+		
 		boost::this_thread::sleep(boost::posix_time::seconds(5));
 
 		try
@@ -793,6 +803,8 @@ void M6Scheduler::Run()
 			if (now > *update)
 			{
 				do ++update; while (*update < now);
+
+				writeNextUpdateTime = true;
 				
 				bool weekly = ba::iequals(
 					now.date().day_of_week().as_long_string(), updateWeekday);
@@ -844,7 +856,9 @@ void M6Scheduler::Run()
 				string out, err;
 				int r = ForkExec(args, 0, "", out, err);
 				
-				if (r != 0)
+				if (r == 0)
+					M6SignalCatcher::Signal(SIGHUP);	// signal to reload databanks
+				else
 					log << action << " of " << databank << " returned: " << r << endl;
 				
 				if (not out.empty())

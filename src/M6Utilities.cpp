@@ -42,6 +42,11 @@ fs::path GetExecutablePath()
 	return fs::path(buffer);
 }
 
+bool IsaTTY()
+{
+	return true;
+}
+
 struct M6SignalCatcherImpl
 {
 	static BOOL				CtrlHandler(DWORD inCntrlType);
@@ -127,6 +132,7 @@ void M6SignalCatcher::Signal(int inSignal)
 #elif defined(linux) || defined(__linux) || defined (__linux__)
 
 #include <termio.h>
+#include <linux/limits.h>
 
 void SetStdinEcho(bool inEnable)
 {
@@ -146,7 +152,12 @@ fs::path GetExecutablePath()
 	if (readlink("/proc/self/exe", path, sizeof(path)) == -1)
 		throw runtime_error("could not get exe path");
 	
-	return fs::path(result);
+	return fs::path(path);
+}
+
+bool IsaTTY()
+{
+	return isatty(STDOUT_FILENO);
 }
 
 struct M6SignalCatcherImpl

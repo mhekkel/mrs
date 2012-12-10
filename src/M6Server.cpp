@@ -1631,6 +1631,12 @@ void M6Server::ProcessNewConfig(const string& inPage, zeep::http::parameter_map&
 			}
 			else
 			{
+				if (a == nullptr)
+				{
+					a = new zx::element("aliases");
+					db->append(a);
+				}
+				
 				zx::container::iterator ai = a->begin();
 				
 				while (r[0].first != r[0].second)
@@ -2833,16 +2839,23 @@ void M6Server::handle_status_ajax(const zh::request& request, const el::scope& s
 		el::object databank;
 		databank["id"] = id;
 		
+		bool dbScheduled = find(scheduled.begin(), scheduled.end(), id) != scheduled.end();
+		
 		string stage;
 		float progress;
 		if (M6Status::Instance().GetUpdateStatus(id, stage, progress))
 		{
 			el::object update;
-			update["progress"] = progress;
-			update["stage"] = stage;
+			if (progress < 0 and dbScheduled)
+				update["stage"] = "scheduled";
+			else
+			{
+				update["progress"] = progress;
+				update["stage"] = stage;
+			}
 			databank["update"] = update;
 		}
-		else if (find(scheduled.begin(), scheduled.end(), id) != scheduled.end())
+		else if (dbScheduled)
 		{
 			el::object update;
 			update["stage"] = "scheduled";

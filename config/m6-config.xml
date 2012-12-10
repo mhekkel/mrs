@@ -5,6 +5,7 @@
   <directories>
     <directory id="mrs">/data/mrs</directory>
     <directory id="raw">/data/raw</directory>
+    <directory id="log">/data/log</directory>
     <directory id="blast">/data/blast-cache</directory>
     <directory id="parser">/home/maarten/projects/m6/parsers</directory>
     <directory id="docroot">/home/maarten/projects/m6/docroot</directory>
@@ -14,6 +15,8 @@
     <!--		<tool id="clustalo">C:\Users\maarten\bin\clustal-omega\clustalo.exe</tool>-->
     <tool id="clustalo">/usr/bin/clustalo</tool>
   </tools>
+  <!-- Scheduler section -->
+  <scheduler enabled="true" time="20:00" weekday="friday"/>
   <!-- Users section -->
   <users>
     <user name="scott" realm="M6 Administrator" password="b92ff7d60b994c8a0d2941ad9349e841"/>
@@ -125,7 +128,8 @@
     </databank>
     <databank id="sprot" parser="uniprot" format="uniprot" update="daily" enabled="true" fasta="true">
       <aliases>
-        <alias>uniprot</alias>
+        <alias name="UniProt">uniprot</alias>
+        <alias>UniProtKB/TrEMBL</alias>
       </aliases>
       <name>SwissProt</name>
       <info>http://www.uniprot.org/</info>
@@ -133,7 +137,8 @@
     </databank>
     <databank id="trembl" parser="uniprot" format="uniprot" enabled="true" update="daily" fasta="true">
       <aliases>
-        <alias>uniprot</alias>
+        <alias name="UniProt">uniprot</alias>
+        <alias>UniProtKB/TrEMBL</alias>
       </aliases>
       <name>TrEMBL</name>
       <info>http://www.uniprot.org/</info>
@@ -142,12 +147,15 @@
     <databank id="genbank" parser="genbank" enabled="true" update="weekly" fasta="false">
       <name>Genbank</name>
       <info>http://www.ncbi.nlm.nih.gov/genbank/</info>
-      <source delete="true" fetch="ftp://ftp.ncbi.nih.gov/">genbank/*.seq.gz</source>
+      <source>genbank/*.seq.gz</source>
+      <aliases>
+        <alias name="Genbank Identifier">gi</alias>
+      </aliases>
     </databank>
     <databank id="refseq" parser="genbank" enabled="true" update="weekly" fasta="false">
       <name>Refseq</name>
       <info>http://www.ncbi.nlm.nih.gov/RefSeq/</info>
-      <source delete="true" fetch="ftp://ftp.ncbi.nih.gov/">refseq/release/complete/*gpff.gz;refseq/release/complete/*gbff.gz</source>
+      <source delete="false">refseq/release/complete/*g{p,b}ff.gz</source>
     </databank>
     <databank id="taxonomy" parser="taxonomy" format="taxonomy" enabled="true" update="daily" fasta="false">
       <name>Taxonomy</name>
@@ -256,7 +264,7 @@
     <databank id="unigene" parser="unigene" enabled="true" update="weekly" fasta="false">
       <name>Unigene</name>
       <info>http://www.ncbi.nlm.nih.gov/entrez/query.fcgi?db=unigene</info>
-      <source fetch="ftp://ftp.ebi.ac.uk//pub/databases">Unigene/*/*.data.gz</source>
+      <source fetch="ftp://ftp.ebi.ac.uk//pub/databases" delete="false">Unigene/*/*.data.gz</source>
     </databank>
     <databank id="uniref50" parser="uniref" enabled="false" update="never" fasta="false">
       <name>UniRef 50</name>

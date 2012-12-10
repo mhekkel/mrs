@@ -559,6 +559,7 @@ class M6BasicIx
 	
 	struct FlushedTerm
 	{
+		virtual			~FlushedTerm() {}
 		uint32			mTerm;
 		vector<uint32>	mDocs;
 	};

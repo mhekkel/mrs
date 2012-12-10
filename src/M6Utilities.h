@@ -1,5 +1,6 @@
 #pragma once
 
+#include <signal.h>
 #include <boost/filesystem/path.hpp>
 
 #ifndef SIGQUIT

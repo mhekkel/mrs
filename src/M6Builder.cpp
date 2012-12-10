@@ -785,7 +785,7 @@ void M6Scheduler::Run()
     if (start < now)
     	start += hours(24);
 	time_iterator update(start, hours(24));		// daily 
-	bool writeNextUpdateTime = true;
+	bool writeNextUpdateTime = true, reload = false;
 
 	for (;;)
 	{
@@ -793,6 +793,12 @@ void M6Scheduler::Run()
 		{
 			log << "Next update at " << *update << endl;
 			writeNextUpdateTime = false;
+		}
+		
+		if (reload)
+		{
+			M6SignalCatcher::Signal(SIGHUP);
+			reload = false;		
 		}
 		
 		boost::this_thread::sleep(boost::posix_time::seconds(5));
@@ -857,7 +863,7 @@ void M6Scheduler::Run()
 				int r = ForkExec(args, 0, "", out, err);
 				
 				if (r == 0)
-					M6SignalCatcher::Signal(SIGHUP);	// signal to reload databanks
+					reload = true;	// signal to reload databanks
 				else
 					log << action << " of " << databank << " returned: " << r << endl;
 				

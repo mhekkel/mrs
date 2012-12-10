@@ -77,8 +77,8 @@ class M6Processor
 	void			ParseFile(const string& inFileName, istream& inFileStream);
 	void			ParseXML(const string& inFileName, istream& inFileStream);
 
-	void			ProcessFile(M6Progress& inProgress, exception_ptr& ex);
-	void			ProcessDocument(exception_ptr& ex);
+	void			ProcessFile(M6Progress& inProgress);
+	void			ProcessDocument();
 	void			ProcessDocument(const string& inDoc);
 
 	void			PutDocument(const string& inDoc)
@@ -89,6 +89,8 @@ class M6Processor
 							ProcessDocument(inDoc);
 					}
 
+	void			Error(exception_ptr& e);
+
 	struct XMLIndex
 	{
 		string		name;
@@ -98,21 +100,22 @@ class M6Processor
 		bool		attr;
 	};
 	
-	M6Databank&		mDatabank;
-	M6Lexicon&		mLexicon;
-	const zx::element*
-					mConfig;
-	M6Parser*		mParser;
-	vector<XMLIndex>mXMLIndexInfo;
-	string			mChunkXPath;
-	M6FileQueue		mFileQueue;
-	M6DocQueue		mDocQueue;
-	bool			mUseDocQueue;
-	bool			mWriteFasta;
-	fs::ofstream	mFastaFile;
-	string			mDbHeader;
+	M6Databank&				mDatabank;
+	M6Lexicon&				mLexicon;
+	const zx::element*		mConfig;
+	M6Parser*				mParser;
+	vector<XMLIndex>		mXMLIndexInfo;
+	string					mChunkXPath;
+	M6FileQueue				mFileQueue;
+	M6DocQueue				mDocQueue;
+	bool					mUseDocQueue;
+	bool					mWriteFasta;
+	fs::ofstream			mFastaFile;
+	string					mDbHeader;
 	boost::thread_specific_ptr<string>
-					mFileName;
+							mFileName;
+	boost::thread_group		mFileThreads, mDocThreads;
+	exception_ptr			mException;
 };
 
 const tr1::tuple<string,string> M6Processor::kSentinel;
@@ -166,6 +169,13 @@ M6Processor::~M6Processor()
 	delete mParser;
 }
 
+void M6Processor::Error(exception_ptr& e)
+{
+	mException = e;
+	mFileThreads.interrupt_all();
+	mDocThreads.interrupt_all();
+}
+
 struct M6LineMatcher
 {
   public:
@@ -217,6 +227,7 @@ void M6Processor::ProcessFile(const string& inFileName, istream& inFileStream)
 		cerr << endl
 			 << "Error parsing file " << inFileName << endl
 			 << e.what() << endl;
+		Error(current_exception());
 	}
 }
 
@@ -336,7 +347,7 @@ void M6Processor::ParseFile(const string& inFileName, istream& inFileStream)
 	}
 }
 
-void M6Processor::ProcessFile(M6Progress& inProgress, exception_ptr& ex)
+void M6Processor::ProcessFile(M6Progress& inProgress)
 {
 	try
 	{
@@ -362,10 +373,9 @@ void M6Processor::ProcessFile(M6Progress& inProgress, exception_ptr& ex)
 		
 		mFileQueue.Put(fs::path());
 	}
-	catch (exception& e)
+	catch (exception&)
 	{
-		cerr << "exception in thread: " << e.what() << endl;
-		ex = current_exception();
+		Error(current_exception());
 	}
 }
 
@@ -399,7 +409,7 @@ M6InputDocument* M6Processor::IndexDocument(const string& inDoc, const string& i
 	return doc;
 }
 
-void M6Processor::ProcessDocument(exception_ptr& ex)
+void M6Processor::ProcessDocument()
 {
 	try
 	{
@@ -477,27 +487,22 @@ void M6Processor::ProcessDocument(exception_ptr& ex)
 		
 		mDocQueue.Put(kSentinel);
 	}
-	catch (exception& e)
+	catch (exception&)
 	{
-		cerr << "exception in thread: " << e.what() << endl;
-		ex = current_exception();
+		Error(current_exception());
 	}
 }
 
 void M6Processor::Process(vector<fs::path>& inFiles, M6Progress& inProgress,
 	uint32 inNrOfThreads)
 {
-	boost::thread_group fileThreads, docThreads;
-	
-	exception_ptr ex;
-	
 	if (inFiles.size() >= inNrOfThreads)
 		mUseDocQueue = false;
 	else
 	{
 		mUseDocQueue = true;
 		for (uint32 i = 0; i < inNrOfThreads; ++i)
-			docThreads.create_thread([&ex, this]() { this->ProcessDocument(ex); });
+			mDocThreads.create_thread([this]() { this->ProcessDocument(); });
 	}
 
 	if (inFiles.size() == 1)
@@ -512,10 +517,13 @@ void M6Processor::Process(vector<fs::path>& inFiles, M6Progress& inProgress,
 			inNrOfThreads = inFiles.size();
 
 		for (uint32 i = 0; i < inNrOfThreads; ++i)
-			fileThreads.create_thread([&ex, &inProgress, this]() { this->ProcessFile(inProgress, ex); });
+			mFileThreads.create_thread([&inProgress, this]() { this->ProcessFile(inProgress); });
 
 		foreach (fs::path& file, inFiles)
 		{
+			if (not (mException == std::exception_ptr()))
+				rethrow_exception(mException);
+
 			if (not fs::exists(file))
 			{
 				cerr << "file missing: " << file << endl;
@@ -526,17 +534,17 @@ void M6Processor::Process(vector<fs::path>& inFiles, M6Progress& inProgress,
 		}
 
 		mFileQueue.Put(fs::path());
-		fileThreads.join_all();
+		mFileThreads.join_all();
 	}
 	
 	if (mUseDocQueue)
 	{
 		mDocQueue.Put(kSentinel);
-		docThreads.join_all();
+		mDocThreads.join_all();
 	}
 
-	if (not (ex == std::exception_ptr()))
-		rethrow_exception(ex);
+	if (not (mException == std::exception_ptr()))
+		rethrow_exception(mException);
 }
 
 // --------------------------------------------------------------------

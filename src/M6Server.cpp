@@ -2820,6 +2820,8 @@ void M6Server::handle_status(const zh::request& request, const el::scope& scope,
 void M6Server::handle_status_ajax(const zh::request& request, const el::scope& scope, zh::reply& reply)
 {
 	vector<el::object> databanks;
+	vector<string> scheduled;
+	M6Scheduler::Instance().GetScheduledDatabanks(scheduled);
 
 	foreach (zx::element* db, M6Config::GetDatabanks())
 	{
@@ -2838,7 +2840,12 @@ void M6Server::handle_status_ajax(const zh::request& request, const el::scope& s
 			el::object update;
 			update["progress"] = progress;
 			update["stage"] = stage;
-			
+			databank["update"] = update;
+		}
+		else if (find(scheduled.begin(), scheduled.end(), id) != scheduled.end())
+		{
+			el::object update;
+			update["stage"] = "scheduled";
 			databank["update"] = update;
 		}
 
@@ -3019,6 +3026,8 @@ void M6Server::Start()
 	uint32 nrOfThreads = boost::thread::hardware_concurrency();
 	//if (vm.count("threads"))
 	//	nrOfThreads = vm["threads"].as<uint32>();
+	
+	(void)M6Scheduler::Instance();
 	
 	RunMainLoop(nrOfThreads);
 }

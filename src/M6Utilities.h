@@ -1,5 +1,7 @@
 #pragma once
 
+#include <boost/filesystem/path.hpp>
+
 #ifndef SIGQUIT
 #define SIGQUIT SIGTERM
 #endif
@@ -30,4 +32,4 @@ class M6SignalCatcher
 };
 
 void SetStdinEcho(bool inEnable);
-
+boost::filesystem::path GetExecutablePath();

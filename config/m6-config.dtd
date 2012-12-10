@@ -1,4 +1,4 @@
-<!ELEMENT m6-config (directories,tools,users,server,formats,parsers,databanks)>
+<!ELEMENT m6-config (directories,tools,scheduler,users,server,formats,parsers,databanks)>
 
 <!ELEMENT directories (directory+)>
 <!ELEMENT directory (#PCDATA)>
@@ -7,6 +7,11 @@
 <!ELEMENT tools (tool+)>
 <!ELEMENT tool (#PCDATA)>
 <!ATTLIST tool id ID #REQUIRED>
+
+<!ELEMENT scheduler EMPTY>
+<!ATTLIST scheduler enabled (true|false) "true"
+		  time CDATA #REQUIRED
+		  weekday CDATA #REQUIRED>
 	
 <!ELEMENT users (user+)>
 <!ELEMENT user (#PCDATA)>

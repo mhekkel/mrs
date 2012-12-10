@@ -6,6 +6,8 @@
 #include <cctype>
 #include <functional>
 
+#include "boost/date_time/posix_time/posix_time.hpp"
+#include "boost/date_time/local_time/local_time.hpp"
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/fstream.hpp>
 #include <boost/iostreams/device/back_inserter.hpp>
@@ -17,7 +19,6 @@
 #define foreach BOOST_FOREACH
 #include <boost/algorithm/string.hpp>
 #include <boost/regex.hpp>
-#include <boost/tr1/tuple.hpp>
 //#include <boost/timer/timer.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/uuid/uuid.hpp>
@@ -41,6 +42,7 @@
 #include "M6Config.h"
 #include "M6Exec.h"
 #include "M6Parser.h"
+#include "M6Utilities.h"
 
 using namespace std;
 using namespace std::tr1;
@@ -701,4 +703,160 @@ bool M6Builder::NeedsUpdate()
 	}
 	
 	return result;
+}
+
+// --------------------------------------------------------------------
+
+M6Scheduler::M6Scheduler()
+	: mThread(boost::bind(&M6Scheduler::Run, this))
+{
+}
+
+M6Scheduler::~M6Scheduler()
+{
+	if (mThread.joinable())
+	{
+		mThread.interrupt();
+		mThread.join();
+	}	
+}
+
+M6Scheduler& M6Scheduler::Instance()
+{
+	static M6Scheduler sInstance;
+	return sInstance;
+}
+	
+void M6Scheduler::Schedule(const string& inDatabank, const char* inAction)
+{
+	boost::mutex::scoped_lock lock(mLock);
+	
+	if (find_if(mScheduled.begin(), mScheduled.end(), [inDatabank](tr1::tuple<string,string>& s) -> bool
+			{ return tr1::get<0>(s) == inDatabank; }) == mScheduled.end())
+	{
+		mScheduled.push_back(make_tuple(inDatabank, inAction));
+	}
+}
+
+void M6Scheduler::GetScheduledDatabanks(vector<string>& outDatabanks)
+{
+	outDatabanks.clear();
+	
+	boost::mutex::scoped_lock lock(mLock);
+	
+	for_each(mScheduled.begin(), mScheduled.end(), [&outDatabanks](tr1::tuple<string,string>& s) {
+		outDatabanks.push_back(tr1::get<0>(s));
+	});
+}
+
+void M6Scheduler::Run()
+{
+    using namespace boost::local_time;
+    using namespace boost::posix_time;
+
+	fs::ofstream log(fs::path(M6Config::GetDirectory("log")) / "build.log");
+	if (not log.is_open())
+	{
+		cerr << "Failed to create log file" << endl;
+		exit(1);
+	}
+
+	bool enabled;
+	ptime updateTime;
+	string updateWeekday;
+	M6Config::GetSchedule(enabled, updateTime, updateWeekday);
+
+	if (not enabled)
+		return;
+
+	ptime now = second_clock::local_time();
+	ptime start = updateTime;
+    if (start < now)
+    	start += hours(24);
+	time_iterator update(start, hours(24));		// daily 
+
+	for (;;)
+	{
+		boost::this_thread::sleep(boost::posix_time::seconds(5));
+
+		try
+		{
+			now = second_clock::local_time();
+			if (now > *update)
+			{
+				do ++update; while (*update < now);
+				
+				bool weekly = ba::iequals(
+					now.date().day_of_week().as_long_string(), updateWeekday);
+				bool monthly = weekly and now.date().day() < 7;
+				
+				foreach (zx::element* db, M6Config::GetDatabanks())
+				{
+					if (db->get_attribute("enabled") != "true")
+						continue;
+					
+					string id = db->get_attribute("id");
+					string update = db->get_attribute("update");
+					
+					if (update == "daily" or
+						(update == "weekly" and weekly) or
+						(update == "monthly" and monthly))
+					{
+						Schedule(id);
+					}
+				}
+			}			
+			
+			for (;;)
+			{
+				string databank, action;
+			
+				mLock.lock();
+				if (not mScheduled.empty())
+				{
+					tr1::tie(databank, action) = mScheduled.front();
+					mScheduled.pop_front();
+				}
+				mLock.unlock();
+				
+				if (databank.empty())
+					break;
+				
+				fs::path m6(GetExecutablePath());
+				
+				string exe = m6.string();
+				vector<const char*> args;
+				args.push_back(exe.c_str());
+				args.push_back(action.c_str());
+				args.push_back(databank.c_str());
+				args.push_back(nullptr);
+				
+				log << "About to " << action << ' ' << databank << endl;
+				
+				string out, err;
+				int r = ForkExec(args, 0, "", out, err);
+				
+				if (r != 0)
+					log << action << " of " << databank << " returned: " << r << endl;
+				
+				if (not out.empty())
+					log << "output: " << out << endl;
+				
+				if (not err.empty())
+					log << "error: " << err << endl;
+				
+				log << endl;
+			}
+		}
+		catch (boost::thread_interrupted&)
+		{
+			log << "Stopping scheduler on interrupt" << endl;
+			break;
+		}
+		catch (exception& e)
+		{
+			log << "Exception in scheduler:" << endl
+				 << e.what() << endl;
+		}	
+	}
 }

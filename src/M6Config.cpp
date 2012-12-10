@@ -2,9 +2,11 @@
 
 #include <sstream>
 
+#include "boost/date_time/local_time/local_time.hpp"
 #include <boost/filesystem/fstream.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <boost/bind.hpp>
+#include <boost/regex.hpp>
 
 #include <zeep/xml/writer.hpp>
 
@@ -156,6 +158,11 @@ zx::element* File::GetTool(const string& inID)
 	return e;
 }
 
+zx::element* File::GetSchedule()
+{
+	return mConfig.find_first("/m6-config/scheduler");
+}
+
 zx::element* File::GetUser(const string& inName, const string& inRealm)
 {
 	return FindFirst(boost::format("/m6-config/users/user[@name='%1%' and @realm='%2%']") % inName % inRealm);
@@ -262,6 +269,35 @@ fs::path GetDbDirectory(const std::string& inDatabankID)
 {
 	fs::path mrsdir(GetDirectory("mrs"));
 	return mrsdir / (inDatabankID + ".m6");
+}
+
+void GetSchedule(bool& outEnabled, boost::posix_time::ptime& outTime, string& outWeekDay)
+{
+	zeep::xml::element* schedule = File::Instance().GetSchedule();
+	if (schedule == nullptr)
+		outEnabled = false;
+	else
+	{
+		using namespace boost::gregorian; 
+	    using namespace boost::date_time;
+	    using namespace boost::local_time;
+	    using namespace boost::posix_time;
+
+		outEnabled = schedule->get_attribute("enabled") == "true";
+		
+		string updateTime = schedule->get_attribute("time");
+		
+		boost::regex rx("(\\d\\d):(\\d\\d)");
+		boost::smatch m;
+		if (not boost::regex_match(updateTime, m, rx))
+			THROW(("Invalid time in schedule configuration"));
+		
+		int updateHour = boost::lexical_cast<int>(m[1].str());
+		int updateMinute = boost::lexical_cast<int>(m[2].str());
+		outTime = boost::posix_time::second_clock::local_time() + hours(updateHour) + minutes(updateMinute);
+
+		outWeekDay = schedule->get_attribute("weekday");
+	}
 }
 
 }

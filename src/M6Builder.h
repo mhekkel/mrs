@@ -4,7 +4,8 @@
 #include <string>
 
 #include <boost/filesystem/path.hpp>
-#include <boost/regex.hpp>
+#include <boost/thread.hpp>
+#include <boost/tr1/tuple.hpp>
 #include <zeep/xml/node.hpp>
 
 #include "M6Lexicon.h"
@@ -37,4 +38,31 @@ class M6Builder
 						mConfig;
 	M6Databank*			mDatabank;
 	M6Lexicon			mLexicon;
+};
+
+class M6Scheduler
+{
+  public:
+	
+	static M6Scheduler&	Instance();
+	
+	void				Schedule(const std::string& inDatabank,
+							const char* inAction = "update");
+	void				GetScheduledDatabanks(
+							std::vector<std::string>& outDatabanks);
+	
+  private:
+
+						M6Scheduler();
+						~M6Scheduler();
+						
+						M6Scheduler(const M6Scheduler&);
+	M6Scheduler&		operator=(const M6Scheduler&);
+
+	void				Run();
+
+	boost::mutex		mLock;
+	boost::thread		mThread;
+	std::deque<std::tr1::tuple<std::string,std::string>>
+						mScheduled;
 };

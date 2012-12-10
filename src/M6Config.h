@@ -2,6 +2,7 @@
 
 #include <boost/filesystem/path.hpp>
 #include <boost/format.hpp>
+#include "boost/date_time/posix_time/posix_time.hpp"
 
 #include <zeep/xml/document.hpp>
 
@@ -34,6 +35,7 @@ class File
 	zeep::xml::element*		GetEnabledDatabank(const std::string& inID);
 	zeep::xml::element*		GetConfiguredDatabank(const std::string& inID);
 	zeep::xml::element*		CreateDatabank();
+	zeep::xml::element*		GetSchedule();
 
   private:
 	zeep::xml::element_set	Find(const boost::format& inFmt);
@@ -63,6 +65,8 @@ const zeep::xml::element*		GetDatabank(const std::string& inID);
 const zeep::xml::element_set	GetDatabanks(const std::string& inID);
 std::string						GetDatabankParam(const std::string& inID, const std::string& inParam);
 boost::filesystem::path			GetDbDirectory(const std::string& inDatabankID);
+void							GetSchedule(bool& outEnabled, boost::posix_time::ptime& outTime,
+									std::string& outWeekDay);
 
 // Inlines
 

@@ -7,6 +7,9 @@
 #include "M6Utilities.h"
 #include "M6Error.h"
 
+using namespace std;
+namespace fs = boost::filesystem;
+
 #if defined(_MSC_VER)
 
 #include <Windows.h>
@@ -26,6 +29,17 @@ void SetStdinEcho(bool inEnable)
         mode |= ENABLE_ECHO_INPUT;
 
     ::SetConsoleMode(hStdin, mode);
+}
+
+fs::path GetExecutablePath()
+{
+	WCHAR buffer[4096];
+	
+	DWORD n = ::GetModuleFileNameW(nullptr, buffer, sizeof(buffer) / sizeof(WCHAR));
+	if (n == 0)
+		throw runtime_error("could not get exe path");
+
+	return fs::path(buffer);
 }
 
 struct M6SignalCatcherImpl
@@ -124,6 +138,15 @@ void SetStdinEcho(bool inEnable)
         tty.c_lflag |= ECHO;
 
     (void)::tcsetattr(STDIN_FILENO, TCSANOW, &tty);
+}
+
+fs::path GetExecutablePath()
+{
+	char path[PATH_MAX] = "";
+	if (readlink("/proc/self/exe", path, sizeof(path)) == -1)
+		throw runtime_error("could not get exe path");
+	
+	return fs::path(result);
 }
 
 struct M6SignalCatcherImpl

@@ -23,6 +23,7 @@
 #include "M6Error.h"
 #include "M6Progress.h"
 #include "M6File.h"
+#include "M6Exec.h"
 
 using namespace std;
 namespace zx = zeep::xml;
@@ -59,7 +60,7 @@ const char* kM6Months[] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Au
 #define url_pchar			url_unreserved "|" url_pct_encoded "|" url_sub_delims "|:|@"
 #define url_path			"(?:/((?:" url_pchar "|\\*|\\?|/)*))?"
 	
-const boost::regex kM6URLParserRE("ftp://" url_userinfo url_host url_port url_path);
+const boost::regex kM6URLParserRE("(?:ftp|rsync)://" url_userinfo url_host url_port url_path);
 
 // --------------------------------------------------------------------
 
@@ -127,60 +128,105 @@ M6FTPFetcher::M6FTPFetcher(const zx::element* inConfig)
 	if (source == nullptr)
 		THROW(("Missing source?"));
 	mSource = source->content();
+    mDelete = source->get_attribute("delete") == "true";
 
 	string src = source->get_attribute("fetch");
 	boost::smatch m;
 	if (not boost::regex_match(src, m, kM6URLParserRE))
 		THROW(("Invalid source url: <%s>", src.c_str()));
 	
-	mServer = m[2];
-	mUser = m[1];
-	if (mUser.empty())
-		mUser = "anonymous";
-	mPort = m[3];
-	if (mPort.empty())
-		mPort = "ftp";
-	mSrcPath = fs::path(m[4].str());
+	if (ba::starts_with(src, "rsync://"))
+	{
+		string rsync = M6Config::GetTool("rsync");
+		if (not fs::exists(rsync))
+			THROW(("rsync not found"));
+		
+		vector<const char*> args;
+		args.push_back(rsync.c_str());
+		args.push_back("-ltpvd");
+		if (mDelete)
+			args.push_back("--delete");
+		args.push_back(src.c_str());
+		
+		if (not ba::ends_with(mSource, "/"))
+		{
+			// strip off the pattern to match files... just rsync everything
+			boost::regex rx("/([^/*?{]*[*?{][^/]*)$");
+			
+			while (boost::regex_search(mSource, m, rx))
+				mSource = m.prefix();
+		}
+		
+		if (mSource.empty())
+			mSource = mDatabank;
+		if (not ba::ends_with(mSource, "/"))
+			mSource += '/';
+		mSource = (fs::path(M6Config::GetDirectory("raw")) / mSource).string();
 
-//    string dst = source->get_attribute("dst");
-//    if (dst.empty() and inConfig->find_first("source") != nullptr)
-//    {
-//		fs::path sd(inConfig->find_first("source")->content());
-//		while (not sd.empty() and sd.filename().string().find_first_of("*?") != string::npos)
-//			sd = sd.parent_path();
-//		if (not sd.empty())
-//			dst = sd.string();
-//    }
-//    
-//    if (dst.empty())
-//        dst = inConfig->get_attribute("id");
-//
-//    fs::path rawdir = M6Config::GetDirectory("raw");
-//    mDstDir = rawdir / dst;
-    
-    mDelete = source->get_attribute("delete") == "true";
-
-	// Get a list of endpoints corresponding to the server name.
-	at::tcp::resolver::query query(mServer, mPort);
-	at::tcp::resolver::iterator endpoint_iterator = mResolver.resolve(query);
-	at::tcp::resolver::iterator end;
-
-	// Try each endpoint until we successfully establish a connection.
-	boost::system::error_code error = boost::asio::error::host_not_found;
-    while (error && endpoint_iterator != end)
-    {
-		mSocket.close();
-		mSocket.connect(*endpoint_iterator++, error);
+		args.push_back(mSource.c_str());
+		args.push_back(nullptr);
+		
+		for_each(args.begin(), args.end(), [](const char* arg) { if (arg != nullptr) cout << arg << ' '; });
+		
+		string out, err;
+		int r = ForkExec(args, 0, "", out, err);
+		
+		if (not out.empty())
+			cout << out << endl;
+		if (not err.empty())
+			cerr << err << endl;
+		if (r != 0)
+			THROW(("Failed to rsync %s", mDatabank.c_str()));
 	}
-
-	if (error)
-		throw boost::system::system_error(error);
-
-	uint32 status = WaitForReply();
-	if (status != 220)
-		Error("Failed to connect");
-
-	Login();
+	else
+	{
+		mServer = m[2];
+		mUser = m[1];
+		if (mUser.empty())
+			mUser = "anonymous";
+		mPort = m[3];
+		if (mPort.empty())
+			mPort = "ftp";
+		mSrcPath = fs::path(m[4].str());
+	
+	//    string dst = source->get_attribute("dst");
+	//    if (dst.empty() and inConfig->find_first("source") != nullptr)
+	//    {
+	//		fs::path sd(inConfig->find_first("source")->content());
+	//		while (not sd.empty() and sd.filename().string().find_first_of("*?") != string::npos)
+	//			sd = sd.parent_path();
+	//		if (not sd.empty())
+	//			dst = sd.string();
+	//    }
+	//    
+	//    if (dst.empty())
+	//        dst = inConfig->get_attribute("id");
+	//
+	//    fs::path rawdir = M6Config::GetDirectory("raw");
+	//    mDstDir = rawdir / dst;
+	    
+		// Get a list of endpoints corresponding to the server name.
+		at::tcp::resolver::query query(mServer, mPort);
+		at::tcp::resolver::iterator endpoint_iterator = mResolver.resolve(query);
+		at::tcp::resolver::iterator end;
+	
+		// Try each endpoint until we successfully establish a connection.
+		boost::system::error_code error = boost::asio::error::host_not_found;
+	    while (error && endpoint_iterator != end)
+	    {
+			mSocket.close();
+			mSocket.connect(*endpoint_iterator++, error);
+		}
+	
+		if (error)
+			throw boost::system::system_error(error);
+	
+		uint32 status = WaitForReply();
+		if (status != 220)
+			Error("Failed to connect");
+	
+		Login();
+	}
 }
 
 M6FTPFetcher::~M6FTPFetcher()

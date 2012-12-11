@@ -1,20 +1,12 @@
 BUGS:
 
 - embl CO section in format is missing
-- links: in OMIM records staan geen links naar swissprot, zou wel moeten
 
 Todo
 
 - rsync, toch maar
-- REST interface herzien:
-	- /find/db/query
-
 - admin page voor automatische update
-- admin/config file:
-	- Log file in server sectie
-
 - Windows: Service Control Manager ondersteuning voor server mode
-- Linux: Daemon en control implementatie
 
 - verhogen score als term in unique index?
 

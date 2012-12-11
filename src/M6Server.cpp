@@ -1463,7 +1463,7 @@ void M6Server::ProcessNewConfig(const string& inPage, zeep::http::parameter_map&
 			config->GetDirectory(dir)->content(p.string());
 		}
 
-		const char* tools[] = { "clustalo" };
+		const char* tools[] = { "clustalo", "rsync" };
 		foreach (const char* tool, tools)
 		{
 			fs::path p = inParams.get(tool, "").as<string>();
@@ -1798,6 +1798,7 @@ void M6Server::handle_admin(const zh::request& request,
 	global["dirs"] = dirs;
 	
 	tools["clustalo"] = mConfigCopy->GetTool("clustalo")->content();
+	tools["rsync"] = mConfigCopy->GetTool("rsync")->content();
 	global["tools"] = tools;
 	
 	sub.put("global", global);

@@ -162,6 +162,8 @@ M6FTPFetcher::M6FTPFetcher(const zx::element* inConfig)
 		if (not ba::ends_with(mSource, "/"))
 			mSource += '/';
 		mSource = (fs::path(M6Config::GetDirectory("raw")) / mSource).string();
+		if (ba::contains(mSource, "/../"))
+			THROW(("invalid destination path for rsync"));
 
 		args.push_back(mSource.c_str());
 		args.push_back(nullptr);

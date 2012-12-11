@@ -2053,7 +2053,55 @@ void M6Server::handle_rest_entry(const zh::request& request, const el::scope& sc
 
 void M6Server::handle_rest_find(const zh::request& request, const el::scope& scope, zh::reply& reply)
 {
-	reply.set_content("no hits found", "text/plain");
+	string db, q;
+
+	zh::parameter_map params;
+	get_parameters(scope, params);
+
+	uint32 resultoffset = params.get("offset", "0").as<uint32>();
+	uint32 resultcount = params.get("count", "100").as<uint32>();
+
+	fs::path path(scope["baseuri"].as<string>());
+	fs::path::iterator p = path.begin();
+
+	if ((p++)->string() == "rest" and
+		(p++)->string() == "find" and
+		p != path.end())
+	{
+		db = (p++)->string();
+		if (p != path.end())
+			q = (p++)->string();
+	}
+	
+	if (q.empty())
+		THROW(("No query specified"));
+
+	if (db.empty())
+		THROW(("No db specified"));
+
+	vector<el::object> hits;
+	uint32 c, hitCount;
+	bool ranked;
+	
+	Find(db, q, true, resultoffset, resultcount, false, hits, hitCount, ranked);
+	
+	if (hits.empty())
+		reply.set_content("no hits found", "text/plain");
+	else
+	{
+		ostringstream s;
+		
+		s << hitCount << " hits found, displaying " << hits.size() << " hits starting from " << resultoffset << endl;
+		foreach (el::object& hit, hits)
+		{
+			s << hit["nr"] << '\t'
+			  << hit["id"] << '\t'
+			  << hit["score"] << '\t'
+			  << hit["title"] << endl;
+		}
+		
+		reply.set_content(s.str(), "text/plain");
+	}
 }
 
 // --------------------------------------------------------------------

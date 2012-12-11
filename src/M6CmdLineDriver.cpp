@@ -888,9 +888,9 @@ void M6ServerDriver::Exec(const string& inCommand, po::variables_map& vm)
 		pidfile = vm["pidfile"].as<string>();
 	
 	if (command == "start")
-		M6Server::Start(user, pidfile, vm.count("user") > 0);
+		M6Server::Start(user, pidfile, vm.count("no-daemon") > 0);
 	else if (command == "stop")
-		M6Server::Stop();
+		M6Server::Stop(pidfile);
 	else
 		THROW(("Invalid command '%s'", command.c_str()));
 }

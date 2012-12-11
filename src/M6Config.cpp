@@ -22,7 +22,7 @@ namespace fs = boost::filesystem;
 namespace M6Config
 {
 
-fs::path sConfigFile = "config/m6-config.xml";
+fs::path sConfigFile = "/etc/mrs/m6-config.xml";
 File* sInstance;
 
 File::File()

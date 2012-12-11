@@ -505,6 +505,27 @@ vector<string> M6Server::UnAlias(const string& inDatabank)
 	return result;
 }
 
+vector<string> M6Server::GetAliases(const string& inDatabank)
+{
+	vector<string> result;
+	
+	result.push_back(inDatabank);
+	
+	foreach (auto& db, mLoadedDatabanks)
+	{
+		if (db.mID == inDatabank)
+		{
+			result.insert(result.end(), db.mAliases.begin(), db.mAliases.end());
+			break;
+		}
+	}
+	
+	sort(result.begin(), result.end());
+	result.erase(unique(result.begin(), result.end()), result.end());
+	
+	return result;
+}
+
 void M6Server::GetLinkedDbs(const string& inDb, const string& inId,
 	vector<string>& outLinkedDbs)
 {
@@ -546,7 +567,7 @@ void M6Server::GetLinkedDbs(const string& inDb, const string& inId,
 		}
 	}
 
-	vector<string> aliases(UnAlias(inDb));
+	vector<string> aliases(GetAliases(inDb));
 
 	foreach (auto& db, mLoadedDatabanks)
 	{
@@ -555,7 +576,7 @@ void M6Server::GetLinkedDbs(const string& inDb, const string& inId,
 		
 		foreach (auto& alias, aliases)
 		{
-			if (db.mDatabank->IsLinked(inDb, inId))
+			if (db.mDatabank->IsLinked(alias, inId))
 			{
 				dbs.insert(db.mID);
 				break;

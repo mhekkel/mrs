@@ -74,6 +74,8 @@ class M6Server : public zh::webapp
 	uint32			Count(const std::string& inDatabank, const std::string& inQuery);
 	std::vector<std::string>
 					UnAlias(const std::string& inDatabank);
+	std::vector<std::string>
+					GetAliases(const std::string& inDatabank);
 
 	const M6DbList&	GetLoadedDatabanks()						{ return mLoadedDatabanks; }
 

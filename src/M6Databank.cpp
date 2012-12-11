@@ -1927,10 +1927,6 @@ void M6DatabankImpl::InitLinkMap(const M6LinkMap& inLinkMap)
 		{
 			M6BasicIndexPtr index(M6BasicIndex::Load(path));
 			mLinkIndices.push_back(M6IndexDesc(l.first, eM6LinkIndex, index));
-			//
-			//mLinkedDbs.insert(l.second.begin(), l.second.end());
-			//foreach (M6Databank* ldb, l.second)
-			//	ldb->mImpl->mLinkedDbs.insert(&mDatabank);
 		}
 	}
 }
@@ -1948,20 +1944,9 @@ bool M6DatabankImpl::IsLinked(const string& inDB, const string& inID)
 			continue;
 		
 		result = li.mIndex->Contains(id);
-		
 		break;
 	}
-	
-//	if (not result)
-//	{
-//		foreach (M6Databank* db, mLinkMap[inDB])
-//		{
-//			unique_ptr<M6Document> doc(db->Fetch(id))
-//			if (doc)
-//				result = doc->GetLinks()[
-//		}
-//	}
-//	
+
 	return result;
 }
 

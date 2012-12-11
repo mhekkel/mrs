@@ -7,7 +7,6 @@
     <directory id="raw">/data/raw</directory>
     <directory id="log">/data/log</directory>
     <directory id="blast">/data/blast-cache</directory>
-    <directory id="log">/data/log</directory>
 <!--    <directory id="parser">/home/maarten/projects/m6/parsers</directory>-->
 <!--    <directory id="docroot">/home/maarten/projects/m6/docroot</directory>-->
     <directory id="parser">C:\Users\maarten\projects\m6\parsers</directory>

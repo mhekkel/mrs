@@ -546,13 +546,21 @@ void M6Server::GetLinkedDbs(const string& inDb, const string& inId,
 		}
 	}
 
+	vector<string> aliases(UnAlias(inDb));
+
 	foreach (auto& db, mLoadedDatabanks)
 	{
 		if (dbs.count(db.mID))
 			continue;
 		
-		if (db.mDatabank->IsLinked(inDb, inId))
-			dbs.insert(db.mID);
+		foreach (auto& alias, aliases)
+		{
+			if (db.mDatabank->IsLinked(inDb, inId))
+			{
+				dbs.insert(db.mID);
+				break;
+			}
+		}
 	}
 	
 	outLinkedDbs.assign(dbs.begin(), dbs.end());
@@ -571,8 +579,6 @@ void M6Server::AddLinks(const string& inDB, const string& inID, el::object& inHi
 		inHit["links"] = el::object(linked);
 	}
 }
-
-
 
 void M6Server::init_scope(el::scope& scope)
 {

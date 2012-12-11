@@ -175,8 +175,21 @@ void M6SignalCatcher::Signal(int inSignal)
 
 #elif defined(linux) || defined(__linux) || defined (__linux__)
 
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/time.h>
+#include <sys/wait.h>
+#include <sys/socket.h>
+#include <sys/resource.h>
+#include <netdb.h>
+#include <unistd.h>
+#include <signal.h>
+#include <getopt.h>
+#include <cerrno>
+#include <pwd.h>
 #include <termio.h>
 #include <linux/limits.h>
+#include <fcntl.h>
 
 void SetStdinEcho(bool inEnable)
 {

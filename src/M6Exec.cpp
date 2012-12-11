@@ -347,7 +347,7 @@ int ForkExec(vector<const char*>& args, double maxRunTime,
 	boost::asio::io_service* ioService = nullptr;
 	if (M6Server::Instance() != nullptr)
 	{
-		ioService = M6Server::Instance()->get_io_service();
+		ioService = &M6Server::Instance()->get_io_service();
 		ioService->notify_fork(boost::asio::io_service::fork_prepare);
 	}
 	

@@ -615,6 +615,8 @@ void M6Server::handle_request(const zh::request& req, zh::reply& rep)
 	}
 	catch (std::exception& e)
 	{
+		cerr << e.what() << endl;
+		
 		el::scope scope(req);
 		init_scope(scope);
 		
@@ -1030,6 +1032,8 @@ void M6Server::handle_search(const zh::request& request,
 	get_parameters(scope, params);
 
 	q = params.get("q", "").as<string>();
+	if (q.empty())
+		q = params.get("query", "").as<string>();	// being backward compatible
 	db = params.get("db", "").as<string>();
 	page = params.get("page", 1).as<uint32>();
 

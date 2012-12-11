@@ -65,6 +65,7 @@ class M6CmdLineDriver
 						unique_ptr<po::positional_options_description>& p);
 	virtual bool	Validate(po::variables_map& vm);
 	virtual void	Exec(const string& inCommand, po::variables_map& vm) = 0;
+	void			LoadConfig(po::variables_map& vm);
 
 	tr1::tuple<const zx::element*,fs::path>
 					GetDatabank(const string& inDatabank);
@@ -271,19 +272,25 @@ bool M6CmdLineDriver::Validate(po::variables_map& vm)
 	{
 		sDatabank = vm["databank"].as<string>();
 		
-		fs::path configFile("config/m6-config.xml");
-		if (vm.count("config-file"))
-			configFile = vm["config-file"].as<string>();
-		
-		if (not fs::exists(configFile))
-			THROW(("Configuration file not found (\"%s\")", configFile.string().c_str()));
-		
-		M6Config::SetConfigFilePath(configFile);
+		LoadConfig(vm);
 
 		result = true;
 	}
 	
 	return result;
+}
+
+void M6CmdLineDriver::LoadConfig(po::variables_map& vm)
+{
+	if (vm.count("config-file"))
+	{
+		fs::path configFile = vm["config-file"].as<string>();
+	
+		if (not fs::exists(configFile))
+			THROW(("Configuration file not found (\"%s\")", configFile.string().c_str()));
+	
+		M6Config::SetConfigFilePath(configFile);
+	}
 }
 
 tr1::tuple<const zx::element*,fs::path>
@@ -377,15 +384,7 @@ bool M6BlastDriver::Validate(po::variables_map& vm)
 	
 	if (vm.count("help") == 0 and vm.count("databank") > 0 and vm.count("query") > 0)
 	{
-		fs::path configFile("config/m6-config.xml");
-		if (vm.count("config-file"))
-			configFile = vm["config-file"].as<string>();
-		
-		if (not fs::exists(configFile))
-			THROW(("Configuration file not found (\"%s\")", configFile.string().c_str()));
-		
-		M6Config::SetConfigFilePath(configFile);
-
+		LoadConfig(vm);
 		result = true;
 	}
 	
@@ -795,21 +794,13 @@ void M6PasswordDriver::AddOptions(po::options_description& desc,
 
 bool M6PasswordDriver::Validate(po::variables_map& vm)
 {
-	fs::path configFile("config/m6-config.xml");
-	if (vm.count("config-file"))
-		configFile = vm["config-file"].as<string>();
-		
-	if (not fs::exists(configFile))
-		THROW(("Configuration file not found (\"%s\")", configFile.string().c_str()));
-		
-	M6Config::SetConfigFilePath(configFile);
-
+	LoadConfig(vm);
 	return true;
 }
 
 void M6PasswordDriver::Exec(const string& inCommand, po::variables_map& vm)
 {
-	string username, realm = "M6 Administrator", password;
+	string username, realm = "M6 Administrator", password, pwcheck;
 
 	if (vm.count("user"))
 		username = vm["user"].as<string>();
@@ -831,16 +822,26 @@ void M6PasswordDriver::Exec(const string& inCommand, po::variables_map& vm)
 	
 	cout << "Enter password: "; cout.flush(); SetStdinEcho(false);
 	getline(cin, password);
+	cout << endl;
+
+	cout << "Enter password again: "; cout.flush(); SetStdinEcho(false);
+	getline(cin, pwcheck);
+	cout << endl;
 	SetStdinEcho(true);
-
-	string hash = M6MD5(username + ':' + realm + ':' + password).Finalise();
-
-	M6Config::File& config(M6Config::File::Instance());
-	zx::element* user = config.GetUser(username, realm);
-	user->set_attribute("password", hash);
-	config.WriteOut();
-//
-//	M6Config::Instance().SetPassword(realm, username, hash);
+	
+	if (password != pwcheck)
+		cerr << "passwords do not match" << endl;
+	else
+	{
+		string hash = M6MD5(username + ':' + realm + ':' + password).Finalise();
+	
+		M6Config::File config;
+		zx::element* user = config.GetUser(username, realm);
+		if (user == nullptr)
+			user = config.CreateUser(username, realm);
+		user->set_attribute("password", hash);
+		config.WriteOut();
+	}
 }
 
 // --------------------------------------------------------------------
@@ -863,15 +864,7 @@ void M6ServerDriver::AddOptions(po::options_description& desc,
 
 bool M6ServerDriver::Validate(po::variables_map& vm)
 {
-	fs::path configFile("config/m6-config.xml");
-	if (vm.count("config-file"))
-		configFile = vm["config-file"].as<string>();
-		
-	if (not fs::exists(configFile))
-		THROW(("Configuration file not found (\"%s\")", configFile.string().c_str()));
-		
-	M6Config::SetConfigFilePath(configFile);
-	
+	LoadConfig(vm);
 	return vm.count("command") > 0;
 }
 

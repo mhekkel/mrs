@@ -168,6 +168,21 @@ zx::element* File::GetUser(const string& inName, const string& inRealm)
 	return FindFirst(boost::format("/m6-config/users/user[@name='%1%' and @realm='%2%']") % inName % inRealm);
 }
 
+zx::element* File::CreateUser(const string& inName, const string& inRealm)
+{
+	zx::element* user = FindFirst(boost::format("/m6-config/users/user[@name='%1%' and @realm='%2%']") % inName % inRealm);
+	if (user == nullptr)
+	{
+		zx::element* users = mConfig.find_first("/m6-config/users");
+		
+		user = new zx::element("user");
+		user->set_attribute("name", inName);
+		user->set_attribute("realm", inRealm);
+		users->append(user);
+	}
+	return user;
+}
+
 zx::element* File::GetServer()
 {
 	return FindFirst(boost::format("/m6-config/server"));

@@ -29,8 +29,12 @@ class M6Server : public zh::webapp
 					M6Server(const zx::element* inConfig);
 	virtual			~M6Server();
 
-	static void		Start();
-	static void		Stop();
+	static M6Server*
+					Instance()					{ return sInstance; }
+
+	static void		Start(const std::string& inRunAs, const std::string& inPidFile,
+						bool inForeground);
+	static void		Stop(const std::string& inPidFile);
 
 	virtual void	handle_request(const zh::request& req, zh::reply& rep);
 	virtual void	create_unauth_reply(bool stale, const std::string& realm, zh::reply& rep);
@@ -126,6 +130,9 @@ class M6Server : public zh::webapp
 
 	void			SpellCheck(const std::string& inDatabank, const std::string& inTerm,
 						std::vector<std::pair<std::string,uint16>>& outCorrections);
+
+	static M6Server*
+					sInstance;
 
 	const zx::element*
 					mConfig;

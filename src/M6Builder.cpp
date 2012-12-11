@@ -670,7 +670,7 @@ void M6Builder::Build(uint32 inNrOfThreads)
 		fs::rename(path, dstPath);
 	}
 	
-	cout << "done" << endl;
+	cerr << "done" << endl;
 }
 
 void M6Builder::IndexDocument(const string& inText, const string& inFileName,

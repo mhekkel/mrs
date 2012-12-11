@@ -20,9 +20,11 @@
 #include <boost/thread/condition.hpp>
 #include <boost/program_options/parsers.hpp>
 #include <boost/algorithm/string.hpp>
+#include <boost/asio.hpp>
 
 #include "M6Exec.h"
 #include "M6Error.h"
+#include "M6Server.h"
 
 using namespace std;
 namespace fs = boost::filesystem;
@@ -342,22 +344,20 @@ int ForkExec(vector<const char*>& args, double maxRunTime,
 	err = pipe(ofd); if (err < 0) THROW(("Pipe error: %s", strerror(errno)));
 	err = pipe(efd); if (err < 0) THROW(("Pipe error: %s", strerror(errno)));
 	
-	int pid = fork();
-	
-	if (pid == -1)
+	boost::asio::io_service* ioService = nullptr;
+	if (M6Server::Instance() != nullptr)
 	{
-		close(ifd[0]);
-		close(ifd[1]);
-		close(ofd[0]);
-		close(ofd[1]);
-		close(efd[0]);
-		close(efd[1]);
-		
-		THROW(("fork failed: %s", strerror(errno)));
+		ioService = M6Server::Instance()->get_io_service();
+		ioService->notify_fork(boost::asio::io_service::fork_prepare);
 	}
+	
+	int pid = fork();
 	
 	if (pid == 0)	// the child
 	{
+		if (ioService != nullptr)
+			ioService->notify_fork(boost::asio::io_service::fork_child);
+		
 		setpgid(0, 0);		// detach from the process group, create new
 
 		signal(SIGCHLD, SIG_IGN);	// block child died signals
@@ -377,6 +377,21 @@ int ForkExec(vector<const char*>& args, double maxRunTime,
 		const char* env[] = { nullptr };
 		(void)execve(args.front(), const_cast<char* const*>(&args[0]), const_cast<char* const*>(env));
 		exit(-1);
+	}
+
+	if (ioService != nullptr)
+		ioService->notify_fork(boost::asio::io_service::fork_parent);
+	
+	if (pid == -1)
+	{
+		close(ifd[0]);
+		close(ifd[1]);
+		close(ofd[0]);
+		close(ofd[1]);
+		close(efd[0]);
+		close(efd[1]);
+		
+		THROW(("fork failed: %s", strerror(errno)));
 	}
 	
 	// make stdout and stderr non-blocking

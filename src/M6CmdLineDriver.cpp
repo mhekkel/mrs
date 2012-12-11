@@ -218,7 +218,7 @@ void M6CmdLineDriver::Exec(int argc, char* const argv[])
 		driver.reset(new M6ServerDriver());
 	else
 	{
-		cout << "Unknown command " << argv[1] << endl
+		cerr << "Unknown command " << argv[1] << endl
 			 << "Supported commands are build, query and info" << endl;
 		exit(1);
 	}
@@ -238,7 +238,7 @@ void M6CmdLineDriver::Exec(int argc, char* const argv[])
 
 	if (not driver->Validate(vm))
 	{
-		cout << desc << "\n";
+		cerr << desc << "\n";
 		exit(1);
 	}		
 	
@@ -851,7 +851,10 @@ void M6ServerDriver::AddOptions(po::options_description& desc,
 {
 	desc.add_options()
 		("config-file,c", po::value<string>(),	"Configuration file")
-		("command", po::value<string>(),		"Command, one of start, restart, status or stop") 
+		("user,u", po::value<string>(),			"User to run as (e.g. nobody)")
+		("pidfile,p", po::value<string>(),		"Create file with process ID (pid)")
+		("no-daemon,F",							"Do not run as background process")
+		("command", po::value<string>(),		"Command, one of start or stop")
 		;
 
 	p.reset(new po::positional_options_description());
@@ -876,17 +879,18 @@ void M6ServerDriver::Exec(const string& inCommand, po::variables_map& vm)
 {
 	string command = vm["command"].as<string>();
 	
+	string user;
+	if (vm.count("user"))
+		user = vm["user"].as<string>();
+	
+	string pidfile;
+	if (vm.count("pidfile"))
+		pidfile = vm["pidfile"].as<string>();
+	
 	if (command == "start")
-		M6Server::Start();
-	else if (command == "restart")
-	{
-		M6Server::Stop();
-		M6Server::Start();
-	}
+		M6Server::Start(user, pidfile, vm.count("user") > 0);
 	else if (command == "stop")
 		M6Server::Stop();
-	//else if (command == "status")
-	//	M6Server::Status();
 	else
 		THROW(("Invalid command '%s'", command.c_str()));
 }

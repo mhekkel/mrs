@@ -180,7 +180,7 @@ M6BlastCache::~M6BlastCache()
 void M6BlastCache::ExecuteStatement(const string& stmt)
 {
 	if (VERBOSE)
-		cout << stmt << endl;
+		cerr << stmt << endl;
 
 	char* errmsg = NULL;
 	int err = sqlite3_exec(mCacheDB, stmt.c_str(), nullptr, nullptr, &errmsg);

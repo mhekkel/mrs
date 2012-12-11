@@ -21,7 +21,9 @@
 	
 <!ELEMENT server (admin?,base-url?,web-service*)+>
 <!ATTLIST server addr NMTOKEN #REQUIRED
-				 port NMTOKEN #REQUIRED>
+				 port NMTOKEN #REQUIRED
+				 user NMTOKEN #IMPLIED
+				 pidfile CDATA #IMPLIED>
 <!ELEMENT admin EMPTY>
 <!ATTLIST admin realm CDATA #REQUIRED>
 <!ELEMENT base-url (#PCDATA)>

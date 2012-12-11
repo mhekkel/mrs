@@ -125,6 +125,8 @@ struct M6Redirect
 
 // --------------------------------------------------------------------
 
+M6Server* M6Server::sInstance;
+
 M6Server::M6Server(const zx::element* inConfig)
 	: webapp(kM6ServerNS)
 	, mConfig(inConfig)
@@ -220,10 +222,16 @@ M6Server::M6Server(const zx::element* inConfig)
 			reply.set_content(d->make_wsdl(location));
 		});
 	}
+	
+	if (sInstance != nullptr)
+		sInstance = this;
 }
 
 M6Server::~M6Server()
 {
+	if (sInstance == this)
+		sInstance = nullptr;
+	
 	foreach (M6LoadedDatabank& db, mLoadedDatabanks)
 	{
 		delete db.mDatabank;
@@ -2998,7 +3006,7 @@ void RunMainLoop(uint32 inNrOfThreads)
 {
 	for (;;)
 	{
-		cout << "Restarting services..."; cout.flush();
+		cerr << "Restarting services...";
 		
 		M6SignalCatcher catcher;
 		catcher.BlockSignals();
@@ -3017,7 +3025,7 @@ void RunMainLoop(uint32 inNrOfThreads)
 		server.bind(addr, boost::lexical_cast<uint16>(port));
 		boost::thread thread(boost::bind(&zeep::http::server::run, boost::ref(server), inNrOfThreads));
 	
-		cout << " done" << endl
+		cerr << " done" << endl
 			 << "listening at " << addr << ':' << port << endl;
 		
 		catcher.UnblockSignals();
@@ -3034,18 +3042,44 @@ void RunMainLoop(uint32 inNrOfThreads)
 	}
 }
 
-void M6Server::Start()
+void M6Server::Start(const string& inRunAs, const string& inPidFile, bool inForeground)
 {
-	uint32 nrOfThreads = boost::thread::hardware_concurrency();
-	//if (vm.count("threads"))
-	//	nrOfThreads = vm["threads"].as<uint32>();
+	const zx::element* config = M6Config::GetServer();
+
+	string runas = inRunAs;
+	if (runas.empty())
+		runas= config->get_attribute("user");
+
+	string pidfile = inPidFile;
+	if (pidfile.empty())
+		pidfile = config->get_attribute("pidfile");
+	
+	if (not inForeground)
+	{
+		Daemonize(runas, pidfile);
+		
+		fs::path logfile = fs::path(M6Config::GetDirectory("log")) / "access.log";
+		fs::path errfile = fs::path(M6Config::GetDirectory("log")) / "error.log";
+		
+		OpenLogFile(logfile.string(), errfile.string());
+	}
 	
 	(void)M6Scheduler::Instance();
 	
+	uint32 nrOfThreads = boost::thread::hardware_concurrency();
+	//if (vm.count("threads"))
+	//	nrOfThreads = vm["threads"].as<uint32>();
 	RunMainLoop(nrOfThreads);
 }
 
-void M6Server::Stop()
+void M6Server::Stop(const string& inPidFile)
 {
+	ifstream pidfile(inPidFile);
+	if (not pidfile.is_open())
+		THROW(("Failed to open pid file"));
 	
+	int pid;
+	pidfile >> pid;
+	
+	StopDaemon(pid);
 }

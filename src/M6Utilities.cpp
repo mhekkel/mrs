@@ -3,9 +3,12 @@
 #include "M6Lib.h"
 
 #include <signal.h>
+#include <fstream>
+#include <iostream>
 
 #include "M6Utilities.h"
 #include "M6Error.h"
+#include "M6Config.h"
 
 using namespace std;
 namespace fs = boost::filesystem;
@@ -46,6 +49,47 @@ bool IsaTTY()
 {
 	return true;
 }
+
+// --------------------------------------------------------------------
+// 
+//	Daemonize
+//	
+
+void Daemonize(const string& inUser, const string& inPidFile)
+{
+	
+}
+
+void StopDaemon(int pid)
+{
+	
+}
+
+// --------------------------------------------------------------------
+// 
+//	OpenLogFile
+//	
+
+void OpenLogFile(const string& inLogFile, const string& inErrFile)
+{
+	static ofstream outfile, errfile;
+	
+	outfile.open(inLogFile);
+	if (not outfile.is_open())
+		THROW(("Failed to create log file %s", inLogFile.c_str()));
+	
+	cout.rdbuf(outfile.rdbuf());
+	
+	errfile.open(inErrFile);
+	if (not errfile.is_open())
+		THROW(("Failed to create log file %s", inErrFile.c_str()));
+	cerr.rdbuf(errfile.rdbuf());
+}
+
+// --------------------------------------------------------------------
+// 
+//	Signal handling
+//	
 
 struct M6SignalCatcherImpl
 {
@@ -159,6 +203,115 @@ bool IsaTTY()
 {
 	return isatty(STDOUT_FILENO);
 }
+
+// --------------------------------------------------------------------
+// 
+//	Daemonize
+//	
+
+void Daemonize(const string& inUser, const string& inPidFile)
+{
+	int pid = fork();
+	
+	if (pid == -1)
+	{
+		cerr << "Fork failed" << endl;
+		exit(1);
+	}
+	
+	// exit the parent (=calling) process
+	if (pid != 0)
+		_exit(0);
+
+	if (setsid() < 0)
+	{
+		cerr << "Failed to create process group: " << strerror(errno) << endl;
+		exit(1);
+	}
+
+	// it is dubious if this is needed:
+	signal(SIGHUP, SIG_IGN);
+
+	// fork again, to avoid being able to attach to a terminal device
+	pid = fork();
+
+	if (pid == -1)
+		cerr << "Fork failed" << endl;
+
+	if (pid != 0)
+		_exit(0);
+
+	if (not inPidFile.empty())
+	{
+		// write our pid to the pid file
+		ofstream pidFile(inPidFile);
+		pidFile << getpid() << endl;
+		pidFile.close();
+	}
+
+	if (chdir("/") != 0)
+	{
+		cerr << "Cannot chdir to /: " << strerror(errno) << endl;
+		exit(1);
+	}
+
+	if (inUser.length() > 0)
+	{
+		struct passwd* pw = getpwnam(inUser.c_str());
+		if (pw == NULL or setuid(pw->pw_uid) < 0)
+		{
+			cerr << "Failed to set uid to " << inUser << ": " << strerror(errno) << endl;
+			exit(1);
+		}
+	}
+
+	// close stdin
+	close(STDIN_FILENO);
+	open("/dev/null", O_RDONLY);
+}
+
+void StopDaemon(int pid)
+{
+	kill(pid, SIGINT);
+	
+	int status;
+	waitpid(pid, &status, 0);
+}
+
+// --------------------------------------------------------------------
+// 
+//	OpenLogFile
+//	
+
+void OpenLogFile(const string& inLogFile, const string& inErrFile)
+{
+	// open the log file
+	int fd = open(inLogFile.c_str(), O_CREAT|O_APPEND|O_RDWR, 0644);
+	if (fd < 0)
+	{
+		cerr << "Opening log file " << inLogFile << " failed" << endl;
+		exit(1);
+	}
+
+	// redirect stdout and stderr to the log file
+	dup2(fd, STDOUT_FILENO);
+
+	// open the error file
+	fd = open(inErrFile.c_str(), O_CREAT|O_APPEND|O_RDWR, 0644);
+	if (fd < 0)
+	{
+		cerr << "Opening log file " << inErrFile << " failed" << endl;
+		exit(1);
+	}
+
+	// redirect stdout and stderr to the log file
+	dup2(fd, STDERR_FILENO);
+}
+
+// --------------------------------------------------------------------
+// 
+//	Signal
+//	
 
 struct M6SignalCatcherImpl
 {

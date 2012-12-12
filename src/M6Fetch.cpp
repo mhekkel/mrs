@@ -143,7 +143,7 @@ M6FTPFetcher::M6FTPFetcher(const zx::element* inConfig)
 		
 		vector<const char*> args;
 		args.push_back(rsync.c_str());
-		args.push_back("-ltpvd");
+		args.push_back("-ltpvdr");
 		if (mDelete)
 			args.push_back("--delete");
 		args.push_back(src.c_str());

@@ -191,6 +191,13 @@ void M6SignalCatcher::Signal(int inSignal)
 #include <linux/limits.h>
 #include <fcntl.h>
 
+namespace
+{
+
+string gExePath;
+	
+}
+
 void SetStdinEcho(bool inEnable)
 {
     struct termios tty;
@@ -205,11 +212,16 @@ void SetStdinEcho(bool inEnable)
 
 fs::path GetExecutablePath()
 {
-	char path[PATH_MAX] = "";
-	if (readlink("/proc/self/exe", path, sizeof(path)) == -1)
-		throw runtime_error("could not get exe path");
+	if (gExePath.empty())
+	{
+		char path[PATH_MAX] = "";
+		if (readlink("/proc/self/exe", path, sizeof(path)) == -1)
+			THROW(("could not get exe path (%s)", strerror(errno)));
+		
+		gExePath = path;
+	}
 	
-	return fs::path(path);
+	return fs::path(gExePath);
 }
 
 bool IsaTTY()
@@ -224,6 +236,11 @@ bool IsaTTY()
 
 void Daemonize(const string& inUser, const string& inPidFile)
 {
+	// store exe path, we might not be able to access it later on
+	char path[PATH_MAX] = "";
+	if (readlink("/proc/self/exe", path, sizeof(path)) > 0)
+		gExePath = path;
+
 	int pid = fork();
 	
 	if (pid == -1)

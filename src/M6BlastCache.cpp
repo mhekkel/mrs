@@ -119,7 +119,8 @@ M6BlastCache::M6BlastCache()
 		"CREATE TABLE IF NOT EXISTS blast_db_file ( "
 			"db TEXT, "
 			"file TEXT, "
-			"time_t INTEGER"
+			"time_t INTEGER, "
+			"PRIMARY KEY (db, file)"
 		")"
 	);
 
@@ -346,8 +347,10 @@ void M6BlastCache::CheckCacheForDB(const string& inDatabank, const vector<fs::pa
 
 			foreach (const fs::path& file, inFiles)
 			{
-				string path = file.string();
+				sqlite3_reset(updateStmt);
 				
+				string path = file.string();
+
 				THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(updateStmt, 1, inDatabank.c_str(), inDatabank.length(), SQLITE_STATIC), mCacheDB);
 				THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(updateStmt, 2, path.c_str(), path.length(), SQLITE_STATIC), mCacheDB);
 				THROW_IF_SQLITE3_ERROR(sqlite3_bind_int64(updateStmt, 3, fs::last_write_time(file)), mCacheDB);
@@ -355,8 +358,9 @@ void M6BlastCache::CheckCacheForDB(const string& inDatabank, const vector<fs::pa
 				THROW_IF_SQLITE3_ERROR(sqlite3_step(updateStmt), mCacheDB);
 			}
 		}
-		catch (...)
+		catch (exception& e)
 		{
+			cerr << "blast-cache exception: " << e.what() << endl;
 		}
 
 		if (selectStmt != nullptr) sqlite3_finalize(selectStmt);

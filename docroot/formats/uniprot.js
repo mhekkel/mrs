@@ -300,13 +300,17 @@ UniProt = {
 			i = j - 1;
 		}
 		
+		var nl = '\n';
+		if ($.browser.msie && $.browser.version < 9)
+			nl = '\r';
+		
 		var result = $("<pre/>"), i = 0;
 		for (j in UniProt.segments) {
 			var s = '';
 			for (var k = UniProt.segments[j].from; k <= UniProt.segments[j].to; ++k) {
 				s += seq[i];
 				++i;
-				if (i % 60 == 0) s += '\r\n'
+				if (i % 60 == 0) s += nl;
 				else if (i % 10 == 0) s += ' ';
 			}
 			result.append($("<span class='segment'/>").attr("id", "segment-" + j).append(s));

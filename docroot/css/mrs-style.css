@@ -779,13 +779,13 @@ form.admin_form hr {
 	Blast Form
 */
 
-form.blast_form {
+form.blast_form, form.align_form {
 	display: inline-block;
 	padding-right:1em;
 	vertical-align: top;
 }
 
-form.blast_form p:first-child {
+form.blast_form p:first-child, form.align_form p:first-child {
 	margin: 3px 0px;
 }
 

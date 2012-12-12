@@ -1471,7 +1471,7 @@ void M6Server::ProcessNewConfig(const string& inPage, zeep::http::parameter_map&
 		foreach (const char* tool, tools)
 		{
 			fs::path p = inParams.get(tool, "").as<string>();
-			if (not fs::exists(p))
+			if (not p.empty() and not fs::exists(p))
 				THROW(("The %s tool does not exist", tool));
 			config->GetTool(tool)->content(p.string());
 		}

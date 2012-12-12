@@ -15,8 +15,8 @@
   <!-- Tools section, specify external executables used by M6 -->
   <tools>
     <!--		<tool id="clustalo">C:\Users\maarten\bin\clustal-omega\clustalo.exe</tool>-->
-    <tool id="clustalo">/usr/bin/clustalo</tool>
-    <tool id="rsync">C:\Users\maarten\bin\clustal-omega\clustalo.exe</tool>
+    <tool id="clustalo">C:\Users\maarten\bin\clustal-omega\clustalo.exe</tool>
+    <tool id="rsync"></tool>
   </tools>
   <!-- Scheduler section -->
   <scheduler enabled="true" time="20:00" weekday="friday"/>

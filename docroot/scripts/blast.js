@@ -343,7 +343,7 @@ BlastJob.prototype = {
 		}
 		
 		with (document.getElementById("blastForm")) {
-			query.value = '>' + this.queryID + '\n' + this.query.replace(/(.{72})/g, "$1\n");
+			query.value = '>' + this.queryID + '\n' + this.query.replace(/(.{72})/g, "$1" + '\n');
 			program.value = this.program;
 			db.value = this.db;
 			expect.value = this.expect;
@@ -763,6 +763,9 @@ BlastResult.prototype.calculateAlignment = function(hsp) {
 
         offset += stringLength;
     }
+
+	if ($.browser.msie && $.browser.version < 9)
+		hsp.alignment = hsp.alignment.replace(/\n/g, '<br/>');
     
     var pre = document.createElement('pre');
     $(pre).html(hsp.alignment);

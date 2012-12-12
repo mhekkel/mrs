@@ -108,6 +108,10 @@ Embl = {
 			Embl.segments.push(segment);
 			i = j - 1;
 		}
+
+		var nl = '\n';
+		if ($.browser.msie && $.browser.version < 9)
+			nl = '\r';
 		
 		var result = $("<pre/>"), i = 0;
 		for (j in Embl.segments) {
@@ -115,7 +119,7 @@ Embl = {
 			for (var k = Embl.segments[j].from; k <= Embl.segments[j].to; ++k) {
 				s += seq[i];
 				++i;
-				if (i % 60 == 0) s += '\n'
+				if (i % 60 == 0) s += nl;
 				else if (i % 10 == 0) s += ' ';
 			}
 			result.append($("<span class='segment'/>").attr("id", "segment-" + j).append(s));

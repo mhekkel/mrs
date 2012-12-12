@@ -29,34 +29,13 @@
 	<div id="main">
 		<mrs:include file="form.html" />
 
-		<form id="alignForm" method="POST" action="#" onsubmit="submitAlignJob(); return false;">
-			<div id="tabs" class="tabs" style="min-width:550px;">
-				<ul>
-					<li><a href="#tab-1">Sequences</a></li>
-<!--					<li><a href="#tab-2">Options</a></li>-->
-				</ul>
-				<div id='tab-1'>
-					<ul>
-						<li id="label1">Enter one or more protein sequences in <em>FastA</em> format</li>
-						<li><textarea name="input" rows="5" cols="72">${input}</textarea></li>
-						<li>
-							&#x00a0;
-							<input type="submit" name="Align" value="Align" class="submit" style="float:right;"/>
-						</li>
-					</ul>
-				</div>
-<!--					<div id="tab-2">-->
-<!--						<ul>-->
-<!--							<li><label><mrs:checkbox name="filter" checked="${filter}" />Filter sequence (low complexity)</label></li>-->
-<!--							<li><label>E-value cutoff-->
-<!--								<select name="expect">-->
-<!--									<mrs:options collection="expectRange" selected="${expect}" />-->
-<!--								</select></label>-->
-<!--							</li>-->
-<!--						</ul>-->
-<!--					</div>-->
-			</div>
-<script language="JavaScript">
+		<form id="alignForm" method="POST" action="#" onsubmit="submitAlignJob(); return false;" class="align_form">
+			<fieldset>
+				<p>Enter one or more protein sequences in <em>FastA</em> format</p>
+				<textarea name="input" rows="5" cols="72">${input}</textarea>
+				<div><input type="submit" name="Align" value="Align" class="submit" style="float:right;"/></div>
+			</fieldset>
+<script language="JavaScript" type="text/javascript">
 //<![CDATA[
 jQuery(function() {
 	jQuery('#tabs').tabs();

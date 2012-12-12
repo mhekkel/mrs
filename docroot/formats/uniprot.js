@@ -279,10 +279,10 @@ UniProt = {
 	},
 
 	createSequence: function(seq, floc) {
-		seq = seq.replace(/\s+/gm, '');
+		seq = seq.replace(/\s+/gm, '').split('');
 		
-		var aaf = seq.split('');
-		for (i in aaf)
+		var aaf = new Array();
+		for (i in seq)
 			aaf[i] = "";
 		
 		for (i in floc) {
@@ -306,7 +306,7 @@ UniProt = {
 			for (var k = UniProt.segments[j].from; k <= UniProt.segments[j].to; ++k) {
 				s += seq[i];
 				++i;
-				if (i % 60 == 0) s += '\n'
+				if (i % 60 == 0) s += '\r\n'
 				else if (i % 10 == 0) s += ' ';
 			}
 			result.append($("<span class='segment'/>").attr("id", "segment-" + j).append(s));

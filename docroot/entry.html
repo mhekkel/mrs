@@ -23,7 +23,10 @@
 	<script src="scripts/format.js" type="text/javascript">
 	</script>
 	<mrs:if test="${formatXSLT}"><script type="text/javascript">Format.xslt = 'formats/${formatXSLT}';</script></mrs:if>
-	<mrs:if test="${formatScript}"><script type="text/javascript" src="formats/${formatScript}.js"></script></mrs:if>
+	<mrs:if test="${formatScript}">
+		<script type="text/javascript" src="formats/${formatScript}.js">
+		</script>
+	</mrs:if>
 
 	<script type="text/javascript">
 		Format.db = '${db}';

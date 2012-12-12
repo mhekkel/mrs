@@ -1,6 +1,8 @@
 #pragma once
 
 #include <vector>
+#include <map>
+#include <set>
 
 #include <zeep/http/webapp.hpp>
 #include <zeep/http/webapp/el.hpp>

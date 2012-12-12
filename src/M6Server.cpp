@@ -197,9 +197,9 @@ M6Server::M6Server(const zx::element* inConfig)
 		
 		zeep::dispatcher* d = nullptr;
 		if (service == "search")
-			d = new M6WSSearch(*this, mLoadedDatabanks, ns, location);
+			d = new M6WSSearch(*this, mLoadedDatabanks, ns, service);
 		else if (service == "blast")
-			d = new M6WSBlast(*this, ns, location);
+			d = new M6WSBlast(*this, ns, service);
 		else
 			THROW(("Invalid web service specified: %s", service.c_str()));
 

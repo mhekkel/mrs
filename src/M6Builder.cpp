@@ -670,7 +670,7 @@ void M6Builder::Build(uint32 inNrOfThreads)
 		fs::rename(path, dstPath);
 	}
 	
-	cerr << "done" << endl;
+	cout << "done" << endl;
 }
 
 void M6Builder::IndexDocument(const string& inText, const string& inFileName,
@@ -868,10 +868,10 @@ void M6Scheduler::Run()
 					log << action << " of " << databank << " returned: " << r << endl;
 				
 				if (not out.empty())
-					log << "output: " << out << endl;
+					log << out << endl;
 				
 				if (not err.empty())
-					log << "error: " << err << endl;
+					log << err << endl;
 				
 				log << endl;
 			}

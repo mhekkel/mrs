@@ -23,6 +23,7 @@
 #endif
 
 #include "M6Utilities.h"
+#include "M6Server.h"
 
 #if defined(__linux__) || defined(__INTEL_COMPILER_BUILD_DATE)
 #include <atomic>
@@ -357,7 +358,7 @@ void M6ProgressImpl::PrintDone()
 	
 	if (IsaTTY())
 		cout << '\r' << msg << endl;
-	else
+	else if (M6Server::Instance() == nullptr)
 		cout << msg << endl;
 
 	M6Status::Instance().SetUpdateStatus(mDatabank, mAction, 1.0f);

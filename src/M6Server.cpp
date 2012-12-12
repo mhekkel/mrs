@@ -326,6 +326,10 @@ void M6Server::LoadAllDatabanks()
 	foreach (auto& blastAlias, blastAliases)
 	{
 		M6BlastDatabank bdb = { blastAlias.first, names[blastAlias.first] };
+		
+		if (bdb.mName.empty())	// refuse empty names
+			continue;
+		
 		foreach (const string& f, blastAlias.second)
 			bdb.mIDs.insert(f);
 		mBlastDatabanks.push_back(bdb);

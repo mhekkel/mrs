@@ -281,13 +281,14 @@ UniProt = {
 	createSequence: function(seq, floc) {
 		seq = seq.replace(/\s+/gm, '');
 		
-		var aaf = new Array();
-		for (i in seq) aaf[i] = "";
+		var aaf = seq.split('');
+		for (i in aaf)
+			aaf[i] = "";
 		
 		for (i in floc) {
 			if (floc[i].length == 0) continue;
 			for (var j = floc[i].from - 1; j < floc[i].to; ++j)
-				if (aaf[j].length == 0) aaf[j] = i; else aaf[j] += ';' + i;
+				if (aaf[j].length == 0) aaf[j] += i; else aaf[j] += ';' + i;
 		}
 		
 		for (var i = 0; i < aaf.length; ++i) {

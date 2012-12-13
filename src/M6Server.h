@@ -34,9 +34,10 @@ class M6Server : public zh::webapp
 	static M6Server*
 					Instance()					{ return sInstance; }
 
-	static void		Start(const std::string& inRunAs, const std::string& inPidFile,
+	static int		Start(const std::string& inRunAs, const std::string& inPidFile,
 						bool inForeground);
-	static void		Stop(const std::string& inPidFile);
+	static int		Stop(const std::string& inPidFile);
+	static int		Status(const std::string& inPidFile);
 
 	virtual void	handle_request(const zh::request& req, zh::reply& rep);
 	virtual void	create_unauth_reply(bool stale, const std::string& realm, zh::reply& rep);
@@ -114,6 +115,7 @@ class M6Server : public zh::webapp
 	void			handle_status(const zh::request& request, const el::scope& scope, zh::reply& reply);
 	void			handle_status_ajax(const zh::request& request, const el::scope& scope, zh::reply& reply);
 	void			handle_info(const zh::request& request, const el::scope& scope, zh::reply& reply);
+	void			handle_browse(const zh::request& request, const el::scope& scope, zh::reply& reply);
 
 	void			handle_admin(const zh::request& request, const el::scope& scope, zh::reply& reply);
 //	void			handle_admin_ajax(const zh::request& request, const el::scope& scope, zh::reply& reply);

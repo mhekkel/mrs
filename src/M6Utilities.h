@@ -34,7 +34,8 @@ class M6SignalCatcher
 
 void SetStdinEcho(bool inEnable);
 boost::filesystem::path GetExecutablePath();
+bool IsPIDFileForExecutable(const boost::filesystem::path& inFile);
 bool IsaTTY();
 void Daemonize(const std::string& inUser, const std::string& inPidFile);
-void StopDaemon(int pid);
+int StopDaemon(int pid);
 void OpenLogFile(const std::string& inLogFile, const std::string& inErrFile);

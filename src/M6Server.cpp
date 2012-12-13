@@ -166,6 +166,7 @@ M6Server::M6Server(const zx::element* inConfig)
 	mount("status",			boost::bind(&M6Server::handle_status, this, _1, _2, _3));
 	mount("ajax/status",	boost::bind(&M6Server::handle_status_ajax, this, _1, _2, _3));
 	mount("info",			boost::bind(&M6Server::handle_info, this, _1, _2, _3));
+	mount("browse",			boost::bind(&M6Server::handle_browse, this, _1, _2, _3));
 
 	mount("admin",			boost::bind(&M6Server::handle_admin, this, _1, _2, _3));
 //	mount("admin/rename",	boost::bind(&M6Server::handle_admin_rename_ajax, this, _1, _2, _3));
@@ -3028,6 +3029,56 @@ void M6Server::handle_info(const zh::request& request, const el::scope& scope, z
 	create_reply_from_template("info.html", sub, reply);
 }
 
+void M6Server::handle_browse(const zh::request& request, const el::scope& scope, zh::reply& reply)
+{
+	zeep::http::parameter_map params;
+	get_parameters(scope, params);
+
+	el::scope sub(scope);
+
+	string db = params.get("db", "").as<string>();
+	if (db.empty())
+		THROW(("No databank specified"));
+
+	string ix = params.get("ix", "").as<string>();
+	if (ix.empty())
+		THROW(("No index specified"));
+
+	M6Databank* mdb = Load(db);
+
+	string iFirst = params.get("first", "").as<string>();
+	string iLast = params.get("last", "").as<string>();
+
+	sub.put("db", db);
+	sub.put("ix", ix);
+	sub.put("first", iFirst);
+	sub.put("last", iLast);
+
+	vector<pair<string,string>> sections;
+	if (mdb->SectionsForIndex(ix, iFirst, iLast, 30, sections))
+	{
+		vector<el::object> elSections;
+		
+		foreach (auto& section, sections)
+		{
+			el::object elSection;
+			elSection["first"] = section.first;
+			elSection["last"] = section.second;
+			elSections.push_back(elSection);
+		}
+		
+		sub.put("sections", elSections.begin(), elSections.end());
+	}
+	else
+	{
+		vector<string> ids;
+		mdb->ListIndexEntries(ix, iFirst, iLast, ids);
+		sub.put("ids", ids.begin(), ids.end());
+	}
+
+	create_reply_from_template("browse.html", sub, reply);
+}
+
 // --------------------------------------------------------------------
 
 void M6Server::ValidateAuthentication(const zh::request& request,
@@ -3126,8 +3177,10 @@ void RunMainLoop(uint32 inNrOfThreads)
 	}
 }
 
-void M6Server::Start(const string& inRunAs, const string& inPidFile, bool inForeground)
+int M6Server::Start(const string& inRunAs, const string& inPidFile, bool inForeground)
 {
+	int result = 0;
+	
 	const zx::element* config = M6Config::GetServer();
 
 	string runas = inRunAs;
@@ -3138,32 +3191,103 @@ void M6Server::Start(const string& inRunAs, const string& inPidFile, bool inFore
 	if (pidfile.empty())
 		pidfile = config->get_attribute("pidfile");
 	
-	if (not inForeground)
+	// check to see if we're running already
+	if (not inForeground and IsPIDFileForExecutable(pidfile))
+		result = 1;
+	else
 	{
-		Daemonize(runas, pidfile);
+		// make sure we can listen to the port before forking off as daemon
 		
-		fs::path logfile = fs::path(M6Config::GetDirectory("log")) / "access.log";
-		fs::path errfile = fs::path(M6Config::GetDirectory("log")) / "error.log";
+		try
+		{
+			string addr = config->get_attribute("addr");
+			string port = config->get_attribute("port");
+			if (port.empty())
+				port = "80";
+			
+			boost::asio::io_service io_service;
+			boost::asio::ip::tcp::resolver resolver(io_service);
+			boost::asio::ip::tcp::resolver::query query(addr, port);
+			boost::asio::ip::tcp::endpoint endpoint(*resolver.resolve(query));
+			
+			boost::asio::ip::tcp::acceptor acceptor(io_service);
+			acceptor.open(endpoint.protocol());
+			acceptor.set_option(boost::asio::ip::tcp::acceptor::reuse_address(true));
+			acceptor.bind(endpoint);
+			acceptor.listen();
+		}
+		catch (exception& e)
+		{
+			THROW(("Is m6 running already? %s", e.what()));
+		}
+
+		if (not inForeground)
+		{
+			Daemonize(runas, pidfile);
+			
+			fs::path logfile = fs::path(M6Config::GetDirectory("log")) / "access.log";
+			fs::path errfile = fs::path(M6Config::GetDirectory("log")) / "error.log";
+			
+			OpenLogFile(logfile.string(), errfile.string());
+		}
+
+		(void)M6Scheduler::Instance();
 		
-		OpenLogFile(logfile.string(), errfile.string());
+		uint32 nrOfThreads = boost::thread::hardware_concurrency();
+		//if (vm.count("threads"))
+		//	nrOfThreads = vm["threads"].as<uint32>();
+		RunMainLoop(nrOfThreads);
 	}
 	
-	(void)M6Scheduler::Instance();
-	
-	uint32 nrOfThreads = boost::thread::hardware_concurrency();
-	//if (vm.count("threads"))
-	//	nrOfThreads = vm["threads"].as<uint32>();
-	RunMainLoop(nrOfThreads);
+	return result;
 }
 
-void M6Server::Stop(const string& inPidFile)
+int M6Server::Stop(const string& inPidFile)
 {
-	ifstream pidfile(inPidFile);
-	if (not pidfile.is_open())
-		THROW(("Failed to open pid file"));
+	int result = 1;
 	
-	int pid;
-	pidfile >> pid;
+	const zx::element* config = M6Config::GetServer();
+
+	string pidfile = inPidFile;
+	if (pidfile.empty())
+		pidfile = config->get_attribute("pidfile");
+
+	if (IsPIDFileForExecutable(pidfile))
+	{
+		ifstream file(pidfile);
+		if (not file.is_open())
+			THROW(("Failed to open pid file"));
+		
+		int pid;
+		file >> pid;
 	
-	StopDaemon(pid);
+		result = StopDaemon(pid);
+	}
+	
+	return result;
 }
+
+int M6Server::Status(const string& inPidFile)
+{
+	const zx::element* config = M6Config::GetServer();
+
+	string pidfile = inPidFile;
+	if (pidfile.empty())
+		pidfile = config->get_attribute("pidfile");
+
+	int result;
+	
+	if (IsPIDFileForExecutable(pidfile))
+	{
+		cerr << "m6 server is running" << endl;
+		result = 0;
+	}
+	else
+	{
+		cerr << "m6 server is not running" << endl;
+		result = 1;
+	}
+	
+	return result;
+}
+

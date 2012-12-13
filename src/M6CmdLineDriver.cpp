@@ -48,7 +48,7 @@ class M6CmdLineDriver
   public:
 	virtual			~M6CmdLineDriver() {}
 
-	static void		Exec(int argc, char* const argv[]);
+	static int		Exec(int argc, char* const argv[]);
 
 	static void		Terminated();
 	static void		SigHandler(int inSignal);
@@ -64,7 +64,7 @@ class M6CmdLineDriver
 	virtual void	AddOptions(po::options_description& desc,
 						unique_ptr<po::positional_options_description>& p);
 	virtual bool	Validate(po::variables_map& vm);
-	virtual void	Exec(const string& inCommand, po::variables_map& vm) = 0;
+	virtual int		Exec(const string& inCommand, po::variables_map& vm) = 0;
 	void			LoadConfig(po::variables_map& vm);
 
 	tr1::tuple<const zx::element*,fs::path>
@@ -84,7 +84,7 @@ class M6BlastDriver : public M6CmdLineDriver
 	virtual void	AddOptions(po::options_description& desc,
 						unique_ptr<po::positional_options_description>& p);
 	virtual bool	Validate(po::variables_map& vm);
-	virtual void	Exec(const string& inCommand, po::variables_map& vm);
+	virtual int		Exec(const string& inCommand, po::variables_map& vm);
 };
 
 class M6BuildDriver : public M6CmdLineDriver
@@ -92,7 +92,7 @@ class M6BuildDriver : public M6CmdLineDriver
   public:
 					M6BuildDriver() {};
 
-	virtual void	Exec(const string& inCommand, po::variables_map& vm);
+	virtual int		Exec(const string& inCommand, po::variables_map& vm);
 };
 
 class M6QueryDriver : public M6CmdLineDriver
@@ -103,7 +103,7 @@ class M6QueryDriver : public M6CmdLineDriver
 	virtual void	AddOptions(po::options_description& desc,
 						unique_ptr<po::positional_options_description>& p);
 	virtual bool	Validate(po::variables_map& vm);
-	virtual void	Exec(const string& inCommand, po::variables_map& vm);
+	virtual int		Exec(const string& inCommand, po::variables_map& vm);
 };
 
 class M6InfoDriver : public M6CmdLineDriver
@@ -111,7 +111,7 @@ class M6InfoDriver : public M6CmdLineDriver
   public:
 					M6InfoDriver() {};
 
-	virtual void	Exec(const string& inCommand, po::variables_map& vm);
+	virtual int		Exec(const string& inCommand, po::variables_map& vm);
 };
 
 class M6EntryDriver : public M6CmdLineDriver
@@ -122,7 +122,7 @@ class M6EntryDriver : public M6CmdLineDriver
 	virtual void	AddOptions(po::options_description& desc,
 						unique_ptr<po::positional_options_description>& p);
 	virtual bool	Validate(po::variables_map& vm);
-	virtual void	Exec(const string& inCommand, po::variables_map& vm);
+	virtual int		Exec(const string& inCommand, po::variables_map& vm);
 };
 
 class M6DumpDriver : public M6CmdLineDriver
@@ -133,7 +133,7 @@ class M6DumpDriver : public M6CmdLineDriver
 	virtual void	AddOptions(po::options_description& desc,
 						unique_ptr<po::positional_options_description>& p);
 	virtual bool	Validate(po::variables_map& vm);
-	virtual void	Exec(const string& inCommand, po::variables_map& vm);
+	virtual int		Exec(const string& inCommand, po::variables_map& vm);
 };
 
 class M6FetchDriver : public M6CmdLineDriver
@@ -141,7 +141,7 @@ class M6FetchDriver : public M6CmdLineDriver
   public:
 					M6FetchDriver() {};
 
-	virtual void	Exec(const string& inCommand, po::variables_map& vm);
+	virtual int		Exec(const string& inCommand, po::variables_map& vm);
 };
 
 class M6VacuumDriver : public M6CmdLineDriver
@@ -149,7 +149,7 @@ class M6VacuumDriver : public M6CmdLineDriver
   public:
 					M6VacuumDriver() {};
 
-	virtual void	Exec(const string& inCommand, po::variables_map& vm);
+	virtual int		Exec(const string& inCommand, po::variables_map& vm);
 };
 
 class M6ValidateDriver : public M6CmdLineDriver
@@ -157,7 +157,7 @@ class M6ValidateDriver : public M6CmdLineDriver
   public:
 					M6ValidateDriver() {};
 
-	virtual void	Exec(const string& inCommand, po::variables_map& vm);
+	virtual int		Exec(const string& inCommand, po::variables_map& vm);
 };
 
 class M6PasswordDriver : public M6CmdLineDriver
@@ -168,7 +168,7 @@ class M6PasswordDriver : public M6CmdLineDriver
 	virtual void	AddOptions(po::options_description& desc,
 						unique_ptr<po::positional_options_description>& p);
 	virtual bool	Validate(po::variables_map& vm);
-	virtual void	Exec(const string& inCommand, po::variables_map& vm);
+	virtual int		Exec(const string& inCommand, po::variables_map& vm);
 };
 
 class M6ServerDriver : public M6CmdLineDriver
@@ -179,7 +179,7 @@ class M6ServerDriver : public M6CmdLineDriver
 	virtual void	AddOptions(po::options_description& desc,
 						unique_ptr<po::positional_options_description>& p);
 	virtual bool	Validate(po::variables_map& vm);
-	virtual void	Exec(const string& inCommand, po::variables_map& vm);
+	virtual int		Exec(const string& inCommand, po::variables_map& vm);
 };
 
 // --------------------------------------------------------------------
@@ -191,7 +191,7 @@ M6CmdLineDriver::M6CmdLineDriver()
 {
 }
 
-void M6CmdLineDriver::Exec(int argc, char* const argv[])
+int M6CmdLineDriver::Exec(int argc, char* const argv[])
 {
 	unique_ptr<M6CmdLineDriver> driver;
 	
@@ -246,7 +246,7 @@ void M6CmdLineDriver::Exec(int argc, char* const argv[])
 	if (vm.count("verbose"))
 		VERBOSE = 1;
 	
-	driver->Exec(argv[1], vm);
+	return driver->Exec(argv[1], vm);
 }
 
 void M6CmdLineDriver::AddOptions(po::options_description& desc,
@@ -254,9 +254,9 @@ void M6CmdLineDriver::AddOptions(po::options_description& desc,
 {
 	desc.add_options()	
 		("databank,d",	po::value<string>(),	"Databank to build")
-		("config-file,c", po::value<string>(),	"Configuration file")
+		("config,c",	po::value<string>(),	"Configuration file")
 		("verbose,v",							"Be verbose")
-		("threads,a", po::value<uint32>(),		"Nr of threads/pipelines")
+		("threads,a",	po::value<uint32>(),	"Nr of threads/pipelines")
 		("help,h",								"Display help message")
 		;
 
@@ -282,9 +282,9 @@ bool M6CmdLineDriver::Validate(po::variables_map& vm)
 
 void M6CmdLineDriver::LoadConfig(po::variables_map& vm)
 {
-	if (vm.count("config-file"))
+	if (vm.count("config"))
 	{
-		fs::path configFile = vm["config-file"].as<string>();
+		fs::path configFile = vm["config"].as<string>();
 	
 		if (not fs::exists(configFile))
 			THROW(("Configuration file not found (\"%s\")", configFile.string().c_str()));
@@ -373,7 +373,7 @@ void M6BlastDriver::AddOptions(po::options_description& desc,
 		("threads,a",		po::value<int32>(),		"Nr of threads")
 		//("write-fasta",								"Write output as FastaA")
 		("verbose,v",								"Be verbose")
-		("config-file,c",	po::value<string>(),	"Configuration file")
+		("config,c",		po::value<string>(),	"Configuration file")
 		("help,h",									"Display help message")
 		;
 }
@@ -391,7 +391,7 @@ bool M6BlastDriver::Validate(po::variables_map& vm)
 	return result;
 }
 
-void M6BlastDriver::Exec(const string& inCommand, po::variables_map& vm)
+int M6BlastDriver::Exec(const string& inCommand, po::variables_map& vm)
 {
 	string matrix("BLOSUM62"), program = "blastp", query;
 	int32 gapOpen = -1, gapExtend = -1, wordSize = 0,
@@ -467,12 +467,14 @@ void M6BlastDriver::Exec(const string& inCommand, po::variables_map& vm)
 	
 		delete r;
 	}
+	
+	return 0;
 }
 
 // --------------------------------------------------------------------
 //	build
 
-void M6BuildDriver::Exec(const string& inCommand, po::variables_map& vm)
+int M6BuildDriver::Exec(const string& inCommand, po::variables_map& vm)
 {
 	uint32 nrOfThreads = boost::thread::hardware_concurrency();
 	if (nrOfThreads > 4)
@@ -496,6 +498,8 @@ void M6BuildDriver::Exec(const string& inCommand, po::variables_map& vm)
 	}
 	else
 		databanks.push_back(sDatabank);
+	
+	int result = 0;
 
 	foreach (string databank, databanks)
 	{
@@ -535,8 +539,11 @@ void M6BuildDriver::Exec(const string& inCommand, po::variables_map& vm)
 			cout << endl
 				 << inCommand << " failed: " << e.what() << endl
 				 << endl;
+			result = 1;
 		}
 	}
+	
+	return result;
 }
 
 // --------------------------------------------------------------------
@@ -560,7 +567,7 @@ bool M6QueryDriver::Validate(po::variables_map& vm)
 	return M6CmdLineDriver::Validate(vm) and vm.count("query");
 }
 
-void M6QueryDriver::Exec(const string& inCommand, po::variables_map& vm)
+int M6QueryDriver::Exec(const string& inCommand, po::variables_map& vm)
 {
 	const zx::element* config;
 	fs::path path;
@@ -595,12 +602,14 @@ void M6QueryDriver::Exec(const string& inCommand, po::variables_map& vm)
 				 << doc->GetAttribute("title") << endl;
 		}
 	}
+	
+	return 0;
 }
 
 // --------------------------------------------------------------------
 //	info
 
-void M6InfoDriver::Exec(const string& inCommand, po::variables_map& vm)
+int M6InfoDriver::Exec(const string& inCommand, po::variables_map& vm)
 {
 	const zx::element* config;
 	fs::path path;
@@ -664,6 +673,8 @@ void M6InfoDriver::Exec(const string& inCommand, po::variables_map& vm)
 			 << descIxType(ix.mType) << " | "
 			 << formatNr(ix.mCount, 12) << " | "
 			 << formatNr(ix.mFileSize, 14) << endl;
+
+	return 0;
 }
 
 // --------------------------------------------------------------------
@@ -686,7 +697,7 @@ bool M6DumpDriver::Validate(po::variables_map& vm)
 	return M6CmdLineDriver::Validate(vm) and vm.count("index");
 }
 
-void M6DumpDriver::Exec(const string& inCommand, po::variables_map& vm)
+int M6DumpDriver::Exec(const string& inCommand, po::variables_map& vm)
 {
 	const zx::element* config;
 	fs::path path;
@@ -695,6 +706,8 @@ void M6DumpDriver::Exec(const string& inCommand, po::variables_map& vm)
 	M6Databank db(path.string());
 	
 	db.DumpIndex(vm["index"].as<string>(), cout);
+
+	return 0;
 }
 
 // --------------------------------------------------------------------
@@ -717,7 +730,7 @@ bool M6EntryDriver::Validate(po::variables_map& vm)
 	return M6CmdLineDriver::Validate(vm) and vm.count("entry");
 }
 
-void M6EntryDriver::Exec(const string& inCommand, po::variables_map& vm)
+int M6EntryDriver::Exec(const string& inCommand, po::variables_map& vm)
 {
 	const zx::element* config;
 	fs::path path;
@@ -737,20 +750,24 @@ void M6EntryDriver::Exec(const string& inCommand, po::variables_map& vm)
 		THROW(("Failed to fetch document???"));
 	
 	cout << doc->GetText() << endl;
+	
+	return 0;
 }
 
 // --------------------------------------------------------------------
 //	fetch
 
-void M6FetchDriver::Exec(const string& inCommand, po::variables_map& vm)
+int M6FetchDriver::Exec(const string& inCommand, po::variables_map& vm)
 {
 	M6Fetch(vm["databank"].as<string>());
+	
+	return 0;
 }
 
 // --------------------------------------------------------------------
 //	vacuum
 
-void M6VacuumDriver::Exec(const string& inCommand, po::variables_map& vm)
+int M6VacuumDriver::Exec(const string& inCommand, po::variables_map& vm)
 {
 	const zx::element* config;
 	fs::path path;
@@ -759,12 +776,14 @@ void M6VacuumDriver::Exec(const string& inCommand, po::variables_map& vm)
 	M6Databank db(path.string(), eReadWrite);
 
 	db.Vacuum();
+	
+	return 0;
 }
 
 // --------------------------------------------------------------------
 //	validate
 
-void M6ValidateDriver::Exec(const string& inCommand, po::variables_map& vm)
+int M6ValidateDriver::Exec(const string& inCommand, po::variables_map& vm)
 {
 	const zx::element* config;
 	fs::path path;
@@ -773,6 +792,8 @@ void M6ValidateDriver::Exec(const string& inCommand, po::variables_map& vm)
 	M6Databank db(path.string());
 
 	db.Validate();
+	
+	return 0;
 }
 
 // --------------------------------------------------------------------
@@ -782,7 +803,7 @@ void M6PasswordDriver::AddOptions(po::options_description& desc,
 	unique_ptr<po::positional_options_description>& p)
 {
 	desc.add_options()
-		("config-file,c", po::value<string>(),	"Configuration file")
+		("config,c",	po::value<string>(),	"Configuration file")
 		("user,u", po::value<string>(),			"User to modify")
 		("realm,r", po::value<string>(),		"Realm to modify (default is 'M6 Administrator'")
 		;
@@ -798,7 +819,7 @@ bool M6PasswordDriver::Validate(po::variables_map& vm)
 	return true;
 }
 
-void M6PasswordDriver::Exec(const string& inCommand, po::variables_map& vm)
+int M6PasswordDriver::Exec(const string& inCommand, po::variables_map& vm)
 {
 	string username, realm = "M6 Administrator", password, pwcheck;
 
@@ -829,8 +850,13 @@ void M6PasswordDriver::Exec(const string& inCommand, po::variables_map& vm)
 	cout << endl;
 	SetStdinEcho(true);
 	
+	int result = 0;
+	
 	if (password != pwcheck)
+	{
 		cerr << "passwords do not match" << endl;
+		result = 1;
+	}
 	else
 	{
 		string hash = M6MD5(username + ':' + realm + ':' + password).Finalise();
@@ -842,6 +868,8 @@ void M6PasswordDriver::Exec(const string& inCommand, po::variables_map& vm)
 		user->set_attribute("password", hash);
 		config.WriteOut();
 	}
+	
+	return result;
 }
 
 // --------------------------------------------------------------------
@@ -851,11 +879,11 @@ void M6ServerDriver::AddOptions(po::options_description& desc,
 						unique_ptr<po::positional_options_description>& p)
 {
 	desc.add_options()
-		("config-file,c", po::value<string>(),	"Configuration file")
-		("user,u", po::value<string>(),			"User to run as (e.g. nobody)")
-		("pidfile,p", po::value<string>(),		"Create file with process ID (pid)")
+		("config,c",	po::value<string>(),	"Configuration file")
+		("user,u",		po::value<string>(),	"User to run as (e.g. nobody)")
+		("pidfile,p",	po::value<string>(),	"Create file with process ID (pid)")
 		("no-daemon,F",							"Do not run as background process")
-		("command", po::value<string>(),		"Command, one of start or stop")
+		("command",		po::value<string>(),	"Command, one of start, stop or status")
 		;
 
 	p.reset(new po::positional_options_description());
@@ -868,7 +896,7 @@ bool M6ServerDriver::Validate(po::variables_map& vm)
 	return vm.count("command") > 0;
 }
 
-void M6ServerDriver::Exec(const string& inCommand, po::variables_map& vm)
+int M6ServerDriver::Exec(const string& inCommand, po::variables_map& vm)
 {
 	string command = vm["command"].as<string>();
 	
@@ -880,12 +908,18 @@ void M6ServerDriver::Exec(const string& inCommand, po::variables_map& vm)
 	if (vm.count("pidfile"))
 		pidfile = vm["pidfile"].as<string>();
 	
+	int result;
+	
 	if (command == "start")
-		M6Server::Start(user, pidfile, vm.count("no-daemon") > 0);
+		result = M6Server::Start(user, pidfile, vm.count("no-daemon") > 0);
 	else if (command == "stop")
-		M6Server::Stop(pidfile);
+		result = M6Server::Stop(pidfile);
+	else if (command == "status")
+		result = M6Server::Status(pidfile);
 	else
 		THROW(("Invalid command '%s'", command.c_str()));
+	
+	return result;
 }
 
 // --------------------------------------------------------------------
@@ -893,6 +927,8 @@ void M6ServerDriver::Exec(const string& inCommand, po::variables_map& vm)
 
 int main(int argc, char* argv[])
 {
+	int result = 0;
+	
 	try
 	{
 		set_terminate(&M6CmdLineDriver::Terminated);
@@ -909,7 +945,6 @@ int main(int argc, char* argv[])
 		signal(SIGTERM, &M6CmdLineDriver::SigHandler);
 		signal(SIGINT, &M6CmdLineDriver::SigHandler);
 #endif
-
 
 		if (argc < 2)
 		{
@@ -933,21 +968,21 @@ int main(int argc, char* argv[])
 			exit(1);
 		}
 		
-		M6CmdLineDriver::Exec(argc, argv);
+		result = M6CmdLineDriver::Exec(argc, argv);
 	}
 	catch (exception& e)
 	{
 		cerr << endl
 			 << "m6-builder exited with an exception:" << endl
 			 << e.what() << endl;
-		exit(1);
+		result = 1;
 	}
 	catch (...)
 	{
 		cerr << endl
 			 << "m6-builder exited with an uncaught exception" << endl;
-		exit(1);
+		result = 1;
 	}
 	
-	return 0;
+	return result;
 }

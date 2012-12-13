@@ -127,6 +127,11 @@ class M6DatabankImpl
 	void			SuggestCorrection(const string& inWord, vector<pair<string,uint16>>& outCorrections);
 	void			SuggestSearchTerms(const string& inWord, vector<string>& outSearchTerms);
 	
+	bool			SectionsForIndex(const string& inIndex, const string& inFirst, const string& inLast,
+						uint32 inRequestedSections, vector<pair<string,string>>& outSections);
+	void			ListIndexEntries(const string& inIndex, const string& inFirst, const string& inLast,
+						vector<string>& outEntries);
+
 	M6DocStore&		GetDocStore()						{ return *mStore; }
 	
 	M6BasicIndexPtr	GetIndex(const string& inName);
@@ -2010,6 +2015,19 @@ void M6DatabankImpl::SuggestSearchTerms(const string& inWord, vector<string>& ou
 		mDictionary->SuggestSearchTerms(inWord, outSearchTerms);
 }
 
+bool M6DatabankImpl::SectionsForIndex(const string& inIndex, const string& inFirst, const string& inLast,
+	uint32 inRequestedSections, vector<pair<string,string>>& outSections)
+{
+//	fout
+	return false;
+}
+
+void M6DatabankImpl::ListIndexEntries(const string& inIndex, const string& inFirst, const string& inLast,
+	vector<string>& outEntries)
+{
+//	fout
+}
+
 void M6DatabankImpl::StartBatchImport(M6Lexicon& inLexicon)
 {
 	mBatch = new M6BatchIndexProcessor(*this, inLexicon);
@@ -2316,3 +2334,16 @@ uint32 M6Databank::GetMaxDocNr() const
 	return mImpl->GetDocStore().NextDocumentNumber();
 }
 
+bool M6Databank::SectionsForIndex(const string& inIndex,
+	const string& inFirst, const string& inLast, uint32 inRequestedSections,
+	vector<pair<string,string>>& outSections)
+{
+	return mImpl->SectionsForIndex(inIndex, inFirst, inLast, inRequestedSections, outSections);
+}
+
+void M6Databank::ListIndexEntries(const string& inIndex,
+	const string& inFirst, const string& inLast,
+	vector<string>& outEntries)
+{
+	return mImpl->ListIndexEntries(inIndex, inFirst, inLast, outEntries);
+}

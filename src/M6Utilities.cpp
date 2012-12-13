@@ -45,6 +45,11 @@ fs::path GetExecutablePath()
 	return fs::path(buffer);
 }
 
+bool IsPIDFileForExecutable(const fs::path& inPidFile)
+{
+	return false;
+}
+
 bool IsaTTY()
 {
 	return true;
@@ -60,9 +65,9 @@ void Daemonize(const string& inUser, const string& inPidFile)
 	
 }
 
-void StopDaemon(int pid)
+int StopDaemon(int pid)
 {
-	
+	return 0;
 }
 
 // --------------------------------------------------------------------
@@ -224,6 +229,23 @@ fs::path GetExecutablePath()
 	return fs::path(gExePath);
 }
 
+bool IsPIDFileForExecutable(const fs::path& inPidFile)
+{
+	fs::ifstream pidfile(inPidFile);
+	if (not pidfile.is_open())
+		THROW(("Failed to open pid file"));
+	
+	int pid;
+	pidfile >> pid;
+	
+	// if /proc/PID/exe points to our executable, this means we're already running
+	char path[PATH_MAX] = "";
+	if (readlink((boost::format("/proc/%1%/exe") % pid).str().c_str(), path, sizeof(path)) == -1)
+		THROW(("could not get exe path (%s), stale pid file?", strerror(errno)));
+	
+	return GetExecutablePath() == fs::path(path);
+}
+
 bool IsaTTY()
 {
 	return isatty(STDOUT_FILENO);
@@ -300,12 +322,20 @@ void Daemonize(const string& inUser, const string& inPidFile)
 	open("/dev/null", O_RDONLY);
 }
 
-void StopDaemon(int pid)
+int StopDaemon(int pid)
 {
-	kill(pid, SIGINT);
+	int err = kill(pid, SIGINT);
 	
-	int status;
-	waitpid(pid, &status, 0);
+	if (err == 0)
+	{
+		int status;
+		err = waitpid(pid, &status, 0);
+	}
+	
+	if (err == -1)
+		cerr << "failed to stop daemon: " << strerror(errno) << endl;
+	
+	return err;
 }
 
 // --------------------------------------------------------------------

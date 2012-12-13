@@ -107,6 +107,15 @@ class M6Databank
 	void			SuggestSearchTerms(const std::string& inWord,
 						std::vector<std::string>& outSearchTerms);
 
+	// for browsing
+	bool			SectionsForIndex(const std::string& inIndex,
+						const std::string& inFirst, const std::string& inLast,
+						uint32 inRequestedSections,
+						std::vector<std::pair<std::string,std::string>>& outSections);
+	void			ListIndexEntries(const std::string& inIndex,
+						const std::string& inFirst, const std::string& inLast,
+						std::vector<std::string>& outEntries);
+
 	M6DocStore&		GetDocStore();
 	
 	uint32			size() const;

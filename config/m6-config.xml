@@ -7,10 +7,10 @@
     <directory id="raw">/data/raw</directory>
     <directory id="log">/data/log</directory>
     <directory id="blast">/data/blast-cache</directory>
-    <!--    <directory id="parser">/home/maarten/projects/m6/parsers</directory>-->
-    <!--    <directory id="docroot">/home/maarten/projects/m6/docroot</directory>-->
-    <directory id="parser">C:\Users\maarten\projects\m6\parsers</directory>
-    <directory id="docroot">C:\Users\maarten\projects\m6\docroot</directory>
+    <directory id="parser">/home/maarten/projects/m6/parsers</directory>
+    <directory id="docroot">/home/maarten/projects/m6/docroot</directory>
+    <!--    <directory id="parser">C:\Users\maarten\projects\m6\parsers</directory>
+    <directory id="docroot">C:\Users\maarten\projects\m6\docroot</directory> -->
   </directories>
   <!-- Tools section, specify external executables used by M6 -->
   <tools>
@@ -23,6 +23,7 @@
   <!-- Users section -->
   <users>
     <user name="scott" realm="M6 Administrator" password="b92ff7d60b994c8a0d2941ad9349e841"/>
+    <user name="admin" realm="M6 Administrator" password="5cab446b28bd84f1903e809e38d35fa6"/>
   </users>
   <!-- Server section -->
   <server addr="0.0.0.0" port="18090" user="nobody" pidfile="/var/run/m6.pid">

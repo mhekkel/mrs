@@ -1508,7 +1508,7 @@ void M6Server::ProcessNewConfig(const string& inPage, zeep::http::parameter_map&
 			e->content(s);
 		}
 		
-		const char* wss[] = { "search", "blast", "align" };
+		const char* wss[] = { "mrsws_search", "mrsws_blast", "mrsws_align" };
 		foreach (const char* ws, wss)
 		{
 			e = server->find_first((boost::format("web-service[@service='%1%']") % ws).str());
@@ -1866,7 +1866,7 @@ void M6Server::handle_admin(const zh::request& request,
 		if (n = serverConfig->find_first("base-url"))
 			server["baseurl"] = n->str();
 			
-		const char* wss[] = { "search", "blast", "align" };
+		const char* wss[] = { "mrsws_search", "mrsws_blast", "mrsws_align" };
 		el::object wsc;
 
 		foreach (const char* ws, wss)

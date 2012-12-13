@@ -1780,7 +1780,7 @@ void M6Server::ProcessNewConfig(const string& inPage, zeep::http::parameter_map&
 			if (hours >= 24 or minutes > 59)
 				THROW(("Invalid.time"));
 			
-			schedule->set_attribute("time", (boost::format("%2.2d:%2.2d") % hours % minutes).str());
+			schedule->set_attribute("time", (boost::format("%02.2d:%02.2d") % hours % minutes).str());
 		}
 		
 		string weekday = inParams.get("weekday", "friday").as<string>();

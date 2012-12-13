@@ -6,12 +6,17 @@
 #include <fstream>
 #include <iostream>
 
+#include <boost/filesystem/fstream.hpp>
+#include <boost/filesystem/operations.hpp>
+#include <boost/algorithm/string.hpp>
+
 #include "M6Utilities.h"
 #include "M6Error.h"
 #include "M6Config.h"
 
 using namespace std;
 namespace fs = boost::filesystem;
+namespace ba = boost::algorithm;
 
 #if defined(_MSC_VER)
 
@@ -231,19 +236,29 @@ fs::path GetExecutablePath()
 
 bool IsPIDFileForExecutable(const fs::path& inPidFile)
 {
-	fs::ifstream pidfile(inPidFile);
-	if (not pidfile.is_open())
-		THROW(("Failed to open pid file"));
-	
-	int pid;
-	pidfile >> pid;
-	
-	// if /proc/PID/exe points to our executable, this means we're already running
-	char path[PATH_MAX] = "";
-	if (readlink((boost::format("/proc/%1%/exe") % pid).str().c_str(), path, sizeof(path)) == -1)
-		THROW(("could not get exe path (%s), stale pid file?", strerror(errno)));
-	
-	return GetExecutablePath() == fs::path(path);
+	bool result = false;
+
+	if (fs::exists(inPidFile))
+	{
+		fs::ifstream pidfile(inPidFile);
+		if (not pidfile.is_open())
+			THROW(("Failed to open pid file %s: %s", inPidFile.string().c_str(), strerror(errno)));
+		
+		int pid;
+		pidfile >> pid;
+		
+		// if /proc/PID/exe points to our executable, this means we're already running
+		char path[PATH_MAX] = "";
+		if (readlink((boost::format("/proc/%1%/exe") % pid).str().c_str(), path, sizeof(path)) == -1)
+			THROW(("could not get exe path (%s), stale pid file?", strerror(errno)));
+
+		string exe(GetExecutablePath().string());
+
+		result = (exe == path) or
+			(ba::ends_with(path, " (deleted)") and ba::starts_with(path, exe));
+	}
+
+	return result;
 }
 
 bool IsaTTY()

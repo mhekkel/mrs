@@ -36,6 +36,7 @@
 				<li><a href="#" id="parsers">Parsers</a></li>
 				<li><a href="#" id="formats">Formats</a></li>
 				<li><a href="#" id="databanks">Databanks</a></li>
+				<li><a href="#" id="scheduler">Scheduler</a></li>
 <!--				<li><a href="#" id="blast" onclick="Admin.changeStatsView('blast');">Blast</a></li>-->
 			</ul>
 		</div>
@@ -122,7 +123,7 @@
 							</mrs:if>
 							<mrs:if test="${parser.script}">
 							<p>Perl based parsers should be edited directly, you can find the
-							file for the <code>${parser.id}</code> parser at <code style="white-space:nowrap">${parser.script}</code></p>
+							file for the <code>${parser.id}</code> parser at <code style="white-space:nowrap">${global.dirs['parser'] + '/' + parser.script + '.pm'}</code></p>
 							</mrs:if>
 						</fieldset>
 					</form>
@@ -318,17 +319,30 @@
 				<div class="admin-clear" />
 			</div>
 	
-<!--			<div id="blast" class="section">-->
-<!--				<form class="admin_form" method="POST">-->
-<!--					<input type='hidden' name='submit' value='blast'/>-->
-<!--					<fieldset>-->
-<!--						<h3>Blast Cache</h3>-->
-<!--						<div><label>Clustal Omega</label><input type="text" value="${global.tools.clustalo}" name="clustalo"/></div>-->
-<!--						<hr/>-->
-<!--						<input type='submit' value='Submit'/><input type='reset' value='Reset'/>-->
-<!--					</fieldset>-->
-<!--				</form>-->
-<!--			</div>-->
+			<div id="scheduler" class="section">
+				<form class="admin_form" method="POST">
+					<input type='hidden' name='submit' value='scheduler'/>
+					<fieldset>
+						<h3>Scheduler</h3>
+						<p>Enter the time for daily updates and the week day for weekly updates. Monthly updates are done
+						on the first week day of the calender month.</p>
+						<div><label>Enabled</label><mrs:checkbox name="enabled" checked="${scheduler.enabled}"/></div>
+						<div><label>Daily update at</label><input pattern="[0-2][0-9]:[0-5][0-9]" type="text" value="${scheduler.time}" name="time"/></div>
+						<div><label>Weekly update on</label><select name="weekday">
+							<mrs:option value="sunday" selected="${scheduler.weekday}">Sunday</mrs:option>
+							<mrs:option value="monday" selected="${scheduler.weekday}">Monday</mrs:option>
+							<mrs:option value="tuesday" selected="${scheduler.weekday}">Tuesday</mrs:option>
+							<mrs:option value="wednesday" selected="${scheduler.weekday}">Wednesday</mrs:option>
+							<mrs:option value="thursday" selected="${scheduler.weekday}">Thursday</mrs:option>
+							<mrs:option value="friday" selected="${scheduler.weekday}">Friday</mrs:option>
+							<mrs:option value="saturday" selected="${scheduler.weekday}">Saturday</mrs:option>
+						</select>
+						</div>
+						<hr/>
+						<input type='submit' value='Submit'/><input type='reset' value='Reset'/>
+					</fieldset>
+				</form>
+			</div>
 		
 		</div>
 		

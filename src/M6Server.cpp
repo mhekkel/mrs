@@ -1746,6 +1746,43 @@ void M6Server::ProcessNewConfig(const string& inPage, zeep::http::parameter_map&
 				source->remove_attribute("delete");
 		}
 	}
+	else if (inPage == "scheduler")
+	{
+		zx::element* schedule = config->GetSchedule();
+		
+		if (inParams.get("enabled", true).as<bool>())
+			schedule->set_attribute("enabled", "true");
+		else
+			schedule->set_attribute("enabled", "false");
+
+		string time = inParams.get("time", "").as<string>();
+		
+		if (time.empty())
+			schedule->remove_attribute("time");
+		else
+		{
+			vector<string> p;
+			ba::split(p, time, ba::is_any_of(":"));
+			
+			if (p.size() != 2)
+				THROW(("Invalid time"));
+			
+			uint32 hours = boost::lexical_cast<uint32>(p[0]);
+			uint32 minutes = boost::lexical_cast<uint32>(p[1]);
+	
+			if (hours >= 24 or minutes > 59)
+				THROW(("Invalid.time"));
+			
+			schedule->set_attribute("time", (boost::format("%2.2d:%2.2d") % hours % minutes).str());
+		}
+		
+		string weekday = inParams.get("weekday", "friday").as<string>();
+		const char* kWeekDays[] = { "sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday" };
+		if (find(kWeekDays, boost::end(kWeekDays), weekday) == boost::end(kWeekDays))
+			THROW(("Invalid weekday"));
+		
+		schedule->set_attribute("weekday", weekday);
+	}
 	
 	config->Validate();
 	delete mConfigCopy;
@@ -1980,6 +2017,14 @@ void M6Server::handle_admin(const zh::request& request,
 		aliasobjects.push_back(aliasobject);
 	}
 	sub.put("aliases", aliasobjects.begin(), aliasobjects.end());
+
+	// add the scheduler settings
+	el::object scheduler;
+	zx::element* schedule = mConfigCopy->GetSchedule();
+	scheduler["enabled"] = schedule->get_attribute("enabled") == "true";
+	scheduler["time"] = schedule->get_attribute("time");
+	scheduler["weekday"] = schedule->get_attribute("weekday");
+	sub.put("scheduler", scheduler);
 
 	create_reply_from_template("admin.html", sub, reply);
 }

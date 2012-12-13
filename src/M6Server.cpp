@@ -197,9 +197,9 @@ M6Server::M6Server(const zx::element* inConfig)
 		string location = ws->get_attribute("location");
 		
 		zeep::dispatcher* d = nullptr;
-		if (service == "search")
+		if (service == "mrsws_search")
 			d = new M6WSSearch(*this, mLoadedDatabanks, ns, service);
-		else if (service == "blast")
+		else if (service == "mrsws_blast")
 			d = new M6WSBlast(*this, ns, service);
 		else
 			THROW(("Invalid web service specified: %s", service.c_str()));
@@ -212,7 +212,14 @@ M6Server::M6Server(const zx::element* inConfig)
 			doc.read(request.payload);
 			zeep::envelope env(doc);
 		
-			reply.set_content(zeep::make_envelope(d->dispatch(env.request())));
+			try
+			{
+				reply.set_content(zeep::make_envelope(d->dispatch(env.request())));
+			}
+			catch (exception& e)
+			{
+				reply.set_content(zeep::make_fault(e));
+			}
 		});
 		
 		string wsdl = location + "/wsdl";

@@ -411,7 +411,8 @@ string M6Server::GetEntry(M6Databank* inDatabank,
 
 void M6Server::Find(const string& inDatabank, const string& inQuery, bool inAllTermsRequired,
 	uint32 inResultOffset, uint32 inMaxResultCount, bool inAddLinks,
-	vector<el::object>& outHits, uint32& outHitCount, bool& outRanked)
+	vector<el::object>& outHits, uint32& outHitCount, bool& outRanked,
+	string& outParseError)
 {
 	M6Databank* databank = Load(inDatabank);
 
@@ -422,7 +423,29 @@ void M6Server::Find(const string& inDatabank, const string& inQuery, bool inAllT
 	M6Iterator* filter;
 	vector<string> queryTerms;
 	
-	ParseQuery(*databank, inQuery, inAllTermsRequired, queryTerms, filter);
+	try
+	{
+		ParseQuery(*databank, inQuery, inAllTermsRequired, queryTerms, filter);
+	}
+	catch (exception& e)
+	{
+		outParseError = e.what();
+		
+		stringstream q;
+		M6Tokenizer tokenizer(inQuery);
+		for (;;)
+		{
+			M6Token token = tokenizer.GetNextWord();
+			if (token == eM6TokenEOF)
+				break;
+				
+			if (token == eM6TokenWord or token == eM6TokenNumber)
+				q << tokenizer.GetTokenString() << ' ';
+		}
+
+		ParseQuery(*databank, q.str(), inAllTermsRequired, queryTerms, filter);
+	}	
+		
 	if (queryTerms.empty())
 		rset.reset(filter);
 	else
@@ -1105,8 +1128,9 @@ void M6Server::handle_search(const zh::request& request,
 					vector<el::object> hits;
 					uint32 c;
 					bool r;
+					string error;
 					
-					Find(db.mID, q, true, 0, 5, false, hits, c, r);
+					Find(db.mID, q, true, 0, 5, false, hits, c, r, error);
 					
 					boost::mutex::scoped_lock lock(m);
 					
@@ -1126,6 +1150,7 @@ void M6Server::handle_search(const zh::request& request,
 						databank["name"] = db.mName;
 						databank["hits"] = hits;
 						databank["hitCount"] = c;
+						databank["error"] = error;
 						databanks.push_back(databank);
 					}
 				}
@@ -1159,12 +1184,13 @@ void M6Server::handle_search(const zh::request& request,
 		
 		vector<el::object> hits;
 		bool ranked;
+		string error;
 		
-		Find(db, q, true, resultoffset, maxresultcount, true, hits, hitCount, ranked);
+		Find(db, q, true, resultoffset, maxresultcount, true, hits, hitCount, ranked, error);
 		if (hitCount == 0)
 		{
 			sub.put("relaxed", el::object(true));
-			Find(db, q, false, resultoffset, maxresultcount, true, hits, hitCount, ranked);
+			Find(db, q, false, resultoffset, maxresultcount, true, hits, hitCount, ranked, error);
 		}
 		
 		if (not hits.empty())
@@ -1182,6 +1208,7 @@ void M6Server::handle_search(const zh::request& request,
 		sub.put("hitCount", el::object(hitCount));
 		sub.put("lastPage", el::object(((hitCount - 1) / hits_per_page) + 1));
 		sub.put("ranked", ranked);
+		sub.put("error", error);
 	}
 
 	vector<string> terms;
@@ -1264,7 +1291,7 @@ void M6Server::handle_link(const zh::request& request, const el::scope& scope, z
 
 	id = params.get("id", "").as<string>();
 	db = params.get("db", "").as<string>();
-	ix = params.get("ix", "").as<string>();
+	ix = params.get("ix", "").as<string>();		if (ix == "full-text") ix = "*";
 	q = params.get("q", "").as<string>();
 
 	M6Tokenizer::CaseFold(db);
@@ -2171,10 +2198,13 @@ void M6Server::handle_rest_find(const zh::request& request, const el::scope& sco
 	vector<el::object> hits;
 	uint32 c, hitCount;
 	bool ranked;
+	string error;
 	
-	Find(db, q, true, resultoffset, resultcount, false, hits, hitCount, ranked);
+	Find(db, q, true, resultoffset, resultcount, false, hits, hitCount, ranked, error);
 	
-	if (hits.empty())
+	if (not error.empty())
+		reply.set_content(string("Error parsing query: ") + error, "text/plain");
+	else if (hits.empty())
 		reply.set_content("no hits found", "text/plain");
 	else
 	{
@@ -3107,7 +3137,7 @@ void M6Server::handle_browse(const zh::request& request, const el::scope& scope,
 	sub.put("last", iLast);
 
 	vector<pair<string,string>> sections;
-	if (mdb->SectionsForIndex(ix, iFirst, iLast, 30, sections))
+	if (mdb->BrowseSectionsForIndex(ix, iFirst, iLast, 30, sections))
 	{
 		vector<el::object> elSections;
 		
@@ -3123,9 +3153,9 @@ void M6Server::handle_browse(const zh::request& request, const el::scope& scope,
 	}
 	else
 	{
-		vector<string> ids;
-		mdb->ListIndexEntries(ix, iFirst, iLast, ids);
-		sub.put("ids", ids.begin(), ids.end());
+		vector<string> keys;
+		mdb->ListIndexEntries(ix, iFirst, iLast, keys);
+		sub.put("keys", keys.begin(), keys.end());
 	}
 
 	create_reply_from_template("browse.html", sub, reply);

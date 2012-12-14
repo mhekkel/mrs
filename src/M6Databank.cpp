@@ -127,8 +127,8 @@ class M6DatabankImpl
 	void			SuggestCorrection(const string& inWord, vector<pair<string,uint16>>& outCorrections);
 	void			SuggestSearchTerms(const string& inWord, vector<string>& outSearchTerms);
 	
-	bool			SectionsForIndex(const string& inIndex, const string& inFirst, const string& inLast,
-						uint32 inRequestedSections, vector<pair<string,string>>& outSections);
+	bool			BrowseSectionsForIndex(const string& inIndex, const string& inFirst, const string& inLast,
+						uint32 inRequestedBrowseSections, vector<pair<string,string>>& outBrowseSections);
 	void			ListIndexEntries(const string& inIndex, const string& inFirst, const string& inLast,
 						vector<string>& outEntries);
 
@@ -2015,17 +2015,36 @@ void M6DatabankImpl::SuggestSearchTerms(const string& inWord, vector<string>& ou
 		mDictionary->SuggestSearchTerms(inWord, outSearchTerms);
 }
 
-bool M6DatabankImpl::SectionsForIndex(const string& inIndex, const string& inFirst, const string& inLast,
-	uint32 inRequestedSections, vector<pair<string,string>>& outSections)
+bool M6DatabankImpl::BrowseSectionsForIndex(const string& inIndex, const string& inFirst, const string& inLast,
+	uint32 inRequestedBrowseSections, vector<pair<string,string>>& outBrowseSections)
 {
-//	fout
-	return false;
+	bool result = false;
+	
+	foreach (const M6IndexDesc& desc, mIndices)
+	{
+		if (not ba::iequals(inIndex, desc.mName))
+			continue;
+
+		desc.mIndex->GetBrowseSections(inFirst, inLast, inRequestedBrowseSections, outBrowseSections);
+//		result = outBrowseSections.size() == inRequestedBrowseSections;
+		result = outBrowseSections.size() > 5;
+		break;
+	}
+
+	return result;
 }
 
 void M6DatabankImpl::ListIndexEntries(const string& inIndex, const string& inFirst, const string& inLast,
 	vector<string>& outEntries)
 {
-//	fout
+	foreach (const M6IndexDesc& desc, mIndices)
+	{
+		if (not ba::iequals(inIndex, desc.mName))
+			continue;
+
+		desc.mIndex->GetBrowseEntries(inFirst, inLast, outEntries);
+		break;
+	}
 }
 
 void M6DatabankImpl::StartBatchImport(M6Lexicon& inLexicon)
@@ -2334,11 +2353,12 @@ uint32 M6Databank::GetMaxDocNr() const
 	return mImpl->GetDocStore().NextDocumentNumber();
 }
 
-bool M6Databank::SectionsForIndex(const string& inIndex,
-	const string& inFirst, const string& inLast, uint32 inRequestedSections,
-	vector<pair<string,string>>& outSections)
+bool M6Databank::BrowseSectionsForIndex(const string& inIndex,
+	const string& inFirst, const string& inLast, uint32 inRequestedBrowseSections,
+	vector<pair<string,string>>& outBrowseSections)
 {
-	return mImpl->SectionsForIndex(inIndex, inFirst, inLast, inRequestedSections, outSections);
+	return mImpl->BrowseSectionsForIndex(inIndex, inFirst, inLast,
+					inRequestedBrowseSections, outBrowseSections);
 }
 
 void M6Databank::ListIndexEntries(const string& inIndex,

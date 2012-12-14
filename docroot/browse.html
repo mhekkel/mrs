@@ -29,7 +29,9 @@
 
 		<div class="nav">
 			<span class="left">
-				Records ${first}-${last} of <mrs:number f="#,##0" n="${keyCount}"/>
+<!--				Records ${first}-${last} of <mrs:number f="#,##0" n="${keyCount}"/>-->
+				<mrs:if test="${not empty first}">Keys ${first} to ${last} for index ${ix} in ${db}</mrs:if>
+				<mrs:if test="${empty first}">Keys for index ${ix} in ${db}</mrs:if>
 			</span>
 			
 			<span class="right">
@@ -53,26 +55,42 @@
 			&#x00a0;
 		</div>
 		
-		<table id="tabel" cellspacing="0" cellpadding="0" style="position:relative;" class="list">
-			<caption style="white-space:nowrap;">
-				Index entries for index ${index.id}${not empty index.name ? ' index.name' : ''}
-				in databank <a style="color:white; text-decoration:underline;" href="info?db=${db}">${db}</a>
-			</caption>
-			<tr>
-				<th>Nr</th>
-				<th style="min-width:300px;">Value</th>
-			</tr>
-	
+		<mrs:if test="${not empty sections}">
+			<div class="wbox">
+				
+				<div class="wleft">
+					<ul class="browse">
+						<mrs:for begin="0" end="${(sections.count / 2) - 1}" var="i">
+							<li>
+								<a href="browse?ix=${ix};db=${db};first=${sections[i].first};last=${sections[i].last}">
+									${sections[i].first} .. ${sections[i].last}
+								</a>
+							</li>
+						</mrs:for>
+					</ul>
+				</div>
+				<div class="wright">
+					<ul class="browse">
+						<mrs:for begin="${sections.count / 2}" end="${sections.count - 1}" var="i">
+							<li>
+								<a href="browse?ix=${ix};db=${db};first=${sections[i].first};last=${sections[i].last}">
+									${sections[i].first} .. ${sections[i].last}
+								</a>
+							</li>
+						</mrs:for>
+					</ul>
+				</div>
+				<div class="wclear"/>
+			</div>
+		</mrs:if>
+		
+		<mrs:if test="${not empty keys}">
 			<mrs:iterate collection="keys" var="key">
-			<tr>
-				<td class="nr">${key.nr}</td>
-				<td>
-					<a href="search?db=${db}&amp;q=${index.id}='${key.value}'">${key.value}</a>
-				</td>
-			</tr>
+			<ul class="browse">
+				<li><a href="link?db=${db}&amp;ix=${ix}&amp;id=${key}">${key}</a></li>
+			</ul>
 			</mrs:iterate>
-	
-		</table>
+		</mrs:if>
 	</div>
 </body>
 </html>

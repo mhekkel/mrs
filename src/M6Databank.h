@@ -108,10 +108,10 @@ class M6Databank
 						std::vector<std::string>& outSearchTerms);
 
 	// for browsing
-	bool			SectionsForIndex(const std::string& inIndex,
+	bool			BrowseSectionsForIndex(const std::string& inIndex,
 						const std::string& inFirst, const std::string& inLast,
-						uint32 inRequestedSections,
-						std::vector<std::pair<std::string,std::string>>& outSections);
+						uint32 inRequestedBrowseSections,
+						std::vector<std::pair<std::string,std::string>>& outBrowseSections);
 	void			ListIndexEntries(const std::string& inIndex,
 						const std::string& inFirst, const std::string& inLast,
 						std::vector<std::string>& outEntries);

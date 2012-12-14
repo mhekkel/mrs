@@ -60,7 +60,7 @@ void M6QueryParser::Match(M6Token inToken)
 {
 	if (mLookahead != inToken)
 	{
-		boost::format fmt("Query error: expected %1% but found %2%");
+		boost::format fmt("expected %1% but found %2%");
 		THROW(((fmt % inToken % mLookahead).str().c_str()));
 	}
 	
@@ -172,10 +172,18 @@ M6Iterator* M6QueryParser::ParseTest()
 		}
 
 		case eM6TokenPattern:
-			if (mDatabank != nullptr)
-				result.reset(mDatabank->FindPattern("full-text", mTokenizer.GetTokenString()));
+		{
+			string pat = mTokenizer.GetTokenString();
 			Match(eM6TokenPattern);
+			if (mLookahead == eM6TokenColon and pat == "*")
+			{
+				Match(eM6TokenColon);
+				result.reset(ParseTest());
+			}
+			else if (mDatabank != nullptr)
+				result.reset(mDatabank->FindPattern("full-text", pat));
 			break;
+		}
 
 		case eM6TokenWord:
 		case eM6TokenNumber:
@@ -414,7 +422,16 @@ void AnalyseQuery(const string& inQuery, vector<string>& outTerms)
 	M6QueryParser parser(nullptr, inQuery, true);
 	
 	M6Iterator* filter = nullptr;
-	parser.Parse(outTerms, filter);
+
+	try
+	{
+		parser.Parse(outTerms, filter);
+	}
+	catch (...)
+	{
+		outTerms.clear();
+	}
+	
 	delete filter;
 }
 

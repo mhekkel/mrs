@@ -69,7 +69,8 @@ class M6Server : public zh::webapp
 	void			Find(const std::string& inDatabank, const std::string& inQuery,
 						bool inAllTermsRequired, uint32 inResultOffset,
 						uint32 inMaxResultCount, bool inAddLinks,
-						std::vector<el::object>& outHits, uint32& outHitCount, bool& outRanked);
+						std::vector<el::object>& outHits, uint32& outHitCount, bool& outRanked,
+						std::string& outParseError);
 
 	void			GetLinkedDbs(const std::string& inDb, const std::string& inId, std::vector<std::string>& outLinkedDbs);
 	void			AddLinks(const std::string& inDb, const std::string& inId, el::object& inHit);

@@ -833,3 +833,39 @@ form.blast_form p.hideOptions:hover {
 	cursor: pointer;
 }
 
+/* two boxes, one left, the other right */
+
+.wbox {
+	width: 100%;
+}
+
+.wleft {
+	width: 50%;
+	float: left;
+	padding-right: 10px;
+	vertical-align: top;
+}
+
+.wright {
+	margin-left: 50%;
+	padding-left: 10px;
+	vertical-align: top;
+	border: solid 1px white;
+}
+
+.wclear {
+	clear: both;
+	height: 1px;
+	overflow: hidden;
+	margin: 0;
+	border: solid 1px white;
+}
+
+ul.browse
+{
+	list-style-image: none;
+	list-style-type: none;
+	margin: 0px;
+	padding-left: 10px;
+}
+

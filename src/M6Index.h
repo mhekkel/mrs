@@ -98,8 +98,19 @@ class M6BasicIndex
 	iterator		begin() const;
 	iterator		end() const;
 	
-	iterator		lower_bound(const std::string& inKey) const;
-	iterator		upper_bound(const std::string& inKey) const;
+//	iterator		lower_bound(const std::string& inKey) const;
+//	iterator		upper_bound(const std::string& inKey) const;
+
+	void			GetBrowseSections(const std::string& inFirst, const std::string& inLast,
+						uint32 inNrOfSections, std::vector<std::pair<std::string,std::string>>& outSections);
+
+	void			GetBrowseSections(uint32 inNrOfSections,
+						std::vector<std::pair<std::string,std::string>>& outSections)
+					{
+						GetBrowseSections("", "", inNrOfSections, outSections);
+					}
+	void			GetBrowseEntries(const std::string& inFirst, const std::string& inLast,
+						std::vector<std::string>& outEntries);
 	
 	typedef boost::function<bool(const char* inKey, uint32 inKeyLength, uint32 inCount)>	KeyVisitor;
 	void			VisitKeys(KeyVisitor inVisitor);

@@ -882,6 +882,10 @@ struct M6IndexImpl
 						return mIndex.CompareKeys(inKeyA.c_str(), inKeyA.length(), inKeyB.c_str(), inKeyB.length());
 					}
 
+	virtual void	GetBrowseSections(const string& inFirst, const string& inLast,
+						uint32 inNrOfSections, vector<pair<string,string>>& outSections) = 0;
+	virtual void	GetBrowseEntries(const string& inFirst, const string& inLast,
+						vector<string>& outEntries) = 0;
 	virtual void	VisitKeys(M6BasicIndex::KeyVisitor inVisitor) = 0;
 
 	virtual void	Validate() = 0;
@@ -1004,6 +1008,10 @@ class M6IndexImplT : public M6IndexImpl
 		M6DataType	data;
 	};
 
+	virtual void	GetBrowseSections(const string& inFirst, const string& inLast,
+						uint32 inNrOfSections, vector<pair<string,string>>& outSections);
+	virtual void	GetBrowseEntries(const string& inFirst, const string& inLast,
+						vector<string>& outEntries);
 	virtual void	VisitKeys(M6BasicIndex::KeyVisitor inVisitor);
 	
   protected:
@@ -3210,6 +3218,159 @@ void M6IndexImplT<M6DataType>::Visit(Visitor inVisitor, uint32 inPage, uint32 in
 }
 
 template<class M6DataType>
+void M6IndexImplT<M6DataType>::GetBrowseSections(const string& inFirst, const string& inLast,
+	uint32 inNrOfSections, vector<pair<string,string>>& outSections)
+{
+	outSections.clear();
+	
+	if (inNrOfSections == 0)
+		return;
+	
+	IndexPage* root(Load<IndexPage>(mHeader.mRoot));
+
+	LeafPage* beginPage;
+	LeafPage* endPage;
+	
+	uint32 beginKey = 0, endKey = 0;
+	
+	if (inFirst.empty())
+		beginPage = static_cast<LeafPage*>(GetFirstLeafPage());
+	else
+	{
+		uint32 pageNr;
+		root->LowerBound(inFirst, pageNr, beginKey);
+		beginPage = Load<LeafPage>(pageNr);
+	}
+
+	if (inLast.empty())
+		endPage = nullptr;
+	else
+	{
+		uint32 pageNr;
+		root->LowerBound(inLast, pageNr, endKey);
+		endPage = Load<LeafPage>(pageNr);
+	}	
+	
+	Release(root);
+	
+	// We now have begin and end, unfortunately we now have to count
+	// first to know the interval.
+	
+	uint32 n;
+	
+	if (beginPage == endPage)
+		n = endKey - beginKey;
+	else
+	{
+		n = beginPage->GetN() - beginKey;
+		LeafPage* page = beginPage;
+		Reference(page);
+	
+		for (;;)
+		{
+			if (page->GetLink() == 0)
+			{
+				Release(page);
+				break;
+			}
+			
+			LeafPage* next = Load<LeafPage>(page->GetLink());
+			Release(page);
+			page = next;
+			
+			if (page == endPage)
+			{
+				n += endKey;
+				break;
+			}
+			
+			n += page->GetN();
+		}
+	}
+
+	// no use trying, we don't have enough keys to continue
+	if (n < 2 * inNrOfSections)
+		return;
+
+	uint32 interval = n / inNrOfSections;
+
+	// Now walk the same pages, picking first and last keys for each section
+	
+	LeafPage* page = beginPage;
+	Reference(page);
+	uint32 skip = interval;
+	pair<string,string> section;
+	section.first = page->GetKey(beginKey);
+	skip += beginKey;
+
+	while (outSections.size() < inNrOfSections)
+	{
+		if (page->GetN() >= skip)
+		{
+			section.second = page->GetKey(skip - 1);
+			outSections.push_back(section);
+			
+			if (page->GetN() > skip)
+			{
+				section.first = page->GetKey(skip);
+				skip += interval;
+				continue;
+			}
+		}
+		
+		if (page->GetLink() == 0 or page == endPage)
+		{
+			// last page, now if inLast is empty, take the last key of this page
+			outSections.back().second = page->GetKey(page->GetN() - 1);
+			Release(page);
+			break;
+		}
+		
+		skip -= page->GetN();
+		
+		LeafPage* next = Load<LeafPage>(page->GetLink());
+		Release(page);
+		page = next;
+		
+		if (skip == 0)
+		{
+			section.first = page->GetKey(0);
+			skip += interval;
+		}
+	}
+	
+	if (inLast.empty() == false and outSections.back().second != inLast)
+		outSections.back().second = inLast;
+	
+	if (beginPage != nullptr)
+		Release(beginPage);
+	
+	if (endPage != nullptr)
+		Release(endPage);
+}
+
+template<class M6DataType>
+void M6IndexImplT<M6DataType>::GetBrowseEntries(
+	const string& inFirst, const string& inLast, vector<string>& outEntries)
+{
+	outEntries.clear();
+	
+	uint32 page = 0, key = 0;
+	
+	IndexPage* root(Load<IndexPage>(mHeader.mRoot));
+	if (not inFirst.empty())
+		root->LowerBound(inFirst, page, key);
+	Release(root);
+	
+	Visit([&](const char* inKey, uint32 inKeyLen, const M6DataType& inData) -> bool
+	{
+		outEntries.push_back(string(inKey, inKey + inKeyLen));
+		
+		return inLast >= inKey;
+	}, page, key);
+}
+
+template<class M6DataType>
 void M6IndexImplT<M6DataType>::VisitKeys(M6BasicIndex::KeyVisitor inVisitor)
 {
 	LeafPage* page = static_cast<LeafPage*>(GetFirstLeafPage());
@@ -3389,6 +3550,18 @@ M6BasicIndex::iterator M6BasicIndex::begin() const
 M6BasicIndex::iterator M6BasicIndex::end() const
 {
 	return mImpl->End();
+}
+
+void M6BasicIndex::GetBrowseSections(const string& inFirst, const string& inLast,
+	uint32 inNrOfSections, vector<pair<string,string>>& outSections)
+{
+	mImpl->GetBrowseSections(inFirst, inLast, inNrOfSections, outSections);
+}
+
+void M6BasicIndex::GetBrowseEntries(const string& inFirst, const string& inLast,
+	vector<string>& outEntries)
+{
+	mImpl->GetBrowseEntries(inFirst, inLast, outEntries);
 }
 
 void M6BasicIndex::VisitKeys(KeyVisitor inVisitor)

@@ -28,7 +28,7 @@
 <!ATTLIST admin realm CDATA #REQUIRED>
 <!ELEMENT base-url (#PCDATA)>
 <!ELEMENT web-service EMPTY>
-<!ATTLIST web-service service (search|blast|align) #REQUIRED
+<!ATTLIST web-service service (mrsws_search|mrsws_blast|mrsws_align) #REQUIRED
 					  ns CDATA #REQUIRED
 					  location CDATA #REQUIRED>
 	

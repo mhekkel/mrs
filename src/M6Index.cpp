@@ -3258,7 +3258,9 @@ void M6IndexImplT<M6DataType>::GetBrowseSections(const string& inFirst, const st
 	
 	uint32 n;
 	
-	if (beginPage == endPage)
+	if (inFirst.empty() and inLast.empty())
+		n = mHeader.mSize;
+	else if (beginPage == endPage)
 		n = endKey - beginKey;
 	else
 	{

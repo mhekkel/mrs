@@ -1119,6 +1119,7 @@ void M6Server::handle_search(const zh::request& request,
 		boost::thread_group thr;
 		boost::mutex m;
 		vector<el::object> databanks;
+		string error;
 		
 		foreach (M6LoadedDatabank& db, mLoadedDatabanks)
 		{
@@ -1128,11 +1129,14 @@ void M6Server::handle_search(const zh::request& request,
 					vector<el::object> hits;
 					uint32 c;
 					bool r;
-					string error;
+					string dbError;
 					
-					Find(db.mID, q, true, 0, 5, false, hits, c, r, error);
+					Find(db.mID, q, true, 0, 5, false, hits, c, r, dbError);
 					
 					boost::mutex::scoped_lock lock(m);
+					
+					if (not dbError.empty())
+						error = dbError;
 					
 					hitCount += c;
 					ranked = ranked or r;
@@ -1150,7 +1154,6 @@ void M6Server::handle_search(const zh::request& request,
 						databank["name"] = db.mName;
 						databank["hits"] = hits;
 						databank["hitCount"] = c;
-						databank["error"] = error;
 						databanks.push_back(databank);
 					}
 				}
@@ -1158,6 +1161,9 @@ void M6Server::handle_search(const zh::request& request,
 			});
 		}
 		thr.join_all();
+
+		if (not error.empty())
+			sub.put("error", error);
 
 		if (not databanks.empty())
 		{

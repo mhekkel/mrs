@@ -33,6 +33,10 @@ addLoadEvent(updateFindAllStatus);
 	<div id="main">
 		<mrs:include file="form.html" />
 
+		<mrs:if test="${error}">
+			<div class="relaxed">The query contained a syntax error (${error})</div>
+		</mrs:if>
+
 		<mrs:if test="${empty hit-databanks}">
 		<div class="no-hits">No hits found</div>
 		</mrs:if>

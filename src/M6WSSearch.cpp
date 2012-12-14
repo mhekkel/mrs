@@ -557,42 +557,42 @@ void M6WSSearch::GetLinked(const string& db, const string& id,
 
 void M6WSSearch::FindSimilar(const std::string& db, const std::string& id, WSSearchNS::Algorithm algorithm, int resultoffset, int maxresultcount, std::vector<WSSearchNS::FindResult>& response)
 {
-	mServer.log() << "UNIMPLEMENTED: " << __func__ << endl;
+	mServer.log() << "UNIMPLEMENTED: " << BOOST_CURRENT_FUNCTION << endl;
 	THROW(("Unimplemented SOAP call"));
 }
 
 void M6WSSearch::Count(const std::string& db, const std::string& booleanquery, uint32& response)
 {
-	mServer.log() << "UNIMPLEMENTED: " << __func__ << endl;
+	mServer.log() << "UNIMPLEMENTED: " << BOOST_CURRENT_FUNCTION << endl;
 	THROW(("Unimplemented SOAP call"));
 }
 
 void M6WSSearch::Cooccurrence(const std::string& db, const std::vector<std::string>& ids, float idf_cutoff, int resultoffset, int maxresultcount, std::vector<std::string>& terms)
 {
-	mServer.log() << "UNIMPLEMENTED: " << __func__ << endl;
+	mServer.log() << "UNIMPLEMENTED: " << BOOST_CURRENT_FUNCTION << endl;
 	THROW(("Unimplemented SOAP call"));
 }
 
 void M6WSSearch::SpellCheck(const std::string& db, const std::string& queryterm, std::vector<std::string>& suggestions)
 {
-	mServer.log() << "UNIMPLEMENTED: " << __func__ << endl;
+	mServer.log() << "UNIMPLEMENTED: " << BOOST_CURRENT_FUNCTION << endl;
 	THROW(("Unimplemented SOAP call"));
 }
 
 void M6WSSearch::SuggestSearchTerms(const std::string& db, const std::string& queryterm, std::vector<std::string>& suggestions)
 {
-	mServer.log() << "UNIMPLEMENTED: " << __func__ << endl;
+	mServer.log() << "UNIMPLEMENTED: " << BOOST_CURRENT_FUNCTION << endl;
 	THROW(("Unimplemented SOAP call"));
 }
 
 void M6WSSearch::CompareDocuments(const std::string& db, const std::string& doc_a, const std::string& doc_b, float& similarity)
 {
-	mServer.log() << "UNIMPLEMENTED: " << __func__ << endl;
+	mServer.log() << "UNIMPLEMENTED: " << BOOST_CURRENT_FUNCTION << endl;
 	THROW(("Unimplemented SOAP call"));
 }
 
 void M6WSSearch::ClusterDocuments(const std::string& db, const std::vector<std::string>& ids, WSSearchNS::Cluster& response)
 {
-	mServer.log() << "UNIMPLEMENTED: " << __func__ << endl;
+	mServer.log() << "UNIMPLEMENTED: " << BOOST_CURRENT_FUNCTION << endl;
 	THROW(("Unimplemented SOAP call"));
 }

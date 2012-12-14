@@ -4,6 +4,7 @@ BUGS:
 
 Todo
 
+- boost::notify_fork gebruiken
 - Bij query parse fout: melding en toch zoeken naar de woorden uit de query
 - rsync afronden?
 - Windows: Service Control Manager ondersteuning voor server mode

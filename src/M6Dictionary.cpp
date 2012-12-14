@@ -575,7 +575,7 @@ bool M6DictionaryCreator::Visit(const char* inKey, uint32 inKeyLength, uint32 in
 
 	uint32 digits = accumulate(inKey, inKey + inKeyLength, 0UL, [](uint32 cnt, char ch) -> uint32
 	{
-		if (isdigit(ch))
+		if (ch >= '0' and ch <= '9')
 			++cnt;
 		return cnt;
 	});

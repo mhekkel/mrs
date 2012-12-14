@@ -76,6 +76,8 @@ class M6Processor
 
 	void			ParseFile(const string& inFileName, istream& inFileStream);
 	void			ParseXML(const string& inFileName, istream& inFileStream);
+	void			ParseNode(M6InputDocument& inDoc, zx::node* inNode,
+						const string& inIndex, M6DataType inDataType, bool isUnique);
 
 	void			ProcessFile(M6Progress& inProgress);
 	void			ProcessDocument();
@@ -234,6 +236,22 @@ void M6Processor::ProcessFile(const string& inFileName, istream& inFileStream)
 	}
 }
 
+void M6Processor::ParseNode(M6InputDocument& inDoc, zx::node* inNode,
+	const string& inIndex, M6DataType inDataType, bool isUnique)
+{
+	zx::element* el = dynamic_cast<zx::element*>(inNode);
+	if (el == nullptr)
+	{
+		string text = inNode->str();
+		inDoc.Index(inIndex, inDataType, isUnique, text.c_str(), text.length());
+	}
+	else
+	{
+		foreach (zx::node* node, el->nodes())
+			ParseNode(inDoc, node, inIndex, inDataType, isUnique);
+	}
+}
+
 void M6Processor::ParseXML(const string& inFileName, istream& inFileStream)
 {
 	// simple case first, just parse the entire document
@@ -250,11 +268,15 @@ void M6Processor::ParseXML(const string& inFileName, istream& inFileStream)
 		{
 			foreach (zx::node* n, ix.xpath.evaluate<zx::node>(*xml))
 			{
-				string text = n->str();
-				
-				doc->Index(ix.name, ix.type, ix.unique, text.c_str(), text.length());
 				if (ix.attr)
+				{
+					string text = n->str();
+				
+					doc->Index(ix.name, ix.type, ix.unique, text.c_str(), text.length());
 					doc->SetAttribute(ix.name, text.c_str(), text.length());
+				}
+				else
+					ParseNode(*doc, n, ix.name, ix.type, ix.unique);
 			}
 		}
 		

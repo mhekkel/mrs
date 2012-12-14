@@ -1569,24 +1569,24 @@ void M6Server::ProcessNewConfig(const string& inPage, zeep::http::parameter_map&
 	}
 	else if (inPage == "parsers")
 	{
-		if (btn == "delete")
-		{
-			string parserID = inParams.get("selected", "").as<string>();
-			zx::element* parser = config->GetParser(parserID);
-			if (parser != nullptr)
-			{
-				parser->parent()->remove(parser);
-				delete parser;
-			}
-		}
-		else if (btn == "add")
-		{
-			
-		}
-		else
-		{
-			
-		}
+//		if (btn == "delete")
+//		{
+//			string parserID = inParams.get("selected", "").as<string>();
+//			zx::element* parser = config->GetParser(parserID);
+//			if (parser != nullptr)
+//			{
+//				parser->parent()->remove(parser);
+//				delete parser;
+//			}
+//		}
+//		else if (btn == "add")
+//		{
+//			
+//		}
+//		else
+//		{
+//			
+//		}
 	}
 	else if (inPage == "formats")
 	{

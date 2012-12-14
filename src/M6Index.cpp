@@ -3357,7 +3357,7 @@ void M6IndexImplT<M6DataType>::GetBrowseEntries(
 {
 	outEntries.clear();
 	
-	uint32 page = 0, key = 0;
+	uint32 page = 0, key = 0, n = 0;
 	
 	IndexPage* root(Load<IndexPage>(mHeader.mRoot));
 	if (not inFirst.empty())
@@ -3368,7 +3368,7 @@ void M6IndexImplT<M6DataType>::GetBrowseEntries(
 	{
 		outEntries.push_back(string(inKey, inKey + inKeyLen));
 		
-		return inLast >= inKey;
+		return ++n < 100 and (inLast.empty() or inLast >= inKey);
 	}, page, key);
 }
 

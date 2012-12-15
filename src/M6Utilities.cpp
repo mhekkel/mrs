@@ -249,7 +249,7 @@ bool IsPIDFileForExecutable(const fs::path& inPidFile)
 		
 		// if /proc/PID/exe points to our executable, this means we're already running
 		char path[PATH_MAX] = "";
-		if (readlink((boost::format("/proc/%1%/exe") % pid).str().c_str(), path, sizeof(path)) == 0)
+		if (readlink((boost::format("/proc/%1%/exe") % pid).str().c_str(), path, sizeof(path)) > 0)
 		{
 			string exe(GetExecutablePath().string());
 	

@@ -3,12 +3,12 @@
 <m6-config>
   <!-- Paths where all the data and files are stored -->
   <directories>
-    <directory id="mrs">/data/mrs</directory>
-    <directory id="raw">/data/raw</directory>
-    <directory id="log">/var/log/mrs</directory>
-    <directory id="blast">/data/blast-cache</directory>
-    <directory id="parser">/data/parsers</directory>
-    <directory id="docroot">/data/docroot</directory>
+    <directory id="mrs">__MRS_DIR__</directory>
+    <directory id="raw">__RAW_DIR__</directory>
+    <directory id="log">__LOG_DIR__</directory>
+    <directory id="blast">__BLAST_CACHE_DIR__</directory>
+    <directory id="parser">__PARSER_DIR__</directory>
+    <directory id="docroot">__DOCROOT__</directory>
   </directories>
   <!-- Tools section, specify external executables used by M6 -->
   <tools>
@@ -22,7 +22,7 @@
 <!--    <user name="scott" realm="M6 Administrator" password="b92ff7d60b994c8a0d2941ad9349e841"/>-->
   </users>
   <!-- Server section -->
-  <server addr="0.0.0.0" port="18090" user="nobody" pidfile="/var/run/m6.pid">
+  <server addr="0.0.0.0" port="18090" user="__MRS_USER__" pidfile="__RUN_FILE__">
     <admin realm="M6 Administrator"/>
     <base-url>__BASE_URL__</base-url>
     <web-service service="mrsws_search" ns="http://mrs.cmbi.ru.nl/mrsws/mrsws_search" location="mrsws/search"/>

@@ -640,6 +640,7 @@ void M6RSyncFetcherImpl::Mirror(bool inDryRun, ostream& out)
 	string databank = mConfig->get_attribute("id");
 	
 	M6Progress progress(databank, "rsync");
+	progress.Consumed(1);
 
 	zx::element* source = mConfig->find_first("source");
 	string srcdir = source->content();

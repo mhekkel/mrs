@@ -42,6 +42,13 @@ Status = {
 					row.cells[7].innerHTML = db.update.stage;
 					row.cells[6].children[0].style.display = 'none';
 				}
+				else if (db.update.stage == 'listing files' ||
+					db.update.stage == 'rsync')
+				{
+					row.className = 'active';
+					row.cells[7].innerHTML = db.update.stage;
+					row.cells[6].children[0].style.display = 'none';
+				}
 				else if (db.update.progress < 0)
 				{
 					row.className = 'error';

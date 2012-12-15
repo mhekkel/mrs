@@ -1,45 +1,46 @@
-# Makefile for m6 tools
+# Makefile for m6
 #
-#  Copyright Maarten L. Hekkelman, Radboud University 2008-2010.
+#  Copyright Maarten L. Hekkelman, Radboud University 2008-2012.
 # Distributed under the Boost Software License, Version 1.0.
 #    (See accompanying file LICENSE_1_0.txt or copy at
 #          http://www.boost.org/LICENSE_1_0.txt)
-#
-# You may have to edit the first three defines on top of this
-# makefile to match your current installation.
 
-#BOOST_LIB_SUFFIX	= 				# e.g. '-mt'
-BOOST_LIB_DIR		= $(HOME)/projects/boost/lib
-BOOST_INC_DIR		= $(HOME)/projects/boost/include
+# Directories where MRS will be installed
+BINDIR				?= /usr/local/bin
+MANDIR				?= /usr/local/man/man3
+
+MRSBASEURL			= http://localhost:18090/
+MRSDIR				?= /data
+MRSLOGDIR			?= /var/log/mrs
+MRSETCDIR			?= /usr/local/etc/mrs
+#MRSUSER				?= dba
 
 PERL				?= /usr/bin/perl
 
-PREFIX				?= /usr/local
-LIBDIR				?= $(PREFIX)/lib
-INCDIR				?= $(PREFIX)/include
-MANDIR				?= $(PREFIX)/man/man3
-
-OBJDIR				= obj
+# in case you have boost >= 1.48 installed somewhere else on your disk
+#BOOST_LIB_SUFFIX	= # e.g. '-mt', not usually needed anymore
+#BOOST_LIB_DIR		= $(HOME)/projects/boost/lib
+#BOOST_INC_DIR		= $(HOME)/projects/boost/include
 
 BOOST_LIBS			= system thread filesystem regex math_c99 math_c99f program_options date_time iostreams timer random
 BOOST_LIBS			:= $(BOOST_LIBS:%=boost_%$(BOOST_LIB_SUFFIX))
-LIBS				= m pthread zeep rt
-#LDFLAGS				+= $(BOOST_LIB_DIR:%=-L%) $(LIBS:%=-l%) -g $(BOOST_LIBS:%=$(BOOST_LIB_DIR)/lib%.a) \
-#							-L ../libzeep/ $(HOME)/lib64/libstdc++.a
-LDFLAGS				+= $(LIBS:%=-l%) $(BOOST_LIBS:%=-l%) -g -L ../libzeep/ 
+LIBS				= m pthread zeep rt sqlite3
 
 CXX					= c++
+
 CFLAGS				+= $(BOOST_INC_DIR:%=-I%) -I. -pthread -std=c++0x -I../libzeep/
 CFLAGS				+= -Wno-deprecated -Wno-multichar 
 CFLAGS				+= $(shell $(PERL) -MExtUtils::Embed -e perl_inc)
+
+LDFLAGS				+= $(LIBS:%=-l%) $(BOOST_LIBS:%=-l%) -g -L ../libzeep/ 
 LDFLAGS				+= $(shell $(PERL) -MExtUtils::Embed -e ldopts)
-LDFLAGS				+= $(shell curl-config --libs)
-LDFLAGS				+= -lsqlite3
+
+OBJDIR				= obj
+
 ifneq ($(DEBUG),1)
 CFLAGS				+= -O3 -DNDEBUG -g
 else
 CFLAGS				+= -g -DDEBUG 
-LDFLAGS				+= -g
 OBJDIR				:= $(OBJDIR).dbg
 endif
 
@@ -54,7 +55,9 @@ VPATH += src
 OBJECTS = \
 	$(OBJDIR)/M6BitStream.o \
 	$(OBJDIR)/M6Blast.o \
+	$(OBJDIR)/M6BlastCache.o \
 	$(OBJDIR)/M6Builder.o \
+	$(OBJDIR)/M6CmdLineDriver.o \
 	$(OBJDIR)/M6Config.o \
 	$(OBJDIR)/M6Databank.o \
 	$(OBJDIR)/M6DataSource.o \
@@ -74,31 +77,17 @@ OBJECTS = \
 	$(OBJDIR)/M6Progress.o \
 	$(OBJDIR)/M6Query.o \
 	$(OBJDIR)/M6SequenceFilter.o \
+	$(OBJDIR)/M6Server.o \
 	$(OBJDIR)/M6Tokenizer.o \
 	$(OBJDIR)/M6Utilities.o \
-
-OBJECTS.m6 = \
-	$(OBJECTS) \
-	$(OBJDIR)/M6BlastCache.o \
-	$(OBJDIR)/M6CmdLineDriver.o \
-	$(OBJDIR)/M6Server.o \
 	$(OBJDIR)/M6WSBlast.o \
 	$(OBJDIR)/M6WSSearch.o \
 
-OBJECTS.m6-test = \
-	$(OBJECTS) \
-	$(OBJDIR)/M6TestMain.o \
-	$(OBJDIR)/M6TestDocStore.o 
+all: m6 config/m6-config.xml
 
-all: m6
-
-m6: $(OBJECTS.m6)
+m6: $(OBJECTS)
 	@ echo ">>" $@
 	@ $(CXX) $(BOOST_INC_DIR:%=-I%) -o $@ -I. $^ $(LDFLAGS)
-
-m6-test: $(OBJECTS.m6-test)
-	@ echo ">>" $@
-	@ $(CXX) $(BOOST_INC_DIR:%=-I%) -o $@ -I. $^ $(LDFLAGS) $(BOOST_LIB_DIR)/libboost_unit_test_framework.a
 
 $(OBJDIR)/%.o: %.cpp | $(OBJDIR)
 	@ echo ">>" $<
@@ -112,4 +101,25 @@ $(OBJDIR):
 	@ test -d $@ || mkdir -p $@
 
 clean:
-	rm -rf $(OBJDIR)/* m6 m6-test
+	rm -rf $(OBJDIR)/* m6
+
+config/m6-config.xml: config/m6-config.xml.dist
+	sed -e 's|__DATA_DIR__|$(DATADIR)|g' \
+		-e 's|__SCRIPT_DIR__|$(SCRIPTDIR)|g' \
+		$@.dist > $@
+	
+INSTALLDIRS = $(MRSLOGDIR) $(MRSETCDIR) $(MRSDIR)/raw  $(MRSDIR)/mrs $(MRSDIR)/blast-cache \
+	 $(MRSDIR)/docroot/scripts $(MRSDIR)/docroot/css $(MRSDIR)/docroot/formats $(MRSDIR)/docroot/images \
+	 $(MRSDIR)/docroot/help 
+
+install: m6
+	for d in $(INSTALLDIRS); do \
+		install $(MRSUSER:%=-o %) -m664 -d $$d; \
+	done
+	for f in `find docroot -type f | grep -v .svn`; do \
+		install $(MRSUSER:%=-o %) -m664 $$f $(MRSDIR)/$$f; \
+	done
+	for f in `find parsers -type f | grep -v .svn`; do \
+		install $(MRSUSER:%=-o %) -m664 $$f $(MRSDIR)/$$f; \
+	done
+	

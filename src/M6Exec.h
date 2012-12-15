@@ -1,14 +1,14 @@
 #pragma once
 
 #include <vector>
-#include <string>
+#include <iostream>
 
 #include <boost/iostreams/concepts.hpp>
 #include <boost/iostreams/categories.hpp>
 #include <boost/iostreams/read.hpp>
 
 int ForkExec(std::vector<const char*>& args, double maxRunTime,
-	const std::string& in, std::string& out, std::string& err);
+	const std::istream& in, std::ostream& out, std::ostream& err);
 
 class M6Process : public boost::iostreams::source
 {

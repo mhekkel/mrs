@@ -881,19 +881,13 @@ void M6Scheduler::Run()
 				
 				log << "About to " << action << ' ' << databank << endl;
 				
-				string out, err;
-				int r = ForkExec(args, 0, "", out, err);
+				stringstream in;
+				int r = ForkExec(args, 0, in, log, log);
 				
 				if (r == 0)
 					reload = true;	// signal to reload databanks
 				else
 					log << action << " of " << databank << " returned: " << r << endl;
-				
-				if (not out.empty())
-					log << out << endl;
-				
-				if (not err.empty())
-					log << err << endl;
 				
 				log << endl;
 			}

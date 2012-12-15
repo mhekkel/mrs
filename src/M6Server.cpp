@@ -2945,13 +2945,13 @@ void M6Server::handle_align_submit_ajax(const zh::request& request, const el::sc
 			args.push_back(nullptr);
 
 			double maxRunTime = 30;
-			string out, err;
+			stringstream in(fasta), out, err;
 			
-			int r = ForkExec(args, maxRunTime, fasta, out, err);
+			int r = ForkExec(args, maxRunTime, in, out, err);
 
-			result["alignment"] = out;
-			if (not err.empty())
-				result["error"] = err;
+			result["alignment"] = out.str();
+			if (not err.str().empty())
+				result["error"] = err.str();
 		}
 		catch (exception& e)
 		{

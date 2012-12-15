@@ -30,6 +30,7 @@ using namespace std;
 namespace fs = boost::filesystem;
 namespace po = boost::program_options;
 namespace ba = boost::algorithm;
+namespace io = boost::iostreams;
 
 double system_time()
 {
@@ -324,7 +325,7 @@ streamsize M6ProcessImpl::read(char* s, streamsize n)
 #else
 
 int ForkExec(vector<const char*>& args, double maxRunTime,
-	const string& stdin, string& stdout, string& stderr)
+	const istream& stdin, ostream& stdout, ostream& stderr)
 {
 	if (args.empty() or args.front() == nullptr)
 		THROW(("No arguments to ForkExec"));
@@ -393,19 +394,38 @@ int ForkExec(vector<const char*>& args, double maxRunTime,
 		
 		THROW(("fork failed: %s", strerror(errno)));
 	}
-	
-	// make stdout and stderr non-blocking
-	int flags;
-	
+
+	// handle stdin, if any	
 	close(ifd[0]);
 	
-	if (stdin.empty())
-		close(ifd[1]);
-	else
+	boost::thread thread([&stdin, ifd, args]()
 	{
-		flags = fcntl(ifd[1], F_GETFL, 0);
-		fcntl(ifd[1], F_SETFL, flags | O_NONBLOCK);
-	}
+		char buffer[1024];
+		
+		while (not stdin.eof())
+		{
+			streamsize k = io::read(stdin, buffer, sizeof(buffer));
+			
+			if (k == -1)
+				break;
+
+			const char* b = buffer;
+			
+			while (k > 0)
+			{
+				int r = write(ifd[1], b, k);
+				if (r > 0)
+					b += r, k -= r;
+				else if (r < 0 and errno != EAGAIN)
+					THROW(("Error writing to command %s", args.front()));
+			}
+		}
+
+		close(ifd[1]);
+	});
+
+	// make stdout and stderr non-blocking
+	int flags;
 
 	close(ofd[1]);
 	flags = fcntl(ofd[0], F_GETFL, 0);
@@ -420,29 +440,8 @@ int ForkExec(vector<const char*>& args, double maxRunTime,
 	
 	bool errDone = false, outDone = false, killed = false;
 	
-	const char* in = stdin.c_str();
-	size_t l_in = stdin.length();
-	
 	while (not errDone and not outDone)
 	{
-		if (l_in > 0)
-		{
-			size_t k = l_in;
-			if (k > 1024)
-				k = 1024;
-			
-			int r = write(ifd[1], in, k);
-			if (r > 0)
-				in += r, l_in -= r;
-			else if (r < 0 and errno != EAGAIN)
-				THROW(("Error writing to command %s", args.front()));
-			
-			if (l_in == 0)
-				close(ifd[1]);
-		}
-		else
-			usleep(100000);
-
 		char buffer[1024];
 		int r, n;
 		
@@ -452,7 +451,7 @@ int ForkExec(vector<const char*>& args, double maxRunTime,
 			r = read(ofd[0], buffer, sizeof(buffer));
 			
 			if (r > 0)
-				stdout.append(buffer, r);
+				stdout.write(buffer, r);
 			else if (r == 0 or errno != EAGAIN)
 				outDone = true;
 			else
@@ -465,28 +464,34 @@ int ForkExec(vector<const char*>& args, double maxRunTime,
 			r = read(efd[0], buffer, sizeof(buffer));
 			
 			if (r > 0)
-				stderr.append(buffer, r);
+				stderr.write(buffer, r);
 			else if (r == 0 and errno != EAGAIN)
 				errDone = true;
 			else
 				break;
 		}
 
-		if (not errDone and not outDone and not killed and maxRunTime > 0 and startTime + maxRunTime < system_time())
+		if (not errDone and not outDone)
 		{
-			kill(pid, SIGINT);
-
-			int status = 0;
-			waitpid(pid, &status, 0);
-
-			THROW(("%s was killed since its runtime exceeded the limit of %d seconds", args.front(), maxRunTime));
+			if (not killed and maxRunTime > 0 and startTime + maxRunTime < system_time())
+			{
+				kill(pid, SIGINT);
+				killed = true;
+	
+				int status = 0;
+				waitpid(pid, &status, 0);
+	
+				THROW(("%s was killed since its runtime exceeded the limit of %d seconds", args.front(), maxRunTime));
+			}
+			else
+				sleep(1);
 		}
 	}
 	
+	thread.join();
+	
 	close(ofd[0]);
 	close(efd[0]);
-	if (l_in > 0)
-		close(ifd[1]);
 	
 	// no zombies please, removed the WNOHANG. the forked application should really stop here.
 	int status = 0;

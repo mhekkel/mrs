@@ -64,16 +64,24 @@ const boost::regex kM6URLParserRE("(?:ftp|rsync)://" url_userinfo url_host url_p
 
 // --------------------------------------------------------------------
 
-class M6FTPFetcher
+struct M6FetcherImpl
 {
-  public:
-						M6FTPFetcher(const zx::element* inConfig);
-						~M6FTPFetcher();
-	
-	bool				IsOutOfDate();
-	void				Mirror();
+						M6FetcherImpl(const zx::element* inConfig)
+							: mConfig(inConfig) {}
+	virtual				~M6FetcherImpl() {}
 
-  private:
+	virtual void		Work() = 0;
+
+	const zx::element*	mConfig;
+};
+
+// --------------------------------------------------------------------
+
+struct M6FTPFetcherImpl : public M6FetcherImpl
+{
+						M6FTPFetcherImpl(const zx::element* inConfig);
+
+	virtual void		Work();
 
 	void				Login();
 
@@ -119,8 +127,9 @@ class M6FTPFetcher
 	vector<fs::path>	mFilesToDelete;
 };
 
-M6FTPFetcher::M6FTPFetcher(const zx::element* inConfig)
-	: mResolver(mIOService), mSocket(mIOService), mDelete(false)
+M6FTPFetcherImpl::M6FTPFetcherImpl(const zx::element* inConfig)
+	: M6FetcherImpl(inConfig)
+	, mResolver(mIOService), mSocket(mIOService), mDelete(false)
 {
 	mDatabank = inConfig->get_attribute("id");
 	
@@ -135,139 +144,56 @@ M6FTPFetcher::M6FTPFetcher(const zx::element* inConfig)
 	if (not boost::regex_match(src, m, kM6URLParserRE))
 		THROW(("Invalid source url: <%s>", src.c_str()));
 	
-	if (ba::starts_with(src, "rsync://"))
-	{
-		string rsync = M6Config::GetTool("rsync");
-		if (not fs::exists(rsync))
-			THROW(("rsync not found"));
-		
-		vector<const char*> args;
-		args.push_back(rsync.c_str());
-		args.push_back("-ltpvdr");
-		if (mDelete)
-			args.push_back("--delete");
-		args.push_back(src.c_str());
-		
-		if (not ba::ends_with(mSource, "/"))
-		{
-			// strip off the pattern to match files... just rsync everything
-			boost::regex rx("/([^/*?{]*[*?{][^/]*)$");
-			
-			while (boost::regex_search(mSource, m, rx))
-				mSource = m.prefix();
-		}
-		
-		if (mSource.empty())
-			mSource = mDatabank;
-		if (not ba::ends_with(mSource, "/"))
-			mSource += '/';
-		mSource = (fs::path(M6Config::GetDirectory("raw")) / mSource).string();
-		if (ba::contains(mSource, "/../"))
-			THROW(("invalid destination path for rsync"));
+	mServer = m[2];
+	mUser = m[1];
+	if (mUser.empty())
+		mUser = "anonymous";
+	mPort = m[3];
+	if (mPort.empty())
+		mPort = "ftp";
+	mSrcPath = fs::path(m[4].str());
+}
 
-		args.push_back(mSource.c_str());
-		args.push_back(nullptr);
-		
-		for_each(args.begin(), args.end(), [](const char* arg) { if (arg != nullptr) cout << arg << ' '; });
-		
-		string out, err;
-		int r = ForkExec(args, 0, "", out, err);
-		
-		if (not out.empty())
-			cout << out << endl;
-		if (not err.empty())
-			cerr << err << endl;
-		if (r != 0)
-			THROW(("Failed to rsync %s", mDatabank.c_str()));
+void M6FTPFetcherImpl::Work()
+{
+//    string dst = source->get_attribute("dst");
+//    if (dst.empty() and inConfig->find_first("source") != nullptr)
+//    {
+//		fs::path sd(inConfig->find_first("source")->content());
+//		while (not sd.empty() and sd.filename().string().find_first_of("*?") != string::npos)
+//			sd = sd.parent_path();
+//		if (not sd.empty())
+//			dst = sd.string();
+//    }
+//    
+//    if (dst.empty())
+//        dst = inConfig->get_attribute("id");
+//
+//    fs::path rawdir = M6Config::GetDirectory("raw");
+//    mDstDir = rawdir / dst;
+    
+	// Get a list of endpoints corresponding to the server name.
+	at::tcp::resolver::query query(mServer, mPort);
+	at::tcp::resolver::iterator endpoint_iterator = mResolver.resolve(query);
+	at::tcp::resolver::iterator end;
+
+	// Try each endpoint until we successfully establish a connection.
+	boost::system::error_code error = boost::asio::error::host_not_found;
+    while (error && endpoint_iterator != end)
+    {
+		mSocket.close();
+		mSocket.connect(*endpoint_iterator++, error);
 	}
-	else
-	{
-		mServer = m[2];
-		mUser = m[1];
-		if (mUser.empty())
-			mUser = "anonymous";
-		mPort = m[3];
-		if (mPort.empty())
-			mPort = "ftp";
-		mSrcPath = fs::path(m[4].str());
-	
-	//    string dst = source->get_attribute("dst");
-	//    if (dst.empty() and inConfig->find_first("source") != nullptr)
-	//    {
-	//		fs::path sd(inConfig->find_first("source")->content());
-	//		while (not sd.empty() and sd.filename().string().find_first_of("*?") != string::npos)
-	//			sd = sd.parent_path();
-	//		if (not sd.empty())
-	//			dst = sd.string();
-	//    }
-	//    
-	//    if (dst.empty())
-	//        dst = inConfig->get_attribute("id");
-	//
-	//    fs::path rawdir = M6Config::GetDirectory("raw");
-	//    mDstDir = rawdir / dst;
-	    
-		// Get a list of endpoints corresponding to the server name.
-		at::tcp::resolver::query query(mServer, mPort);
-		at::tcp::resolver::iterator endpoint_iterator = mResolver.resolve(query);
-		at::tcp::resolver::iterator end;
-	
-		// Try each endpoint until we successfully establish a connection.
-		boost::system::error_code error = boost::asio::error::host_not_found;
-	    while (error && endpoint_iterator != end)
-	    {
-			mSocket.close();
-			mSocket.connect(*endpoint_iterator++, error);
-		}
-	
-		if (error)
-			throw boost::system::system_error(error);
-	
-		uint32 status = WaitForReply();
-		if (status != 220)
-			Error("Failed to connect");
-	
-		Login();
-	}
-}
 
-M6FTPFetcher::~M6FTPFetcher()
-{
-}
+	if (error)
+		throw boost::system::system_error(error);
 
-void M6FTPFetcher::Error(const char* inError)
-{
-	THROW(("%s: %s\n(trying to access server %s)",
-		inError, mReply.c_str(), mServer.c_str()));
-}
+	uint32 status = WaitForReply();
+	if (status != 220)
+		Error("Failed to connect");
 
-void M6FTPFetcher::Login()
-{
-	uint32 status = SendAndWaitForReply("user", mUser);
-	if (status == 331)
-		status = SendAndWaitForReply("pass", mPassword);
-	if (status != 230 and status != 202)
-		Error("Error logging in");
-}
+	Login();
 
-fs::path M6FTPFetcher::GetPWD()
-{
-	uint32 status = SendAndWaitForReply("pwd", "");
-	if (status != 257)
-		Error("Error getting current working directory");
-	
-	boost::regex re("257 \"((?:[^\"]|\"\")+)\"( .*)?\\s*$");
-	boost::smatch m;
-	if (not boost::regex_match(mReply, m, re))
-		Error("Invalid reply to PWD command");
-	
-	string path = m[1];
-	ba::replace_all(path, "\"\"", "\"");
-	return fs::path(path);
-}
-
-void M6FTPFetcher::Mirror()
-{
 	int64 bytesToFetch = CollectFiles();
 	
 	if (not mFilesToFetch.empty())
@@ -297,12 +223,38 @@ void M6FTPFetcher::Mirror()
 	}
 }
 
-bool M6FTPFetcher::IsOutOfDate()
+void M6FTPFetcherImpl::Error(const char* inError)
 {
-	return CollectFiles() > 0;
+	THROW(("%s: %s\n(trying to access server %s)",
+		inError, mReply.c_str(), mServer.c_str()));
 }
 
-uint32 M6FTPFetcher::SendAndWaitForReply(const string& inCommand, const string& inParam)
+void M6FTPFetcherImpl::Login()
+{
+	uint32 status = SendAndWaitForReply("user", mUser);
+	if (status == 331)
+		status = SendAndWaitForReply("pass", mPassword);
+	if (status != 230 and status != 202)
+		Error("Error logging in");
+}
+
+fs::path M6FTPFetcherImpl::GetPWD()
+{
+	uint32 status = SendAndWaitForReply("pwd", "");
+	if (status != 257)
+		Error("Error getting current working directory");
+	
+	boost::regex re("257 \"((?:[^\"]|\"\")+)\"( .*)?\\s*$");
+	boost::smatch m;
+	if (not boost::regex_match(mReply, m, re))
+		Error("Invalid reply to PWD command");
+	
+	string path = m[1];
+	ba::replace_all(path, "\"\"", "\"");
+	return fs::path(path);
+}
+
+uint32 M6FTPFetcherImpl::SendAndWaitForReply(const string& inCommand, const string& inParam)
 {
 	if (VERBOSE)
 		cerr << "---> " << inCommand << ' ' << inParam << endl;
@@ -315,7 +267,7 @@ uint32 M6FTPFetcher::SendAndWaitForReply(const string& inCommand, const string& 
 	return WaitForReply();
 }
 
-uint32 M6FTPFetcher::WaitForReply()
+uint32 M6FTPFetcherImpl::WaitForReply()
 {
 	boost::asio::streambuf response;
 	boost::asio::read_until(mSocket, response, "\r\n");
@@ -355,7 +307,7 @@ uint32 M6FTPFetcher::WaitForReply()
 	return result;
 }
 
-int64 M6FTPFetcher::CollectFiles()
+int64 M6FTPFetcherImpl::CollectFiles()
 {
 	int64 result = 0;
 	
@@ -383,7 +335,7 @@ int64 M6FTPFetcher::CollectFiles()
 	return result;
 }
 
-int64 M6FTPFetcher::CollectFiles(fs::path inLocalDir, fs::path inRemoteDir, fs::path::iterator p, fs::path::iterator e,
+int64 M6FTPFetcherImpl::CollectFiles(fs::path inLocalDir, fs::path inRemoteDir, fs::path::iterator p, fs::path::iterator e,
 	M6Progress& inProgress)
 {
 	string s = p->string();
@@ -481,7 +433,7 @@ int64 M6FTPFetcher::CollectFiles(fs::path inLocalDir, fs::path inRemoteDir, fs::
 	return result;
 }
 
-void M6FTPFetcher::ListFiles(const string& inPattern,
+void M6FTPFetcherImpl::ListFiles(const string& inPattern,
 	boost::function<void(char, const string&, size_t, time_t)> inProc)
 {
 	uint32 status = SendAndWaitForReply("pasv", "");
@@ -570,7 +522,7 @@ void M6FTPFetcher::ListFiles(const string& inPattern,
 		Error("Error listing");
 }
 
-void M6FTPFetcher::FetchFile(fs::path inRemote, fs::path inLocal, time_t inTime, M6Progress& inProgress)
+void M6FTPFetcherImpl::FetchFile(fs::path inRemote, fs::path inLocal, time_t inTime, M6Progress& inProgress)
 {
 	fs::path local(inLocal.branch_path() / (inLocal.filename().string() + ".tmp"));
 	
@@ -655,16 +607,135 @@ void M6FTPFetcher::FetchFile(fs::path inRemote, fs::path inLocal, time_t inTime,
 	}
 }
 
+// --------------------------------------------------------------------
+
+struct M6RSyncFetcherImpl : public M6FetcherImpl
+{
+						M6RSyncFetcherImpl(const zx::element* inConfig);
+	
+	virtual void		Work();
+};
+
+M6RSyncFetcherImpl::M6RSyncFetcherImpl(const zx::element* inConfig)
+	: M6FetcherImpl(inConfig)
+{
+}
+
+void M6RSyncFetcherImpl::Work()
+{
+	string databank = mConfig->get_attribute("id");
+	
+	zx::element* source = mConfig->find_first("source");
+	string srcdir = source->content();
+
+	string fetch = source->get_attribute("fetch");
+	
+	string rsync = M6Config::GetTool("rsync");
+	if (not fs::exists(rsync))
+		THROW(("rsync not found"));
+	
+	vector<const char*> args;
+	args.push_back(rsync.c_str());
+	args.push_back("-ltpvdn");
+	if (source->get_attribute("recursive") == "true")
+		args.push_back("--recursive");
+	if (source->get_attribute("delete") == "true")
+		args.push_back("--delete");
+	args.push_back(fetch.c_str());
+	
+	bool stripped = false;
+	if (not ba::ends_with(srcdir, "/"))
+	{
+		// strip off the pattern to match files... just rsync everything
+		boost::regex rx("/([^/*?{]*[*?{][^/]*)$");
+		boost::smatch m;
+		
+		while (boost::regex_search(srcdir, m, rx))
+		{
+			stripped = true;
+			srcdir = m.prefix();
+		}
+	}
+	
+	if (stripped)
+	{
+		if (srcdir.empty())
+			srcdir = databank;
+		if (not ba::ends_with(srcdir, "/"))
+			srcdir += '/';
+	}
+	else
+		srcdir = source->content();	// probably a full path to a single file?
+	
+	srcdir = (fs::path(M6Config::GetDirectory("raw")) / srcdir).string();
+	if (ba::contains(srcdir, "/../"))
+		THROW(("invalid destination path for rsync"));
+
+	args.push_back(srcdir.c_str());
+	args.push_back(nullptr);
+	
+	for_each(args.begin(), args.end(), [](const char* arg) { if (arg != nullptr) cout << arg << ' '; });
+	cout << endl;
+	
+	stringstream in;
+	int r = ForkExec(args, 0, in, cout, cerr);
+	
+	if (r != 0)
+		THROW(("Failed to rsync %s", databank.c_str()));
+}
+
+// --------------------------------------------------------------------
+
+class M6Fetcher
+{
+  public:
+						M6Fetcher(const zx::element* inConfig);
+						~M6Fetcher();
+	
+//	bool				IsOutOfDate();
+	void				Mirror();
+
+  private:
+	M6FetcherImpl*		mImpl;
+};
+
+M6Fetcher::M6Fetcher(const zx::element* inConfig)
+	: mImpl(nullptr)
+{
+	zx::element* source = inConfig->find_first("source");
+	if (source == nullptr)
+		THROW(("Missing source?"));
+	
+	string fetch = source->get_attribute("fetch");
+	if (ba::starts_with(fetch, "rsync://"))
+		mImpl = new M6RSyncFetcherImpl(inConfig);
+	else if (ba::starts_with(fetch, "ftp://"))
+		mImpl = new M6FTPFetcherImpl(inConfig);
+	else
+		THROW(("Unsupported URL method in %s", fetch.c_str()));
+}
+
+M6Fetcher::~M6Fetcher()
+{
+	delete mImpl;
+}
+
+void M6Fetcher::Mirror()
+{
+	if (mImpl != nullptr)
+		mImpl->Work();
+}
+
 void M6Fetch(const string& inDatabank)
 {
 	const zx::element* config = M6Config::GetEnabledDatabank(inDatabank);
-	M6FTPFetcher fetch(config);
+	M6Fetcher fetch(config);
 	fetch.Mirror();
 }
 
-bool M6FetchNeeded(const string& inDatabank)
-{
-	const zx::element* config = M6Config::GetEnabledDatabank(inDatabank);
-	M6FTPFetcher fetch(config);
-	return fetch.IsOutOfDate();
-}
+//bool M6FetchNeeded(const string& inDatabank)
+//{
+//	const zx::element* config = M6Config::GetEnabledDatabank(inDatabank);
+//	M6Fetcher fetch(config);
+//	return fetch.IsOutOfDate();
+//}

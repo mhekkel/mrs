@@ -3325,6 +3325,11 @@ int M6Server::Start(const string& inRunAs, const string& inPidFile, bool inForeg
 		//if (vm.count("threads"))
 		//	nrOfThreads = vm["threads"].as<uint32>();
 		RunMainLoop(nrOfThreads);
+		
+		if (not pidfile.empty() and fs::exists(pidfile))
+		{
+			try { fs::remove(pidfile); } catch (...) {}
+		}
 	}
 	
 	return result;
@@ -3350,6 +3355,14 @@ int M6Server::Stop(const string& inPidFile)
 		file >> pid;
 	
 		result = StopDaemon(pid);
+		
+		file.close();
+		try
+		{
+			if (fs::exists(pidfile))
+				fs::remove(pidfile);
+		}
+		catch (...) {}
 	}
 	
 	return result;

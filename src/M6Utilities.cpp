@@ -249,13 +249,13 @@ bool IsPIDFileForExecutable(const fs::path& inPidFile)
 		
 		// if /proc/PID/exe points to our executable, this means we're already running
 		char path[PATH_MAX] = "";
-		if (readlink((boost::format("/proc/%1%/exe") % pid).str().c_str(), path, sizeof(path)) == -1)
-			THROW(("could not get exe path (%s), stale pid file?", strerror(errno)));
-
-		string exe(GetExecutablePath().string());
-
-		result = (exe == path) or
-			(ba::ends_with(path, " (deleted)") and ba::starts_with(path, exe));
+		if (readlink((boost::format("/proc/%1%/exe") % pid).str().c_str(), path, sizeof(path)) == 0)
+		{
+			string exe(GetExecutablePath().string());
+	
+			result = (exe == path) or
+				(ba::ends_with(path, " (deleted)") and ba::starts_with(path, exe));
+		}
 	}
 
 	return result;
@@ -345,10 +345,10 @@ int StopDaemon(int pid)
 	{
 		int status;
 		err = waitpid(pid, &status, 0);
+
+		if (err == -1)
+			cerr << "failed to stop daemon: " << strerror(errno) << endl;
 	}
-	
-	if (err == -1)
-		cerr << "failed to stop daemon: " << strerror(errno) << endl;
 	
 	return err;
 }

@@ -70,7 +70,7 @@ struct M6FetcherImpl
 							: mConfig(inConfig) {}
 	virtual				~M6FetcherImpl() {}
 
-	virtual void		Work() = 0;
+	virtual void		Mirror(bool inDryRun, ostream& out) = 0;
 
 	const zx::element*	mConfig;
 };
@@ -81,7 +81,7 @@ struct M6FTPFetcherImpl : public M6FetcherImpl
 {
 						M6FTPFetcherImpl(const zx::element* inConfig);
 
-	virtual void		Work();
+	virtual void		Mirror(bool inDryRun, ostream& out);
 
 	void				Login();
 
@@ -110,7 +110,6 @@ struct M6FTPFetcherImpl : public M6FetcherImpl
 	at::tcp::socket		mSocket;
 
 	string				mServer, mUser, mPassword, mPort;
-	bool				mDelete;
 	
 	string				mReply;
 	string				mSource;
@@ -129,7 +128,7 @@ struct M6FTPFetcherImpl : public M6FetcherImpl
 
 M6FTPFetcherImpl::M6FTPFetcherImpl(const zx::element* inConfig)
 	: M6FetcherImpl(inConfig)
-	, mResolver(mIOService), mSocket(mIOService), mDelete(false)
+	, mResolver(mIOService), mSocket(mIOService)
 {
 	mDatabank = inConfig->get_attribute("id");
 	
@@ -137,7 +136,6 @@ M6FTPFetcherImpl::M6FTPFetcherImpl(const zx::element* inConfig)
 	if (source == nullptr)
 		THROW(("Missing source?"));
 	mSource = source->content();
-    mDelete = source->get_attribute("delete") == "true";
 
 	string src = source->get_attribute("fetch");
 	boost::smatch m;
@@ -154,8 +152,10 @@ M6FTPFetcherImpl::M6FTPFetcherImpl(const zx::element* inConfig)
 	mSrcPath = fs::path(m[4].str());
 }
 
-void M6FTPFetcherImpl::Work()
+void M6FTPFetcherImpl::Mirror(bool inDryRun, ostream& out)
 {
+	zx::element* source = mConfig->find_first("source");
+
 //    string dst = source->get_attribute("dst");
 //    if (dst.empty() and inConfig->find_first("source") != nullptr)
 //    {
@@ -196,29 +196,43 @@ void M6FTPFetcherImpl::Work()
 
 	int64 bytesToFetch = CollectFiles();
 	
-	if (not mFilesToFetch.empty())
+	if (inDryRun)
 	{
-		M6Progress progress(mDatabank, bytesToFetch, "Fetching");
-		
 		foreach (auto file, mFilesToFetch)
+			out << "fetching " << file.remote << " => " << file.local << endl;
+		
+		if (source->get_attribute("delete") == "true")
 		{
-			progress.Message(string("Fetching ") + file.remote.filename().string());
-
-			if (VERBOSE)
-				cerr << "fetching " << file.remote << " => " << file.local << endl;
-			
-			FetchFile(file.remote, file.local, file.time, progress);
+			foreach (auto del, mFilesToDelete)
+				out << "Deleting " << del << endl;
 		}
 	}
-	
-	if (mDelete)
+	else
 	{
-		foreach (auto del, mFilesToDelete)
+		if (not mFilesToFetch.empty())
 		{
-			if (VERBOSE)
-				cerr << "Deleting " << del << endl;
+			M6Progress progress(mDatabank, bytesToFetch, "Fetching");
 			
-			fs::remove(del);
+			foreach (auto file, mFilesToFetch)
+			{
+				progress.Message(string("Fetching ") + file.remote.filename().string());
+	
+				if (VERBOSE)
+					cerr << "fetching " << file.remote << " => " << file.local << endl;
+				
+				FetchFile(file.remote, file.local, file.time, progress);
+			}
+		}
+		
+		if (source->get_attribute("delete") == "true")
+		{
+			foreach (auto del, mFilesToDelete)
+			{
+				if (VERBOSE)
+					cerr << "Deleting " << del << endl;
+				
+				fs::remove(del);
+			}
 		}
 	}
 }
@@ -613,7 +627,7 @@ struct M6RSyncFetcherImpl : public M6FetcherImpl
 {
 						M6RSyncFetcherImpl(const zx::element* inConfig);
 	
-	virtual void		Work();
+	virtual void		Mirror(bool inDryRun, ostream& out);
 };
 
 M6RSyncFetcherImpl::M6RSyncFetcherImpl(const zx::element* inConfig)
@@ -621,10 +635,12 @@ M6RSyncFetcherImpl::M6RSyncFetcherImpl(const zx::element* inConfig)
 {
 }
 
-void M6RSyncFetcherImpl::Work()
+void M6RSyncFetcherImpl::Mirror(bool inDryRun, ostream& out)
 {
 	string databank = mConfig->get_attribute("id");
 	
+	M6Progress progress(databank, "rsync");
+
 	zx::element* source = mConfig->find_first("source");
 	string srcdir = source->content();
 
@@ -636,11 +652,13 @@ void M6RSyncFetcherImpl::Work()
 	
 	vector<const char*> args;
 	args.push_back(rsync.c_str());
-	args.push_back("-ltpvdn");
+	args.push_back("-ltpvd");
 	if (source->get_attribute("recursive") == "true")
 		args.push_back("--recursive");
 	if (source->get_attribute("delete") == "true")
 		args.push_back("--delete");
+	if (inDryRun)
+		args.push_back("--dry-run");
 	args.push_back(fetch.c_str());
 	
 	bool stripped = false;
@@ -692,8 +710,7 @@ class M6Fetcher
 						M6Fetcher(const zx::element* inConfig);
 						~M6Fetcher();
 	
-//	bool				IsOutOfDate();
-	void				Mirror();
+	void				Mirror(bool inDryRun, ostream& out);
 
   private:
 	M6FetcherImpl*		mImpl;
@@ -720,22 +737,22 @@ M6Fetcher::~M6Fetcher()
 	delete mImpl;
 }
 
-void M6Fetcher::Mirror()
+void M6Fetcher::Mirror(bool inDryRun, ostream& out)
 {
 	if (mImpl != nullptr)
-		mImpl->Work();
+		mImpl->Mirror(inDryRun, out);
 }
 
 void M6Fetch(const string& inDatabank)
 {
 	const zx::element* config = M6Config::GetEnabledDatabank(inDatabank);
 	M6Fetcher fetch(config);
-	fetch.Mirror();
+	fetch.Mirror(false, cout);
 }
 
-//bool M6FetchNeeded(const string& inDatabank)
-//{
-//	const zx::element* config = M6Config::GetEnabledDatabank(inDatabank);
-//	M6Fetcher fetch(config);
-//	return fetch.IsOutOfDate();
-//}
+void M6DryRunFetch(const std::string& inDatabank, ostream& outResult)
+{
+	const zx::element* config = M6Config::GetEnabledDatabank(inDatabank);
+	M6Fetcher fetch(config);
+	fetch.Mirror(true, outResult);
+}

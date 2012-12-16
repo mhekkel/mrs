@@ -161,9 +161,10 @@ sub to_fasta
 
 	my %seq;
 
-	while ($text =~ m/^SEQRES (?:  \d| \d\d|\d\d\d) (.)(?:    \d|   \d\d| \d\d\d|\d\d\d\d)  (.+)/mg)
+	while ($text =~ m/^SEQRES.+/mg)
 	{
-		my ($chainId, $r) = ($1, $2);
+		my $chainId = substr($&, 11, 1);
+		my $r = substr($&, 19);
 
 		$seq{$chainId} = '' unless defined $seq{$chainId};
 		

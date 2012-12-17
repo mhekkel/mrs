@@ -179,7 +179,7 @@ void M6InputDocument::Index(const string& inIndex, M6DataType inDataType,
 	bool isUnique, const char* inText, size_t inSize)
 {
 	bool tokenize = true;
-#pragma message("TODO implement inIndexNrs")
+//#pragma message("TODO implement inIndexNrs")
 	bool inIndexNumbers = true;
 	
 	if (inDataType != eM6TextData)

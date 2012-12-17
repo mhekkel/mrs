@@ -17,12 +17,16 @@ using namespace std;
 namespace zx = zeep::xml;
 namespace fs = boost::filesystem;
 
+#ifndef MRS_ETC_DIR
+#error MRS_ETC_DIR is not defined
+#endif
+
 // --------------------------------------------------------------------
 
 namespace M6Config
 {
 
-fs::path sConfigFile = "/etc/mrs/m6-config.xml";
+fs::path sConfigFile = MRS_ETC_DIR "/m6-config.xml";
 File* sInstance;
 
 File::File()

@@ -1,0 +1,521 @@
+#!/usr/bin/perl
+# 
+# configuration script for MRS
+#
+# Copyright 2007-2011, M.L. Hekkelman. CMBI, Radboud Universiteit Nijmegen
+#
+#	This script works a bit like the GNU configure scripts, it checks whether
+#	the required libraries are available and some other info.
+#	
+
+use strict;
+use warnings;
+use English;
+use Config;
+use Getopt::Long;
+use Data::Dumper;
+use ExtUtils::Embed;
+
+$| = 1;	# flush stdout
+
+my $verbose = 0;
+
+# let's start with a sanity check
+
+die "This version of perl is not supported, please make sure you use at least 5.8\n"
+	unless $PERL_VERSION ge v5.8.0;
+
+die "Perl must be build using ithreads, MRS cannot function without\n"
+	unless $Config{useithreads};
+
+# Now first find out what Perl executable will be used
+
+my $perlpath = $Config{perlpath};
+if ($OSNAME ne 'VMS') {
+	$perlpath .= $Config{_exe}
+		unless $perlpath =~ m/$Config{_exe}$/i;
+}
+
+print "Using perl $perlpath\n";
+
+my %lib_dirs;	# the set of library search paths
+
+my @lib_dirs_guess = (
+	'/usr/lib',
+	'/usr/lib64',
+	'/usr/local/lib',
+	'/usr/local/lib64',
+	'/usr/pkg/lib',
+	'/usr/pkg/lib64',
+	'/opt/local/lib',
+	'/opt/local/lib64'
+);
+
+my %inc_dirs;	# the set of include search paths
+
+my @inc_dirs_guess = (
+	'/usr/include',
+	'/usr/local/include',
+	'/usr/pkg/include',
+	'/opt/local/include',
+);
+
+my @libs = (
+	'm', 'boost_system'
+);
+
+my $host = `hostname -f`; 	chomp($host);
+
+my $mrs_user = `whoami`;
+chomp($mrs_user);
+
+my $port = 18090;
+my $base_url = "http://$host:$port/";
+
+# variables that can be set using flags to ./configure:
+
+# The prefix, sysconf and localstate directories
+my $prefix			= "/usr/local";
+my $sysconfdir		= "/usr/local/etc";
+my $srvdir			= "/srv";
+
+# derived installation directories
+my $bin_dir = "$prefix/bin";
+my $man_dir = "$prefix/man";
+my $data_dir = "$srvdir/m6-data";
+my $log_dir = "$data_dir/log";
+my $config_dir = "$sysconfdir/mrs";
+
+# the compiler to use
+my $cxx = $ENV{CXX};
+$cxx = $ENV{CC} unless defined $cxx;
+$cxx = `which c++` unless defined $cxx;
+chomp($cxx);
+
+my $cxxflags = $ENV{CXXFLAGS};
+$cxxflags = $ENV{CFLAGS} unless defined $cxxflags;
+$cxxflags = '' unless defined $cxxflags;
+
+my ($gcc_major_version, $gcc_minor_version, $gcc_patch_level, $gcc_march);
+
+# The clustalo executable
+my $clustalo = `which clustalo`;
+chomp($clustalo);
+$clustalo = '' unless -x $clustalo;
+
+# The rsync executable
+my $rsync = `which rsync`;
+chomp($rsync);
+$rsync = '' unless -x $rsync;
+
+# The boost variables
+my $boost = "";
+my $no_blast = 0;
+
+# now read in the old make.config file, if it exists
+if (-f 'make.config')
+{
+	print "Reading settings from previous make.config file\n";
+	
+	my $fh;
+	open($fh, "<make.config");
+	while (my $line = <$fh>)
+	{
+		chomp($line);
+		my ($fld, $value) = split(m/\s+\+?=\s*/, $line);
+		next unless defined $fld and defined $value;
+
+		if 		($fld eq 'CXX')			 { $cxx = $value; }
+		elsif	($fld eq 'CXXFLAGS')	 { $cxxflags = $value; }
+		elsif	($fld eq 'RSYNC')		 { $rsync = $value if length($value) > 0; }
+		elsif	($fld eq 'CLUSTALO')	 { $clustalo = $value if length($value) > 0; }
+		elsif	($fld eq 'BIN_DIR')		 { $bin_dir = $value; $prefix = $1 if ($bin_dir =~ m|(.+)/bin$|); }
+		elsif	($fld eq 'MAN_DIR')		 { $man_dir = $value; }
+		elsif	($fld eq 'MRS_ETC_DIR')	 { $config_dir = $value; }
+		elsif	($fld eq 'MRS_LOG_DIR')	 { $log_dir = $value; }
+		elsif	($fld eq 'MRS_DATA_DIR') { $data_dir = $value; }
+		elsif	($fld eq 'MRS_USER')	 { $mrs_user = $value; }
+		elsif	($fld eq 'MRS_BASE_URL') { $base_url = $value; }
+		elsif	($fld eq 'MRS_PORT')	 { $port = $value; }
+		elsif	($fld eq 'BOOST')		 { $boost = $value; }
+	}
+	close($fh);
+}
+
+# That's it, now check the options
+my ($cmd_line_prefix, $cmd_line_configdir, $cmd_line_datadir, $cmd_line_logdir,
+	$cmd_line_mrs_user, $cmd_line_base_url, $cmd_line_port);
+
+&GetOptions(
+	"prefix=s"				=> \$cmd_line_prefix,
+	"config-dir=s"			=> \$cmd_line_configdir,
+	"data-dir=s"			=> \$cmd_line_datadir,
+	"log-dir=s"				=> \$cmd_line_logdir,
+	"cxx=s"					=> \$cxx,
+	"rsync=s"				=> \$rsync,
+	"boost=s"				=> \$boost,
+	"mrs-user=s"			=> \$cmd_line_mrs_user,
+	"base-url=s"			=> \$cmd_line_base_url,
+	"port=n"				=> \$cmd_line_port,
+#	"gcc-march-flag=s"      => \$gcc_march,
+	"verbose"				=> \$verbose,
+	"help"					=> \&Usage);
+
+# a usage subroutine
+
+sub Usage {
+print<<EOF;
+Usage: perl configure [OPTIONS]
+    --help              This help message
+    --prefix            The installation directory prefix string
+                        Default is [$prefix]
+    --config-dir        The directory for configuration files
+                        Default is [$config_dir]
+    --data-dir          The directory where MRS will store its data files.
+                        Default is [$data_dir]
+    --log-dir           The directory where the MRS server will store its log files.
+                        Default is [$log_dir]
+    --mrs-user          User that owns the mrs datafiles. Default is $mrs_user
+    --mrs-base-url      The base URL for the server pages, or the external address,
+    					default is $base_url.
+    --mrs-port          The network port for the server to listen to,
+    					default is $port.
+    --cxx               The compiler to use, must be a GCC >= 4.6 or equivalent.
+                        Default is [$cxx]
+    --boost=[path]      The path where the boost files are installed
+    --rsync             The rsync executable for updating the data.
+    
+EOF
+	exit;
+}
+
+# OK, we have the options, now validate them and then try to build the makefiles and config files
+
+if (defined $cmd_line_prefix)
+{
+	$prefix = $cmd_line_prefix;
+
+	$bin_dir = "$prefix/bin";
+	$man_dir = "$prefix/man";
+	$config_dir = ($prefix eq '/usr' or $prefix eq '/usr/') ? '/etc' : "$prefix/etc/mrs";
+}
+
+$config_dir = $cmd_line_configdir		if (defined $cmd_line_configdir);
+$data_dir = $cmd_line_datadir			if (defined $cmd_line_datadir);
+$log_dir = $cmd_line_logdir				if (defined $cmd_line_logdir);
+$mrs_user = $cmd_line_mrs_user			if (defined $cmd_line_mrs_user);
+$base_url = $cmd_line_base_url			if (defined $cmd_line_base_url);
+$port = $cmd_line_port					if (defined $cmd_line_port);
+
+&ValidateOptions();
+&WriteMakefiles();
+exit;
+
+sub ValidateOptions()
+{
+	# Check the compiler
+	
+	print "Checking for a compiler...";
+
+	my $C_file=<<END;
+#include <iostream>
+int main() { std::cout << __GNUC__ << '\t' << __GNUC_MINOR__ << '\t' << __GNUC_PATCHLEVEL__ << std::endl; return 0; }
+END
+	
+	eval {
+		my $gcc_version = &compile($C_file, $cxx);
+		($gcc_major_version, $gcc_minor_version, $gcc_patch_level) = split(m/\t/, $gcc_version);
+	};
+	
+	if ($@) {
+		die "A compiler error prevented the determination of the version: $@\n";
+	}
+	
+	die "\nThis version of gcc is too old to build MRS\n"
+		unless ($gcc_major_version > 4 or ($gcc_major_version == 4 and $gcc_minor_version >= 6));
+	print " OK\n";
+	
+	# set the C++0x flag
+	$cxxflags .= " -std=c++0x" unless $cxxflags and $cxxflags =~ m/-std=c\+\+0x/;
+	$cxxflags .= " -pthread" unless $cxxflags =~ m/-pthread/;
+	
+	# check the required libraries
+	my ($header_check, $lib_check, @lib_version);
+
+	# boost libraries
+	if ($boost)
+	{
+		$inc_dirs{"$boost/include"} = 1;
+		$lib_dirs{"$boost/lib"} = 1;
+	}
+	
+	$header_check =<<END;
+#include <boost/version.hpp>
+#include <boost/regex.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/thread.hpp>
+#include <iostream>
+int main() { std::cout << BOOST_LIB_VERSION << std::endl; return 0; }
+END
+	
+	my @boost_version;
+	if (not (@boost_version = CheckLib("boost", $header_check, undef))
+		or length(@boost_version) == 0 or not defined $boost_version[0])
+	{
+		die "\n\nCannot continue since you don't seem to have boost installed\n",
+			"Please install the libboost-dev, libboost-thread-dev,\n",
+			"libboost-regex-dev and libboost-filesystem-dev packages and run configure again.\n";
+	}
+
+	@boost_version = split(m/_/, $boost_version[0]);
+	
+	die "MRS needs boost version 1.48 or higher\n" unless $boost_version[1] >= 48;
+
+	# libz
+	
+	$header_check =<<END;
+#include <zlib.h>
+#include <iostream>
+int main() { std::cout << ZLIB_VERSION; return 0; }
+END
+
+	$lib_check =<<END;
+#include <zlib.h>
+int main() { z_stream_s s; inflateInit(&s); return 0; }
+END
+
+	if (not CheckLib("z", $header_check, $lib_check))
+	{
+		die "\n\nCannot continue since you don't seem to have zlib installed\n",
+			"Please install the zlib-dev package and run configure again.\n";
+	}
+	
+	push @libs, 'z';
+	
+	# libbz2
+	
+	$header_check =<<END;
+#include <bzlib.h>
+#include <iostream>
+int main() { std::cout << 1 << '\t' << 0; return 0; }
+END
+
+	$lib_check =<<END;
+#include <bzlib.h>
+int main() { bz_stream s; BZ2_bzCompressInit(&s, 0, 0, 0); return 0; }
+END
+
+	if (not CheckLib("bz2", $header_check, $lib_check))
+	{
+		die "\n\nCannot continue since you don't seem to have bzlib installed\n",
+			"Please install the libbz2-dev package and run configure again.\n";
+	}
+	
+	push @libs, 'bz2';
+	
+	# libperl
+	
+	$cxxflags = sprintf("$cxxflags %s %s", &perl_inc(), &ldopts());
+	$cxxflags =~ s/\s+/ /g;
+	
+	$header_check =<<END;
+#include "EXTERN.h"
+#include "perl.h"
+#include "XSUB.h"
+#include <iostream>
+int main() { std::cout << 1 << '\t' << 0; return 0; }
+END
+
+	$lib_check =<<END;
+#include "EXTERN.h"
+#include "perl.h"
+#include "XSUB.h"
+int main()
+{ 
+	int argc = 0;
+	const char* env[] = { nullptr };
+	const char* argv[] = { nullptr };
+	PERL_SYS_INIT3(&argc, (char***)&argv, (char***)&env);
+	return 0;
+}
+END
+	if (not CheckLib("perl", $header_check, $lib_check))
+	{
+		die "\n\nCannot continue since libperl is not installed correctly\n",
+			"Please install the libperl-dev package and run configure again\n";
+	}
+}
+
+sub CheckLib
+{
+	my ($libname, $header_check, $lib_check, $cxx_options) = @_;
+
+	print "Checking for lib${libname}...";
+	
+	my ($header_ok, $lib_ok, $lib_version);
+	
+	if (defined $header_check)
+	{
+		eval {
+			$lib_version = &compile($header_check, $cxx, $cxx_options);
+			$header_ok = 1;
+		};
+	
+		if ($@)
+		{
+			foreach my $d ( @inc_dirs_guess )
+			{
+				if (-d $d)
+				{
+					eval { $lib_version = &compile($header_check, "$cxx -I$d", $cxx_options); };
+					next if ($@);
+					$header_ok = 1;
+					$inc_dirs{$d} = 1;
+					last;
+				}
+			}
+		}
+	}
+	else
+	{
+		$header_ok = 1;
+	}
+
+	if ($header_ok and defined $lib_check)
+	{
+		foreach my $lib_dir ( @lib_dirs_guess )
+		{
+			eval {
+				my $lib_version_2 = &compile($lib_check, "$cxx ", "-L${lib_dir} -l${libname}", $cxx_options);
+				$lib_version = $lib_version_2
+					unless defined $lib_version and
+							length($lib_version) > length($lib_version_2);
+				$lib_version = 1 unless defined $lib_version;
+				$lib_ok = 1;
+			};
+		
+			next if ($@);
+
+			$lib_dirs{$lib_dir} = 1;
+			last;
+		}
+	}
+	
+	if ($header_ok and (not defined $lib_check or $lib_ok))
+	{
+		print " OK\n" ;
+		return split(m/\t/, $lib_version);
+	}
+	
+	return undef;
+}
+
+sub WriteMakefiles()
+{
+	# Now write a make.config file in the plugin directory
+	
+	print "Creating make.config file...";
+	
+	my $inc_paths = join(" ", keys %inc_dirs);
+	my $lib_paths = join(" ", keys %lib_dirs);
+	
+	my $libs = join(" ", reverse @libs);
+	
+	my $no_blast_def = "";
+	$no_blast_def = "DEFINES       += NO_BLAST\n" if $no_blast;
+
+	my $opt = "-O2";
+	
+	if (defined $gcc_march) {
+		$opt = "$opt $gcc_march" unless $gcc_march eq 'none';
+	}
+	elsif ($gcc_major_version == 4 and $gcc_minor_version >= 2) {
+		$opt = "$opt -march=native";
+	}
+
+	my $make_config =<<EOF;
+MRS_USER      = $mrs_user
+MRS_BASE_URL  = $base_url
+MRS_PORT      = $port
+CXX           = $cxx
+PERL          = $perlpath
+CLUSTALO      = $clustalo
+RSYNC         = $rsync
+BOOST         = $boost
+BIN_DIR       = $bin_dir
+MAN_DIR       = $man_dir
+MRS_ETC_DIR   = $config_dir
+MRS_DATA_DIR  = $data_dir
+MRS_LOG_DIR   = $log_dir
+EOF
+
+	open MCFG, ">make.config" or die "Could not open the file make.config for writing!\n";
+	print MCFG $make_config;
+	close MCFG;
+	
+	print<<EOF;
+done
+
+The new make.config contains:
+
+$make_config
+EOF
+}
+
+# utility routines
+sub compile
+{
+	my ($code, $cxx, $ld_options, $cxx_options) = @_;
+	
+	foreach my $inc_dir (keys %inc_dirs)
+	{
+		next unless length($inc_dir) > 0;
+		die "geen compiler?" unless defined $cxx;
+		$inc_dir = "" unless defined $inc_dir;
+		$cxx = "$cxx -I$inc_dir";
+	}
+	
+	$cxx = "$cxx $cxx_options" if defined $cxx_options;
+	$cxx = "$cxx $cxxflags";
+	
+	$ld_options = "" unless defined $ld_options;
+	
+	foreach my $lib_dir (keys %lib_dirs)
+	{
+		$ld_options = "$ld_options -L$lib_dir";
+	}
+	
+	foreach my $lib (@libs)
+	{
+		$ld_options = "$ld_options -l$lib";
+	}
+	
+	my $r;
+	our ($n);
+
+	++$n;
+	
+	my $bn = "gcc_test_$$-$n";
+	
+	open F, ">/tmp/$bn.cpp";
+	print F $code;
+	close F;
+
+	my $err = `$cxx -o /tmp/$bn.out /tmp/$bn.cpp $ld_options 2>&1`;
+	if ($verbose)
+	{
+		print STDERR "\n\ncc: $cxx -o /tmp/$bn.out /tmp/$bn.cpp $ld_options 2>&1\n";
+		print STDERR "\nerr: $err\n" if length($err) > 0;
+	}
+	die "Could not compile: $err\n" unless -x "/tmp/$bn.out";
+	
+	$r = `/tmp/$bn.out`;
+	print STDERR ("r: $r\n") if $verbose;
+	chomp($r) if defined $r;
+
+	unlink("/tmp/$bn.out", "/tmp/$bn.cpp");
+	
+	return $r;
+}
+
+ 

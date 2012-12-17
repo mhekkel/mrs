@@ -959,7 +959,8 @@ int main(int argc, char* argv[])
 				 << "    fetch       Fetch/mirror remote data for a databank" << endl
 				 << "    info        Display information and statistics for a databank" << endl
 				 << "    query       Perform a search in a databank" << endl
-				 << "    vacuum      Clean up a databank removing unused data" << endl
+				 << "    server      Start or Stop a server session, or query the status" << endl
+				 << "    vacuum      Clean up a databank reclaiming unused disk space" << endl
 				 << "    validate    Perform a set of validation tests" << endl
 				 << "    update      Same as build, but does a fetch first" << endl
 				 << "    password    Generate password for use in configuration file" << endl

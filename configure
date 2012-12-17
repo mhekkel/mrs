@@ -68,7 +68,8 @@ my $host = `hostname -f`; 	chomp($host);
 my $mrs_user = `whoami`;
 chomp($mrs_user);
 
-my $base_url = "http://$host:18090/";
+my $port = 18090;
+my $base_url = "http://$host:$port/";
 
 # variables that can be set using flags to ./configure:
 
@@ -134,13 +135,15 @@ if (-f 'make.config')
 		elsif	($fld eq 'MRS_DATA_DIR') { $data_dir = $value; }
 		elsif	($fld eq 'MRS_USER')	 { $mrs_user = $value; }
 		elsif	($fld eq 'MRS_BASE_URL') { $base_url = $value; }
+		elsif	($fld eq 'MRS_PORT')	 { $port = $value; }
 		elsif	($fld eq 'BOOST')		 { $boost = $value; }
 	}
 	close($fh);
 }
 
 # That's it, now check the options
-my ($cmd_line_prefix, $cmd_line_configdir, $cmd_line_datadir, $cmd_line_logdir, $cmd_line_mrs_user, $cmd_line_base_url);
+my ($cmd_line_prefix, $cmd_line_configdir, $cmd_line_datadir, $cmd_line_logdir,
+	$cmd_line_mrs_user, $cmd_line_base_url, $cmd_line_port);
 
 &GetOptions(
 	"prefix=s"				=> \$cmd_line_prefix,
@@ -152,6 +155,7 @@ my ($cmd_line_prefix, $cmd_line_configdir, $cmd_line_datadir, $cmd_line_logdir, 
 	"boost=s"				=> \$boost,
 	"mrs-user=s"			=> \$cmd_line_mrs_user,
 	"base-url=s"			=> \$cmd_line_base_url,
+	"port=n"				=> \$cmd_line_port,
 #	"gcc-march-flag=s"      => \$gcc_march,
 	"verbose"				=> \$verbose,
 	"help"					=> \&Usage);
@@ -173,6 +177,8 @@ Usage: perl configure [OPTIONS]
     --mrs-user          User that owns the mrs datafiles. Default is $mrs_user
     --mrs-base-url      The base URL for the server pages, or the external address,
     					default is $base_url.
+    --mrs-port          The network port for the server to listen to,
+    					default is $port.
     --cxx               The compiler to use, must be a GCC >= 4.6 or equivalent.
                         Default is [$cxx]
     --boost=[path]      The path where the boost files are installed
@@ -198,6 +204,7 @@ $data_dir = $cmd_line_datadir			if (defined $cmd_line_datadir);
 $log_dir = $cmd_line_logdir				if (defined $cmd_line_logdir);
 $mrs_user = $cmd_line_mrs_user			if (defined $cmd_line_mrs_user);
 $base_url = $cmd_line_base_url			if (defined $cmd_line_base_url);
+$port = $cmd_line_port					if (defined $cmd_line_port);
 
 &ValidateOptions();
 &WriteMakefiles();
@@ -396,6 +403,7 @@ sub WriteMakefiles()
 	my $make_config =<<EOF;
 MRS_USER      = $mrs_user
 MRS_BASE_URL  = $base_url
+MRS_PORT      = $port
 CXX           = $cxx
 PERL          = $perlpath
 CLUSTALO      = $clustalo

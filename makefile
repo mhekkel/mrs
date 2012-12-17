@@ -18,6 +18,7 @@ MRS_LOG_DIR			?= $(MRS_DATA_DIR)log/
 MRS_ETC_DIR			?= /usr/local/etc/mrs/
 
 MRS_BASE_URL		?= http://$(shell hostname -f)/
+MRS_PORT			?= 18090
 MRS_USER			?= $(shell whoami)
 
 PERL				?= $(which perl)
@@ -109,6 +110,8 @@ $(OBJDIR)/sqlite.o: src/sqlite-amalgamation/sqlite3.c
 	@ echo ">>" $<
 	@ $(CXX) -x c -MD -c -o $@ $< $(CFLAGS)
 
+$(OBJDIR)/M6Config.o: make.config
+
 include $(OBJECTS:%.o=%.d)
 
 $(OBJECTS:.o=.d):
@@ -121,34 +124,43 @@ libzeep/libzeep.a:
 
 clean:
 	rm -rf $(OBJDIR)/* m6
+	
+INSTALLDIRS = \
+	$(MRS_LOG_DIR) \
+	$(MRS_ETC_DIR) \
+	$(MRS_DATA_DIR)/raw \
+	$(MRS_DATA_DIR)/mrs \
+	$(MRS_DATA_DIR)/blast-cache \
+	$(MRS_DATA_DIR)/parsers \
+	$(MRS_DATA_DIR)/docroot
 
-config/m6-config.xml: config/m6-config.xml.dist
+install: m6
+	for d in $(INSTALLDIRS); do \
+		install $(MRS_USER:%=-o %) -m755 -d $$d; \
+	done
+	for d in `find docroot -type d | grep -v .svn`; do \
+		install $(MRS_USER:%=-o %) -m755 -d $(MRS_DATA_DIR)/$$d; \
+	done
+	for f in `find docroot -type f | grep -v .svn`; do \
+		install $(MRS_USER:%=-o %) -m644 $$f $(MRS_DATA_DIR)/$$f; \
+	done
+	for f in `find parsers -type f | grep -v .svn`; do \
+		install $(MRS_USER:%=-o %) -m644 $$f $(MRS_DATA_DIR)/$$f; \
+	done
+	install $(MRS_USER:%=-o %) -m444 config/m6-config.dtd $(MRS_ETC_DIR)/m6-config.dtd
 	sed -e 's|__MRS_DATA_DIR__|$(MRS_DATA_DIR)|g' \
 		-e 's|__MRS_LOG_DIR__|$(MRS_LOG_DIR)|g' \
 		-e 's|__MRS_USER__|$(MRS_USER)|g' \
 		-e 's|__MRS_BASE_URL__|$(MRS_BASE_URL)|g' \
+		-e 's|__MRS_PORT__|$(MRS_PORT)|g' \
 		-e 's|__RSYNC__|$(RSYNC)|g' \
 		-e 's|__CLUSTALO__|$(CLUSTALO)|g' \
-		$@.dist > $@
-	
-INSTALLDIRS = $(MRS_LOG_DIR) $(MRS_ETC_DIR) $(MRS_DATA_DIR)/raw $(MRS_DATA_DIR)/mrs $(MRS_DATA_DIR)/blast-cache \
-	$(MRS_DATA_DIR)/parsers $(MRS_DATA_DIR)/docroot
-
-install: m6 config/m6-config.xml
-	for d in $(INSTALLDIRS); do \
-		install $(MRS_USER:%=-o %) -m775 -d $$d; \
-	done
-	for d in `find docroot -type d | grep -v .svn`; do \
-		install $(MRS_USER:%=-o %) -d $(MRS_DATA_DIR)/$$d; \
-	done
-	for f in `find docroot -type f | grep -v .svn`; do \
-		install $(MRS_USER:%=-o %) -m664 $$f $(MRS_DATA_DIR)/$$f; \
-	done
-	for f in `find parsers -type f | grep -v .svn`; do \
-		install $(MRS_USER:%=-o %) -m664 $$f $(MRS_DATA_DIR)/$$f; \
-	done
-	install $(MRS_USER:%=-o %) -m444 config/m6-config.dtd $(MRS_ETC_DIR)/m6-config.dtd
-	install $(MRS_USER:%=-o %) -m664 config/m6-config.xml $(MRS_ETC_DIR)/m6-config.xml
+		config/m6-config.xml.dist > /tmp/m6-config.xml.dist
+	install $(MRS_USER:%=-o %) -m644 /tmp/m6-config.xml.dist $(MRS_ETC_DIR)/m6-config.xml.dist
+	if [ ! -f $(MRS_ETC_DIR)/m6-config.xml ]; then \
+		install $(MRS_USER:%=-o %) -m644 /tmp/m6-config.xml.dist $(MRS_ETC_DIR)/m6-config.xml; \
+	fi
+	rm /tmp/m6-config.xml.dist
 	install -m755 m6 $(BIN_DIR)/m6
 
 DIST = m6-$(VERSION)
@@ -162,7 +174,4 @@ dist:
 	rm -rf $(DIST)
 	
 make.config:
-	@echo "creating empty make.config file"
-	@echo "# Set local options for make here" > make.config
-	@echo "#CXX			= $(HOME)/bin/c++			# at least version 4.6 of gcc or equivalent" >> make.config
-	@echo "#BOOST		= $(HOME)/projects/boost	# at least version 1.48 of Boost" >> make.config
+	@ echo "Please run configure before running make" && exit 1

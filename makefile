@@ -123,28 +123,33 @@ clean:
 	rm -rf $(OBJDIR)/* m6
 
 config/m6-config.xml: config/m6-config.xml.dist
-	sed -e 's|__DATA_DIR__|$(DATADIR)|g' \
-		-e 's|__SCRIPT_DIR__|$(SCRIPTDIR)|g' \
+	sed -e 's|__MRS_DATA_DIR__|$(MRS_DATA_DIR)|g' \
+		-e 's|__MRS_LOG_DIR__|$(MRS_LOG_DIR)|g' \
+		-e 's|__MRS_USER__|$(MRS_USER)|g' \
+		-e 's|__MRS_BASE_URL__|$(MRS_BASE_URL)|g' \
+		-e 's|__RSYNC__|$(RSYNC)|g' \
+		-e 's|__CLUSTALO__|$(CLUSTALO)|g' \
 		$@.dist > $@
 	
-INSTALLDIRS = $(MRSLOGDIR) $(MRSETCDIR) $(MRSDIR)/raw $(MRSDIR)/mrs $(MRSDIR)/blast-cache \
-	$(MRSDIR)/parsers $(MRSDIR)/docroot
+INSTALLDIRS = $(MRS_LOG_DIR) $(MRS_ETC_DIR) $(MRS_DATA_DIR)/raw $(MRS_DATA_DIR)/mrs $(MRS_DATA_DIR)/blast-cache \
+	$(MRS_DATA_DIR)/parsers $(MRS_DATA_DIR)/docroot
 
-install: m6
+install: m6 config/m6-config.xml
 	for d in $(INSTALLDIRS); do \
-		install $(MRSUSER:%=-o %) -m775 -d $$d; \
+		install $(MRS_USER:%=-o %) -m775 -d $$d; \
 	done
 	for d in `find docroot -type d | grep -v .svn`; do \
-		install $(MRSUSER:%=-o %) -d $(MRSDIR)/$$d; \
+		install $(MRS_USER:%=-o %) -d $(MRS_DATA_DIR)/$$d; \
 	done
 	for f in `find docroot -type f | grep -v .svn`; do \
-		install $(MRSUSER:%=-o %) -m664 $$f $(MRSDIR)/$$f; \
+		install $(MRS_USER:%=-o %) -m664 $$f $(MRS_DATA_DIR)/$$f; \
 	done
 	for f in `find parsers -type f | grep -v .svn`; do \
-		install $(MRSUSER:%=-o %) -m664 $$f $(MRSDIR)/$$f; \
+		install $(MRS_USER:%=-o %) -m664 $$f $(MRS_DATA_DIR)/$$f; \
 	done
-	install $(MRSUSER:%=-o %) -m444 config/m6-config.dtd $(MRSETCDIR)/m6-config.dtd
-	install $(MRSUSER:%=-o %) -m664 config/m6-config.xml $(MRSETCDIR)/m6-config.xml
+	install $(MRS_USER:%=-o %) -m444 config/m6-config.dtd $(MRS_ETC_DIR)/m6-config.dtd
+	install $(MRS_USER:%=-o %) -m664 config/m6-config.xml $(MRS_ETC_DIR)/m6-config.xml
+	install -m755 m6 $(BIN_DIR)/m6
 
 DIST = m6-$(VERSION)
 	

@@ -3,17 +3,17 @@
 <m6-config>
   <!-- Paths where all the data and files are stored -->
   <directories>
-    <directory id="mrs">__MRS_DIR__</directory>
-    <directory id="raw">__RAW_DIR__</directory>
-    <directory id="log">__LOG_DIR__</directory>
-    <directory id="blast">__BLAST_CACHE_DIR__</directory>
-    <directory id="parser">__PARSER_DIR__</directory>
-    <directory id="docroot">__DOCROOT__</directory>
+    <directory id="mrs">__MRS_DATA_DIR__/mrs</directory>
+    <directory id="raw">__MRS_DATA_DIR__/raw</directory>
+    <directory id="log">__MRS_LOG_DIR__</directory>
+    <directory id="blast">__MRS_DATA_DIR__/blast-cache</directory>
+    <directory id="parser">__MRS_DATA_DIR__/parsers</directory>
+    <directory id="docroot">__MRS_DATA_DIR__/docroot</directory>
   </directories>
   <!-- Tools section, specify external executables used by M6 -->
   <tools>
-    <tool id="clustalo">/usr/bin/clustalo</tool>
-    <tool id="rsync">/usr/bin/rsync</tool>
+    <tool id="clustalo">__CLUSTALO__</tool>
+    <tool id="rsync">__RSYNC__</tool>
   </tools>
   <!-- Scheduler section -->
   <scheduler enabled="true" time="20:00" weekday="friday"/>
@@ -22,9 +22,9 @@
 <!--    <user name="scott" realm="M6 Administrator" password="b92ff7d60b994c8a0d2941ad9349e841"/>-->
   </users>
   <!-- Server section -->
-  <server addr="0.0.0.0" port="18090" user="__MRS_USER__" pidfile="__RUN_FILE__">
+  <server addr="0.0.0.0" port="18090" user="__MRS_USER__" pidfile="__MRS_DATA_DIR__/log/m6.pid">
     <admin realm="M6 Administrator"/>
-    <base-url>__BASE_URL__</base-url>
+    <base-url>__MRS_BASE_URL__</base-url>
     <web-service service="mrsws_search" ns="http://mrs.cmbi.ru.nl/mrsws/mrsws_search" location="mrsws/search"/>
     <web-service service="mrsws_blast" ns="http://mrs.cmbi.ru.nl/mrsws/mrsws_blast" location="mrsws/blast"/>
   </server>

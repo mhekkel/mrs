@@ -10,33 +10,38 @@ VERSION				= 6.0.0b1
 include make.config
 
 # Directories where MRS will be installed
-BINDIR				?= /usr/local/bin
-MANDIR				?= /usr/local/man/man3
+BIN_DIR				?= /usr/local/bin
+MAN_DIR				?= /usr/local/man/man3
 
-MRSBASEURL			= http://localhost:18090/
-MRSDIR				?= /data
-MRSLOGDIR			?= /var/log/mrs
-MRSETCDIR			?= /usr/local/etc/mrs
-#MRSUSER				?= dba
+MRS_DATA_DIR		?= /srv/m6-data/
+MRS_LOG_DIR			?= $(MRS_DATA_DIR)log/
+MRS_ETC_DIR			?= /usr/local/etc/mrs/
 
-PERL				?= /usr/bin/perl
+MRS_BASE_URL		?= http://$(shell hostname -f)/
+MRS_USER			?= $(shell whoami)
+
+PERL				?= $(which perl)
 
 # in case you have boost >= 1.48 installed somewhere else on your disk
 #BOOST_LIB_SUFFIX	= # e.g. '-mt', not usually needed anymore
-BOOST				= $(HOME)/projects/boost
+BOOST				?= $(HOME)/projects/boost
 BOOST_LIB_DIR		= $(BOOST)/lib
 BOOST_INC_DIR		= $(BOOST)/include
 
-BOOST_LIBS			= system thread filesystem regex math_c99 math_c99f program_options date_time iostreams chrono timer random
+DEFINES				+= MRS_ETC_DIR='"$(MRS_ETC_DIR)"' \
+					   MRS_USER='"$(MRS_USER)"' 
+
+BOOST_LIBS			= system thread filesystem regex math_c99 math_c99f program_options date_time iostreams timer random chrono
 BOOST_LIBS			:= $(BOOST_LIBS:%=boost_%$(BOOST_LIB_SUFFIX))
 LIBS				= m pthread rt z bz2
 
 CXX					?= c++
 
-CXXFLAGS			+= -std=c++0x
+CXXFLAGS			?= -std=c++0x
 CFLAGS				+= $(BOOST_INC_DIR:%=-I%) -I. -pthread -I libzeep/
 CFLAGS				+= -Wno-deprecated -Wno-multichar 
 CFLAGS				+= $(shell $(PERL) -MExtUtils::Embed -e perl_inc)
+CFLAGS				+= $(DEFINES:%=-D%)
 
 LDFLAGS				+= $(LIBS:%=-l%) $(BOOST_LIB_DIR:%=-L %) $(BOOST_LIBS:%=-l%) -g -L libzeep/ 
 LDFLAGS				+= $(shell $(PERL) -MExtUtils::Embed -e ldopts)
@@ -122,13 +127,15 @@ config/m6-config.xml: config/m6-config.xml.dist
 		-e 's|__SCRIPT_DIR__|$(SCRIPTDIR)|g' \
 		$@.dist > $@
 	
-INSTALLDIRS = $(MRSLOGDIR) $(MRSETCDIR) $(MRSDIR)/raw  $(MRSDIR)/mrs $(MRSDIR)/blast-cache \
-	 $(MRSDIR)/docroot/scripts $(MRSDIR)/docroot/css $(MRSDIR)/docroot/formats $(MRSDIR)/docroot/images \
-	 $(MRSDIR)/docroot/help 
+INSTALLDIRS = $(MRSLOGDIR) $(MRSETCDIR) $(MRSDIR)/raw $(MRSDIR)/mrs $(MRSDIR)/blast-cache \
+	$(MRSDIR)/parsers $(MRSDIR)/docroot
 
 install: m6
 	for d in $(INSTALLDIRS); do \
-		install $(MRSUSER:%=-o %) -m664 -d $$d; \
+		install $(MRSUSER:%=-o %) -m775 -d $$d; \
+	done
+	for d in `find docroot -type d | grep -v .svn`; do \
+		install $(MRSUSER:%=-o %) -d $(MRSDIR)/$$d; \
 	done
 	for f in `find docroot -type f | grep -v .svn`; do \
 		install $(MRSUSER:%=-o %) -m664 $$f $(MRSDIR)/$$f; \
@@ -136,6 +143,8 @@ install: m6
 	for f in `find parsers -type f | grep -v .svn`; do \
 		install $(MRSUSER:%=-o %) -m664 $$f $(MRSDIR)/$$f; \
 	done
+	install $(MRSUSER:%=-o %) -m444 config/m6-config.dtd $(MRSETCDIR)/m6-config.dtd
+	install $(MRSUSER:%=-o %) -m664 config/m6-config.xml $(MRSETCDIR)/m6-config.xml
 
 DIST = m6-$(VERSION)
 	

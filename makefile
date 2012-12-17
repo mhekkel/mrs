@@ -123,7 +123,7 @@ libzeep/libzeep.a:
 	$(MAKE) -C libzeep BOOST=$(BOOST) CXX=$(CXX)
 
 clean:
-	rm -rf $(OBJDIR)/* m6
+	rm -rf $(OBJDIR)/* m6 config/m6-config.xml
 	
 INSTALLDIRS = \
 	$(MRS_LOG_DIR) \
@@ -135,20 +135,24 @@ INSTALLDIRS = \
 	$(MRS_DATA_DIR)/docroot
 
 install: m6
-	for d in $(INSTALLDIRS); do \
+	@ echo "Creating directories"
+	@ for d in $(INSTALLDIRS); do \
 		install $(MRS_USER:%=-o %) -m755 -d $$d; \
 	done
-	for d in `find docroot -type d | grep -v .svn`; do \
+	@ for d in `find docroot -type d | grep -v .svn`; do \
 		install $(MRS_USER:%=-o %) -m755 -d $(MRS_DATA_DIR)/$$d; \
 	done
-	for f in `find docroot -type f | grep -v .svn`; do \
+	@ echo "Copying files"
+	@ for f in `find docroot -type f | grep -v .svn`; do \
 		install $(MRS_USER:%=-o %) -m644 $$f $(MRS_DATA_DIR)/$$f; \
 	done
-	for f in `find parsers -type f | grep -v .svn`; do \
+	@ for f in `find parsers -type f | grep -v .svn`; do \
 		install $(MRS_USER:%=-o %) -m644 $$f $(MRS_DATA_DIR)/$$f; \
 	done
-	install $(MRS_USER:%=-o %) -m444 config/m6-config.dtd $(MRS_ETC_DIR)/m6-config.dtd
-	sed -e 's|__MRS_DATA_DIR__|$(MRS_DATA_DIR)|g' \
+	@ install -m755 m6 $(BIN_DIR)/m6
+	@ echo "Creating configuration file"
+	@ install $(MRS_USER:%=-o %) -m444 config/m6-config.dtd $(MRS_ETC_DIR)/m6-config.dtd
+	@ sed -e 's|__MRS_DATA_DIR__|$(MRS_DATA_DIR)|g' \
 		-e 's|__MRS_LOG_DIR__|$(MRS_LOG_DIR)|g' \
 		-e 's|__MRS_USER__|$(MRS_USER)|g' \
 		-e 's|__MRS_BASE_URL__|$(MRS_BASE_URL)|g' \
@@ -156,15 +160,21 @@ install: m6
 		-e 's|__RSYNC__|$(RSYNC)|g' \
 		-e 's|__CLUSTALO__|$(CLUSTALO)|g' \
 		config/m6-config.xml.dist > /tmp/m6-config.xml.dist
-	install $(MRS_USER:%=-o %) -m644 /tmp/m6-config.xml.dist $(MRS_ETC_DIR)/m6-config.xml.dist
-	if [ ! -f $(MRS_ETC_DIR)/m6-config.xml ]; then \
+	@ install $(MRS_USER:%=-o %) -m644 /tmp/m6-config.xml.dist $(MRS_ETC_DIR)/m6-config.xml.dist
+	@ if [ ! -f $(MRS_ETC_DIR)/m6-config.xml ]; then \
 		install $(MRS_USER:%=-o %) -m644 /tmp/m6-config.xml.dist $(MRS_ETC_DIR)/m6-config.xml; \
+		echo ""; \
+		echo ""; \
+		echo "     PLEASE NOTE"; \
+		echo ""; \
+		echo "Don't forget to create an admin user for the MRS server by running the command $(BIN_DIR)/m6 password"; \
+		echo ""; \
+		echo ""; \
 	fi
-	rm /tmp/m6-config.xml.dist
-	install -m755 m6 $(BIN_DIR)/m6
+	@ rm /tmp/m6-config.xml.dist
 
 DIST = m6-$(VERSION)
-	
+
 dist:
 	rm -rf $(DIST)
 	svn export . $(DIST)

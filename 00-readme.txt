@@ -6,18 +6,47 @@ You need to have the following to build MRS from source code:
 
 - gcc 4.6
 - libboost >= 1.48
-	(1.46 is possible, but you have to modify the makefile in that case)
 - libperl-dev			Development files for Perl
-- sqlite development files for version 3
-- libzeep 2.9			can be downloaded from
-							https://svn.cmbi.ru.nl/libzeep/trunk/
-- libarchive development files
 
-There's no configuration script anymore, just type make.
+Then run:
+
+./configure
+make
+make install
+
+You can set several options using the configure script, see ./configure --help
+to see which options are available.
+
+After installing you have a single executable called 'm6'. This program works with command as the first parameter followed by options depending on the command.
+
+  Command can be one of:
+
+    blast       Do a blast search
+    build       (Re-)build a databank
+    dump        Dump index data
+    entry       Retrieve and print an entry
+    fetch       Fetch/mirror remote data for a databank
+    info        Display information and statistics for a databank
+    query       Perform a search in a databank
+    server      Start or Stop a server session, or ask the status
+    vacuum      Clean up a databank reclaiming unused disk space
+    validate    Perform a set of validation tests
+    update      Same as build, but does a fetch first
+    password    Generate password for use in configuration file
+
+The first thing you should do after installing MRS 6 is run the password command and add a new user/password for the admin account. The password is stored encrypted in the configuration file. You then start a server using the command:
+
+	m6 server start
+
+If this was successful you can now access the MRS website at the address of the local machine and the port specified (default: 18090). Use your web browser to go to this address and click the Admin link on the right top of the page. Then follow the instructions there.
+
+The default setup will automatically update the enabled databanks. You can update databanks manually as well of course using the 'm6 update db' command.
+
+
 
 For Windows:
 
-I've copied the text from the previous MRS readme here, hope it is still correct :-)
+I've copied the text from the previous MRS readme here. It must be out of date by now, I'll fix this asap.
 
 To build MRS using Microsoft Visual Studio 2010 you need the following:
 

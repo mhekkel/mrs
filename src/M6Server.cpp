@@ -363,6 +363,50 @@ M6Databank* M6Server::Load(const string& inDatabank)
 	return result;
 }
 
+tr1::tuple<M6Databank*,uint32> M6Server::GetEntryDatabankAndNr(const string& inDatabank, const string& inID)
+{
+	string db = inDatabank;
+
+	string id = inID;
+	M6Tokenizer::CaseFold(id);
+
+	M6Databank* mdb = Load(db);
+	uint32 docNr = 0;
+
+	if (mdb == nullptr and not id.empty())
+	{
+		foreach (string adb, UnAlias(db))
+		{
+			mdb = Load(adb);
+			if (mdb != nullptr)
+			{
+				bool exists;
+				tr1::tie(exists, docNr) = mdb->Exists("id", id);
+				if (exists)
+				{
+					db = adb;
+					break;
+				}
+			}
+		}
+	}
+	
+	if (mdb == nullptr)
+		THROW(("Databank %s not loaded", db.c_str()));
+
+	if (docNr == 0)
+	{
+		bool exists;
+		tr1::tie(exists, docNr) = mdb->Exists("id", id);
+		if (not exists)
+			THROW(("Entry %s does not exist in databank %s", id.c_str(), db.c_str()));
+		if (docNr == 0)
+			THROW(("Multiple entries with ID %s in databank %s", id.c_str(), db.c_str()));
+	}
+	
+	return tr1::make_tuple(mdb, docNr);
+}
+
 string M6Server::GetEntry(M6Databank* inDatabank, const string& inFormat, uint32 inDocNr)
 {
 	unique_ptr<M6Document> doc(inDatabank->Fetch(inDocNr));
@@ -407,6 +451,16 @@ string M6Server::GetEntry(M6Databank* inDatabank,
 		THROW(("Entry %s not found", inValue.c_str()));
 
 	return GetEntry(inDatabank, inFormat, docNr);
+}
+
+string M6Server::GetEntry(const string& inDB, const string& inID, const string& inFormat)
+{
+	M6Databank* db;
+	uint32 docNr;
+	
+	tr1::tie(db, docNr) = GetEntryDatabankAndNr(inDB, inID);
+	
+	return GetEntry(db, inFormat, docNr);
 }
 
 void M6Server::Find(const string& inDatabank, const string& inQuery, bool inAllTermsRequired,
@@ -722,10 +776,6 @@ void M6Server::handle_download(const zh::request& request, const el::scope& scop
 	string format = params.get("format", "entry").as<string>();
 	string db = params.get("db", "").as<string>();
 
-	M6Databank* mdb = Load(db);
-	if (mdb == nullptr)
-		THROW(("Databank %s not loaded", db.c_str()));
-	
 	string id;
 	stringstream ss;
 	uint32 n = 0;
@@ -735,12 +785,12 @@ void M6Server::handle_download(const zh::request& request, const el::scope& scop
 		if (p.first == "id")
 		{
 			id = p.second.as<string>();
-			ss << GetEntry(mdb, format, "id", id);
+			ss << GetEntry(db, id, format);
 			++n;
 		}
 		else if (p.first == "nr")
 		{
-			ss << GetEntry(mdb, format, boost::lexical_cast<uint32>(p.second.as<string>()));
+			ss << GetEntry(Load(db), format, boost::lexical_cast<uint32>(p.second.as<string>()));
 			++n;
 		}
 	}
@@ -955,7 +1005,13 @@ void M6Server::handle_entry(const zh::request& request, const el::scope& scope, 
 void M6Server::highlight_query_terms(zx::element* node, boost::regex& expr)
 {
 	foreach (zx::element* e, *node)
+	{
+		// do not highlight script, style or head blocks
+		if (e->name() == "script" or e->name() == "head" or e->name() == "style")
+			continue;
+		
 		highlight_query_terms(e, expr);
+	}
 
 	foreach (zx::node* n, node->nodes())
 	{
@@ -2136,41 +2192,7 @@ void M6Server::handle_rest_entry(const zh::request& request, const el::scope& sc
 	if (db.empty())
 		THROW(("No db specified"));
 
-	M6Databank* mdb = Load(db);
-	uint32 docNr = 0;
-
-	if (mdb == nullptr and not id.empty())
-	{
-		foreach (string adb, UnAlias(db))
-		{
-			mdb = Load(adb);
-			if (mdb != nullptr)
-			{
-				bool exists;
-				tr1::tie(exists, docNr) = mdb->Exists("id", id);
-				if (exists)
-				{
-					db = adb;
-					break;
-				}
-			}
-		}
-	}
-	
-	if (mdb == nullptr)
-		THROW(("Databank %s not loaded", db.c_str()));
-
-	if (docNr == 0)
-	{
-		bool exists;
-		tr1::tie(exists, docNr) = mdb->Exists("id", id);
-		if (not exists)
-			THROW(("Entry %s does not exist in databank %s", id.c_str(), db.c_str()));
-		if (docNr == 0)
-			THROW(("Multiple entries with ID %s in databank %s", id.c_str(), db.c_str()));
-	}
-
-	reply.set_content(GetEntry(mdb, format, docNr), "text/plain");
+	reply.set_content(GetEntry(db, id, format), "text/plain");
 }
 
 void M6Server::handle_rest_find(const zh::request& request, const el::scope& scope, zh::reply& reply)
@@ -2908,10 +2930,7 @@ void M6Server::handle_align(const zh::request& request, const el::scope& scope, 
 			if (t.size() < 2 or t.size() > 3)
 				THROW(("Invalid parameters passed for align"));
 			
-			M6Databank* mdb = Load(t[0]);
-			if (mdb == nullptr)
-				THROW(("Databank %s not loaded", t[0].c_str()));
-			fasta += GetEntry(mdb, "fasta", "id", t[1]);
+			fasta += GetEntry(t[0], t[1], "fasta");
 		}
 
 		sub.put("input", el::object(fasta));

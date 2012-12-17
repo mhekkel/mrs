@@ -7,30 +7,26 @@
     <directory id="raw">/data/raw</directory>
     <directory id="log">/data/log</directory>
     <directory id="blast">/data/blast-cache</directory>
-    <directory id="parser">/home/maarten/projects/m6/parsers</directory>
-    <directory id="docroot">/home/maarten/projects/m6/docroot</directory>
-    <!--    <directory id="parser">C:\Users\maarten\projects\m6\parsers</directory>
-    <directory id="docroot">C:\Users\maarten\projects\m6\docroot</directory> -->
+    <directory id="parser">/data/parsers</directory>
+    <directory id="docroot">/data/docroot</directory>
   </directories>
   <!-- Tools section, specify external executables used by M6 -->
   <tools>
-    <!--		<tool id="clustalo">C:\Users\maarten\bin\clustal-omega\clustalo.exe</tool>-->
-    <tool id="clustalo">C:\Users\maarten\bin\clustal-omega\clustalo.exe</tool>
-    <tool id="rsync"></tool>
+    <tool id="clustalo">/usr/bin/clustalo</tool>
+    <tool id="rsync">/usr/bin/rsync</tool>
   </tools>
   <!-- Scheduler section -->
   <scheduler enabled="true" time="20:00" weekday="friday"/>
-  <!-- Users section -->
+  <!-- Users section, users can be added or modified using the command "m6 password" -->
   <users>
-    <user name="scott" realm="M6 Administrator" password="b92ff7d60b994c8a0d2941ad9349e841"/>
-    <user name="admin" realm="M6 Administrator" password="5cab446b28bd84f1903e809e38d35fa6"/>
+   <user name="scott" realm="M6 Administrator" password="b92ff7d60b994c8a0d2941ad9349e841"/>
   </users>
   <!-- Server section -->
-  <server addr="0.0.0.0" port="18090" user="nobody" pidfile="/var/run/m6.pid">
+  <server addr="0.0.0.0" port="18091" user="maarten" pidfile="/data/log/m6.pid">
     <admin realm="M6 Administrator"/>
-    <base-url>http://lord-jim.cmbi.umcn.nl:18090/</base-url>
-    <web-service service="search" ns="http://mrs.cmbi.ru.nl/mrsws/search" location="mrsws/search"/>
-    <web-service service="blast" ns="http://mrs.cmbi.ru.nl/mrsws/blast" location="mrsws/blast"/>
+    <base-url>http://mrs.cmbi.ru.nl:18091/</base-url>
+    <web-service service="mrsws_search" ns="http://mrs.cmbi.ru.nl/mrsws/mrsws_search" location="mrsws/search"/>
+    <web-service service="mrsws_blast" ns="http://mrs.cmbi.ru.nl/mrsws/mrsws_blast" location="mrsws/blast"/>
   </server>
   <!-- Formats section, formats are used to add links to entries and
 		 to link a JavaScript pretty printer -->
@@ -123,7 +119,7 @@
     <databank id="embl" parser="embl" format="embl" enabled="true" update="weekly" fasta="false">
       <name>EMBL</name>
       <info>http://www.ebi.ac.uk/embl/index.html</info>
-      <source delete="false">embl_release/*.dat.gz</source>
+      <source delete="true" fetch="rsync://rsync.cmbi.ru.nl/embl_release/">embl_release/*.dat.gz</source>
     </databank>
     <databank id="enzyme" parser="enzyme" format="enzyme" enabled="true" update="daily" fasta="false">
       <name>Enzyme</name>
@@ -151,7 +147,7 @@
     <databank id="genbank" parser="genbank" enabled="true" update="weekly" fasta="false">
       <name>Genbank</name>
       <info>http://www.ncbi.nlm.nih.gov/genbank/</info>
-      <source delete="false">genbank/*.seq.gz</source>
+      <source delete="true" fetch="rsync://ftp.ncbi.nih.gov/genbank/">genbank/*.seq.gz</source>
       <aliases>
         <alias name="Genbank Identifier">gi</alias>
       </aliases>
@@ -159,21 +155,17 @@
     <databank id="refseq" parser="genbank" enabled="true" update="weekly" fasta="false">
       <name>Refseq</name>
       <info>http://www.ncbi.nlm.nih.gov/RefSeq/</info>
-      <source delete="false">refseq/release/complete/*g{p,b}ff.gz</source>
+      <source delete="true" fetch="rsync://ftp.ncbi.nih.gov/refseq/release/complete/">refseq/release/complete/*g{p,b}ff.gz</source>
     </databank>
     <databank id="taxonomy" parser="taxonomy" format="taxonomy" enabled="true" update="daily" fasta="false">
       <name>Taxonomy</name>
       <info>http://www.ncbi.nlm.nih.gov/entrez/query.fcgi?db=Taxonomy</info>
       <source fetch="ftp://ftp.ebi.ac.uk/pub/databases" delete="false">taxonomy/taxonomy.dat</source>
     </databank>
-    <databank id="nlwiki" parser="dbest" enabled="false" update="never" fasta="false">
-      <name>Wikipedia - Nederlandstalig</name>
-      <source delete="false">nlwiki/nlwiki-latest-pages-articles.xml.bz2</source>
-    </databank>
     <databank id="pdb" parser="pdb" enabled="true" update="daily" fasta="true">
       <name>PDB</name>
       <info>http://www.rcsb.org/pdb/</info>
-      <source delete="true" fetch="rsync://rsync.cmbi.ru.nl/pdb/">pdb/divided/??/pdb????.ent.gz</source>
+      <source delete="true" fetch="ftp://ftp.cmbi.ru.nl/pub/molbio/data">pdb/divided/??/pdb????.ent.gz</source>
     </databank>
     <databank id="dssp" parser="dssp" enabled="true" update="daily" fasta="false">
       <name>DSSP</name>
@@ -219,7 +211,7 @@
     <databank id="dbest" parser="dbest" enabled="false" update="never" fasta="false">
       <name>dbEST</name>
       <info>http://www.ncbi.nlm.nih.gov/dbEST/</info>
-      <source delete="true" fetch="ftp://ftp.ncbi.nih.gov/repository">dbEST/dbEST.reports.*.gz</source>
+      <source delete="true" fetch="rsync://ftp.ncbi.nih.gov/repository/dbEST/">dbEST/dbEST.reports.*.gz</source>
     </databank>
     <databank id="pfama" parser="pfam" format="stockholm" enabled="true" update="weekly" fasta="false">
       <aliases>
@@ -290,19 +282,5 @@
       <info>http://www.pubmedcentral.nih.gov/</info>
       <source fetch="ftp://ftp.ncbi.nih.gov/pub" delete="false">pmc/articles*.tar.gz</source>
     </databank>
-    <!-- databanks used in debugging m6 -->
-    <!--		<databank id="pdb-mini" parser="pdb">-->
-    <!--			<name>PDB mini</name>-->
-    <!--			<info>http://www.rcsb.org/pdb/</info>-->
-    <!--			<source>pdb/cr/pdb?cr?.ent.gz</source>-->
-    <!--		</databank>-->
-    <!--		<databank id="sprot-mini" parser="uniprot">-->
-    <!--			<name>SwissProt mini</name>-->
-    <!--			<source>uniprot/sprot-mini.dat</source>-->
-    <!--		</databank>-->
-    <!--		<databank id="embl-mini" parser="embl" format="embl">-->
-    <!--			<name>EMBL mini</name>-->
-    <!--			<source>embl_release/rel_est_vrl_01_r113.dat.gz</source>-->
-    <!--		</databank>-->
   </databanks>
 </m6-config>

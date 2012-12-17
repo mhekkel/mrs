@@ -5,6 +5,10 @@
 #    (See accompanying file LICENSE_1_0.txt or copy at
 #          http://www.boost.org/LICENSE_1_0.txt)
 
+VERSION				= 6.0.0b1
+
+include make.config
+
 # Directories where MRS will be installed
 BINDIR				?= /usr/local/bin
 MANDIR				?= /usr/local/man/man3
@@ -19,20 +23,22 @@ PERL				?= /usr/bin/perl
 
 # in case you have boost >= 1.48 installed somewhere else on your disk
 #BOOST_LIB_SUFFIX	= # e.g. '-mt', not usually needed anymore
-#BOOST_LIB_DIR		= $(HOME)/projects/boost/lib
-#BOOST_INC_DIR		= $(HOME)/projects/boost/include
+BOOST				= $(HOME)/projects/boost
+BOOST_LIB_DIR		= $(BOOST)/lib
+BOOST_INC_DIR		= $(BOOST)/include
 
-BOOST_LIBS			= system thread filesystem regex math_c99 math_c99f program_options date_time iostreams timer random
+BOOST_LIBS			= system thread filesystem regex math_c99 math_c99f program_options date_time iostreams chrono timer random
 BOOST_LIBS			:= $(BOOST_LIBS:%=boost_%$(BOOST_LIB_SUFFIX))
-LIBS				= m pthread zeep rt sqlite3
+LIBS				= m pthread rt z bz2
 
-CXX					= c++
+CXX					?= c++
 
-CFLAGS				+= $(BOOST_INC_DIR:%=-I%) -I. -pthread -std=c++0x -I../libzeep/
+CXXFLAGS			+= -std=c++0x
+CFLAGS				+= $(BOOST_INC_DIR:%=-I%) -I. -pthread -I libzeep/
 CFLAGS				+= -Wno-deprecated -Wno-multichar 
 CFLAGS				+= $(shell $(PERL) -MExtUtils::Embed -e perl_inc)
 
-LDFLAGS				+= $(LIBS:%=-l%) $(BOOST_LIBS:%=-l%) -g -L ../libzeep/ 
+LDFLAGS				+= $(LIBS:%=-l%) $(BOOST_LIB_DIR:%=-L %) $(BOOST_LIBS:%=-l%) -g -L libzeep/ 
 LDFLAGS				+= $(shell $(PERL) -MExtUtils::Embed -e ldopts)
 
 OBJDIR				= obj
@@ -47,7 +53,7 @@ endif
 ifeq ($(PROFILE),1)
 CFLAGS				+= -pg
 LDFLAGS				+= -pg
-OBJDIR				:= $(OBJDIR).Profile
+OBJDIR				:= $(OBJDIR).profile
 endif
 
 VPATH += src
@@ -82,16 +88,21 @@ OBJECTS = \
 	$(OBJDIR)/M6Utilities.o \
 	$(OBJDIR)/M6WSBlast.o \
 	$(OBJDIR)/M6WSSearch.o \
+	$(OBJDIR)/sqlite.o \
 
 all: m6 config/m6-config.xml
 
-m6: $(OBJECTS)
+m6: $(OBJECTS) libzeep/libzeep.a
 	@ echo ">>" $@
-	@ $(CXX) $(BOOST_INC_DIR:%=-I%) -o $@ -I. $^ $(LDFLAGS)
+	@ $(CXX) -o $@ -I. $^ $(LDFLAGS)
 
 $(OBJDIR)/%.o: %.cpp | $(OBJDIR)
 	@ echo ">>" $<
-	@ $(CXX) -MD -c -o $@ $< $(CFLAGS)
+	@ $(CXX) -MD -c -o $@ $< $(CFLAGS) $(CXXFLAGS)
+
+$(OBJDIR)/sqlite.o: src/sqlite-amalgamation/sqlite3.c
+	@ echo ">>" $<
+	@ $(CXX) -x c -MD -c -o $@ $< $(CFLAGS)
 
 include $(OBJECTS:%.o=%.d)
 
@@ -99,6 +110,9 @@ $(OBJECTS:.o=.d):
 
 $(OBJDIR):
 	@ test -d $@ || mkdir -p $@
+
+libzeep/libzeep.a:
+	$(MAKE) -C libzeep BOOST=$(BOOST) CXX=$(CXX)
 
 clean:
 	rm -rf $(OBJDIR)/* m6
@@ -122,4 +136,19 @@ install: m6
 	for f in `find parsers -type f | grep -v .svn`; do \
 		install $(MRSUSER:%=-o %) -m664 $$f $(MRSDIR)/$$f; \
 	done
+
+DIST = m6-$(VERSION)
 	
+dist:
+	rm -rf $(DIST)
+	svn export . $(DIST)
+	svn export ../libzeep $(DIST)/libzeep
+	rm -rf $(DIST)/test $(DIST)/libzeep/tests
+	tar cvjf $(DIST).tbz $(DIST)/
+	rm -rf $(DIST)
+	
+make.config:
+	@echo "creating empty make.config file"
+	@echo "# Set local options for make here" > make.config
+	@echo "#CXX			= $(HOME)/bin/c++			# at least version 4.6 of gcc or equivalent" >> make.config
+	@echo "#BOOST		= $(HOME)/projects/boost	# at least version 1.48 of Boost" >> make.config

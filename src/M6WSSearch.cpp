@@ -246,22 +246,18 @@ void M6WSSearch::GetIndices(const string& inDatabank, vector<WSSearchNS::Index>&
 void M6WSSearch::GetEntry(const string& inDatabank, const string& inID,
 	WSSearchNS::Format inFormat, string& outEntry)
 {
-	M6Databank* db = mServer.Load(inDatabank);
-	if (db == nullptr)
-		THROW(("Databank %s not loaded", inDatabank.c_str()));
-	
 	switch (inFormat)
 	{
 		case WSSearchNS::plain:
-			outEntry = mServer.GetEntry(db, "plain", "id", inID);
+			outEntry = mServer.GetEntry(inDatabank, inID, "plain");
 			break;
 		
 		case WSSearchNS::title:
-			outEntry = mServer.GetEntry(db, "title", "id", inID);
+			outEntry = mServer.GetEntry(inDatabank, inID, "title");
 			break;
 		
 		case WSSearchNS::fasta:
-			outEntry = mServer.GetEntry(db, "fasta", "id", inID);
+			outEntry = mServer.GetEntry(inDatabank, inID, "fasta");
 			break;
 		
 		default:
@@ -272,11 +268,7 @@ void M6WSSearch::GetEntry(const string& inDatabank, const string& inID,
 void M6WSSearch::GetEntryLinesMatchingRegularExpression(
 	const string& inDatabank, const string& inID, const string& inRE, string& outText)
 {
-	M6Databank* db = mServer.Load(inDatabank);
-	if (db == nullptr)
-		THROW(("Databank %s not loaded", inDatabank.c_str()));
-	
-	istringstream s(mServer.GetEntry(db, "plain", "id", inID));
+	istringstream s(mServer.GetEntry(inDatabank, inID, "plain"));
 	ostringstream result;
 	
 	boost::regex re(inRE);
@@ -369,6 +361,17 @@ void M6WSSearch::Find(const string& db, const vector<string>& queryterms,
 			}
 
 			response.push_back(result);
+		}
+	}
+	else
+	{
+		if (maxresultcount <= 0)
+			maxresultcount = 5;
+
+		foreach (const string& adb, mServer.UnAlias(db))
+		{
+			Find(adb, queryterms, algorithm, alltermsrequired, booleanfilter,
+				resultoffset, maxresultcount, response);
 		}
 	}
 }
@@ -511,19 +514,34 @@ void M6WSSearch::FindBoolean(const string& inDatabank, const WSSearchNS::Boolean
 			response.push_back(result);
 		}
 	}
+	else
+	{
+		if (maxresultcount <= 0)
+			maxresultcount = 5;
+
+		foreach (const string& db, mServer.UnAlias(inDatabank))
+			FindBoolean(db, inQuery, resultoffset, maxresultcount, response);
+	}
 }
 
 void M6WSSearch::GetLinked(const string& db, const string& id,
-	const string& linkedDb, int resultoffset, int maxresultcount, vector<WSSearchNS::FindResult>& response)
+	const string& linkedDb, int resultoffset, int maxresultcount,
+	vector<WSSearchNS::FindResult>& response)
 {
-	M6Databank* msdb = mServer.Load(db);
-	M6Databank* mddb = mServer.Load(linkedDb);
+	M6Databank* sdb;
+	M6Databank* ddb;
+	uint32 docNr;
 	
-	if (msdb == nullptr or mddb == nullptr)
-		THROW(("Databank not loaded"));
+	tr1::tie(sdb, docNr) = mServer.GetEntryDatabankAndNr(db, id);
+	if (sdb == nullptr)
+		THROW(("entry %s not found in %s", id.c_str(), db.c_str()));
+	
+	ddb = mServer.Load(linkedDb);
+	if (ddb == nullptr)
+		THROW(("linked databank not loaded"));
 	
 	// Collect the links
-	unique_ptr<M6Iterator> iter(mddb->GetLinkedDocuments(db, id));
+	unique_ptr<M6Iterator> iter(ddb->GetLinkedDocuments(db, id));
 
 	if (iter)
 	{
@@ -542,7 +560,7 @@ void M6WSSearch::GetLinked(const string& db, const string& id,
 		{
 			WSSearchNS::Hit h;
 				
-			unique_ptr<M6Document> doc(mddb->Fetch(docNr));
+			unique_ptr<M6Document> doc(ddb->Fetch(docNr));
 				
 			h.id = doc->GetAttribute("id");
 			h.title = doc->GetAttribute("title");
@@ -563,8 +581,7 @@ void M6WSSearch::FindSimilar(const std::string& db, const std::string& id, WSSea
 
 void M6WSSearch::Count(const std::string& db, const std::string& booleanquery, uint32& response)
 {
-	mServer.log() << "UNIMPLEMENTED: " << BOOST_CURRENT_FUNCTION << endl;
-	THROW(("Unimplemented SOAP call"));
+	response = mServer.Count(db, booleanquery);
 }
 
 void M6WSSearch::Cooccurrence(const std::string& db, const std::vector<std::string>& ids, float idf_cutoff, int resultoffset, int maxresultcount, std::vector<std::string>& terms)

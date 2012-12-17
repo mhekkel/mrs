@@ -4,6 +4,8 @@
 #include <map>
 #include <set>
 
+#include <boost/tr1/tuple.hpp>
+
 #include <zeep/http/webapp.hpp>
 #include <zeep/http/webapp/el.hpp>
 #include <zeep/dispatcher.hpp>
@@ -62,9 +64,13 @@ class M6Server : public zh::webapp
 	};
 	typedef std::vector<M6BlastDatabank> M6BlastDbList;
 
+	std::tr1::tuple<M6Databank*,uint32>
+					GetEntryDatabankAndNr(const std::string& inDatabank, const std::string& inID);
 	std::string		GetEntry(M6Databank* inDatabank, const std::string& inFormat, uint32 inDocNr);
 	std::string		GetEntry(M6Databank* inDatabank, const std::string& inFormat,
 						const std::string& inIndex, const std::string& inValue);
+	std::string		GetEntry(const std::string& inDB, const std::string& inID,
+						const std::string& inFormat);
 
 	void			Find(const std::string& inDatabank, const std::string& inQuery,
 						bool inAllTermsRequired, uint32 inResultOffset,

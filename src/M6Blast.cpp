@@ -1073,8 +1073,11 @@ struct HitData
 };
 
 HitData::HitData(const char* inEntry, const sequence& inTarget)
-	: mDefLine(inEntry, strchr(inEntry, '\n')), mTarget(inTarget)
+	: mTarget(inTarget)
 {
+	const char* b = inEntry;
+	const char* e = strchr(inEntry, '\n');
+	mDefLine.assign(b, e);
 }
 
 void HitData::AddHsp(const HspData& inHsp)

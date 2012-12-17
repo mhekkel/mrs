@@ -12,7 +12,6 @@ use strict;
 use warnings;
 use English;
 use Config;
-use Sys::Hostname;
 use Getopt::Long;
 use Data::Dumper;
 
@@ -64,8 +63,7 @@ my @libs = (
 	'm', 'boost_system'
 );
 
-my $os = `uname -s`;	chomp($os);
-my $host = hostname;
+my $host = `hostname -f`; 	chomp($host);
 
 my $mrs_user = `whoami`;
 chomp($mrs_user);
@@ -142,9 +140,7 @@ if (-f 'make.config')
 }
 
 # That's it, now check the options
-my ($cmd_line_prefix, $cmd_line_configdir, $cmd_line_datadir, $cmd_line_logdir, $cmd_line_mrs_user, $cmd_line_mrs_base_url)
-		=
-   ($prefix, $config_dir, $data_dir, $log_dir, $mrs_user, $base_url);
+my ($cmd_line_prefix, $cmd_line_configdir, $cmd_line_datadir, $cmd_line_logdir, $cmd_line_mrs_user, $cmd_line_base_url);
 
 &GetOptions(
 	"prefix=s"				=> \$cmd_line_prefix,
@@ -155,7 +151,7 @@ my ($cmd_line_prefix, $cmd_line_configdir, $cmd_line_datadir, $cmd_line_logdir, 
 	"rsync=s"				=> \$rsync,
 	"boost=s"				=> \$boost,
 	"mrs-user=s"			=> \$cmd_line_mrs_user,
-	"mrs-base-url=s"		=> \$cmd_line_mrs_base_url,
+	"base-url=s"			=> \$cmd_line_base_url,
 #	"gcc-march-flag=s"      => \$gcc_march,
 	"verbose"				=> \$verbose,
 	"help"					=> \&Usage);
@@ -194,15 +190,14 @@ if (defined $cmd_line_prefix)
 
 	$bin_dir = "$prefix/bin";
 	$man_dir = "$prefix/man";
-	
-	$config_dir = "$prefix/etc/mrs"
-		unless ($prefix eq "/usr" or defined $cmd_line_configdir);
+	$config_dir = ($prefix eq '/usr' or $prefix eq '/usr/') ? '/etc' : "$prefix/etc/mrs";
 }
 
 $config_dir = $cmd_line_configdir		if (defined $cmd_line_configdir);
 $data_dir = $cmd_line_datadir			if (defined $cmd_line_datadir);
+$log_dir = $cmd_line_logdir				if (defined $cmd_line_logdir);
 $mrs_user = $cmd_line_mrs_user			if (defined $cmd_line_mrs_user);
-$base_url = $cmd_line_mrs_base_url	if (defined $cmd_line_mrs_base_url);
+$base_url = $cmd_line_base_url			if (defined $cmd_line_base_url);
 
 &ValidateOptions();
 &WriteMakefiles();
@@ -398,41 +393,32 @@ sub WriteMakefiles()
 		$opt = "$opt -march=native";
 	}
 
-	open MCFG, ">make.config" or die "Could not open the file make.config for writing!\n";
-	
-print MCFG<<EOF;
-# These variables were set up by the configure script
-# 
-
-# general info
-
+	my $make_config =<<EOF;
 MRS_USER      = $mrs_user
 MRS_BASE_URL  = $base_url
-
-# Applications
-
 CXX           = $cxx
 PERL          = $perlpath
 CLUSTALO      = $clustalo
 RSYNC         = $rsync
-
-# location of libraries and headers
-
 BOOST         = $boost
-
-# paths
-
-PREFIX        = $prefix
 BIN_DIR       = $bin_dir
 MAN_DIR       = $man_dir
 MRS_ETC_DIR   = $config_dir
 MRS_DATA_DIR  = $data_dir
 MRS_LOG_DIR   = $log_dir
 EOF
-	
+
+	open MCFG, ">make.config" or die "Could not open the file make.config for writing!\n";
+	print MCFG $make_config;
 	close MCFG;
 	
-	print " done\n";
+	print<<EOF;
+done
+
+The new make.config contains:
+
+$make_config
+EOF
 }
 
 # utility routines

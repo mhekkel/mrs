@@ -134,7 +134,8 @@ int ForkExec(vector<const char*>& args, double maxRunTime, istream& in, ostream&
 				if (not WriteFile(hInputWrite, buffer, k, &w, nullptr) or
 					w != k)
 				{
-					cerr << "Error writing to pipe";
+					cerr << "Error writing to pipe " << ::GetLastError() << endl;
+					return;
 				}
 
 				if (w > 0)
@@ -260,14 +261,92 @@ struct M6ProcessImpl
 
 	boost::thread	mThread;
 	int32			mRefCount;
-	string			mCommand;
-	istream&		mRawData;
+	bool			mRunning;
+	HANDLE			mHOutputRead, mHProcess;
 };
 
 M6ProcessImpl::M6ProcessImpl(const string& inCommand, istream& inRawData)
-	: mRefCount(1), mCommand(inCommand), mRawData(inRawData)
+	: mRefCount(1), mRunning(false), mHOutputRead(nullptr)
 {
 	mOFD[0] = mOFD[1] = nullptr;
+
+	SECURITY_ATTRIBUTES sa = { 0 };
+	sa.nLength = sizeof(sa);
+	sa.bInheritHandle = true;
+	
+	HANDLE hInputWriteTmp, hInputRead, hInputWrite;
+	HANDLE hOutputReadTmp, hOutputRead, hOutputWrite;
+	
+	if (not CreatePipe(&hOutputReadTmp, &hOutputWrite, &sa, 0) or
+		not CreatePipe(&hInputRead, &hInputWriteTmp, &sa, 0) or
+		
+		not DuplicateHandle(GetCurrentProcess(), hOutputReadTmp,
+							GetCurrentProcess(), &hOutputRead,
+							0, false, DUPLICATE_SAME_ACCESS) or
+		not DuplicateHandle(GetCurrentProcess(), hInputWriteTmp,
+							GetCurrentProcess(), &hInputWrite,
+							0, false, DUPLICATE_SAME_ACCESS) or
+
+		not CloseHandle(hOutputReadTmp) or
+		not CloseHandle(hInputWriteTmp))
+	{
+		THROW(("Error creating pipes"));
+	}
+
+	mThread = boost::thread([&inRawData, hInputWrite]() {
+		char buffer[1024];
+		
+		while (not inRawData.eof())
+		{
+			streamsize k = io::read(inRawData, buffer, sizeof(buffer));
+			
+			if (k == -1)
+				break;
+
+			const char* b = buffer;
+			
+			while (k > 0)
+			{
+				DWORD w;
+				if (not WriteFile(hInputWrite, buffer, k, &w, nullptr) or
+					w != k)
+				{
+					cerr << "Error writing to pipe " << ::GetLastError() << endl;
+					return;	// what else
+				}
+
+				if (w > 0)
+					b += w, k -= w;
+			}
+		}
+		
+		if (hInputWrite != nullptr)
+			CloseHandle(hInputWrite);
+	});
+	
+	STARTUPINFOA si = { 0 };
+	si.cb = sizeof(si);
+	si.dwFlags = STARTF_USESTDHANDLES;
+	si.hStdInput = hInputRead;
+	si.hStdOutput = hOutputWrite;
+	si.hStdError = hOutputWrite;
+
+	const char* cwd = nullptr;
+
+	PROCESS_INFORMATION pi;
+	mRunning = CreateProcessA(nullptr, const_cast<char*>(inCommand.c_str()), nullptr, nullptr, true,
+		CREATE_NEW_PROCESS_GROUP, nullptr, const_cast<char*>(cwd), &si, &pi);
+
+	CloseHandle(hOutputWrite);
+	CloseHandle(hInputRead);
+
+	if (mRunning)
+	{
+		CloseHandle(pi.hThread);
+		mHProcess = pi.hProcess;
+	}
+
+	mHOutputRead = hOutputRead;
 }
 
 M6ProcessImpl::~M6ProcessImpl()
@@ -277,6 +356,12 @@ M6ProcessImpl::~M6ProcessImpl()
 		mThread.interrupt();
 		mThread.join();
 	}
+
+	if (mHProcess != nullptr)
+		CloseHandle(mHProcess);
+
+	if (mHOutputRead != nullptr)
+		CloseHandle(mHOutputRead);
 }
 
 void M6ProcessImpl::Reference()
@@ -292,84 +377,30 @@ void M6ProcessImpl::Release()
 
 streamsize M6ProcessImpl::read(char* s, streamsize n)
 {
-	if (mOFD[0] == nullptr)
+	streamsize result = -1;
+	
+	while (mHOutputRead != nullptr and n > 0)
 	{
-		boost::mutex m;
-		boost::condition c;
-		boost::mutex::scoped_lock lock(m);
+		char buffer[1024];
+		DWORD rr, avail;
 		
-		mThread = boost::thread([this, &c]()
+		if (mHOutputRead)
 		{
-			try
+			if (not PeekNamedPipe(mHOutputRead, nullptr, 0, nullptr, &avail, nullptr))
 			{
-				SECURITY_ATTRIBUTES sa = { sizeof(SECURITY_ATTRIBUTES) };
-				sa.bInheritHandle = true;
-				
-				HANDLE ifd[2];
-				
-				::CreatePipe(&ifd[0], &ifd[1], &sa, 0);
-				::SetHandleInformation(ifd[1], HANDLE_FLAG_INHERIT, 0); 
-			
-				::CreatePipe(&mOFD[0], &mOFD[1], &sa, 0);
-				::SetHandleInformation(mOFD[0], HANDLE_FLAG_INHERIT, 0); 
-			
-				STARTUPINFOA si = { sizeof(STARTUPINFOA) };
-				si.dwFlags = STARTF_USESHOWWINDOW | STARTF_USESTDHANDLES;
-				si.hStdInput = ifd[0];
-				si.hStdOutput = mOFD[1];
-		//		si.hStdError = mEFD[1];
-			
-				PROCESS_INFORMATION pi;
-				if (not ::CreateProcessA(nullptr, const_cast<char*>(mCommand.c_str()), nullptr, nullptr, true,
-						CREATE_NEW_PROCESS_GROUP, nullptr, /*const_cast<char*>(cwd.c_str())*/ nullptr, &si, &pi))
+				unsigned int err = GetLastError();
+				if (err == ERROR_HANDLE_EOF or err == ERROR_BROKEN_PIPE)
 				{
-					THROW(("Failed to launch %s (%d)", mCommand.c_str(), GetLastError()));
-				}
-			
-				c.notify_one();
-			
-				for (;;)
-				{
-					char buffer[4096];
-					mRawData.read(buffer, sizeof(buffer));
-					if (mRawData.gcount() > 0)
-					{
-						DWORD rr;
-						if (not ::WriteFile(ifd[1], buffer, mRawData.gcount(), &rr, nullptr))
-							THROW(("WriteFile failed: %d", GetLastError()));
-						continue;
-					}
-					
-					if (mRawData.eof())
-					{
-						::CloseHandle(ifd[1]);
-						break;
-					}
-				}
-				
-				::CloseHandle(mOFD[0]);
-				if (pi.hProcess != nullptr)
-				{
-					::CloseHandle(pi.hProcess);
-					::CloseHandle(pi.hThread);
+					CloseHandle(mHOutputRead);
+					mHOutputRead = nullptr;
 				}
 			}
-			catch (exception& e)
-			{
-				cerr << "Process " << mCommand << " Failed: " << e.what() << endl;
-				exit(1);
-			}
-		});
-
-		c.wait(lock);
+			else if (avail > 0 and ReadFile(mHOutputRead, s, avail < n ? avail : n, &rr, nullptr))
+				result += rr, n -= rr;
+		}
 	}
-
-	DWORD rr;
-
-	if (not ::ReadFile(mOFD[0], s, n, &rr, nullptr))
-		THROW(("Error reading data: %d", GetLastError()));
-
-	return rr;
+	
+	return result;
 }
 
 #else

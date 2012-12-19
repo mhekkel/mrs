@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <numeric>
+#include <zlib.h>
 
 #include <boost/iostreams/char_traits.hpp>
 #include <boost/filesystem/operations.hpp>
@@ -9,9 +10,7 @@
 #include <boost/iostreams/device/back_inserter.hpp>
 #include <boost/iostreams/filtering_stream.hpp>
 #include <boost/iostreams/copy.hpp>
-#include <boost/iostreams/filter/zlib.hpp>
 #include <boost/iostreams/filter/bzip2.hpp>
-#include <boost/iostreams/filter/gzip.hpp>
 #include <boost/algorithm/string.hpp>
 
 #include "M6DataSource.h"
@@ -93,6 +92,34 @@ class compress_decompressor
 	
 	// oooh...
 	uint8			last_field;
+};
+
+class gzip_decompressor
+{
+  public:
+	typedef char							char_type;
+	typedef io::multichar_input_filter_tag	category;
+
+				gzip_decompressor()
+					: mDstPtr(0), mDstSize(0), mEOF(false)
+				{
+					memset(&mZStream, 0, sizeof(mZStream));
+					int err = inflateInit2(&mZStream, 47);
+					if (err != Z_OK)
+						THROW(("Error initializing zlib: %d", err));
+				}
+
+	template<typename Source>
+	streamsize	read(Source& src, char* s, streamsize n);
+
+  private:
+	enum { kBufferSize = 4096 };
+
+	z_stream_s		mZStream;
+	uint8			mSrcBuffer[kBufferSize];
+	uint8			mDstBuffer[kBufferSize];
+	streamsize		mDstPtr, mDstSize;
+	bool			mEOF;
 };
 
 // --------------------------------------------------------------------
@@ -216,7 +243,7 @@ M6PlainTextDataSourceImpl::M6PlainTextDataSourceImpl(const fs::path& inFile, M6P
 		mNext->mFilename = inFile.filename().string();
 
 		if (inFile.extension() == ".gz")
-			mNext->mStream.push(io::gzip_decompressor());
+			mNext->mStream.push(gzip_decompressor());
 		else if (inFile.extension() == ".bz2")
 			mNext->mStream.push(io::bzip2_decompressor());
 		else if (inFile.extension() == ".Z")
@@ -290,7 +317,7 @@ M6TarDataSourceImpl::M6TarDataSourceImpl(const fs::path& inArchive, M6Progress& 
 	: M6DataSourceImpl(inProgress), mProgress(inProgress)
 {
 	if (inArchive.extension() == ".gz" or inArchive.extension() == ".tgz")
-		mStream.push(io::gzip_decompressor());
+		mStream.push(gzip_decompressor());
 	else if (inArchive.extension() == ".bz2" or inArchive.extension() == ".tbz")
 		mStream.push(io::bzip2_decompressor());
 	else if (inArchive.extension() == ".Z")
@@ -674,6 +701,62 @@ int compress_decompressor::next_code(Source& src)
 	return errCompressOK;
 }
 
+template<typename Source>
+streamsize gzip_decompressor::read(Source& src, char* s, streamsize n)
+{
+	streamsize result = -1;
+	bool streamEnd = false;
 
+	for (;;)
+	{
+		if (mDstPtr < mDstSize)
+		{
+			streamsize k = mDstSize - mDstPtr;
+			if (k > n)
+				k = n;
+			
+			memcpy(s, mDstBuffer + mDstPtr, k);
+			mDstPtr += k;
+			result += k;
+			s += k;
+			n -= k;
+		}
+		
+		if (n == 0)
+			break;
+		
+		mZStream.next_out = mDstBuffer;
+		mZStream.avail_out = kBufferSize;
 
+		// shift bytes in src buffer to beginning
+		if (mZStream.next_in > mSrcBuffer and mZStream.avail_in > 0)
+			memmove(mSrcBuffer, mZStream.next_in, mZStream.avail_in);
+		mZStream.next_in = mSrcBuffer;
+		
+		int flush = 0;
+		if (not mEOF)
+		{
+			streamsize r = io::read(src, reinterpret_cast<char*>(mSrcBuffer + mZStream.avail_in),
+										kBufferSize - mZStream.avail_in);
 
+			if (r <= 0)
+				mEOF = true;
+			else
+				mZStream.avail_in += r;
+		}
+		else
+			flush = Z_SYNC_FLUSH;
+		
+		int err = inflate(&mZStream, flush);
+		if (err == Z_STREAM_END and mZStream.avail_out == kBufferSize)
+			break;
+
+		if (err < Z_OK and err != Z_BUF_ERROR)
+			THROW(("Decompression error: %s (%d)", mZStream.msg, err));
+
+		mDstSize = kBufferSize - mZStream.avail_out;
+		mDstPtr = 0;
+	}
+	
+	return result;
+}

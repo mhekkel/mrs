@@ -78,8 +78,7 @@ double system_time()
 
 #if defined(_MSC_VER)
 
-int ForkExec(vector<const char*>& args, double maxRunTime,
-	const string& in, string& out, string& err)
+int ForkExec(vector<const char*>& args, double maxRunTime, istream& in, ostream& out, ostream& err)
 {
 	if (args.empty() or args.front() == nullptr)
 		THROW(("No arguments to ForkExec"));
@@ -118,11 +117,29 @@ int ForkExec(vector<const char*>& args, double maxRunTime,
 	}
 
 	boost::thread thread([&in, hInputWrite]() {
-		DWORD w;
-		if (not WriteFile(hInputWrite, in.c_str(), in.length(), &w, nullptr) or
-			w != in.length())
+		char buffer[1024];
+		
+		while (not in.eof())
 		{
-			cerr << "Error writing to pipe";
+			streamsize k = io::read(in, buffer, sizeof(buffer));
+			
+			if (k == -1)
+				break;
+
+			const char* b = buffer;
+			
+			while (k > 0)
+			{
+				DWORD w;
+				if (not WriteFile(hInputWrite, buffer, k, &w, nullptr) or
+					w != k)
+				{
+					cerr << "Error writing to pipe";
+				}
+
+				if (w > 0)
+					b += w, k -= w;
+			}
 		}
 
 		CloseHandle(hInputWrite);
@@ -150,6 +167,8 @@ int ForkExec(vector<const char*>& args, double maxRunTime,
 		CloseHandle(pi.hThread);
 	
 		bool outDone = false, errDone = false;
+		bool outCR = false, errCR = false;
+		
 		while (not (outDone and errDone))
 		{
 			char buffer[1024];
@@ -164,7 +183,24 @@ int ForkExec(vector<const char*>& args, double maxRunTime,
 						outDone = true;
 				}
 				else if (avail > 0 and ReadFile(hOutputRead, buffer, sizeof(buffer), &rr, nullptr))
-					out.append(buffer, buffer + rr);
+				{
+					for (char* a = buffer, *b = buffer; a != buffer + rr; ++a, ++b)
+					{
+						if (*a == '\r')
+						{
+							*b = '\n';
+							outCR = true;
+						}
+						else
+						{
+							if (*a == '\n' and not outCR)
+								*b = *a;
+							outCR = false;
+						}
+					}
+
+					out.write(buffer, rr);
+				}
 			}
 	
 			if (not errDone)
@@ -176,16 +212,30 @@ int ForkExec(vector<const char*>& args, double maxRunTime,
 						errDone = true;
 				}
 				else if (avail > 0 and ReadFile(hErrorRead, buffer, sizeof(buffer), &rr, nullptr))
-					err.append(buffer, buffer + rr);
+				{
+					for (char* a = buffer, *b = buffer; a != buffer + rr; ++a, ++b)
+					{
+						if (*a == '\r')
+						{
+							*b = '\n';
+							errCR = true;
+						}
+						else
+						{
+							if (*a == '\n' and not errCR)
+								*b = *a;
+							errCR = false;
+						}
+					}
+
+					err.write(buffer, rr);
+				}
 			}
 		}
 		
 		CloseHandle(pi.hProcess);
 	}
 
-	ba::replace_all(out, "\r\n", "\n");
-	ba::replace_all(err, "\r\n", "\n");
-	
 	CloseHandle(hOutputRead);
 	CloseHandle(hErrorRead);
 
@@ -324,8 +374,7 @@ streamsize M6ProcessImpl::read(char* s, streamsize n)
 
 #else
 
-int ForkExec(vector<const char*>& args, double maxRunTime,
-	const istream& stdin, ostream& stdout, ostream& stderr)
+int ForkExec(vector<const char*>& args, double maxRunTime, istream& stdin, ostream& stdout, ostream& stderr)
 {
 	if (args.empty() or args.front() == nullptr)
 		THROW(("No arguments to ForkExec"));

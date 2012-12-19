@@ -7,6 +7,18 @@
 #include <time.h>
 #include <iostream>
 
+#if defined(_MSC_VER)
+#include <WinSock.h>
+typedef SOCKET M6SocketType;
+#else
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <cstdarg>
+#include <netdb.h>
+typedef int M6SocketType;
+#endif
+
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/fstream.hpp>
 #include <boost/regex.hpp>
@@ -14,10 +26,11 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/foreach.hpp>
 #define foreach BOOST_FOREACH
-#include <boost/asio.hpp>
 #include <boost/format.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/function.hpp>
+#include <boost/iostreams/device/file_descriptor.hpp>
+#include <boost/iostreams/filtering_stream.hpp>
 
 #include "M6Config.h"
 #include "M6Error.h"
@@ -29,7 +42,7 @@ using namespace std;
 namespace zx = zeep::xml;
 namespace fs = boost::filesystem;
 namespace ba = boost::algorithm;
-namespace at = boost::asio::ip;
+namespace io = boost::iostreams;
 
 // --------------------------------------------------------------------
 // Regular expression to parse directory listings
@@ -64,6 +77,39 @@ const boost::regex kM6URLParserRE("(?:ftp|rsync)://" url_userinfo url_host url_p
 
 // --------------------------------------------------------------------
 
+#if defined(_MSC_VER)
+
+class M6WSockInit
+{
+  public:
+				M6WSockInit()		{ ::WSAStartup(MAKEWORD (2, 2), &mData); }
+				~M6WSockInit()		{ ::WSACleanup(); }
+  private:
+	WSADATA		mData;
+} sWSockInit;
+
+inline int close(SOCKET s) { return ::closesocket(s); }
+inline int read(SOCKET s, char* data, int len) { return ::recv(s, data, len, 0); }
+inline int write(SOCKET s, const char* data, int len) { return ::send(s, data, len, 0); }
+#endif
+
+// --------------------------------------------------------------------
+
+struct M6SocketDevice : public io::source
+{
+	typedef char			char_type;
+	typedef io::source_tag	category;
+
+					M6SocketDevice(M6SocketType inSocket)
+						: mSocket(inSocket) {}
+
+	streamsize		read(char* s, streamsize n)	{ return ::read(mSocket, s, n); }
+
+	M6SocketType	mSocket;
+};
+
+// --------------------------------------------------------------------
+
 struct M6FetcherImpl
 {
 						M6FetcherImpl(const zx::element* inConfig)
@@ -80,6 +126,7 @@ struct M6FetcherImpl
 struct M6FTPFetcherImpl : public M6FetcherImpl
 {
 						M6FTPFetcherImpl(const zx::element* inConfig);
+	virtual 			~M6FTPFetcherImpl();
 
 	virtual void		Mirror(bool inDryRun, ostream& out);
 
@@ -100,16 +147,15 @@ struct M6FTPFetcherImpl : public M6FetcherImpl
 	void				Retrieve();
 
 	void				Error(const char* inError);
+	M6SocketType		CreateDataSocket();
 	
 	fs::path			GetPWD();
 
 	string				mDatabank;
-	boost::asio::io_service
-						mIOService;
-	at::tcp::resolver	mResolver;
-	at::tcp::socket		mSocket;
+	M6SocketType		mControlSocket, mDataSocket;
 
-	string				mServer, mUser, mPassword, mPort;
+	string				mServer, mUser, mPassword;
+	uint16				mPort;
 	
 	string				mReply;
 	string				mSource;
@@ -128,7 +174,8 @@ struct M6FTPFetcherImpl : public M6FetcherImpl
 
 M6FTPFetcherImpl::M6FTPFetcherImpl(const zx::element* inConfig)
 	: M6FetcherImpl(inConfig)
-	, mResolver(mIOService), mSocket(mIOService)
+//	, mResolver(mIOService), mSocket(mIOService)
+	, mControlSocket(-1), mDataSocket(-1)
 {
 	mDatabank = inConfig->get_attribute("id");
 	
@@ -146,47 +193,40 @@ M6FTPFetcherImpl::M6FTPFetcherImpl(const zx::element* inConfig)
 	mUser = m[1];
 	if (mUser.empty())
 		mUser = "anonymous";
-	mPort = m[3];
-	if (mPort.empty())
-		mPort = "ftp";
+	if (string(m[3]).empty())
+		mPort = 21;
+	else
+		mPort = boost::lexical_cast<uint16>(m[3]);
 	mSrcPath = fs::path(m[4].str());
+}
+
+M6FTPFetcherImpl::~M6FTPFetcherImpl()
+{
+	if (mControlSocket >= 0)
+		close(mControlSocket);
+	
+	if (mDataSocket >= 0)
+		close(mDataSocket);
 }
 
 void M6FTPFetcherImpl::Mirror(bool inDryRun, ostream& out)
 {
 	zx::element* source = mConfig->find_first("source");
 
-//    string dst = source->get_attribute("dst");
-//    if (dst.empty() and inConfig->find_first("source") != nullptr)
-//    {
-//		fs::path sd(inConfig->find_first("source")->content());
-//		while (not sd.empty() and sd.filename().string().find_first_of("*?") != string::npos)
-//			sd = sd.parent_path();
-//		if (not sd.empty())
-//			dst = sd.string();
-//    }
-//    
-//    if (dst.empty())
-//        dst = inConfig->get_attribute("id");
-//
-//    fs::path rawdir = M6Config::GetDirectory("raw");
-//    mDstDir = rawdir / dst;
-    
-	// Get a list of endpoints corresponding to the server name.
-	at::tcp::resolver::query query(mServer, mPort);
-	at::tcp::resolver::iterator endpoint_iterator = mResolver.resolve(query);
-	at::tcp::resolver::iterator end;
-
-	// Try each endpoint until we successfully establish a connection.
-	boost::system::error_code error = boost::asio::error::host_not_found;
-    while (error && endpoint_iterator != end)
-    {
-		mSocket.close();
-		mSocket.connect(*endpoint_iterator++, error);
-	}
-
-	if (error)
-		throw boost::system::system_error(error);
+	struct hostent* host;
+	if ((host = (struct hostent*)gethostbyname(mServer.c_str())) == nullptr)
+		Error("Could not get hostname");
+	
+	if ((mControlSocket = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+		Error("Error creating socket");
+	
+	struct sockaddr_in sa;
+	sa.sin_family = AF_INET;
+	sa.sin_port = htons(mPort);
+	memcpy(&sa.sin_addr, host->h_addr, host->h_length);
+	
+	if (connect(mControlSocket, (struct sockaddr*)&sa, sizeof(sa)) < 0)
+		Error("Error connecting to host");
 
 	uint32 status = WaitForReply();
 	if (status != 220)
@@ -273,49 +313,48 @@ uint32 M6FTPFetcherImpl::SendAndWaitForReply(const string& inCommand, const stri
 	if (VERBOSE)
 		cerr << "---> " << inCommand << ' ' << inParam << endl;
 	
-	boost::asio::streambuf request;
-	ostream request_stream(&request);
-	request_stream << inCommand << ' ' << inParam << "\r\n";
-	boost::asio::write(mSocket, request);
+	string cmd(inCommand);
+	if (not inParam.empty())
+		cmd = cmd + ' ' + inParam;
+	cmd += "\r\n";
+	
+	if (write(mControlSocket, cmd.c_str(), cmd.length()) < 0)
+		Error("Error writing to control socket");
 
 	return WaitForReply();
 }
 
 uint32 M6FTPFetcherImpl::WaitForReply()
 {
-	boost::asio::streambuf response;
-	boost::asio::read_until(mSocket, response, "\r\n");
-
-	istream response_stream(&response);
-
-	string line;
-	getline(response_stream, line);
+	const size_t kBufferSize = 1024;
+	char buffer[kBufferSize + 1];
+	size_t bytes_read;
+	uint32 result = 0;
 	
-	if (VERBOSE)
-		cerr << line << endl;
-
-	if (line.length() < 3 or not isdigit(line[0]) or not isdigit(line[1]) or not isdigit(line[2]))
-		THROW(("FTP Server returned unexpected line:\n\"%s\"", line.c_str()));
-
-	uint32 result = ((line[0] - '0') * 100) + ((line[1] - '0') * 10) + (line[2] - '0');
-	mReply = line;
-
-	if (line.length() >= 4 and line[3] == '-')
+	while ((bytes_read = read(mControlSocket, buffer, kBufferSize)) != 0)
 	{
-		string test(line.substr(0, 3) + ' ');
-
-		do
+		if (VERBOSE or (buffer[0] == '4' or buffer[0] == '5'))
+			cout.write(buffer, bytes_read); cout.flush();
+		
+		char* b = buffer;
+		while (b != nullptr and b < buffer + bytes_read and isdigit(b[0]) and b[3] == '-')
 		{
-			boost::asio::read_until(mSocket, response, "\r\n");
-			istream response_stream(&response);
-			getline(response_stream, line);
-
-			if (VERBOSE)
-				cerr << line << endl;
-
-			mReply = mReply + '\n' + line;
+			b = strchr(b, '\n');
+			if (b != nullptr) ++b;
 		}
-		while (not ba::starts_with(line, test));
+
+		if (b != nullptr and b < buffer + bytes_read and isdigit(b[0]) and b[3] == ' ')
+		{
+			char* e = strchr(b, '\r');
+			if (e != nullptr)
+				mReply.assign(b, e);
+			else
+				mReply.assign(b);
+			
+			b[3] = 0;
+			result = atoi(b);
+			break;
+		}
 	}
 
 	return result;
@@ -447,6 +486,40 @@ int64 M6FTPFetcherImpl::CollectFiles(fs::path inLocalDir, fs::path inRemoteDir, 
 	return result;
 }
 
+M6SocketType M6FTPFetcherImpl::CreateDataSocket()
+{
+	if (mDataSocket >= 0)
+		close(mDataSocket);
+	
+	if ((mDataSocket = ::socket(AF_INET, SOCK_STREAM, 0)) < 0)
+		Error("Error creating socket");
+	
+	struct sockaddr_in sa;
+	int i = sizeof(sa); 
+	::getsockname(mControlSocket, (struct sockaddr*)&sa, &i);
+	sa.sin_port = 0; /* let system choose a port */
+	if (::bind(mDataSocket, (struct sockaddr*)&sa, sizeof(sa)) < 0)
+		Error("Error in bind");
+
+	int a[4], p[2];
+	if (sscanf(mReply.c_str(), "227 Entering Passive Mode (%d,%d,%d,%d,%d,%d)", &a[0], &a[1], &a[2], &a[3], &p[0], &p[1]) != 6)
+		Error("Error scanning pasv reply");
+
+    sa.sin_family = AF_INET;
+    uint8* addr = (uint8*)&sa.sin_addr;
+    for (uint32 i = 0; i < 4; ++i)
+	    addr[i] = a[i];
+
+    addr = (uint8*)&sa.sin_port;
+    for (uint32 i = 0; i < 2; ++i)
+	    addr[i] = p[i];
+    
+    if (::connect(mDataSocket, (struct sockaddr *)&sa, sizeof(sa)) < 0)
+    	Error("Error connecting data socket");
+
+	return mDataSocket;
+}
+
 void M6FTPFetcherImpl::ListFiles(const string& inPattern,
 	boost::function<void(char, const string&, size_t, time_t)> inProc)
 {
@@ -454,25 +527,13 @@ void M6FTPFetcherImpl::ListFiles(const string& inPattern,
 	if (status != 227)
 		Error("Passive mode failed");
 	
-	boost::regex re("227 Entering Passive Mode \\((\\d+,\\d+,\\d+,\\d+),(\\d+),(\\d+)\\).*");
-	boost::smatch m;
-	if (not boost::regex_match(mReply, m, re))
-		Error("Invalid reply for passive command");
-	
-	string address = m[1];
-	ba::replace_all(address, ",", ".");
-	
-	string port = boost::lexical_cast<string>(
-		boost::lexical_cast<uint32>(m[2]) * 256 +
-		boost::lexical_cast<uint32>(m[3]));
+	M6SocketDevice data(CreateDataSocket());
+	io::filtering_stream<io::input> stream;
+	stream.push(data);
 
-	at::tcp::iostream stream;
-//	stream.expires_from_now(boost::posix_time::seconds(60));
-	stream.connect(address, port);
-		
 	// Yeah, we have a data connection, now send the List command
 	status = SendAndWaitForReply("list", "");
-	
+
 	if (status != 125 and status != 150)
 		Error((string("Error listing: ") + mReply).c_str());
 		
@@ -495,6 +556,7 @@ void M6FTPFetcherImpl::ListFiles(const string& inPattern,
 		
 		ba::trim(line);
 		
+		boost::smatch m;
 		if (boost::regex_match(line, m, kM6LineParserRE))
 		{
 			struct tm t = {};
@@ -555,38 +617,10 @@ void M6FTPFetcherImpl::FetchFile(fs::path inRemote, fs::path inLocal, time_t inT
 	if (status != 227)
 		Error("Passive mode failed");
 	
-	boost::regex re("227 Entering Passive Mode \\((\\d+,\\d+,\\d+,\\d+),(\\d+),(\\d+)\\).*");
-	boost::smatch m;
-	if (not boost::regex_match(mReply, m, re))
-		Error("Invalid reply for passive command");
-	
-	string address = m[1];
-	ba::replace_all(address, ",", ".");
-	
-	string port = boost::lexical_cast<string>(
-		boost::lexical_cast<uint32>(m[2]) * 256 +
-		boost::lexical_cast<uint32>(m[3]));
+	M6SocketDevice data(CreateDataSocket());
+	io::filtering_stream<io::input> stream;
+	stream.push(data);
 
-	// Get a list of endpoints corresponding to the server name.
-	at::tcp::resolver::query query(address, port);
-	at::tcp::resolver::iterator endpoint_iterator = mResolver.resolve(query);
-	at::tcp::resolver::iterator end;
-
-	at::tcp::socket socket(mIOService);
-
-	// Try each endpoint until we successfully establish a connection.
-	boost::system::error_code error = boost::asio::error::host_not_found;
-    while (error and endpoint_iterator != end)
-    {
-		socket.close();
-		socket.connect(*endpoint_iterator++, error);
-	}
-
-	if (error)
-		throw boost::system::system_error(error);
-
-    boost::asio::streambuf response;
-		
 	// Yeah, we have a data connection, now send the RETR command
 	string remote = inRemote.string();
 	ba::replace_all(remote, "\\", "/");
@@ -595,15 +629,15 @@ void M6FTPFetcherImpl::FetchFile(fs::path inRemote, fs::path inLocal, time_t inT
 	if (status != 125 and status != 150)
 		Error("Error retrieving file");
 	
-	while (size_t r = boost::asio::read(socket, response, boost::asio::transfer_at_least(1), error))
+	char buffer[1024];
+	streamsize r;
+	
+	while ((r = io::read(stream, buffer, sizeof(buffer))) > 0)
 	{
-		file << &response;
+		file.write(buffer, r);
 		inProgress.Consumed(r);
 	}
 
-    if (error != boost::asio::error::eof)
-		throw boost::system::system_error(error);
-	
 	status = WaitForReply();
 	if (status != 226)
 		Error("Error retrieving file");
@@ -615,6 +649,7 @@ void M6FTPFetcherImpl::FetchFile(fs::path inRemote, fs::path inLocal, time_t inT
 	fs::rename(local, inLocal);
 	if (inTime > 0)
 	{
+		boost::system::error_code error;
 		fs::last_write_time(inLocal, inTime, error);
 		if (error)
 			cerr << "Error setting time on newly created file" << endl;

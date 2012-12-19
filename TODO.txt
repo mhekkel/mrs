@@ -1,6 +1,8 @@
 BUGS:
 
 - embl CO section in format is missing
+- passive ftp not working
+- 
 
 Todo
 

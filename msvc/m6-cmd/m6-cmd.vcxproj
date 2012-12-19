@@ -66,7 +66,7 @@
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>C:\Boost\include\boost-1_48;$(SolutionDir)..\..\libzeep;$(SolutionDir)..\src;C:\perl\lib\CORE;C:\perl\lib\auto\Win32CORE;$(SolutionDir)..\..\sqlite-amalgamation;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
-      <PreprocessorDefinitions>CURL_STATICLIB;_UNICODE;UNICODE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_UNICODE;UNICODE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -83,7 +83,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <AdditionalIncludeDirectories>C:\Boost\include\boost-1_48;$(SolutionDir)..\..\libzeep;$(SolutionDir)..\src;C:\perl\lib\CORE;C:\perl\lib\auto\Win32CORE;$(SolutionDir)..\..\sqlite-amalgamation;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <PreprocessorDefinitions>CURL_STATICLIB;NDEBUG;_UNICODE;UNICODE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_UNICODE;UNICODE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>

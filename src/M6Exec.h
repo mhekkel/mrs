@@ -8,7 +8,7 @@
 #include <boost/iostreams/read.hpp>
 
 int ForkExec(std::vector<const char*>& args, double maxRunTime,
-	const std::istream& in, std::ostream& out, std::ostream& err);
+	std::istream& in, std::ostream& out, std::ostream& err);
 
 class M6Process : public boost::iostreams::source
 {

@@ -124,6 +124,7 @@ libzeep/libzeep.a:
 
 clean:
 	rm -rf $(OBJDIR)/* m6 config/m6-config.xml
+	$(MAKE) -C libzeep clean
 	
 INSTALLDIRS = \
 	$(MRS_LOG_DIR) \

@@ -48,6 +48,7 @@
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>C:\Boost\include\boost-1_48;$(SolutionDir)..\..\libzeep;C:\Users\maarten\projects\libarchive;C:\Users\maarten\projects\libarchive-3.0.3\libarchive;C:\perl\lib\CORE</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <PreprocessorDefinitions>MRS_ETC_DIR="C:/data/config";_UNICODE;UNICODE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -64,7 +65,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <AdditionalIncludeDirectories>C:\Boost\include\boost-1_48;$(SolutionDir)..\..\libzeep;C:\Users\maarten\projects\libarchive;C:\Users\maarten\projects\libarchive-3.0.3\libarchive;C:\perl\lib\CORE</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <PreprocessorDefinitions>NDEBUG;_UNICODE;UNICODE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>MRS_ETC_DIR="C:/data/config";NDEBUG;_UNICODE;UNICODE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>

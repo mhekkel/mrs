@@ -3,6 +3,7 @@
 #include <iostream>
 #include <numeric>
 #include <zlib.h>
+#include <fstream>
 
 #include <boost/iostreams/char_traits.hpp>
 #include <boost/filesystem/operations.hpp>
@@ -704,7 +705,7 @@ int compress_decompressor::next_code(Source& src)
 template<typename Source>
 streamsize gzip_decompressor::read(Source& src, char* s, streamsize n)
 {
-	streamsize result = -1;
+	streamsize result = 0;
 	bool streamEnd = false;
 
 	for (;;)
@@ -749,7 +750,10 @@ streamsize gzip_decompressor::read(Source& src, char* s, streamsize n)
 		
 		int err = inflate(&mZStream, flush);
 		if (err == Z_STREAM_END and mZStream.avail_out == kBufferSize)
+		{
+			result = -1;
 			break;
+		}
 
 		if (err < Z_OK and err != Z_BUF_ERROR)
 			THROW(("Decompression error: %s (%d)", mZStream.msg, err));

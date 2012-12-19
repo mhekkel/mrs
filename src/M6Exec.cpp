@@ -486,7 +486,7 @@ int ForkExec(vector<const char*>& args, double maxRunTime, istream& stdin, ostre
 		{
 			streamsize k = io::read(stdin, buffer, sizeof(buffer));
 			
-			if (k == -1)
+			if (k <= -1)
 				break;
 
 			const char* b = buffer;
@@ -709,19 +709,23 @@ streamsize M6ProcessImpl::read(char* s, streamsize n)
 				for (;;)
 				{
 					char buffer[4096];
-					mRawData.read(buffer, sizeof(buffer));
-					if (mRawData.gcount() > 0)
-					{
-						int r = ::write(ifd[1], buffer, mRawData.gcount());
-						if (r <= 0)
-							THROW(("WriteFile failed: %s", strerror(errno)));
-						continue;
-					}
 					
-					if (mRawData.eof())
+					streamsize n = io::read(mRawData, buffer, sizeof(buffer));
+					if (n <= 0)
 					{
 						::close(ifd[1]);
 						break;
+					}
+					
+					char* b = buffer;
+					while (n > 0)
+					{
+						int r = ::write(ifd[1], b, n);
+						if (r == -1 and errno == EAGAIN)
+							continue;
+						if (r <= 0)
+							THROW(("WriteFile failed: %s", strerror(errno)));
+						n -= r;
 					}
 				}
 				

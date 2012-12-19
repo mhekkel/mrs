@@ -5,7 +5,7 @@
 #    (See accompanying file LICENSE_1_0.txt or copy at
 #          http://www.boost.org/LICENSE_1_0.txt)
 
-VERSION				= 6.0.0b1
+VERSION				= 6.0.0b2
 
 include make.config
 
@@ -44,7 +44,7 @@ CFLAGS				+= -Wno-deprecated -Wno-multichar
 CFLAGS				+= $(shell $(PERL) -MExtUtils::Embed -e perl_inc)
 CFLAGS				+= $(DEFINES:%=-D%)
 
-LDFLAGS				+= $(LIBS:%=-l%) $(BOOST_LIB_DIR:%=-L %) $(BOOST_LIBS:%=-l%) -g -L libzeep/ 
+LDFLAGS				+= $(BOOST_LIB_DIR:%=-L %) $(BOOST_LIBS:%=-l%) -g -L libzeep/ $(LIBS:%=-l%) 
 LDFLAGS				+= $(shell $(PERL) -MExtUtils::Embed -e ldopts)
 
 OBJDIR				= obj
@@ -96,7 +96,7 @@ OBJECTS = \
 	$(OBJDIR)/M6WSSearch.o \
 	$(OBJDIR)/sqlite.o \
 
-all: m6 config/m6-config.xml
+all: m6
 
 m6: $(OBJECTS) libzeep/libzeep.a
 	@ echo ">>" $@

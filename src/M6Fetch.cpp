@@ -10,6 +10,7 @@
 #if defined(_MSC_VER)
 #include <WinSock.h>
 typedef SOCKET M6SocketType;
+typedef int M6SockLen;
 #else
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -17,6 +18,7 @@ typedef SOCKET M6SocketType;
 #include <cstdarg>
 #include <netdb.h>
 typedef int M6SocketType;
+typedef socklen_t M6SockLen;
 #endif
 
 #include <boost/filesystem/operations.hpp>
@@ -31,6 +33,7 @@ typedef int M6SocketType;
 #include <boost/function.hpp>
 #include <boost/iostreams/device/file_descriptor.hpp>
 #include <boost/iostreams/filtering_stream.hpp>
+#include <boost/iostreams/filter/newline.hpp>
 
 #include "M6Config.h"
 #include "M6Error.h"
@@ -326,35 +329,35 @@ uint32 M6FTPFetcherImpl::SendAndWaitForReply(const string& inCommand, const stri
 
 uint32 M6FTPFetcherImpl::WaitForReply()
 {
-	const size_t kBufferSize = 1024;
-	char buffer[kBufferSize + 1];
-	size_t bytes_read;
-	uint32 result = 0;
+	io::filtering_stream<io::input> data;
+	data.push(M6SocketDevice(mControlSocket));
 	
-	while ((bytes_read = read(mControlSocket, buffer, kBufferSize)) != 0)
-	{
-		if (VERBOSE or (buffer[0] == '4' or buffer[0] == '5'))
-			cout.write(buffer, bytes_read); cout.flush();
-		
-		char* b = buffer;
-		while (b != nullptr and b < buffer + bytes_read and isdigit(b[0]) and b[3] == '-')
-		{
-			b = strchr(b, '\n');
-			if (b != nullptr) ++b;
-		}
+	string line;
+	getline(data, line);
+	
+	if (VERBOSE)
+		cerr << line << endl;
 
-		if (b != nullptr and b < buffer + bytes_read and isdigit(b[0]) and b[3] == ' ')
+	if (line.length() < 3 or not isdigit(line[0]) or not isdigit(line[1]) or not isdigit(line[2]))
+		THROW(("FTP Server returned unexpected line:\n\"%s\"", line.c_str()));
+
+	uint32 result = ((line[0] - '0') * 100) + ((line[1] - '0') * 10) + (line[2] - '0');
+	mReply = line;
+
+	if (line.length() >= 4 and line[3] == '-')
+	{
+		string test(line.substr(0, 3) + ' ');
+
+		do
 		{
-			char* e = strchr(b, '\r');
-			if (e != nullptr)
-				mReply.assign(b, e);
-			else
-				mReply.assign(b);
-			
-			b[3] = 0;
-			result = atoi(b);
-			break;
+			getline(data, line);
+
+			if (VERBOSE)
+				cerr << line << endl;
+
+			mReply = mReply + '\n' + line;
 		}
+		while (not ba::starts_with(line, test));
 	}
 
 	return result;
@@ -495,7 +498,7 @@ M6SocketType M6FTPFetcherImpl::CreateDataSocket()
 		Error("Error creating socket");
 	
 	struct sockaddr_in sa;
-	int i = sizeof(sa); 
+	M6SockLen i = sizeof(sa); 
 	::getsockname(mControlSocket, (struct sockaddr*)&sa, &i);
 	sa.sin_port = 0; /* let system choose a port */
 	if (::bind(mDataSocket, (struct sockaddr*)&sa, sizeof(sa)) < 0)

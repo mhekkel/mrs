@@ -105,7 +105,7 @@
         <alias>pdbfinder2</alias>
       </aliases>
       <name>PDBFINDER</name>
-      <source fetch="ftp://ftp.cmbi.ru.nl/pub/molbio/data" delete="false">pdbfinder2/PDBFIND2.TXT.gz</source>
+      <source fetch="ftp://ftp.cmbi.ru.nl/pub/molbio/data/pdbfinder2/" delete="false">pdbfinder2/PDBFIND2.TXT.gz</source>
     </databank>
     <!-- omim -->
     <databank id="omim" parser="omim" format="omim" enabled="true" update="never" fasta="false">
@@ -114,7 +114,7 @@
       </aliases>
       <name>OMIM - Online Mendelian Inheritance in Man™</name>
       <info>http://www.ncbi.nlm.nih.gov/entrez/query.fcgi?db=OMIM</info>
-      <source fetch="ftp://ftp.ncbi.nih.gov/repository" delete="false">OMIM/ARCHIVE/omim.txt.Z</source>
+      <source fetch="ftp://ftp.ncbi.nih.gov/repository/OMIM/ARCHIVE/" delete="false">omim/omim.txt.Z</source>
     </databank>
     <databank id="embl" parser="embl" format="embl" enabled="true" update="weekly" fasta="false">
       <name>EMBL</name>
@@ -124,7 +124,7 @@
     <databank id="enzyme" parser="enzyme" format="enzyme" enabled="true" update="daily" fasta="false">
       <name>Enzyme</name>
       <info>http://ca.expasy.org/enzyme/</info>
-      <source fetch="ftp://ftp.ebi.ac.uk/pub/databases" delete="false">enzyme/enzyme.dat</source>
+      <source fetch="ftp://ftp.ebi.ac.uk/pub/databases/enzyme/" delete="false">enzyme/enzyme.dat</source>
     </databank>
     <databank id="sprot" parser="uniprot" format="uniprot" update="daily" enabled="true" fasta="true">
       <aliases>
@@ -133,7 +133,7 @@
       </aliases>
       <name>SwissProt</name>
       <info>http://www.uniprot.org/</info>
-      <source fetch="ftp://ftp.ebi.ac.uk/pub/databases" delete="false">uniprot/current_release/knowledgebase/complete/uniprot_sprot.dat.gz</source>
+      <source fetch="ftp://ftp.ebi.ac.uk/pub/databases/uniprot/current_release/knowledgebase/complete" delete="false">uniprot/uniprot_sprot.dat.gz</source>
     </databank>
     <databank id="trembl" parser="uniprot" format="uniprot" enabled="true" update="daily" fasta="true">
       <aliases>
@@ -142,7 +142,7 @@
       </aliases>
       <name>TrEMBL</name>
       <info>http://www.uniprot.org/</info>
-      <source fetch="ftp://ftp.ebi.ac.uk/pub/databases" delete="false">uniprot/current_release/knowledgebase/complete/uniprot_trembl.dat.gz</source>
+      <source fetch="ftp://ftp.ebi.ac.uk/pub/databases/uniprot/current_release/knowledgebase/complete" delete="false">uniprot/uniprot_trembl.dat.gz</source>
     </databank>
     <databank id="genbank" parser="genbank" enabled="true" update="weekly" fasta="false">
       <name>Genbank</name>
@@ -160,33 +160,33 @@
     <databank id="taxonomy" parser="taxonomy" format="taxonomy" enabled="true" update="daily" fasta="false">
       <name>Taxonomy</name>
       <info>http://www.ncbi.nlm.nih.gov/entrez/query.fcgi?db=Taxonomy</info>
-      <source fetch="ftp://ftp.ebi.ac.uk/pub/databases" delete="false">taxonomy/taxonomy.dat</source>
+      <source fetch="ftp://ftp.ebi.ac.uk/pub/databases/taxonomy/" delete="false">taxonomy/taxonomy.dat</source>
     </databank>
     <databank id="pdb" parser="pdb" enabled="true" update="daily" fasta="true">
       <name>PDB</name>
       <info>http://www.rcsb.org/pdb/</info>
-      <source delete="true" fetch="ftp://ftp.cmbi.ru.nl/pub/molbio/data">pdb/divided/??/pdb????.ent.gz</source>
+      <source delete="true" fetch="ftp://ftp.wwpdb.org/pub/pdb/data/structures/divided/pdb/">pdb/??/pdb????.ent.gz</source>
     </databank>
     <databank id="dssp" parser="dssp" enabled="true" update="daily" fasta="false">
       <name>DSSP</name>
       <info>http://www.cmbi.ru.nl/dssp.html</info>
-      <source delete="true" fetch="ftp://ftp.cmbi.ru.nl/pub/molbio/data">dssp/????.dssp</source>
+      <source delete="true" fetch="ftp://ftp.cmbi.ru.nl/pub/molbio/data/dssp/">dssp/????.dssp</source>
     </databank>
     <databank id="hssp" parser="hssp" enabled="true" update="daily" fasta="false">
       <name>HSSP</name>
       <info>http://www.cmbi.ru.nl/hssp</info>
-      <source delete="true" fetch="ftp://ftp.cmbi.ru.nl/pub/molbio/data">hssp/????.hssp.bz2</source>
+      <source delete="true" fetch="ftp://ftp.cmbi.ru.nl/pub/molbio/data/hssp/">hssp/????.hssp.bz2</source>
     </databank>
     <databank id="gene" parser="gene" stylesheet="gene.xslt" enabled="true" update="weekly" fasta="false">
       <name>Entrez Gene</name>
       <info>http://www.ncbi.nlm.nih.gov/entrez/query.fcgi?db=gene</info>
-      <source fetch="ftp://ftp.ncbi.nlm.nih.gov" delete="false">gene/DATA/ASN_BINARY/All_Data.ags.gz</source>
+      <source fetch="ftp://ftp.ncbi.nlm.nih.gov/gene/DATA/ASN_BINARY" delete="false">gene/All_Data.ags.gz</source>
       <filter>/usr/bin/gene2xml -bT</filter>
     </databank>
     <databank id="go" parser="go" enabled="true" update="weekly" fasta="false">
       <name>GO</name>
       <info>http://www.geneontology.org/</info>
-      <source fetch="ftp://ftp.geneontology.org/pub" delete="false">go/ontology/gene_ontology.obo</source>
+      <source fetch="ftp://ftp.geneontology.org/pub/go/ontology/" delete="false">go/gene_ontology.obo</source>
     </databank>
     <!--	<databank id="goa" parser="goa">-->
     <!--		<name>GOA</name>-->
@@ -197,16 +197,16 @@
     <databank id="interpro" parser="interpro" stylesheet="interpro.xslt" enabled="true" update="daily" fasta="false">
       <name>Interpro</name>
       <info>http://www.ebi.ac.uk/interpro/</info>
-      <source fetch="ftp://ftp.ebi.ac.uk/pub/databases" delete="false">interpro/interpro.xml.gz</source>
+      <source fetch="ftp://ftp.ebi.ac.uk/pub/databases/interpro/" delete="false">interpro/interpro.xml.gz</source>
     </databank>
     <databank id="oxford" parser="oxford" enabled="true" update="weekly" fasta="false">
       <name>Oxford Human Mouse grid</name>
       <info>http://www.informatics.jax.org/</info>
-      <source fetch="ftp://ftp.informatics.jax.org/pub" delete="false">reports/HMD_Human3.rpt</source>
+      <source fetch="ftp://ftp.informatics.jax.org/pub/reports" delete="false">oxford/HMD_Human3.rpt</source>
     </databank>
     <databank id="mimmap" parser="mimmap" enabled="true" update="never" fasta="false">
       <name>Mimmap, our view on genemap from OMIM</name>
-      <source fetch="ftp://ftp.ncbi.nih.gov/repository" delete="false">OMIM/ARCHIVE/genemap</source>
+      <source fetch="ftp://ftp.ncbi.nih.gov/repository/OMIM/ARCHIVE/" delete="false">omim/genemap</source>
     </databank>
     <databank id="dbest" parser="dbest" enabled="false" update="never" fasta="false">
       <name>dbEST</name>
@@ -219,7 +219,7 @@
       </aliases>
       <name>Pfam-A</name>
       <info>http://pfam.sanger.ac.uk/</info>
-      <source fetch="ftp://ftp.ebi.ac.uk/pub/databases" delete="false">Pfam/Pfam-A.full.gz</source>
+      <source fetch="ftp://ftp.ebi.ac.uk/pub/databases/Pfam" delete="false">pfam/Pfam-A.full.gz</source>
     </databank>
     <databank id="pfamb" parser="pfam" format="stockholm" enabled="true" update="weekly" fasta="false">
       <aliases>
@@ -227,7 +227,7 @@
       </aliases>
       <name>Pfam-B</name>
       <info>http://pfam.sanger.ac.uk/</info>
-      <source fetch="ftp://ftp.ebi.ac.uk/pub/databases" delete="false">Pfam/Pfam-B.gz</source>
+      <source fetch="ftp://ftp.ebi.ac.uk/pub/databases/Pfam" delete="false">pfam/Pfam-B.gz</source>
     </databank>
     <databank id="pfamseed" parser="pfam" format="stockholm" enabled="true" update="weekly" fasta="false">
       <aliases>
@@ -240,47 +240,47 @@
     <databank id="prints" parser="prints" enabled="true" update="daily" fasta="false">
       <name>PRINTS</name>
       <info>http://bioinf.man.ac.uk/dbbrowser/PRINTS/</info>
-      <source delete="true" fetch="ftp://ftp.ebi.ac.uk/pub/databases">prints/prints*.dat.gz</source>
+      <source delete="true" fetch="ftp://ftp.ebi.ac.uk/pub/databases/prints">prints/prints*.dat.gz</source>
     </databank>
     <databank id="prosite" parser="prosite" enabled="true" update="daily" fasta="false">
       <name>Prosite</name>
       <info>http://www.expasy.org/prosite/</info>
-      <source fetch="ftp://ftp.ebi.ac.uk/pub/databases" delete="false">prosite/prosite*.dat</source>
+      <source fetch="ftp://ftp.ebi.ac.uk/pub/databases/prosite" delete="false">prosite/prosite*.dat</source>
     </databank>
     <databank id="prosite_doc" parser="prosite_doc" enabled="true" update="daily" fasta="false">
       <name>Prosite Documentation</name>
       <info>http://www.expasy.org/prosite/</info>
-      <source fetch="ftp://ftp.ebi.ac.uk/pub/databases" delete="false">prosite/prosite*.doc</source>
+      <source fetch="ftp://ftp.ebi.ac.uk/pub/databases/prosite" delete="false">prosite/prosite*.doc</source>
     </databank>
     <databank id="rebase" parser="rebase" enabled="true" update="weekly" fasta="false">
       <name>REBASE</name>
       <info>http://rebase.neb.com/rebase/rebase.html</info>
-      <source delete="true" fetch="ftp://ftp.neb.com/pub">rebase/bairoch.txt</source>
+      <source delete="true" fetch="ftp://ftp.neb.com/pub/rebase">rebase/bairoch.txt</source>
     </databank>
     <databank id="unigene" parser="unigene" enabled="true" update="weekly" fasta="false">
       <name>Unigene</name>
       <info>http://www.ncbi.nlm.nih.gov/entrez/query.fcgi?db=unigene</info>
-      <source fetch="ftp://ftp.ebi.ac.uk//pub/databases" delete="false">Unigene/*/*.data.gz</source>
+      <source fetch="ftp://ftp.ebi.ac.uk//pub/databases/Unigene" delete="false">unigene/*/*.data.gz</source>
     </databank>
     <databank id="uniref50" parser="uniref" enabled="false" update="never" fasta="false">
       <name>UniRef 50</name>
       <info>http://www.uniprot.org/help/uniref</info>
-      <source fetch="ftp://ftp.ebi.ac.uk/pub/databases" delete="false">uniprot/current_release/uniref/uniref50/uniref50.xml.gz</source>
+      <source fetch="ftp://ftp.ebi.ac.uk/pub/databases/uniprot/current_release/uniref/uniref50" delete="false">uniref/uniref50.xml.gz</source>
     </databank>
     <databank id="uniref90" parser="uniref" enabled="false" update="never" fasta="false">
       <name>UniRef 90</name>
       <info>http://www.uniprot.org/help/uniref</info>
-      <source fetch="ftp://ftp.ebi.ac.uk/pub/databases" delete="false">uniprot/current_release/uniref/uniref90/uniref90.xml.gz</source>
+      <source fetch="ftp://ftp.ebi.ac.uk/pub/databases/uniprot/current_release/uniref/uniref90" delete="false">uniref/uniref90.xml.gz</source>
     </databank>
     <databank id="uniref100" parser="uniref" enabled="false" update="never" fasta="false">
       <name>UniRef 100</name>
       <info>http://www.uniprot.org/help/uniref</info>
-      <source fetch="ftp://ftp.ebi.ac.uk/pub/databases" delete="false">uniprot/current_release/uniref/uniref100/uniref100.xml.gz</source>
+      <source fetch="ftp://ftp.ebi.ac.uk/pub/databases/uniprot/current_release/uniref/uniref100" delete="false">uniref100/uniref100.xml.gz</source>
     </databank>
     <databank id="pmc" parser="pmc" stylesheet="ViewNLM-v2.3.xsl" enabled="true" update="weekly" fasta="false">
       <name>PubMed Central</name>
       <info>http://www.pubmedcentral.nih.gov/</info>
-      <source fetch="ftp://ftp.ncbi.nih.gov/pub" delete="false">pmc/articles*.tar.gz</source>
+      <source fetch="ftp://ftp.ncbi.nih.gov/pub/pmc" delete="false">pmc/articles*.tar.gz</source>
     </databank>
   </databanks>
 </m6-config>

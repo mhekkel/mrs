@@ -177,7 +177,6 @@ struct M6FTPFetcherImpl : public M6FetcherImpl
 
 M6FTPFetcherImpl::M6FTPFetcherImpl(const zx::element* inConfig)
 	: M6FetcherImpl(inConfig)
-//	, mResolver(mIOService), mSocket(mIOService)
 	, mControlSocket(-1), mDataSocket(-1)
 {
 	mDatabank = inConfig->get_attribute("id");
@@ -187,10 +186,10 @@ M6FTPFetcherImpl::M6FTPFetcherImpl(const zx::element* inConfig)
 		THROW(("Missing source?"));
 	mSource = source->content();
 
-	string src = source->get_attribute("fetch");
+	string fetch = source->get_attribute("fetch");
 	boost::smatch m;
-	if (not boost::regex_match(src, m, kM6URLParserRE))
-		THROW(("Invalid source url: <%s>", src.c_str()));
+	if (not boost::regex_match(fetch, m, kM6URLParserRE))
+		THROW(("Invalid source url: <%s>", fetch.c_str()));
 	
 	mServer = m[2];
 	mUser = m[1];
@@ -382,8 +381,17 @@ int64 M6FTPFetcherImpl::CollectFiles()
 	foreach (const string& source, sources)
 	{
 		fs::path p(source);
+		fs::path::iterator pb = p.begin();
+		fs::path::iterator pe = p.end();
 		
-		result += CollectFiles(M6Config::GetDirectory("raw"), GetPWD(), p.begin(), p.end(), progress);
+		if (pb == pe)
+			continue;	// empty path...?
+		
+		fs::path dst = fs::path(M6Config::GetDirectory("raw")) / *pb++;
+		if (pb == pe)
+			THROW(("invalid source specification"));
+		
+		result += CollectFiles(dst, GetPWD(), pb, pe, progress);
 		
 		progress.Consumed(1);
 	}

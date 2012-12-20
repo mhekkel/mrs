@@ -2,7 +2,6 @@
 
 #include <iostream>
 #include <numeric>
-//#include <zlib.h>
 #include <fstream>
 
 #include <boost/iostreams/char_traits.hpp>
@@ -95,34 +94,6 @@ class compress_decompressor
 	// oooh...
 	uint8			last_field;
 };
-
-//class gzip_decompressor
-//{
-//  public:
-//	typedef char							char_type;
-//	typedef io::multichar_input_filter_tag	category;
-//
-//				gzip_decompressor()
-//					: mDstPtr(0), mDstSize(0), mEOF(false)
-//				{
-//					memset(&mZStream, 0, sizeof(mZStream));
-//					int err = inflateInit(&mZStream);
-//					if (err != Z_OK)
-//						THROW(("Error initializing zlib: %d", err));
-//				}
-//
-//	template<typename Source>
-//	streamsize	read(Source& src, char* s, streamsize n);
-//
-//  private:
-//	enum { kBufferSize = 262144 };
-//
-//	z_stream_s		mZStream;
-//	uint8			mSrcBuffer[kBufferSize];
-//	uint8			mDstBuffer[kBufferSize];
-//	streamsize		mDstPtr, mDstSize;
-//	bool			mEOF;
-//};
 
 // --------------------------------------------------------------------
 
@@ -702,65 +673,3 @@ int compress_decompressor::next_code(Source& src)
 	oldcode = newcode;
 	return errCompressOK;
 }
-
-//template<typename Source>
-//streamsize gzip_decompressor::read(Source& src, char* s, streamsize n)
-//{
-//	streamsize result = 0;
-//
-//	while (not mEOF)
-//	{
-//		if (mDstPtr < mDstSize)
-//		{
-//			streamsize k = mDstSize - mDstPtr;
-//			if (k > n)
-//				k = n;
-//			
-//			memcpy(s, mDstBuffer + mDstPtr, k);
-//			mDstPtr += k;
-//			result += k;
-//			s += k;
-//			n -= k;
-//		}
-//		
-//		if (result > 0)
-//			break;
-//
-//		if (mZStream.avail_in == 0)
-//		{
-//			streamsize r = io::read(src, (char*)mSrcBuffer, kBufferSize);
-//			
-//			if (r <= 0)
-//			{
-//				mEOF = true;
-//				break;
-//			}
-//			
-//			mZStream.next_in = mSrcBuffer;
-//			mZStream.avail_in = (uInt)r;
-//		}
-//	
-//		if (mZStream.avail_out == 0)
-//		{
-//			mZStream.avail_out = kBufferSize;
-//			mZStream.next_out = mDstBuffer;
-//			
-//			int err = inflate(&mZStream, Z_NO_FLUSH);
-//			switch (err)
-//			{
-//				case Z_NEED_DICT:
-//					err = Z_DATA_ERROR;
-//				case Z_DATA_ERROR:
-//				case Z_MEM_ERROR:
-//					THROW(("Decompression error: %s", mZStream.msg));
-//				case Z_STREAM_END:
-//					mEOF = mZStream.avail_out == 0;
-//			}
-//			
-//			mDstPtr = 0;
-//			mDstSize = kBufferSize - mZStream.avail_out;
-//		}
-//	}
-//	
-//	return result;
-//}

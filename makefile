@@ -153,7 +153,7 @@ install: m6
 	@ install -m755 m6 $(BIN_DIR)/m6
 	@ echo "Creating configuration file"
 	@ install $(MRS_USER:%=-o %) -m444 config/m6-config.dtd $(MRS_ETC_DIR)/m6-config.dtd
-	@ rm /tmp/m6-config.xml.dist
+	@ rm -f /tmp/m6-config.xml.dist
 	@ sed -e 's|__MRS_DATA_DIR__|$(MRS_DATA_DIR)|g' \
 		-e 's|__MRS_LOG_DIR__|$(MRS_LOG_DIR)|g' \
 		-e 's|__MRS_USER__|$(MRS_USER)|g' \

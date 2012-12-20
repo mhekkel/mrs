@@ -61,10 +61,16 @@ my @inc_dirs_guess = (
 );
 
 my @libs = (
-	'm', 'boost_system'
+	'm'
 );
 
-my $host = `hostname -f`; 	chomp($host);
+# prefer the IP address here, since the hostname might not be fully qualified...
+# It's up to the user/admin to change this later on.
+open(my $h, "hostname -I|");
+my $host = <$h> if $h;
+close($h);
+$host = `hostname -f` unless defined $host;
+$host =~ s/\s+$//;
 
 my $mrs_user = `whoami`;
 chomp($mrs_user);
@@ -248,6 +254,8 @@ END
 		$inc_dirs{"$boost/include"} = 1;
 		$lib_dirs{"$boost/lib"} = 1;
 	}
+	
+	push @libs, 'boost_system';
 	
 	$header_check =<<END;
 #include <boost/version.hpp>

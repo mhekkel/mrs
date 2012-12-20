@@ -1,0 +1,17 @@
+Changes in MRS version 6
+
+- Single file databanks have been replaced with one directory per databank.
+- There's only one executable left: m6. This executable takes as first
+  parameter a command name and then options for the specific command.
+- The tokenizer has changed slightly to optimize recall.
+- Configuration is done in just one, xml file. This can be edited using the
+  admin interface in the web application.
+- Only one server instance and only one IP port used.
+- Makefile have been replaced by a scheduler inside the web application.
+- Parser files have been simplified, they now only contain all that's needed
+  for parsing and nothing more. The configuration previously done has moved
+  to the single configuration file.
+- The web app no longer formats entries, this is now done by formatters
+  written in JavaScript and handled by the browser.
+- NCBI blast support has been dropped, the MRS blast code has been optimized
+  and works on FastA files directly.

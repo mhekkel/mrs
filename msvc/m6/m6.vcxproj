@@ -12,21 +12,75 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\sqlite-amalgamation\sqlite3.c" />
+    <ClCompile Include="..\..\src\M6BitStream.cpp" />
+    <ClCompile Include="..\..\src\M6Blast.cpp" />
     <ClCompile Include="..\..\src\M6BlastCache.cpp" />
+    <ClCompile Include="..\..\src\M6Builder.cpp" />
     <ClCompile Include="..\..\src\M6CmdLineDriver.cpp" />
+    <ClCompile Include="..\..\src\M6Config.cpp" />
+    <ClCompile Include="..\..\src\M6Databank.cpp" />
+    <ClCompile Include="..\..\src\M6DataSource.cpp" />
+    <ClCompile Include="..\..\src\M6Dictionary.cpp" />
+    <ClCompile Include="..\..\src\M6DocStore.cpp" />
+    <ClCompile Include="..\..\src\M6Document.cpp" />
+    <ClCompile Include="..\..\src\M6Error.cpp" />
+    <ClCompile Include="..\..\src\M6Exec.cpp" />
     <ClCompile Include="..\..\src\M6Fetch.cpp" />
+    <ClCompile Include="..\..\src\M6File.cpp" />
+    <ClCompile Include="..\..\src\M6Index.cpp" />
+    <ClCompile Include="..\..\src\M6Iterator.cpp" />
+    <ClCompile Include="..\..\src\M6Lexicon.cpp" />
+    <ClCompile Include="..\..\src\M6Matrix.cpp" />
     <ClCompile Include="..\..\src\M6MD5.cpp" />
+    <ClCompile Include="..\..\src\M6Parser.cpp" />
+    <ClCompile Include="..\..\src\M6Progress.cpp" />
+    <ClCompile Include="..\..\src\M6Query.cpp" />
+    <ClCompile Include="..\..\src\M6SequenceFilter.cpp" />
     <ClCompile Include="..\..\src\M6Server.cpp" />
+    <ClCompile Include="..\..\src\M6Tokenizer.cpp" />
+    <ClCompile Include="..\..\src\M6Utilities.cpp" />
     <ClCompile Include="..\..\src\M6WSBlast.cpp" />
     <ClCompile Include="..\..\src\M6WSSearch.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\sqlite-amalgamation\sqlite3.h" />
+    <ClInclude Include="..\..\src\M6BitStream.h" />
+    <ClInclude Include="..\..\src\M6Blast.h" />
+    <ClInclude Include="..\..\src\M6BlastCache.h" />
+    <ClInclude Include="..\..\src\M6Builder.h" />
+    <ClInclude Include="..\..\src\M6Config.h" />
+    <ClInclude Include="..\..\src\M6Databank.h" />
+    <ClInclude Include="..\..\src\M6DataSource.h" />
+    <ClInclude Include="..\..\src\M6Dictionary.h" />
+    <ClInclude Include="..\..\src\M6DocStore.h" />
+    <ClInclude Include="..\..\src\M6Document.h" />
+    <ClInclude Include="..\..\src\M6Error.h" />
+    <ClInclude Include="..\..\src\M6Exec.h" />
+    <ClInclude Include="..\..\src\M6Fetch.h" />
+    <ClInclude Include="..\..\src\M6File.h" />
+    <ClInclude Include="..\..\src\M6Index-v1.h" />
+    <ClInclude Include="..\..\src\M6Index.h" />
+    <ClInclude Include="..\..\src\M6Iterator.h" />
+    <ClInclude Include="..\..\src\M6Lexicon.h" />
+    <ClInclude Include="..\..\src\M6Lib.h" />
+    <ClInclude Include="..\..\src\M6Matrix.h" />
+    <ClInclude Include="..\..\src\M6MD5.h" />
+    <ClInclude Include="..\..\src\M6Parser.h" />
+    <ClInclude Include="..\..\src\M6Progress.h" />
+    <ClInclude Include="..\..\src\M6Query.h" />
+    <ClInclude Include="..\..\src\M6Queue.h" />
+    <ClInclude Include="..\..\src\M6SequenceFilter.h" />
+    <ClInclude Include="..\..\src\M6Server.h" />
+    <ClInclude Include="..\..\src\M6Tokenizer.h" />
+    <ClInclude Include="..\..\src\M6Utilities.h" />
+    <ClInclude Include="..\..\src\M6WSBlast.h" />
+    <ClInclude Include="..\..\src\M6WSSearch.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{9E5E7747-2076-4E8C-8DCE-71C09ADD1B06}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>m6cmd</RootNamespace>
+    <ProjectName>m6</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
@@ -66,7 +120,7 @@
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>C:\Boost\include\boost-1_48;$(SolutionDir)..\..\libzeep;$(SolutionDir)..\src;C:\perl\lib\CORE;C:\perl\lib\auto\Win32CORE;$(SolutionDir)..\src\sqlite-amalgamation;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
-      <PreprocessorDefinitions>_UNICODE;UNICODE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>MRS_ETC_DIR="C:/data/config";_UNICODE;UNICODE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -83,7 +137,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <AdditionalIncludeDirectories>C:\Boost\include\boost-1_48;$(SolutionDir)..\..\libzeep;$(SolutionDir)..\src;C:\perl\lib\CORE;C:\perl\lib\auto\Win32CORE;$(SolutionDir)..\src\sqlite-amalgamation;$(SolutionDir)..\..\zlib-1.2.5;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <PreprocessorDefinitions>NDEBUG;_UNICODE;UNICODE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>MRS_ETC_DIR="C:/data/config";NDEBUG;_UNICODE;UNICODE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>

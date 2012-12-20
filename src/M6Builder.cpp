@@ -892,13 +892,15 @@ void M6Scheduler::Run()
 				log << endl;
 			}
 		}
-		catch (boost::thread_interrupted&)
+		catch (boost::thread_interrupted& e)
 		{
+			M6Status::Instance().SetError(databank, e.what());
 			log << "Stopping scheduler on interrupt" << endl;
 			break;
 		}
 		catch (exception& e)
 		{
+			M6Status::Instance().SetError(databank, e.what());
 			log << "Exception in scheduler:" << endl
 				 << e.what() << endl;
 		}	

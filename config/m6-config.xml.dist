@@ -110,7 +110,7 @@
     <!-- omim -->
     <databank id="omim" parser="omim" format="omim" enabled="true" update="never" fasta="false">
       <aliases>
-        <alias>MIM</alias>
+        <alias name="Omim">MIM</alias>
       </aliases>
       <name>OMIM - Online Mendelian Inheritance in Man™</name>
       <info>http://www.ncbi.nlm.nih.gov/entrez/query.fcgi?db=OMIM</info>

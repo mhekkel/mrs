@@ -824,6 +824,7 @@ void M6Scheduler::Run()
 		}
 		
 		boost::this_thread::sleep(boost::posix_time::seconds(5));
+		string databank, action;
 
 		try
 		{
@@ -854,11 +855,9 @@ void M6Scheduler::Run()
 					}
 				}
 			}			
-			
+
 			for (;;)
 			{
-				string databank, action;
-			
 				mLock.lock();
 				if (not mScheduled.empty())
 				{
@@ -894,7 +893,7 @@ void M6Scheduler::Run()
 		}
 		catch (boost::thread_interrupted& e)
 		{
-			M6Status::Instance().SetError(databank, e.what());
+			M6Status::Instance().SetError(databank, "interrupted");
 			log << "Stopping scheduler on interrupt" << endl;
 			break;
 		}

@@ -25,8 +25,8 @@
   <server addr="0.0.0.0" port="__MRS_PORT__" user="__MRS_USER__" pidfile="__MRS_DATA_DIR__/log/m6.pid">
     <admin realm="M6 Administrator"/>
     <base-url>__MRS_BASE_URL__</base-url>
-    <web-service service="mrsws_search" ns="http://mrs.cmbi.ru.nl/mrsws/mrsws_search" location="mrsws/search"/>
-    <web-service service="mrsws_blast" ns="http://mrs.cmbi.ru.nl/mrsws/mrsws_blast" location="mrsws/blast"/>
+    <web-service service="mrsws_search" ns="http://mrs.cmbi.ru.nl/mrsws/search" location="mrsws/search"/>
+    <web-service service="mrsws_blast" ns="http://mrs.cmbi.ru.nl/mrsws/blast" location="mrsws/blast"/>
   </server>
   <!-- Formats section, formats are used to add links to entries and
 		 to link a JavaScript pretty printer -->
@@ -119,7 +119,7 @@
     <databank id="embl" parser="embl" format="embl" enabled="true" update="weekly" fasta="false">
       <name>EMBL</name>
       <info>http://www.ebi.ac.uk/embl/index.html</info>
-      <source delete="true" fetch="rsync://rsync.cmbi.ru.nl/embl_release/">embl_release/*.dat.gz</source>
+      <source delete="true" fetch="rsync://ftp.ebi.ac.uk/pub/databases/embl/release/" recursive="false">embl_release/*.dat.gz</source>
     </databank>
     <databank id="enzyme" parser="enzyme" format="enzyme" enabled="true" update="daily" fasta="false">
       <name>Enzyme</name>
@@ -147,7 +147,7 @@
     <databank id="genbank" parser="genbank" enabled="true" update="weekly" fasta="false">
       <name>Genbank</name>
       <info>http://www.ncbi.nlm.nih.gov/genbank/</info>
-      <source delete="true" fetch="rsync://ftp.ncbi.nih.gov/genbank/">genbank/*.seq.gz</source>
+      <source delete="true" fetch="rsync://ftp.ncbi.nih.gov/genbank/" recursive="false">genbank/*.seq.gz</source>
       <aliases>
         <alias name="Genbank Identifier">gi</alias>
       </aliases>
@@ -155,7 +155,7 @@
     <databank id="refseq" parser="genbank" enabled="true" update="weekly" fasta="false">
       <name>Refseq</name>
       <info>http://www.ncbi.nlm.nih.gov/RefSeq/</info>
-      <source delete="true" fetch="rsync://ftp.ncbi.nih.gov/refseq/release/complete/">refseq/release/complete/*g{p,b}ff.gz</source>
+      <source delete="true" fetch="rsync://ftp.ncbi.nih.gov/refseq/release/complete/" recursive="false">refseq/release/complete/*g{p,b}ff.gz</source>
     </databank>
     <databank id="taxonomy" parser="taxonomy" format="taxonomy" enabled="true" update="daily" fasta="false">
       <name>Taxonomy</name>
@@ -211,7 +211,7 @@
     <databank id="dbest" parser="dbest" enabled="false" update="never" fasta="false">
       <name>dbEST</name>
       <info>http://www.ncbi.nlm.nih.gov/dbEST/</info>
-      <source delete="true" fetch="rsync://ftp.ncbi.nih.gov/repository/dbEST/">dbEST/dbEST.reports.*.gz</source>
+      <source delete="true" fetch="rsync://ftp.ncbi.nih.gov/repository/dbEST/" recursive="false">dbEST/dbEST.reports.*.gz</source>
     </databank>
     <databank id="pfama" parser="pfam" format="stockholm" enabled="true" update="weekly" fasta="false">
       <aliases>

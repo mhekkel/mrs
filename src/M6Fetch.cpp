@@ -106,7 +106,7 @@ struct M6SocketDevice : public io::source
 					M6SocketDevice(M6SocketType inSocket)
 						: mSocket(inSocket) {}
 
-	streamsize		read(char* s, streamsize n)	{ return ::read(mSocket, s, n); }
+	streamsize		read(char* s, streamsize n)	{ return static_cast<streamsize>(::read(mSocket, s, n)); }
 
 	M6SocketType	mSocket;
 };
@@ -640,12 +640,12 @@ void M6FTPFetcherImpl::FetchFile(fs::path inRemote, fs::path inLocal, time_t inT
 	if (status != 125 and status != 150)
 		Error("Error retrieving file");
 	
-	char buffer[1024];
+	vector<char> buffer(32 * 1024 * 1024);
 	streamsize r;
 	
-	while ((r = io::read(stream, buffer, sizeof(buffer))) > 0)
+	while ((r = io::read(stream, buffer.data(), buffer.size())) > 0)
 	{
-		file.write(buffer, r);
+		file.write(buffer.data(), r);
 		inProgress.Consumed(r);
 	}
 

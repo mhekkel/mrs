@@ -1840,6 +1840,11 @@ void M6Server::ProcessNewConfig(const string& inPage, zeep::http::parameter_map&
 				source->set_attribute("delete", "true");
 			else
 				source->remove_attribute("delete");
+
+			if (inParams.get("recursive", false).as<bool>())
+				source->set_attribute("recursive", "true");
+			else
+				source->remove_attribute("recursive");
 		}
 	}
 	else if (inPage == "scheduler")
@@ -2077,6 +2082,7 @@ void M6Server::handle_admin(const zh::request& request,
 			el::object fetch;
 			fetch["src"] = e->get_attribute("fetch");
 			fetch["delete"] = e->get_attribute("delete");
+			fetch["recursive"] = e->get_attribute("recursive");
 			databank["fetch"] = fetch;
 		}
 		
@@ -2224,7 +2230,7 @@ void M6Server::handle_rest_find(const zh::request& request, const el::scope& sco
 		THROW(("No db specified"));
 
 	vector<el::object> hits;
-	uint32 c, hitCount;
+	uint32 hitCount;
 	bool ranked;
 	string error;
 	

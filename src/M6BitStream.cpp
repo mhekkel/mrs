@@ -781,7 +781,7 @@ void ReadArray(M6IBitStream& inBits, vector<uint32>& outArray)
 
 void ReadArray(M6IBitStream& inBits, vector<bool>& outArray, uint32& outCount, uint32& outUpdated)
 {
-	uint32 size, result;
+	uint32 size;
 	ReadGamma(inBits, size);
 
 	outCount = size;

@@ -381,7 +381,6 @@ streamsize M6ProcessImpl::read(char* s, streamsize n)
 	
 	while (mHOutputRead != nullptr and n > 0)
 	{
-		char buffer[1024];
 		DWORD rr, avail;
 		
 		if (mHOutputRead)

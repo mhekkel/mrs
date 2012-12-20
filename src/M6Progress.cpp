@@ -106,7 +106,7 @@ M6StatusImpl::M6StatusImpl()
 		if (mDbStatus == nullptr)
 			mDbStatus = mSegment->construct<M6DbSet>("M6DbSet")(*mAllocator);
 	}
-	catch (ip::interprocess_exception& e)
+	catch (ip::interprocess_exception&)
 	{
 		mDbStatus = nullptr;
 		delete mAllocator;

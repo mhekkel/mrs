@@ -9,7 +9,8 @@
 #define foreach BOOST_FOREACH
 #include <boost/filesystem/fstream.hpp>
 #include <boost/algorithm/string.hpp>
-#include <boost/date_time/posix_time/posix_time_types.hpp>
+#include <boost/date_time/posix_time/posix_time.hpp>
+#include <boost/date_time/local_time/local_time.hpp>
 #include <boost/program_options.hpp>
 #include <boost/uuid/uuid_io.hpp>
 
@@ -3254,7 +3255,13 @@ void RunMainLoop(uint32 inNrOfThreads)
 {
 	for (;;)
 	{
-		cerr << "Restarting services...";
+		using namespace boost::local_time;
+		using namespace boost::posix_time;
+
+		local_time_facet* lf(new local_time_facet("[%d/%b/%Y:%H:%M:%S %z]"));
+		cerr.imbue(std::locale(std::cout.getloc(), lf));
+		cerr << local_date_time(second_clock::local_time(), time_zone_ptr())
+			 << " Restarting services...";
 		
 		M6SignalCatcher catcher;
 		catcher.BlockSignals();
@@ -3274,7 +3281,8 @@ void RunMainLoop(uint32 inNrOfThreads)
 		boost::thread thread(boost::bind(&zeep::http::server::run, boost::ref(server), inNrOfThreads));
 	
 		cerr << " done" << endl
-			 << "listening at " << addr << ':' << port << endl;
+			 << local_date_time(second_clock::local_time(), time_zone_ptr())
+			 << " listening at " << addr << ':' << port << endl;
 		
 		catcher.UnblockSignals();
 		
@@ -3407,6 +3415,36 @@ int M6Server::Status(const string& inPidFile)
 	{
 		cerr << "m6 server is running" << endl;
 		result = 0;
+	}
+	else
+	{
+		cerr << "m6 server is not running" << endl;
+		result = 1;
+	}
+	
+	return result;
+}
+
+int M6Server::Reload(const string& inPidFile)
+{
+	const zx::element* config = M6Config::GetServer();
+
+	string pidfile = inPidFile;
+	if (pidfile.empty())
+		pidfile = config->get_attribute("pidfile");
+
+	int result;
+	
+	if (IsPIDFileForExecutable(pidfile))
+	{
+		ifstream file(pidfile);
+		if (not file.is_open())
+			THROW(("Failed to open pid file"));
+		
+		int pid;
+		file >> pid;
+	
+		result = KillDaemon(pid, SIGHUP);
 	}
 	else
 	{

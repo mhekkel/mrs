@@ -353,6 +353,11 @@ int StopDaemon(int pid)
 	return err;
 }
 
+int KillDaemon(int pid, int sig)
+{
+	return ::kill(pid, sig);
+}
+
 // --------------------------------------------------------------------
 // 
 //	OpenLogFile

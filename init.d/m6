@@ -12,12 +12,12 @@
 # Do NOT "set -e"
 
 # PATH should only include /usr/* if it runs after the mountnfs.sh script
-PATH=/sbin:/usr/sbin:/bin:/usr/bin
+PATH=__BIN_DIR__
 DESC="M6 server"
 NAME=m6
-PIDFILE=/var/run/$NAME.pid
-DAEMON=/usr/bin/$NAME
-DAEMON_ARGS="--config=/etc/mrs/m6-config.xml --pid=$PIDFILE"
+PIDFILE=__MRS_LOG_DIR__/$NAME.pid
+DAEMON=__BIN_DIR__/$NAME
+#DAEMON_ARGS="--config=/etc/mrs/m6-config.xml --pid=$PIDFILE"
 SCRIPTNAME=/etc/init.d/$NAME
 
 # Exit if the package is not installed
@@ -39,8 +39,9 @@ SCRIPTNAME=/etc/init.d/$NAME
 #
 do_start()
 {
-	$DAEMON server status --pidfile=$PIDFILE || return 1
+	$DAEMON server status --pidfile=$PIDFILE && return 1
 	$DAEMON server start --pidfile=$PIDFILE || return 2
+	return 0
 }
 
 #
@@ -48,22 +49,9 @@ do_start()
 #
 do_stop()
 {
-	$DAEMON server status --pidfile=$PIDFILE && return 1
+	$DAEMON server status --pidfile=$PIDFILE || return 1
 	$DAEMON server stop --pidfile=$PIDFILE || return 2
 	rm -f $PIDFILE
-	return "$RETVAL"
-}
-
-#
-# Function that sends a SIGHUP to the daemon/service
-#
-do_reload() {
-	#
-	# If the daemon can reload its configuration without
-	# restarting (for example, when it is sent a SIGHUP),
-	# then implement that here.
-	#
-	start-stop-daemon --stop --signal 1 --quiet --pidfile $PIDFILE --name $NAME
 	return 0
 }
 
@@ -85,22 +73,22 @@ case "$1" in
 	esac
 	;;
   status)
-       status_of_proc "$DAEMON" "$NAME" && exit 0 || exit $?
-       ;;
-  #reload|force-reload)
-	#
-	# If do_reload() is not implemented then leave this commented out
-	# and leave 'force-reload' as an alias for 'restart'.
-	#
-	#log_daemon_msg "Reloading $DESC" "$NAME"
-	#do_reload
-	#log_end_msg $?
-	#;;
-  restart|force-reload)
-	#
-	# If the "reload" option is implemented then remove the
-	# 'force-reload' alias
-	#
+  	$DAEMON server status --pidfile=$PIDFILE
+  	case "$?" in
+  		0)	log_success_msg "M6 Server is running"
+			exit 0
+			;;
+		*)	log_failure_msg "M6Server is NOT running"
+			exit 1
+			;;
+	esac
+    ;;
+  reload|force-reload)
+	log_daemon_msg "Reloading $DESC" "$NAME"
+	$DAEMON server reload --pidfile $PIDFILE
+	log_end_msg $?
+	;;
+  restart)
 	log_daemon_msg "Restarting $DESC" "$NAME"
 	do_stop
 	case "$?" in
@@ -119,8 +107,7 @@ case "$1" in
 	esac
 	;;
   *)
-	#echo "Usage: $SCRIPTNAME {start|stop|restart|reload|force-reload}" >&2
-	echo "Usage: $SCRIPTNAME {start|stop|status|restart|force-reload}" >&2
+	echo "Usage: $SCRIPTNAME {start|stop|status|restart|reload|force-reload}" >&2
 	exit 3
 	;;
 esac

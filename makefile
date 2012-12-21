@@ -5,7 +5,7 @@
 #    (See accompanying file LICENSE_1_0.txt or copy at
 #          http://www.boost.org/LICENSE_1_0.txt)
 
-VERSION				= 6.0.0b2
+VERSION				= 6.0.0b3
 
 include make.config
 
@@ -172,8 +172,21 @@ install: m6
 		echo "Don't forget to create an admin user for the MRS server by running the command $(BIN_DIR)/m6 password"; \
 		echo ""; \
 		echo ""; \
+	  else \
+	    echo ""; \
+	    echo "Not overwriting existing $(MRS_ETC_DIR)/m6-config.xml"; \
+	    echo "check the file $(MRS_ETC_DIR)/m6-config.xml.dist for chanages"; \
+	    echo ""; \
 	fi
 	@ rm /tmp/m6-config.xml.dist
+	@ if [ ! -f /etc/init.d/m6 ]; then \
+		sed -e 's|__BIN_DIR__|$(BIN_DIR)|g' \
+			-e 's|__MRS_LOG_DIR__|$(MRS_LOG_DIR)|g' \
+			init.d/m6 > /etc/init.d/m6 ; \
+	  else \
+		echo ""; \
+		echo "Not overwriting /etc/init.d/m6 file" ; \
+	  fi
 
 DIST = m6-$(VERSION)
 

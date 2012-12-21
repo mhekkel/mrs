@@ -40,6 +40,7 @@ class M6Server : public zh::webapp
 						bool inForeground);
 	static int		Stop(const std::string& inPidFile);
 	static int		Status(const std::string& inPidFile);
+	static int		Reload(const std::string& inPidFile);
 
 	virtual void	handle_request(const zh::request& req, zh::reply& rep);
 	virtual void	create_unauth_reply(bool stale, const std::string& realm, zh::reply& rep);

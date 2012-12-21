@@ -38,4 +38,5 @@ bool IsPIDFileForExecutable(const boost::filesystem::path& inFile);
 bool IsaTTY();
 void Daemonize(const std::string& inUser, const std::string& inPidFile);
 int StopDaemon(int pid);
+int KillDaemon(int pid, int sig);
 void OpenLogFile(const std::string& inLogFile, const std::string& inErrFile);

@@ -339,18 +339,12 @@ void Daemonize(const string& inUser, const string& inPidFile)
 
 int StopDaemon(int pid)
 {
-	int err = kill(pid, SIGINT);
-	
-	if (err == 0)
-	{
-		int status;
-		err = waitpid(pid, &status, 0);
+	return ::kill(pid, SIGINT);
+}
 
-		if (err == -1)
-			cerr << "failed to stop daemon: " << strerror(errno) << endl;
-	}
-	
-	return err;
+int KillDaemon(int pid, int sig)
+{
+	return ::kill(pid, sig);
 }
 
 // --------------------------------------------------------------------

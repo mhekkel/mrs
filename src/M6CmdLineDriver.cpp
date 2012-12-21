@@ -57,8 +57,21 @@ class M6CmdLineDriver
 					ConsoleHandler(DWORD inCEvent);
 #endif
 
-  protected:
+	struct DriverInfo
+	{
+		string								name;
+		string								description;
+		boost::function<M6CmdLineDriver*()>	factory;
+	};
+	
+	template<class D>
+	static void		Register(const char* name, const char* description)
+	{
+		DriverInfo d = { name, description, [](){ return new D; } };
+		sDrivers.push_back(d);
+	}
 
+  protected:
 					M6CmdLineDriver();
 
 	virtual void	AddOptions(po::options_description& desc,
@@ -70,8 +83,11 @@ class M6CmdLineDriver
 	tr1::tuple<const zx::element*,fs::path>
 					GetDatabank(const string& inDatabank);
 
-	static string	sDatabank;
+	static string				sDatabank;
+	static vector<DriverInfo>	sDrivers;
 };
+
+vector<M6CmdLineDriver::DriverInfo> M6CmdLineDriver::sDrivers;
 
 // --------------------------------------------------------------------
 // implementations
@@ -194,33 +210,39 @@ M6CmdLineDriver::M6CmdLineDriver()
 int M6CmdLineDriver::Exec(int argc, char* const argv[])
 {
 	unique_ptr<M6CmdLineDriver> driver;
-	
-	if (strcmp(argv[1], "blast") == 0)
-		driver.reset(new M6BlastDriver());
-	else if (strcmp(argv[1], "build") == 0 or strcmp(argv[1], "update") == 0)
-		driver.reset(new M6BuildDriver());
-	else if (strcmp(argv[1], "query") == 0)
-		driver.reset(new M6QueryDriver());
-	else if (strcmp(argv[1], "info") == 0)
-		driver.reset(new M6InfoDriver());
-	else if (strcmp(argv[1], "entry") == 0)
-		driver.reset(new M6EntryDriver());
-	else if (strcmp(argv[1], "dump") == 0)
-		driver.reset(new M6DumpDriver());
-	else if (strcmp(argv[1], "fetch") == 0)
-		driver.reset(new M6FetchDriver());
-	else if (strcmp(argv[1], "vacuum") == 0)
-		driver.reset(new M6VacuumDriver());
-	else if (strcmp(argv[1], "validate") == 0)
-		driver.reset(new M6ValidateDriver());
-	else if (strcmp(argv[1], "password") == 0)
-		driver.reset(new M6PasswordDriver());
-	else if (strcmp(argv[1], "server") == 0)
-		driver.reset(new M6ServerDriver());
-	else
+
+	if (argc > 1)
 	{
-		cerr << "Unknown command " << argv[1] << endl
-			 << "Supported commands are build, query and info" << endl;
+		foreach (DriverInfo& di, sDrivers)
+		{
+			if (di.name == argv[1])
+			{
+				driver.reset(di.factory());
+				break;
+			}
+		}
+	}
+
+	if (not driver)
+	{
+		if (argc > 1)
+		{
+			cout << "Invalid command " << argv[1] << endl
+				 << endl;
+		}
+		
+		cout << "Usage: m6 command [options]" << endl
+			 << endl
+			 << "  Command can be one of:" << endl
+			 << endl;
+		
+		foreach (DriverInfo& di, sDrivers)
+			cout << "    " << di.name << string(12 - di.name.length(), ' ') << di.description << endl;
+		
+		cout << endl
+			 << "  Use m6 command --help for more info on each command" << endl
+			 << endl;
+		
 		exit(1);
 	}
 
@@ -237,7 +259,7 @@ int M6CmdLineDriver::Exec(int argc, char* const argv[])
 	
 	po::notify(vm);
 
-	if (not driver->Validate(vm))
+	if (vm.count("help") or not driver->Validate(vm))
 	{
 		cerr << desc << "\n";
 		exit(1);
@@ -253,7 +275,7 @@ void M6CmdLineDriver::AddOptions(po::options_description& desc,
 	unique_ptr<po::positional_options_description>& p)
 {
 	desc.add_options()	
-		("databank,d",	po::value<string>(),	"Databank to build")
+		("databank,d",	po::value<string>(),	"Databank")
 		("config,c",	po::value<string>(),	"Configuration file")
 		("verbose,v",							"Be verbose")
 		("threads,a",	po::value<uint32>(),	"Nr of threads/pipelines")
@@ -806,6 +828,7 @@ void M6PasswordDriver::AddOptions(po::options_description& desc,
 		("config,c",	po::value<string>(),	"Configuration file")
 		("user,u", po::value<string>(),			"User to modify")
 		("realm,r", po::value<string>(),		"Realm to modify (default is 'M6 Administrator'")
+		("help,h",								"Display help message")
 		;
 
 	p.reset(new po::positional_options_description());
@@ -883,7 +906,8 @@ void M6ServerDriver::AddOptions(po::options_description& desc,
 		("user,u",		po::value<string>(),	"User to run as (e.g. nobody)")
 		("pidfile,p",	po::value<string>(),	"Create file with process ID (pid)")
 		("no-daemon,F",							"Do not run as background process")
-		("command",		po::value<string>(),	"Command, one of start, stop or status")
+		("command",		po::value<string>(),	"Command, one of start, stop, status or reload")
+		("help,h",								"Display help message")
 		;
 
 	p.reset(new po::positional_options_description());
@@ -916,6 +940,8 @@ int M6ServerDriver::Exec(const string& inCommand, po::variables_map& vm)
 		result = M6Server::Stop(pidfile);
 	else if (command == "status")
 		result = M6Server::Status(pidfile);
+	else if (command == "reload")
+		result = M6Server::Reload(pidfile);
 	else
 		THROW(("Invalid command '%s'", command.c_str()));
 	
@@ -946,42 +972,32 @@ int main(int argc, char* argv[])
 		signal(SIGINT, &M6CmdLineDriver::SigHandler);
 #endif
 
-		if (argc < 2)
-		{
-			cout << "Usage: m6 command [options]" << endl
-				 << endl
-				 << "  Command can be one of:" << endl
-				 << endl
-				 << "    blast       Do a blast search" << endl
-				 << "    build       (Re-)build a databank" << endl
-				 << "    dump        Dump index data" << endl
-				 << "    entry       Retrieve and print an entry" << endl
-				 << "    fetch       Fetch/mirror remote data for a databank" << endl
-				 << "    info        Display information and statistics for a databank" << endl
-				 << "    query       Perform a search in a databank" << endl
-				 << "    server      Start or Stop a server session, or query the status" << endl
-				 << "    vacuum      Clean up a databank reclaiming unused disk space" << endl
-				 << "    validate    Perform a set of validation tests" << endl
-				 << "    update      Same as build, but does a fetch first" << endl
-				 << "    password    Generate password for use in configuration file" << endl
-				 << endl
-				 << "  Use m6 command --help for more info on each command" << endl;
-			exit(1);
-		}
+		M6CmdLineDriver::Register<M6BlastDriver>	("blast",	"Do a blast search");
+		M6CmdLineDriver::Register<M6BuildDriver>	("build",	"(Re-)build a databank");
+		M6CmdLineDriver::Register<M6DumpDriver>		("dump",	"Dump index data");
+		M6CmdLineDriver::Register<M6EntryDriver>	("entry",	"Retrieve and print an entry");
+		M6CmdLineDriver::Register<M6FetchDriver>	("fetch",	"Fetch/mirror remote data for a databank");
+		M6CmdLineDriver::Register<M6InfoDriver>		("info",	"Display information and statistics for a databank");
+		M6CmdLineDriver::Register<M6QueryDriver>	("query",	"Perform a search in a databank");
+		M6CmdLineDriver::Register<M6ServerDriver>	("server",	"Start or Stop a server session, or query the status");
+		M6CmdLineDriver::Register<M6VacuumDriver>	("vacuum",	"Clean up a databank reclaiming unused disk space");
+		M6CmdLineDriver::Register<M6ValidateDriver>	("validate","Perform a set of validation tests");
+		M6CmdLineDriver::Register<M6BuildDriver>	("update",	"Same as build, but does a fetch first");
+		M6CmdLineDriver::Register<M6PasswordDriver>	("password","Generate password for use in configuration file");
 		
 		result = M6CmdLineDriver::Exec(argc, argv);
 	}
 	catch (exception& e)
 	{
 		cerr << endl
-			 << "m6-builder exited with an exception:" << endl
+			 << "m6 exited with an exception:" << endl
 			 << e.what() << endl;
 		result = 1;
 	}
 	catch (...)
 	{
 		cerr << endl
-			 << "m6-builder exited with an uncaught exception" << endl;
+			 << "m6 exited with an uncaught exception" << endl;
 		result = 1;
 	}
 	

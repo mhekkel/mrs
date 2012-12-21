@@ -3413,12 +3413,14 @@ int M6Server::Status(const string& inPidFile)
 	
 	if (IsPIDFileForExecutable(pidfile))
 	{
-		cerr << "m6 server is running" << endl;
+		if (VERBOSE)
+			cerr << "m6 server is running" << endl;
 		result = 0;
 	}
 	else
 	{
-		cerr << "m6 server is not running" << endl;
+		if (VERBOSE)
+			cerr << "m6 server is not running" << endl;
 		result = 1;
 	}
 	
@@ -3448,7 +3450,8 @@ int M6Server::Reload(const string& inPidFile)
 	}
 	else
 	{
-		cerr << "m6 server is not running" << endl;
+		if (VERBOSE)
+			cerr << "m6 server is not running" << endl;
 		result = 1;
 	}
 	

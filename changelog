@@ -1,9 +1,8 @@
 Changes in MRS version 6
 
 - Single file databanks have been replaced with one directory per databank.
-- There's only one executable left: m6. This executable takes as first
+- There's only one executable left: m6. This executable takes as the first
   parameter a command name and then options for the specific command.
-- The tokenizer has changed slightly to optimize recall.
 - Configuration is done in just one, xml file. This can be edited using the
   admin interface in the web application.
 - Only one server instance and only one IP port used.
@@ -11,14 +10,13 @@ Changes in MRS version 6
   application.
 - Parser files have been simplified, they now only contain all that's needed
   for parsing and nothing more. The configuration previously contained in the
-  parsers has moved to the single configuration file.
+  parsers has moved to the single configuration file. There's also a generic
+  parser that can be used to index 'one document per file' databanks.
 - The web app no longer formats entries, this is now done by formatters
   written in JavaScript and handled by the browser. Unfortunately this means
   that Webkit based browsers can no longer display PubMed Central records,
   neither can Opera. This has to do with a bug(?) in the handling of XML 
   Stylesheets in these browsers.
-- NCBI blast support has been dropped, the MRS blast code has been optimized
-  and works on FastA files directly.
 - New link implementation. The parser takes care of recording links to
   external documents and the server takes care of the rest. No need to
   explicitly define links between databanks anymore.
@@ -43,5 +41,11 @@ Changes in MRS version 6
   However, the performance penalty was large. The alternative is to use
   aliases that can specify a group of databanks. E.g. uniprot is an alias
   for both sprot and trembl.
-
-  
+- The tokenizer has changed slightly to optimize recall.
+- A new way to browse index entries. Go to the information page for a databank
+  and click on the index names. This will open a page where you easily select
+  index entries and the documents that contain them.
+- NCBI blast support has been dropped, the MRS blast code has been optimized
+  and now works on FastA files directly. The blast cache is now stored on
+  disk and the index is managed by a SQLite databank. Results are removed
+  once the databank they point to is updated.

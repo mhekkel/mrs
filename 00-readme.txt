@@ -17,6 +17,7 @@ MRS runs on both Linux and Windows although a recent C++ compiler is required
 to build it. The Linux version comes with an init.d script. For windows, I 
 still have to implement the code to run MRS as a service.
 
+See the changelog file for an overview of what has changed since version 5.
 
 
 Building MRS

@@ -3,7 +3,6 @@
 #include <signal.h>
 
 #include <iostream>
-#include <map>
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem/operations.hpp>
@@ -260,7 +259,7 @@ int M6CmdLineDriver::Exec(int argc, char* const argv[])
 	
 	po::notify(vm);
 
-	if (not driver->Validate(vm))
+	if (vm.count("help") or not driver->Validate(vm))
 	{
 		cerr << desc << "\n";
 		exit(1);
@@ -276,7 +275,7 @@ void M6CmdLineDriver::AddOptions(po::options_description& desc,
 	unique_ptr<po::positional_options_description>& p)
 {
 	desc.add_options()	
-		("databank,d",	po::value<string>(),	"Databank to build")
+		("databank,d",	po::value<string>(),	"Databank")
 		("config,c",	po::value<string>(),	"Configuration file")
 		("verbose,v",							"Be verbose")
 		("threads,a",	po::value<uint32>(),	"Nr of threads/pipelines")
@@ -829,6 +828,7 @@ void M6PasswordDriver::AddOptions(po::options_description& desc,
 		("config,c",	po::value<string>(),	"Configuration file")
 		("user,u", po::value<string>(),			"User to modify")
 		("realm,r", po::value<string>(),		"Realm to modify (default is 'M6 Administrator'")
+		("help,h",								"Display help message")
 		;
 
 	p.reset(new po::positional_options_description());
@@ -907,6 +907,7 @@ void M6ServerDriver::AddOptions(po::options_description& desc,
 		("pidfile,p",	po::value<string>(),	"Create file with process ID (pid)")
 		("no-daemon,F",							"Do not run as background process")
 		("command",		po::value<string>(),	"Command, one of start, stop, status or reload")
+		("help,h",								"Display help message")
 		;
 
 	p.reset(new po::positional_options_description());
@@ -989,14 +990,14 @@ int main(int argc, char* argv[])
 	catch (exception& e)
 	{
 		cerr << endl
-			 << "m6-builder exited with an exception:" << endl
+			 << "m6 exited with an exception:" << endl
 			 << e.what() << endl;
 		result = 1;
 	}
 	catch (...)
 	{
 		cerr << endl
-			 << "m6-builder exited with an uncaught exception" << endl;
+			 << "m6 exited with an uncaught exception" << endl;
 		result = 1;
 	}
 	

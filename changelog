@@ -7,11 +7,41 @@ Changes in MRS version 6
 - Configuration is done in just one, xml file. This can be edited using the
   admin interface in the web application.
 - Only one server instance and only one IP port used.
-- Makefile have been replaced by a scheduler inside the web application.
+- Makefile (mrs-update) has been replaced by a scheduler inside the web
+  application.
 - Parser files have been simplified, they now only contain all that's needed
-  for parsing and nothing more. The configuration previously done has moved
-  to the single configuration file.
+  for parsing and nothing more. The configuration previously contained in the
+  parsers has moved to the single configuration file.
 - The web app no longer formats entries, this is now done by formatters
-  written in JavaScript and handled by the browser.
+  written in JavaScript and handled by the browser. Unfortunately this means
+  that Webkit based browsers can no longer display PubMed Central records,
+  neither can Opera. This has to do with a bug(?) in the handling of XML 
+  Stylesheets in these browsers.
 - NCBI blast support has been dropped, the MRS blast code has been optimized
   and works on FastA files directly.
+- New link implementation. The parser takes care of recording links to
+  external documents and the server takes care of the rest. No need to
+  explicitly define links between databanks anymore.
+- New REST interface, the old one was dropped.
+  To retrieve the fasta for the 104k_thepa record from SwissProt, you call:
+  
+  	http://mrs.cmbi.ru.nl/m6/rest/entry/sprot/104k_thepa?format=fasta
+
+  of course, you can leave out the format parameter, in which case you
+  get the plain document.
+  
+  To search for crambin in swissprot, you would call:
+  
+  	http://mrs.cmbi.ru.nl/m6/rest/find/sprot/crambin
+  
+  Here, you can optionally specify the parameters 'offset' and 'count', as in:
+  
+  	http://mrs.cmbi.ru.nl/m6/rest/find/sprot/crambin?offset=1&count=2
+
+- Joined databanks have been dropped. This was a nice way to overcome the
+  fact that MRS files cannot be updated with new or modified documents.
+  However, the performance penalty was large. The alternative is to use
+  aliases that can specify a group of databanks. E.g. uniprot is an alias
+  for both sprot and trembl.
+
+  

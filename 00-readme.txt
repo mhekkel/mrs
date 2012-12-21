@@ -1,9 +1,21 @@
 MRS is full text retrieval software optimized for large, flat file databanks
-containing biological and medical information.
+containing biological and medical information. After indexing these databanks,
+they can be searched using a command line interface and when running the
+server, using a web browser or using web services (SOAP, REST).
+
+Searching can be done using simple keyword searches, but also using more
+advanced boolean queries, searches limited to parts of a document, searches
+for 'strings' (sequences of words). Results are sorted by relevance, when
+applicable. MRS also has a protein BLAST search engine built in.
 
 Previous versions used to be hard to set up and configure, version 6 tries
 to address this by combining all configuration information in one place and
-offering a graphical interface to manipulate this configuration.
+offering a graphical interface to manipulate this configuration. The update
+process is fully automated and easy to follow.
+
+MRS runs on both Linux and Windows although a recent C++ compiler is required
+to build it. The Linux version comes with an init.d script. For windows, I 
+still have to implement the code to run MRS as a service.
 
 
 

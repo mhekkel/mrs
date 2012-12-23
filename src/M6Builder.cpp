@@ -858,6 +858,9 @@ void M6Scheduler::Run()
 
 			for (;;)
 			{
+				databank.clear();
+				action.clear();
+
 				mLock.lock();
 				if (not mScheduled.empty())
 				{

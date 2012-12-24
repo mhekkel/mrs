@@ -60,8 +60,11 @@ class M6Scheduler
 	M6Scheduler&		operator=(const M6Scheduler&);
 
 	void				Run();
+	void				OpenBuildLog();
 
 	boost::mutex		mLock;
+	std::unique_ptr<std::ostream>
+						mLogFile;
 	boost::thread		mThread;
 	std::deque<std::tr1::tuple<std::string,std::string>>
 						mScheduled;

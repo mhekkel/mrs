@@ -782,17 +782,30 @@ void M6Scheduler::GetScheduledDatabanks(vector<string>& outDatabanks)
 	});
 }
 
+void M6Scheduler::OpenBuildLog()
+{
+	using namespace boost::gregorian;
+	using namespace boost::local_time;
+	using namespace boost::posix_time;
+	
+	stringstream s;
+	s.imbue(locale(cout.getloc(), new date_facet("%Y%m%d")));
+	s << "build_log-" << second_clock::local_time().date();
+	
+	fs::path logfile(fs::path(M6Config::GetDirectory("log")) / s.str());
+
+	// close old log file first (in case we're reopening)
+	if (mLogFile)
+		mLogFile.reset(nullptr);
+
+	mLogFile.reset(new fs::ofstream(logfile, ios::app));
+}
+
 void M6Scheduler::Run()
 {
+	using namespace boost::gregorian;
     using namespace boost::local_time;
     using namespace boost::posix_time;
-
-	fs::ofstream log(fs::path(M6Config::GetDirectory("log")) / "build.log");
-	if (not log.is_open())
-	{
-		cerr << "Failed to create log file" << endl;
-		exit(1);
-	}
 
 	bool enabled;
 	ptime updateTime;
@@ -809,11 +822,13 @@ void M6Scheduler::Run()
 	time_iterator update(start, hours(24));		// daily 
 	bool writeNextUpdateTime = true, reload = false;
 
+	OpenBuildLog();
+
 	for (;;)
 	{
 		if (writeNextUpdateTime)
 		{
-			log << "Next update at " << *update << endl;
+			*mLogFile << "Next update at " << *update << endl;
 			writeNextUpdateTime = false;
 		}
 		
@@ -838,6 +853,8 @@ void M6Scheduler::Run()
 				bool weekly = ba::iequals(
 					now.date().day_of_week().as_long_string(), updateWeekday);
 				bool monthly = weekly and now.date().day() < 7;
+				
+				OpenBuildLog();
 				
 				foreach (zx::element* db, M6Config::GetDatabanks())
 				{
@@ -881,29 +898,29 @@ void M6Scheduler::Run()
 				args.push_back(databank.c_str());
 				args.push_back(nullptr);
 				
-				log << "About to " << action << ' ' << databank << endl;
+				*mLogFile << "About to " << action << ' ' << databank << endl;
 				
 				stringstream in;
-				int r = ForkExec(args, 0, in, log, log);
+				int r = ForkExec(args, 0, in, *mLogFile, *mLogFile);
 				
 				if (r == 0)
 					reload = true;	// signal to reload databanks
 				else
-					log << action << " of " << databank << " returned: " << r << endl;
+					*mLogFile << action << " of " << databank << " returned: " << r << endl;
 				
-				log << endl;
+				*mLogFile << endl;
 			}
 		}
 		catch (boost::thread_interrupted& e)
 		{
 			M6Status::Instance().SetError(databank, "interrupted");
-			log << "Stopping scheduler on interrupt" << endl;
+			*mLogFile << "Stopping scheduler on interrupt" << endl;
 			break;
 		}
 		catch (exception& e)
 		{
 			M6Status::Instance().SetError(databank, e.what());
-			log << "Exception in scheduler:" << endl
+			*mLogFile << "Exception in scheduler:" << endl
 				 << e.what() << endl;
 		}	
 	}

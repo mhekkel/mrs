@@ -3159,6 +3159,8 @@ void M6Server::handle_browse(const zh::request& request, const el::scope& scope,
 		THROW(("No index specified"));
 
 	M6Databank* mdb = Load(db);
+	if (mdb == nullptr)
+		THROW(("Databank not loaded"));
 
 	string iFirst = params.get("first", "").as<string>();
 	string iLast = params.get("last", "").as<string>();

@@ -94,8 +94,8 @@ my $config_dir = "$sysconfdir/mrs";
 
 # the compiler to use
 my $cxx = $ENV{CXX};
-$cxx = $ENV{CC} unless defined $cxx;
 $cxx = `which c++` unless defined $cxx;
+$cxx = $ENV{CC} unless defined $cxx;
 chomp($cxx);
 
 my $cxxflags = $ENV{CXXFLAGS};
@@ -182,9 +182,9 @@ Usage: perl configure [OPTIONS]
     --log-dir           The directory where the MRS server will store its log files.
                         Default is [$log_dir]
     --mrs-user          User that owns the mrs datafiles. Default is $mrs_user
-    --mrs-base-url      The base URL for the server pages, or the external address,
+    --base-url          The base URL for the server pages, or the external address,
     					default is $base_url.
-    --mrs-port          The network port for the server to listen to,
+    --port              The network port for the server to listen to,
     					default is $port.
     --cxx               The compiler to use, must be a GCC >= 4.6 or equivalent.
                         Default is [$cxx]

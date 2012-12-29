@@ -287,6 +287,7 @@ struct M6IBitStreamFileImpl : public M6IBitStreamImpl
 					Clone()					{ return new (mBitBufferSize) M6IBitStreamFileImpl(*this); }
 
 	void*			operator new(size_t inSize, uint32 inBitBufferSize);
+	void			operator delete(void* inPtr);
 	void			operator delete(void* inPtr, uint32);
 
 	M6File&			mData;
@@ -324,6 +325,11 @@ void M6IBitStreamFileImpl::Read()
 void* M6IBitStreamFileImpl::operator new(size_t inSize, uint32 inBitBufferSize)
 {
 	return ::malloc(inSize + inBitBufferSize);
+}
+
+void M6IBitStreamFileImpl::operator delete(void* inPtr)
+{
+	::free(inPtr);
 }
 
 void M6IBitStreamFileImpl::operator delete(void* inPtr, uint32)

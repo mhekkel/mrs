@@ -127,6 +127,7 @@ clean:
 	$(MAKE) -C libzeep clean
 	
 INSTALLDIRS = \
+	$(BIN_DIR) \
 	$(MRS_LOG_DIR) \
 	$(MRS_ETC_DIR) \
 	$(MRS_DATA_DIR)/raw \

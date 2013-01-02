@@ -75,6 +75,11 @@ int StopDaemon(int pid)
 	return 0;
 }
 
+int KillDaemon(int pid, int sig)
+{
+	return 0;
+}
+
 // --------------------------------------------------------------------
 // 
 //	OpenLogFile

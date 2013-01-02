@@ -13,10 +13,7 @@
 #include <boost/date_time/local_time/local_time.hpp>
 #include <boost/program_options.hpp>
 #include <boost/uuid/uuid_io.hpp>
-
-#if BOOST_VERSION >= 104800
 #include <boost/random/random_device.hpp>
-#endif
 
 #include <zeep/envelope.hpp>
 
@@ -68,12 +65,8 @@ M6AuthInfo::M6AuthInfo(const string& inRealm)
 {
 	using namespace boost::gregorian;
 
-#if BOOST_VERSION >= 104800
 	boost::random::random_device rng;
 	uint32 data[4] = { rng(), rng(), rng(), rng() };
-#else
-	int64 data[2] = { random(), random() };
-#endif
 
 	mNonce = M6MD5(data, sizeof(data)).Finalise();
 	mCreated = pt::second_clock::local_time();

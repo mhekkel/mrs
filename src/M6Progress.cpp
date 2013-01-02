@@ -8,6 +8,7 @@
 #include <unistd.h>
 #endif
 
+#include <boost/version.hpp>
 #include <boost/thread.hpp>
 #include <boost/format.hpp>
 #include <boost/date_time/posix_time/posix_time_types.hpp>
@@ -17,10 +18,7 @@
 #include <boost/interprocess/allocators/allocator.hpp>
 #include <boost/foreach.hpp>
 #define foreach BOOST_FOREACH
-
-#if BOOST_VERSION >= 104800
 #include <boost/timer/timer.hpp>
-#endif
 
 #include "M6Utilities.h"
 #include "M6Server.h"
@@ -255,10 +253,8 @@ struct M6ProgressImpl
 	uint32			mSpinner;
 	boost::mutex	mMutex;
 	boost::thread	mThread;
-#if BOOST_VERSION >= 104800
 	boost::timer::cpu_timer
 					mTimer;
-#endif
 };
 
 M6ProgressImpl::~M6ProgressImpl()
@@ -349,10 +345,7 @@ void M6ProgressImpl::PrintDone()
 {
 	int width = 80;
 
-	string msg = mAction + " done";
-#if BOOST_VERSION >= 104800
-	msg += " in " + mTimer.format(0, "%ts cpu / %ws wall");
-#endif
+	string msg = mTimer.format(0, mAction + " done in %ts cpu / %ws wall");
 	if (msg.length() < width)
 		msg += string(width - msg.length(), ' ');
 	

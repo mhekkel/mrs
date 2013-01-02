@@ -271,8 +271,7 @@ END
 		or length(@boost_version) == 0 or not defined $boost_version[0])
 	{
 		die "\n\nCannot continue since you don't seem to have boost installed\n",
-			"Please install the libboost-dev, libboost-thread-dev,\n",
-			"libboost-regex-dev and libboost-filesystem-dev packages and run configure again.\n";
+			"Please install e.g. the libboost1.48-all-dev package and run configure again.\n";
 	}
 
 	@boost_version = split(m/_/, $boost_version[0]);

@@ -1,16 +1,11 @@
 BUGS:
 
 - embl CO section in format is missing
-- passive ftp not working
-- 
 
 Todo
 
 - boost::notify_fork gebruiken
-- Bij query parse fout: melding en toch zoeken naar de woorden uit de query
-- rsync afronden?
 - Windows: Service Control Manager ondersteuning voor server mode
-
 - verhogen score als term in unique index?
 
 - Version
@@ -28,10 +23,6 @@ Parsers:
 
 - mediawiki :-)
 - mbox
-
-Basic:
-
-- Set up testing framework
 
 Search:
 

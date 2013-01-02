@@ -1,3 +1,8 @@
+//   Copyright Maarten L. Hekkelman, Radboud University 2012.
+//  Distributed under the Boost Software License, Version 1.0.
+//     (See accompanying file LICENSE_1_0.txt or copy at
+//           http://www.boost.org/LICENSE_1_0.txt)
+
 //	Document store. Store documents in pages and keep an index
 //	to the start of each document.
 //	The total size of a doc store is limited to 32 tera bytes.

@@ -1,3 +1,8 @@
+//   Copyright Maarten L. Hekkelman, Radboud University 2012.
+//  Distributed under the Boost Software License, Version 1.0.
+//     (See accompanying file LICENSE_1_0.txt or copy at
+//           http://www.boost.org/LICENSE_1_0.txt)
+
 //	M6 stores documents and documents contain unstructured text.
 //	That's not very useful by itself, and so we add attributes
 //	to a document. An attribute could be e.g. an ID or a title.

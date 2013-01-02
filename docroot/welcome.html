@@ -50,20 +50,29 @@ for more information.</p>
 
 <p>If you have suggestions for improvement, please mail to
 <a href="mailto:m.hekkelman@cmbi.ru.nl?subject=MRS feedback">M.L. Hekkelman</a>.
-Or even better, use the mailinglist to post and discuss them.</p>
+Or even better, use the mailinglist to post and discuss them. You can find the
+mailinglist at
+<blockquote>
+<a href="https://lists.berlios.de/mailman/listinfo/mrs-user">https://lists.berlios.de/mailman/listinfo/mrs-user</a>
+</blockquote>
+</p>
 
 </div>
 
 <div class="wright">
 
-<!--<h2>SOAP access</h2>-->
-<!---->
-<!--<p>This MRS server can be accessed using SOAP, the wsdl's are located at:</p>-->
-<!--<ul style="list-style-type: none;">-->
-<!--	<li><a href="http://mrs.cmbi.ru.nl/mrsws/search/wsdl">http://mrs.cmbi.ru.nl/mrsws/search/wsdl</a></li>-->
-<!--	<li><a href="http://mrs.cmbi.ru.nl/mrsws/blast/wsdl">http://mrs.cmbi.ru.nl/mrsws/blast/wsdl</a></li>-->
-<!--	<li><a href="http://mrs.cmbi.ru.nl/mrsws/clustal/wsdl">http://mrs.cmbi.ru.nl/mrsws/clustal/wsdl</a></li>-->
-<!--</ul>-->
+<mrs:if test="${wsdl.length}">
+
+<h2>SOAP access</h2>
+
+<p>This MRS server can be accessed using SOAP, the wsdl's are located at:</p>
+<ul style="list-style-type: none;">
+	<mrs:if test="${wsdl['mrsws_search']}"><li><a href="${wsdl['mrsws_search']}">${wsdl['mrsws_search']}</a></li></mrs:if>
+	<mrs:if test="${wsdl['mrsws_blast']}"><li><a href="${wsdl['mrsws_blast']}">${wsdl['mrsws_blast']}</a></li></mrs:if>
+	<mrs:if test="${wsdl['mrsws_align']}"><li><a href="${wsdl['mrsws_align']}">${wsdl['mrsws_align']}</a></li></mrs:if>
+</ul>
+
+</mrs:if>
 
 <!--<h2>Open Source</h2>-->
 <!---->

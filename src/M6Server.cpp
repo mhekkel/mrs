@@ -700,7 +700,7 @@ void M6Server::init_scope(el::scope& scope)
 		databanks.push_back(databank);
 	}
 	scope.put("databanks", el::object(databanks));
-	
+
 	scope.put("blastEnabled", el::object(not mBlastDatabanks.empty()));
 	scope.put("alignEnabled", el::object(mAlignEnabled));
 }
@@ -748,7 +748,24 @@ void M6Server::create_unauth_reply(bool stale, const string& realm, zh::reply& r
 
 void M6Server::handle_welcome(const zh::request& request, const el::scope& scope, zh::reply& reply)
 {
-	create_reply_from_template("index.html", scope, reply);
+	el::scope sub(scope);
+
+	if (not mWebServices.empty())
+	{
+		el::object wsdl;
+
+		const char* wss[] = { "mrsws_search", "mrsws_blast", "mrsws_align" };
+		el::object wsc;
+
+		foreach (const char* ws, wss)
+		{
+			if (zx::node* n = mConfig->find_first_node((boost::format("web-service[@service='%1%']/@location") % ws).str().c_str()))
+				wsdl[ws] = mBaseURL + n->str() + "/wsdl";
+		}
+		sub.put("wsdl", wsdl);
+	}
+
+	create_reply_from_template("index.html", sub, reply);
 }
 
 void M6Server::handle_file(const zh::request& request,

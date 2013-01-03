@@ -76,46 +76,32 @@ the page. Then follow the instructions there.
 The default setup will automatically update the enabled databanks. You can
 update databanks manually as well of course using the 'm6 update db' command.
 
-
-
 For Windows:
 
-I've copied the text from the previous MRS readme here. It must be out of
-date by now, I'll fix this asap.
+Building MRS on Windows is not trivial, don't try it unless you have
+experience building Windows software using Visual Studio.
 
-To build MRS using Microsoft Visual Studio 2010 you need the following:
+First of all, you need to have MSVC set up correctly to build 64 bit
+executables. You then need to build the Boost libraries with static
+runtime libraries. The m6 project file assumes you've installed Boost in
+C:\Boost and you're using version 1.48. Also, make sure you build Boost
+with zlib and bz2 support. The way I did it is, download boost, extract it,
+run boostrap and then:
 
-- zlib
-- libbz2
-- perl
-- boost
+bjam link=static runtime-link=static threading=multi address-model=64 
+	-sBZIP2_SOURCE="C:/Users/maarten/projects/bzip2-1.0.6"
+	-sZLIB_SOURCE="C:/Users/maarten/projects/zlib-1.2.5"
+	-sICU_PATH="C:/Users/maarten/projects/icu" stage install
 
-If you don't have MS Studio 2010, you can use the Express version instead. However, this means you will build a 32 bit version of MRS and of course that means you're limited to indexing only smaller databanks (you won't be able to index EMBL or even TrEMBL e.g.). You still can use large files created on other computers though.
-
-Directory layout
-
-The way I usually set-up my projects is by creating a directory called 'projects' first. This directory is located in my home directory. So in my case, the projects directory is
-
-C:\Users\maarten\projects\
-
-Since you're reading this document you probably have extracted the source code already, but if you didn't, save the code in a directory called 'm6' in this projects directory.
-
-The next thing you need to do is download the source code for both libz and libbz2. Extract both into the same projects directory.
-
-We now need a custom build perl. Download the perl source code (when writing this readme I'm using perl-5.14.1). Extract this code into the projects directory as well. Now edit the file perl-5.14.1/win32/Makefile and change the line containing
+Then you need to build a custom Perl interpreter. Download the source code
+and edit the file perl-5.14.1/win32/Makefile uncomment the line containing:
 
 	CCTYPE		= MSVC100
 
-removing the leading hash comment character. In case you're using the Express edition on a 64 bit version of Windows, you need to uncomment the line containing 'WIN64 = undef'.
+and build and install perl using nmake. This should install a perl in C:\Perl
+and here you can also file the perl514.dll file which you need to place in the
+m6\msvc\x64\{Debug,Release} folders.
 
-Now open the command-line prompt for the MS Visual tools, a shortcut can be found in the Start menu/Microsoft Visual Studio 2010/Visual Studio Tools. cd into the win32 directory of perl-5.14.1 and type nmake and nmake install. This should install your new perl in C:\perl. Be sure to use the 64 bit version of the shortcut.
-
-The next step is to build boost. Begin by downloading e.g. boost-1_46_1 and bjam. Install the bjam executable somewhere in your path and extract the boost tar file in the projects directory. In the extracted boost directory you run the following bjam command to build the libraries. Be sure the paths in this command are correct (for zlib and bzlib).
-
-bjam link=static runtime-link=static threading=multi address-model=64 -sBZIP2_SOURCE="C:/Users/maarten/projects/bzip2-1.0.6" -sZLIB_SOURCE="C:/Users/maarten/projects/zlib-1.2.5" -sICU_PATH="C:/Users/maarten/projects/icu" stage
-
-bjam link=static runtime-link=static threading=multi address-model=64 -sBZIP2_SOURCE="C:/Users/maarten/projects/bzip2-1.0.6" -sZLIB_SOURCE="C:/Users/maarten/projects/zlib-1.2.5" stage install --prefix="C:/Users/maarten/projects/boost/"
-
-The result should be a boost directory in the projects directory containing the right libraries and header files.
-
-And now you're ready to open the m6.sln solution file located in msvc and build the Release version of MRS.
+Libzeep is contained in the source tar but the solution file assumes it is
+located in the same directory as the m6 directory. Either move it, or change
+the paths in the m6 project file.

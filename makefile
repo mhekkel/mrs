@@ -11,7 +11,7 @@ include make.config
 
 # Directories where MRS will be installed
 BIN_DIR				?= /usr/local/bin
-MAN_DIR				?= /usr/local/man/man3
+MAN_DIR				?= /usr/local/man
 
 MRS_DATA_DIR		?= /srv/m6-data/
 MRS_LOG_DIR			?= $(MRS_DATA_DIR)log/
@@ -128,6 +128,7 @@ clean:
 	
 INSTALLDIRS = \
 	$(BIN_DIR) \
+	$(MAN_DIR)/man1 \
 	$(MRS_LOG_DIR) \
 	$(MRS_ETC_DIR) \
 	$(MRS_DATA_DIR)/raw \
@@ -136,7 +137,18 @@ INSTALLDIRS = \
 	$(MRS_DATA_DIR)/parsers \
 	$(MRS_DATA_DIR)/docroot
 
-install: m6
+%: %.dist
+	@ sed -e 's|__MRS_DATA_DIR__|$(MRS_DATA_DIR)|g' \
+		-e 's|__BIN_DIR__|$(BIN_DIR)|g' \
+		-e 's|__MRS_LOG_DIR__|$(MRS_LOG_DIR)|g' \
+		-e 's|__MRS_USER__|$(MRS_USER)|g' \
+		-e 's|__MRS_BASE_URL__|$(MRS_BASE_URL)|g' \
+		-e 's|__MRS_PORT__|$(MRS_PORT)|g' \
+		-e 's|__RSYNC__|$(RSYNC)|g' \
+		-e 's|__CLUSTALO__|$(CLUSTALO)|g' \
+		$< > $@
+
+install: m6 config/m6-config.xml m6.1 init.d/m6
 	@ echo "Creating directories"
 	@ for d in $(INSTALLDIRS); do \
 		install $(MRS_USER:%=-o %) -m755 -d $$d; \
@@ -151,21 +163,12 @@ install: m6
 	@ for f in `find parsers -type f | grep -v .svn`; do \
 		install $(MRS_USER:%=-o %) -m644 $$f $(MRS_DATA_DIR)/$$f; \
 	done
-	@ install -m755 m6 $(BIN_DIR)/m6
-	@ echo "Creating configuration file"
-	@ install $(MRS_USER:%=-o %) -m444 config/m6-config.dtd $(MRS_ETC_DIR)/m6-config.dtd
-	@ rm -f /tmp/m6-config.xml.dist
-	@ sed -e 's|__MRS_DATA_DIR__|$(MRS_DATA_DIR)|g' \
-		-e 's|__MRS_LOG_DIR__|$(MRS_LOG_DIR)|g' \
-		-e 's|__MRS_USER__|$(MRS_USER)|g' \
-		-e 's|__MRS_BASE_URL__|$(MRS_BASE_URL)|g' \
-		-e 's|__MRS_PORT__|$(MRS_PORT)|g' \
-		-e 's|__RSYNC__|$(RSYNC)|g' \
-		-e 's|__CLUSTALO__|$(CLUSTALO)|g' \
-		config/m6-config.xml.dist > /tmp/m6-config.xml.dist
-	@ install $(MRS_USER:%=-o %) -m644 /tmp/m6-config.xml.dist $(MRS_ETC_DIR)/m6-config.xml.dist
+	install -m755 m6 $(BIN_DIR)/m6
+	install m6.1 $(MAN_DIR)/man1/m6.1; gzip $(MAN_DIR)/man1/m6.1
+	install $(MRS_USER:%=-o %) -m444 config/m6-config.dtd $(MRS_ETC_DIR)/m6-config.dtd
+	install $(MRS_USER:%=-o %) -m644 m6-config.xml $(MRS_ETC_DIR)/m6-config.xml.dist
 	@ if [ ! -f $(MRS_ETC_DIR)/m6-config.xml ]; then \
-		install $(MRS_USER:%=-o %) -m644 /tmp/m6-config.xml.dist $(MRS_ETC_DIR)/m6-config.xml; \
+		install $(MRS_USER:%=-o %) -m644 $(MRS_ETC_DIR)/m6-config.xml.dist $(MRS_ETC_DIR)/m6-config.xml; \
 		echo ""; \
 		echo ""; \
 		echo "     PLEASE NOTE"; \
@@ -179,11 +182,8 @@ install: m6
 	    echo "check the file $(MRS_ETC_DIR)/m6-config.xml.dist for chanages"; \
 	    echo ""; \
 	fi
-	@ rm /tmp/m6-config.xml.dist
 	@ if [ ! -f /etc/init.d/m6 ]; then \
-		sed -e 's|__BIN_DIR__|$(BIN_DIR)|g' \
-			-e 's|__MRS_LOG_DIR__|$(MRS_LOG_DIR)|g' \
-			init.d/m6 > /etc/init.d/m6 ; \
+		@ install init.d/m6 /etc/init.d/m6 ; \
 	  else \
 		echo ""; \
 		echo "Not overwriting /etc/init.d/m6 file" ; \

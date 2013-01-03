@@ -1,6 +1,6 @@
 .TH m6 1 "03-jan-2013" "version 6.0" "USER COMMANDS"
 .SH NAME
-6 \- A tool to build and manipulate a MRS 6 server and its data files
+m6 \- A tool to build and manipulate a MRS 6 server and its data files
 .SH SYNOPSIS
 .TP
 \fBm6\fP \fIcommand\fP [\fIoptions\fP] [\fIargs\fP]
@@ -11,12 +11,25 @@ databanks containing biological or medical information.
 Run `m6 help` to access the built-in tool documentation.
 .SH FILES
 .TP
-.B __CONFIG_DIR__/m6-config.xml
-This file contains all the configuration details.
+.B __MRS_ETC_DIR__/m6-config.xml
+file containing all the configuration details.
 .TP
-.B __SCRIPT_DIR__
-The directory containing the parser scripts for mrs.
+.B __MRS_DATA_DIR__/mrs
+directory containing the MRS data files.
+.TP
+.B __MRS_DATA_DIR__/raw
+directory containing a mirror of the raw data.
+.TP
+.B __MRS_DATA_DIR__/parsers
+directory containing the MRS parser script.
+.TP
+.B __MRS_DATA_DIR__/docroot
+directory containing HTML templates for the web server.
+.TP
+.B __MRS_DATA_DIR__/log
+directory containing log files for the web server.
+.TP
+.B __MRS_DATA_DIR__/blast-cache
+directory containing cached blast results.
 .SH AUTHOR
 Maarten L. Hekkelman (m.hekkelman (at) cmbi.ru.nl)
-.SH SEE ALSO
-mrs-build(1), mrs-query(1), mrs-config.xml(5)

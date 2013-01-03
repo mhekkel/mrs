@@ -96,7 +96,7 @@ OBJECTS = \
 	$(OBJDIR)/M6WSSearch.o \
 	$(OBJDIR)/sqlite.o \
 
-all: m6
+all: m6 config/m6-config.xml m6.1 init.d/m6
 
 m6: $(OBJECTS) libzeep/libzeep.a
 	@ echo ">>" $@
@@ -138,8 +138,9 @@ INSTALLDIRS = \
 	$(MRS_DATA_DIR)/docroot
 
 %: %.dist
-	@ sed -e 's|__MRS_DATA_DIR__|$(MRS_DATA_DIR)|g' \
+	sed -e 's|__MRS_DATA_DIR__|$(MRS_DATA_DIR)|g' \
 		-e 's|__BIN_DIR__|$(BIN_DIR)|g' \
+		-e 's|__MRS_ETC_DIR__|$(MRS_ETC_DIR)|g' \
 		-e 's|__MRS_LOG_DIR__|$(MRS_LOG_DIR)|g' \
 		-e 's|__MRS_USER__|$(MRS_USER)|g' \
 		-e 's|__MRS_BASE_URL__|$(MRS_BASE_URL)|g' \
@@ -164,11 +165,11 @@ install: m6 config/m6-config.xml m6.1 init.d/m6
 		install $(MRS_USER:%=-o %) -m644 $$f $(MRS_DATA_DIR)/$$f; \
 	done
 	install -m755 m6 $(BIN_DIR)/m6
-	install m6.1 $(MAN_DIR)/man1/m6.1; gzip $(MAN_DIR)/man1/m6.1
+	install m6.1 $(MAN_DIR)/man1/m6.1; gzip -f $(MAN_DIR)/man1/m6.1
 	install $(MRS_USER:%=-o %) -m444 config/m6-config.dtd $(MRS_ETC_DIR)/m6-config.dtd
-	install $(MRS_USER:%=-o %) -m644 m6-config.xml $(MRS_ETC_DIR)/m6-config.xml.dist
+	install $(MRS_USER:%=-o %) -m644 config/m6-config.xml $(MRS_ETC_DIR)/m6-config.xml.dist
 	@ if [ ! -f $(MRS_ETC_DIR)/m6-config.xml ]; then \
-		install $(MRS_USER:%=-o %) -m644 $(MRS_ETC_DIR)/m6-config.xml.dist $(MRS_ETC_DIR)/m6-config.xml; \
+		install $(MRS_USER:%=-o %) -m644 config/m6-config.xml $(MRS_ETC_DIR)/m6-config.xml; \
 		echo ""; \
 		echo ""; \
 		echo "     PLEASE NOTE"; \

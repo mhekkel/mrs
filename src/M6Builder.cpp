@@ -734,11 +734,15 @@ bool M6Builder::NeedsUpdate()
 		{
 			if (fs::last_write_time(file) > dbTime)
 			{
+				if (VERBOSE)
+					cerr << "Needs update because " << file << " is newer than " << path << endl;
 				result = true;
 				break;
 			}
 		}
 	}
+	else if (VERBOSE)
+		cerr << "Needs update because " << path << " does not exist" << endl;
 	
 	return result;
 }

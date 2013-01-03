@@ -80,7 +80,7 @@ addLoadEvent(updateFindAllStatus);
 					<mrs:link db="${db.id}" nr="${hit.docNr}" index="id" q="${q}">${hit.id}</mrs:link>
 				</td>
 				<mrs:if test="${ranked}">
-					<td style="${(hit.nr > cookies.hitsToShow) ? 'display:none' : '' }"><img src="images/pixel-red.png" width="${hit.score}" height="7" style="padding-top:4px"/></td>
+					<td style="${(hit.nr > cookies.hitsToShow) ? 'display:none' : '' }"><img src="images/pixel-red.png" width="${hit.score}" height="7" style="padding-top:4px" alt=""/></td>
 				</mrs:if>
 				<td style="${hit.nr > cookies.hitsToShow ? 'display:none' : '' }">${hit.title}</td>
 			</tr>

@@ -1365,6 +1365,7 @@ M6DatabankImpl::~M6DatabankImpl()
 	delete mStore;
 
 	delete mFastaFile;
+	delete mDictionary;
 }
 
 void M6DatabankImpl::GetInfo(M6DatabankInfo& outInfo)
@@ -1669,6 +1670,9 @@ extern double system_time();
 M6Iterator* M6DatabankImpl::Find(const vector<string>& inQueryTerms,
 	M6Iterator* inFilter, bool inAllTermsRequired, uint32 inReportLimit)
 {
+	// take ownership
+	unique_ptr<M6Iterator> filter(inFilter);
+	
 	if (inReportLimit == 0 or inQueryTerms.empty())
 		return nullptr;
 

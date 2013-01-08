@@ -32,7 +32,7 @@ namespace M6Config
 {
 
 fs::path sConfigFile = MRS_ETC_DIR "/m6-config.xml";
-File* sInstance;
+unique_ptr<File> sInstance;
 
 File::File()
 {
@@ -79,8 +79,8 @@ istream* File::LoadDTD(const string& inBase, const string& inPublicID, const str
 
 File& File::Instance()
 {
-	if (sInstance == nullptr)
-		sInstance = new File;
+	if (not sInstance)
+		sInstance.reset(new File);
 	return *sInstance;
 }
 
@@ -285,8 +285,7 @@ zx::element* File::CreateDatabank()
 void Reload()
 {
 	unique_ptr<File> newFile(new File);
-	delete sInstance;
-	sInstance = newFile.release();
+	sInstance.reset(newFile.release());
 }
 
 fs::path GetDbDirectory(const std::string& inDatabankID)

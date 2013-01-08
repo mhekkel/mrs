@@ -20,7 +20,7 @@ class M6Iterator
 {
   public:
 					M6Iterator() : mCount(0), mRanked(false) {}
-					~M6Iterator() {}
+	virtual 		~M6Iterator() {}
 
 	virtual bool	Next(uint32& outDoc, float& outRank) = 0;
 

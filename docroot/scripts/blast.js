@@ -735,8 +735,8 @@ BlastResult.prototype.selectHsp = function(hitNr, hspNr) {
 BlastResult.prototype.calculateAlignment = function(hsp) {
 	hsp.alignment = 'Hello, world!';
 
-	var qOffset = hsp.queryStart + 1;
-	var sOffset = hsp.subjectStart + 1;
+	var qOffset = hsp.queryStart;
+	var sOffset = hsp.subjectStart;
 	var alignmentLength = hsp.queryAlignment.length;
 	
 	hsp.alignment = '';

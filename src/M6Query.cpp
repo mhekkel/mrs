@@ -444,6 +444,14 @@ void ParseQuery(M6Databank& inDatabank, const string& inQuery,
 	bool inAllTermsRequired, vector<string>& outTerms, M6Iterator*& outFilter)
 {
 	M6QueryParser parser(&inDatabank, inQuery, inAllTermsRequired);
-	parser.Parse(outTerms, outFilter);
+	try
+	{
+		parser.Parse(outTerms, outFilter);
+	}
+	catch (...)
+	{
+		delete outFilter;
+		throw;
+	}
 }
 

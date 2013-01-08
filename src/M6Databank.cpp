@@ -1283,6 +1283,9 @@ M6DatabankImpl::M6DatabankImpl(M6Databank& inDatabank, const fs::path& inPath, M
 			continue;
 
 		string name = ix->path().stem().string();
+		if (name == "full-text")
+			continue;
+
 		M6BasicIndexPtr index(M6BasicIndex::Load(ix->path()));
 		mIndices.push_back(M6IndexDesc(name, index->GetIndexType(), index));
 	}

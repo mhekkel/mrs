@@ -374,6 +374,8 @@ string M6OutputDocument::GetText()
 		do getline(is, text); while (text != "]]" and not is.eof());
 		text.clear();
 	}
+	else
+		text += '\n';
 
 	io::filtering_ostream out(io::back_inserter(text));
 	io::copy(is, out);

@@ -207,7 +207,7 @@ M6Server::M6Server(const zx::element* inConfig)
 
 		mWebServices.push_back(d);
 		
-		mount(location, [d] (const zh::request& request, const el::scope& scope, zh::reply& reply)
+		mount(location, [this, d] (const zh::request& request, const el::scope& scope, zh::reply& reply)
 		{
 			zx::document doc;
 			doc.read(request.payload);

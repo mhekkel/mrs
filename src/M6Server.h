@@ -113,6 +113,8 @@ class M6Server : public zh::webapp
 	void			handle_similar(const zh::request& request, const el::scope& scope, zh::reply& reply);
 	void			handle_welcome(const zh::request& request, const el::scope& scope, zh::reply& reply);
 
+	void			handle_search_ajax(const zh::request& request, const el::scope& scope, zh::reply& reply);
+
 	void			handle_rest(const zh::request& request, const el::scope& scope, zh::reply& reply);
 	void			handle_rest_entry(const zh::request& request, const el::scope& scope, zh::reply& reply);
 	void			handle_rest_find(const zh::request& request, const el::scope& scope, zh::reply& reply);

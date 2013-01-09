@@ -4,6 +4,9 @@ BUGS:
 
 Todo
 
+- MRS::Client ondersteunen/aanpassen?
+- FTP proxy
+
 - boost::notify_fork gebruiken
 - Windows: Service Control Manager ondersteuning voor server mode
 - verhogen score als term in unique index?

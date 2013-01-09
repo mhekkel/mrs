@@ -149,6 +149,8 @@ M6Server::M6Server(const zx::element* inConfig)
 //	mount("man",			boost::bind(&M6Server::handle_file, this, _1, _2, _3));
 	mount("images",			boost::bind(&M6Server::handle_file, this, _1, _2, _3));
 
+	mount("ajax/search",	boost::bind(&M6Server::handle_search_ajax, this, _1, _2, _3));
+
 	mount("rest",			boost::bind(&M6Server::handle_rest, this, _1, _2, _3));
 
 	mount("favicon.ico",	boost::bind(&M6Server::handle_file, this, _1, _2, _3));
@@ -213,11 +215,14 @@ M6Server::M6Server(const zx::element* inConfig)
 		
 			try
 			{
-				reply.set_content(zeep::make_envelope(d->dispatch(env.request())));
+				zx::element* request = env.request();
+				reply.set_content(zeep::make_envelope(d->dispatch(request)));
+				log() << request->name();
 			}
 			catch (exception& e)
 			{
 				reply.set_content(zeep::make_fault(e));
+				log() << "SOAP Fault";
 			}
 		});
 		
@@ -473,7 +478,7 @@ void M6Server::Find(const string& inDatabank, const string& inQuery, bool inAllT
 		THROW(("Invalid databank"));
 	
 	unique_ptr<M6Iterator> rset;
-	M6Iterator* filter;
+	M6Iterator* filter = nullptr;
 	vector<string> queryTerms;
 	
 	try
@@ -1558,6 +1563,39 @@ void M6Server::handle_similar(const zh::request& request, const el::scope& scope
 	}
 	
 	create_reply_from_template("results.html", sub, reply);
+}
+
+void M6Server::handle_search_ajax(const zh::request& request, const el::scope& scope, zh::reply& reply)
+{
+	zh::parameter_map params;
+	get_parameters(scope, params);
+
+	string q = params.get("q", "").as<string>();
+	string db = params.get("db", "").as<string>();
+	uint32 offset = params.get("offset", 0).as<uint32>();
+	uint32 count = params.get("count", 0).as<uint32>();
+	
+	if (count <= 0)
+		count = 5;
+
+	vector<el::object> hits;
+
+	uint32 hitCount;
+	bool ranked;
+	string error;
+	
+	Find(db, q, true, offset, count, true, hits, hitCount, ranked, error);
+	if (hitCount == 0)
+		Find(db, q, false, offset, count, true, hits, hitCount, ranked, error);
+	
+	el::object result;
+	if (not hits.empty())
+		result["hits"] = hits;
+
+	result["ranked"] = ranked;
+	result["error"] = error;
+	
+	reply.set_content(result.toJSON(), "text/javascript");
 }
 
 void M6Server::ProcessNewConfig(const string& inPage, zeep::http::parameter_map& inParams)

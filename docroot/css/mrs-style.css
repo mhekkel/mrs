@@ -17,10 +17,14 @@ html, body {
 
 /* Data part of window */
 #main {
-	padding: 8px;
+	padding: 4px;
 	margin: 0;
-	min-width: 740px;
 	font-size: small;
+}
+
+@media all and (min-width: 800px)
+{
+	#main { padding: 8px; }
 }
 
 a {
@@ -83,7 +87,7 @@ ul#menu {
 ul#menu li {
 	background: #44749d;
 	float: left;
-	padding: 3px;
+	padding: .2em;
 	margin: 0px;
 }
 
@@ -95,7 +99,7 @@ ul#menu li a {
 	display: block;
 	color: white;
 	font-weight: bold;
-	padding: 0px 5px 0px 5px;
+	padding: 0 .5em 0 .5em;
 }
 
 ul#menu li a:hover {
@@ -108,8 +112,7 @@ ul#menu li a:hover {
 .blackbox {
 	background-color: #c6d4e1;
 	color: #2f506c;
-	margin: -8px -8px 10px -8px;
-	padding: 6px 10px 6px 10px;
+	padding: .4em;
 	border-bottom: solid 1px #44749d;
 }
 
@@ -130,9 +133,15 @@ ul#menu li a:hover {
 	color: #5e5c56;
 	font-weight: bold;
 	display: block;
-	margin: -10px -8px 10px -8px;
+	margin: -4px -4px 4px -4px;
 	padding: 5px;
-	margin-bottom: 10px;
+}
+
+@media all and (min-width: 800px)
+{
+	.nav {
+		margin: -8px -8px 8px -8px;
+	}
 }
 
 .nav form {
@@ -192,7 +201,13 @@ table.list {
 	padding: 0px;
 	margin: 0px;
 	vertical-align: top;
-	min-width: 450px;
+}
+
+@media all and (min-width: 800px)
+{
+	table.list {
+		min-width: 450px;
+	}
 }
 
 .entry caption, .list caption {
@@ -510,20 +525,49 @@ table.status tr.error td {
 	background-color: #ecc3c3;
 }
 
-table.status tr.error td.active {
+table.status tr.error td.active, ul.status-list li.error {
 	background-color: #ec9a9a;
 }
 
-table.status tr.scheduled {
+table.status tr.scheduled, ul.status-list li.scheduled {
 	background-color: #dfeeff;
 }
 
-table.status tr.active td {
+table.status tr.active td, ul.status-list li.active {
 	background-color: #d9ecc3;
 }
 
-table.status tr.active td.active {
+table.status tr.active td.active, ul.status-list li.active {
 	background-color: #c6ec9a;
+}
+
+ul.status-list, ul.status-sub-list
+{
+	list-style-image: none;
+	list-style-type: none;
+	margin: 0;
+	padding: 0;
+}
+
+ul.status-list li
+{
+	border-bottom: 1px solid #ebe7e0;
+	padding: 0.1em;
+}
+
+ul.status-sub-list li
+{
+	border-bottom: none;
+}
+
+ul.status-sub-list a
+{
+	font-weight: bold;
+}
+
+ul.status-sub-list li:first-child
+{
+	margin-bottom: .2em;
 }
 
 /* the global selection widget */
@@ -835,30 +879,33 @@ form.blast_form p.hideOptions:hover {
 
 /* two boxes, one left, the other right */
 
-.wbox {
-	width: 100%;
-}
-
-.wleft {
-	width: 50%;
-	float: left;
-	padding-right: 10px;
-	vertical-align: top;
-}
-
-.wright {
-	margin-left: 50%;
-	padding-left: 10px;
-	vertical-align: top;
-	border: solid 1px white;
-}
-
-.wclear {
-	clear: both;
-	height: 1px;
-	overflow: hidden;
-	margin: 0;
-	border: solid 1px white;
+@media all and (min-width: 800px)
+{
+	.wbox {
+		width: 100%;
+	}
+	
+	.wleft {
+		width: 50%;
+		float: left;
+		padding-right: 10px;
+		vertical-align: top;
+	}
+	
+	.wright {
+		margin-left: 50%;
+		padding-left: 10px;
+		vertical-align: top;
+		border: solid 1px white;
+	}
+	
+	.wclear {
+		clear: both;
+		height: 1px;
+		overflow: hidden;
+		margin: 0;
+		border: solid 1px white;
+	}
 }
 
 ul.browse
@@ -868,4 +915,6 @@ ul.browse
 	margin: 0px;
 	padding-left: 10px;
 }
+
+
 

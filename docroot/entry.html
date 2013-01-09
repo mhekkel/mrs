@@ -1,15 +1,12 @@
-<?xml version="1.0" encoding="UTF-8"?>
-
-<!DOCTYPE xhtml
-	PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/1999/xhtml">
-
 <html xmlns="http://www.w3.org/1999/xhtml"
 	xmlns:mrs="http://mrs.cmbi.ru.nl/mrs-web/ml"
 	xml:lang="en" lang="en">
 <head>
 	<mrs:if test="${baseUrl}"><base href="${baseUrl}" /></mrs:if>
+
     <title>M6</title>
 
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="author" content="Maarten L. Hekkelman" />
     <meta name="generator" content="Japi" />
 	<meta http-equiv="content-type" content="text/html; charset=utf-8" />
@@ -35,10 +32,9 @@
 
 </head>
 <body>
-	<mrs:include file="menu.html" />
+	<mrs:include file="header.html" />
 
 	<div id="main">
-		<mrs:include file="form.html" />
 
 		<mrs:if test="${redirect}">
 			<div id="onlyone" class="redirect">Only one hit for query '${redirect}'</div>
@@ -61,6 +57,7 @@
 						</select></mrs:enable>
 					</form>
 				</li>
+				<mrs:if test="${not mobile}">
 				<li>
 					<form id="similarForm" method="get" action="similar">
 						<input type="hidden" name="db" value="${db}" />
@@ -81,9 +78,11 @@
 				<li>
 					<input value="Download" type="button" class="submit" onclick="document.getElementById('downloadForm').submit();" />
 				</li>
+				</mrs:if>
 				<li class="linksource">
-					Data provided by <a href="${databank.url}">${databank.url}</a>
+					source: <a href="${databank.url}">${db}</a>
 				</li>
+				<mrs:if test="${not mobile}">
 			<mrs:if test="${links}">
 				<li>
 					<span class="reference" style="padding-left:4px;">
@@ -94,6 +93,7 @@
 					</span>
 				</li>
 			</mrs:if>
+				</mrs:if>
 			</ul>
 		</div>
 		

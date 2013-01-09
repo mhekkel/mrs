@@ -27,7 +27,9 @@ class M6Builder
 
 	bool				NeedsUpdate();
 
-	void				IndexDocument(const std::string& inText,
+	static void			IndexDocument(const std::string& inDatabankID,
+							M6Databank* inDatabank,
+							const std::string& inText,
 							const std::string& inFileName,
 							std::vector<std::string>& outTerms);
 

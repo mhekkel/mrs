@@ -433,6 +433,9 @@ M6InputDocument* M6Processor::IndexDocument(const string& inDoc, const string& i
 {
 	M6InputDocument* doc = new M6InputDocument(mDatabank, inDoc);
 	
+	if (mParser == nullptr)
+		THROW(("No parser"));
+
 	mParser->ParseDocument(doc, inFileName, mDbHeader);
 	
 	doc->Tokenize(mLexicon, 0);
@@ -700,10 +703,14 @@ void M6Builder::Build(uint32 inNrOfThreads)
 	cout << "done" << endl;
 }
 
-void M6Builder::IndexDocument(const string& inText, const string& inFileName,
+void M6Builder::IndexDocument(const std::string& inDatabankID, M6Databank* inDatabank,
+	const string& inText, const string& inFileName,
 	vector<string>& outTerms)
 {
-	M6Processor processor(*mDatabank, mLexicon, mConfig);
+	M6Lexicon lexicon;
+	const zx::element* config = M6Config::GetEnabledDatabank(inDatabankID);
+	
+	M6Processor processor(*inDatabank, lexicon, config);
 	unique_ptr<M6InputDocument> doc(processor.IndexDocument(inText, inFileName));
 	
 	foreach (auto& list, doc->GetIndexTokens())
@@ -711,7 +718,7 @@ void M6Builder::IndexDocument(const string& inText, const string& inFileName,
 		foreach (auto& token, list.mTokens)
 		{
 			if (token != 0)
-				outTerms.push_back(mLexicon.GetString(token));
+				outTerms.push_back(lexicon.GetString(token));
 		}
 	}
 }

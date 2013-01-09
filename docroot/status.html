@@ -1,14 +1,10 @@
-<?xml version="1.0" encoding="UTF-8"?>
-
-<!DOCTYPE xhtml
-	PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/1999/xhtml">
-
 <html xmlns="http://www.w3.org/1999/xhtml"
 	xmlns:mrs="http://mrs.cmbi.ru.nl/mrs-web/ml"
 	xml:lang="en" lang="en">
 <head>
     <title>M6</title>
 
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="author" content="Maarten L. Hekkelman" />
     <meta name="generator" content="Japi" />
 	<meta http-equiv="content-type" content="text/html; charset=utf-8" />
@@ -25,19 +21,11 @@
 	</script>
 </head>
 <body>
-	<mrs:include file="menu.html" />
-
+	<mrs:include file="header.html" />
+	
 	<div id="main">
-		<mrs:include file="form.html" />
-
-<!--		<div class="nav">-->
-<!--			<ul>-->
-<!--				<li><a href="#" id="stats_databanks" onclick="Status.changeStatsView('databanks');">Databanks</a></li>-->
-<!--				<li><a href="#" id="stats_files" onclick="Status.changeStatsView('files');">Files</a></li>-->
-<!--				<li><a href="#" id="stats_update" onclick="Status.changeStatsView('update');">Update</a></li>-->
-<!--			</ul>-->
-<!--		</div>-->
-
+		
+		<mrs:if test="${not mobile}">
 		<table id="databanks" class="list status" cellspacing="0" cellpadding="0" style="width:100%;"
 			xmlns:m2="http://mrs.cmbi.ru.nl/mrs-web/nl/my-ns">
 		<caption>Indexed databanks</caption>
@@ -64,7 +52,33 @@
 		</tr>
 		</mrs:iterate>
 		</table>
+		</mrs:if>
 
+		<mrs:if test="${mobile}">
+		<ul id="ul-db-list" class="status-list">
+			<mrs:iterate collection="statusDatabanks" var="db">
+			<li id="db-${db.id}">
+				<ul class="status-sub-list">
+					<li>
+						<a href="info?db=${db.id}">${db.id}</a>
+						<span style="float:right">${db.name}</span>
+						<div style="clear: both"/>
+					</li>
+<!--					<li>-->
+<!--					<mrs:if test="${db.entries}"><mrs:number f='#,##0' n='${db.entries}'/> <em>entries;</em></mrs:if>-->
+<!--					<mrs:if test="${db.size}"><em>file size</em> <mrs:number f='#,##0B' n='${db.size}'/>;</mrs:if>-->
+<!--					<mrs:if test="${db.version}"><em>version</em> ${db.version};</mrs:if>-->
+<!--					</li>-->
+					<mrs:if test="${db.buildDate}"><li><em>updated</em> ${db.buildDate}</li></mrs:if>
+					<li>
+						<canvas id='update-progress' width="100" height="10" style="display:none;" />
+						<span id='update-status' />
+					</li>
+				</ul>
+			</li>
+			</mrs:iterate>
+		</ul>
+		</mrs:if>
 	</div>
 </body>
 </html>

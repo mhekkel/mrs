@@ -938,9 +938,14 @@ int M6ServerDriver::Exec(const string& inCommand, po::variables_map& vm)
 		pidfile = vm["pidfile"].as<string>();
 	
 	int result;
-	
+
+	bool foreground = vm.count("no-daemon") > 0;
+#if defined(_MSC_VER)
+	foreground = true;
+#endif
+
 	if (command == "start")
-		result = M6Server::Start(user, pidfile, vm.count("no-daemon") > 0);
+		result = M6Server::Start(user, pidfile, foreground);
 	else if (command == "stop")
 		result = M6Server::Stop(pidfile);
 	else if (command == "status")

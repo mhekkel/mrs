@@ -1506,13 +1506,12 @@ void M6Server::handle_similar(const zh::request& request, const el::scope& scope
 	if (mdb == nullptr) THROW(("Databank %s not loaded", db.c_str()));
 
 	vector<string> queryTerms;
-	M6Builder builder(db);
 	
 	unique_ptr<M6Document> doc(mdb->Fetch(boost::lexical_cast<uint32>(nr)));
 	if (not doc)
 		THROW(("Unable to fetch document"));
 	
-	builder.IndexDocument(doc->GetText(), doc->GetAttribute("filename"), queryTerms);
+	M6Builder::IndexDocument(db, mdb, doc->GetText(), doc->GetAttribute("filename"), queryTerms);
 
 	M6Iterator* filter = nullptr;
 	unique_ptr<M6Iterator> results(mdb->Find(queryTerms, filter, false, resultoffset + maxresultcount));

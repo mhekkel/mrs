@@ -1,7 +1,19 @@
 <?xml version="1.0" ?>
+<div id="header">
+
+<ul xmlns:mrs="http://mrs.cmbi.ru.nl/mrs-web/ml" id="menu">
+	<li><a href=".">Home</a></li>
+	<mrs:if test="${blastEnabled}"><li><a href="blast">Blast</a></li></mrs:if>
+	<mrs:if test="${alignEnabled}"><li><a href="align">Align</a></li></mrs:if>
+	<li><a href="status">Status</a></li>
+	<mrs:if test="${db and db != 'all' and not mobile}"><li><a href="info?db=${db}">Databank: ${db}</a></li></mrs:if>
+	<li class="help"><a href="admin">Admin</a></li>
+</ul>
+
 <form xmlns:mrs="http://mrs.cmbi.ru.nl/mrs-web/ml"
 	id="queryForm"
 	class="blackbox" action="search" method="get">
+	<mrs:if test="${not mobile}">
 	<label>
 		Search
 		<select name="db" onchange="document.getElementById('queryForm').submit();" style="width:150px;">
@@ -13,6 +25,11 @@
 		for
 		<input id="q" type="text" name="q" size="40" value="${q}" />
 	</label>
+	</mrs:if>
+	<mrs:if test="${mobile}">
+		<input name="db" value="all" type="hidden"/>
+		<input id="q" type="text" name="q" size="30" value="${q}" />
+	</mrs:if>
 	<input type="submit" value="Search" class="submit"/>
 	<input type="hidden" value="${count > 0 ? count : 3}" name="count" />
 
@@ -43,3 +60,4 @@ jQuery(function() {
 
 </form>
 
+</div>

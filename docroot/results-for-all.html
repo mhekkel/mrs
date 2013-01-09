@@ -1,14 +1,10 @@
-<?xml version="1.0" encoding="UTF-8"?>
-
-<!DOCTYPE xhtml
-	PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/1999/xhtml">
-
 <html xmlns="http://www.w3.org/1999/xhtml"
 	xmlns:mrs="http://mrs.cmbi.ru.nl/mrs-web/ml"
 	xml:lang="en" lang="en">
 <head>
     <title>M6</title>
 
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="author" content="Maarten L. Hekkelman" />
     <meta name="generator" content="Japi" />
 	<meta http-equiv="content-type" content="text/html; charset=utf-8" />
@@ -28,11 +24,9 @@ addLoadEvent(updateFindAllStatus);
 
 </head>
 <body>
-	<mrs:include file="menu.html" />
+	<mrs:include file="header.html" />
 
 	<div id="main">
-		<mrs:include file="form.html" />
-
 		<mrs:if test="${error}">
 			<div class="relaxed">The query contained a syntax error (${error})</div>
 		</mrs:if>
@@ -42,6 +36,7 @@ addLoadEvent(updateFindAllStatus);
 		</mrs:if>
 
 		<mrs:if test="${not empty hit-databanks}">
+		<mrs:if test="${not mobile}">
 		<div class="nav">
 			<mrs:if test="${ranked}">
 				<span class="left chooseLink" id="chooseOrder">Order by
@@ -87,6 +82,30 @@ addLoadEvent(updateFindAllStatus);
 		</mrs:iterate>
 	</mrs:iterate>
 		</table>
+		</mrs:if>
+
+		<mrs:if test="${mobile}">
+		<table id="tabel" cellspacing="0" cellpadding="0" style="position:relative;" class="list">
+			<caption>Results for query [${q}]</caption>
+			<mrs:iterate collection="hit-databanks" var="db">
+			<tr>
+				<th colspan="2">${db.name} <span style="float:right">${db.hitCount} hits</span></th>
+			</tr>
+			<mrs:iterate collection="${db.hits}" var="hit">
+			<tr>
+				<td><mrs:link db="${db.id}" nr="${hit.docNr}" index="id" q="${q}">${hit.id}</mrs:link></td>
+				<td>${hit.title}</td>
+			</tr>
+			</mrs:iterate>
+			<mrs:if test="${db.hitCount gt db.hits.length}">
+			<tr>
+				<td colspan="2"><a href="search?db=${db.id}&amp;q=${q}">more...</a></td>
+			</tr>
+			</mrs:if>
+			</mrs:iterate>
+		</table>
+		</mrs:if>
+
 		</mrs:if>
 
 		<mrs:include file="spelling-suggestions.html" />

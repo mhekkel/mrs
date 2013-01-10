@@ -35,7 +35,6 @@
     <ClCompile Include="..\..\src\M6Parser.cpp" />
     <ClCompile Include="..\..\src\M6Progress.cpp" />
     <ClCompile Include="..\..\src\M6Query.cpp" />
-    <ClCompile Include="..\..\src\M6SequenceFilter.cpp" />
     <ClCompile Include="..\..\src\M6Server.cpp" />
     <ClCompile Include="..\..\src\M6Tokenizer.cpp" />
     <ClCompile Include="..\..\src\M6Utilities.cpp" />

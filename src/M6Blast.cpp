@@ -25,7 +25,6 @@
 #include "M6Matrix.h"
 #include "M6Error.h"
 #include "M6Progress.h"
-#include "M6SequenceFilter.h"
 
 using namespace std;
 using namespace zeep;

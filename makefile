@@ -88,7 +88,6 @@ OBJECTS = \
 	$(OBJDIR)/M6Parser.o \
 	$(OBJDIR)/M6Progress.o \
 	$(OBJDIR)/M6Query.o \
-	$(OBJDIR)/M6SequenceFilter.o \
 	$(OBJDIR)/M6Server.o \
 	$(OBJDIR)/M6Tokenizer.o \
 	$(OBJDIR)/M6Utilities.o \

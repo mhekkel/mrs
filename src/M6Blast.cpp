@@ -1388,9 +1388,9 @@ void BlastQuery<WORDSIZE>::Report(Result& outResult)
 			for (sequence::const_iterator qf = hsp.mAlignedQuery.begin(), t = hsp.mAlignedTarget.begin();
 				qf != hsp.mAlignedQuery.end(); ++qf, ++t, ++qu)
 			{
-				char r = (*qf == '-' or *qf == 22) ? '-' : kResidues[*qf];
+				char r = (*qf == '-' or *qf > 22) ? '-' : kResidues[*qf];
 				if (r == 'X')
-					r = tolower(kResidues[*qu]);
+					r = tolower(*qu);
 				assert((r >= 'a' and r <= 'z') or (r >= 'A' and r <= 'Z') or r == '-');
 				p.mQueryAlignment += r;
 				p.mTargetAlignment += *t == '-' ? '-' : kResidues[*t];
@@ -1930,39 +1930,41 @@ Result* Search(const vector<fs::path>& inDatabanks,
 
 	if (inWordSize == 0) inWordSize = 3;
 
-	string query(inQuery), queryID("query"), queryDef;
+	if (inQuery.length() < inWordSize)
+		throw M6Exception("query length is less than wordsize");
 
-	// regular expression for FastA formatted files
-	boost::regex
-		kFastARE("^>([^| ]+(?:\\|[^| \n\r\t]*)*)(?: ([^\r\n]+))?(?:\r|\n|\r\n)(.+)");
+	string query, queryID, queryDef;
+	string::const_iterator i = inQuery.begin();
 
-	boost::smatch m;
-	if (regex_search(inQuery, m, kFastARE))
+	if (inQuery[0] == '>' and not isspace(inQuery[1]))
 	{
-		queryID = m[1];
-		queryDef = m[2];
-		query = m[3];
+		++i;
+
+		do
+			queryID += *i;
+		while (i != inQuery.end() and not isspace(*++i));
+
+		while (i != inQuery.end() and *i != '\r' and *i != '\n')
+			queryDef += *i++;
 	}
 
-	string q;
-	q.reserve(query.length());
-	
-	foreach (char r, query)
+	while (i != inQuery.end())
 	{
-		if (isspace(r))
+		if (isspace(*i))
+		{
+			++i;
 			continue;
-		
-		if (r == '>')	// next query, we only take the first
+		}
+			
+		if (*i == '>')
 			break;
-		
-		uint8 nr = ResidueNr(r);
 
+		uint8 nr = ResidueNr(*i);
 		if (nr > 22)
 			THROW(("Query contains invalid characters"));
 
-		q += r;
+		query += *i++;
 	}
-	query = q;
 
 	if (query.length() < inWordSize)
 		THROW(("Query length should be at least wordsize"));

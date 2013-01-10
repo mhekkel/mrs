@@ -7,19 +7,7 @@ Status = {
 	timeout: null,
 
 	init: function() {
-		if (document.getElementById("databanks"))
-			Status.updateStatus();
-		else if (document.getElementById("ul-db-list"))
-		{
-			jQuery.getJSON("ajax/status", { method: Status.viewing },
-				function(data, status) {
-					if (status == "success") 
-					{
-						Status.updateUL(data);
-					}
-				}
-			);		
-		}
+		Status.updateStatus();
 	},
 
 	updateStatus: function() {
@@ -35,7 +23,11 @@ Status = {
 	},
 	
 	updateList: function(stat) {
-		
+		if (stat.length + 1 != document.getElementById('databanks').rows.length) {
+			window.location.reload();
+			return;
+		}
+	
 		for (i in stat) {
 			var db = stat[i];
 			
@@ -74,9 +66,9 @@ Status = {
 					if (ctx != null) {
 						bar.style.display = '';
 	
-						var p = db.update.progress * 98;
-						if (p > 98)
-							p = 98;
+						var p = db.update.progress * 100;
+						if (p > 100)
+							p = 100;
 	
 						ctx.strokeStyle = "#2f506c";
 						ctx.strokeRect(0, 0, 100, 10);
@@ -85,116 +77,13 @@ Status = {
 						ctx.fillRect(1, 1, p, 8);
 						
 						ctx.fillStyle = "#ffffff";
-						ctx.fillRect(p + 1, 1, 98 - p - 1, 8);
+						ctx.fillRect(p + 1, 1, 100 - p, 8);
 					}
 				}
 			} else {
 				row.className = '';
 				row.cells[7].innerHTML = '';
 				row.cells[6].children[0].style.display = 'none';
-			}
-		}
-	},
-	
-	updateUL: function(stat)
-	{
-		for (i in stat)
-		{
-			var db = stat[i];
-			
-			var row = document.getElementById("db-" + db.id);
-			if (row == null) continue;
-
-			if (db.update != null)
-			{
-				if (db.update.stage != null)
-					$(row).find("#update-status").text(db.update.stage);
-				
-				if (db.update.stage == 'scheduled')
-					row.className = 'scheduled';
-				else if (db.update.stage == 'listing files' || db.update.stage == 'rsync')
-					row.className = 'active';
-				else if (db.update.progress < 0)
-					row.className = 'error';
-				else
-				{
-					row.className = 'active';
-
-					// HTML 5 canvas
-					$(row).find("#update-progress").each(function()
-					{
-						var ctx = this.getContext('2d');
-						if (ctx != null)
-						{
-							this.style.display = '';
-		
-							var p = db.update.progress * 98;
-							if (p > 98)
-								p = 98;
-		
-							ctx.strokeStyle = "#2f506c";
-							ctx.strokeRect(0, 0, 100, 10);
-		
-							ctx.fillStyle = "#c6d4e1";
-							ctx.fillRect(1, 1, p, 8);
-							
-							ctx.fillStyle = "#ffffff";
-							ctx.fillRect(p + 1, 1, 98 - p - 1, 8);
-						}
-					});
-				}
-/*				
-			
-				if (db.update.stage == 'scheduled')
-				{
-					row.className = 'scheduled';
-					
-					row.cells[7].innerHTML = db.update.stage;
-					row.cells[6].children[0].style.display = 'none';
-				}
-				else if (db.update.stage == 'listing files' ||
-					db.update.stage == 'rsync')
-				{
-					row.className = 'active';
-					row.cells[7].innerHTML = db.update.stage;
-					row.cells[6].children[0].style.display = 'none';
-				}
-				else if (db.update.progress < 0)
-				{
-					row.className = 'error';
-					row.cells[7].innerHTML = db.update.stage;
-					row.cells[6].children[0].style.display = 'none';
-				}
-				else
-				{
-					row.className = 'active';
-					row.cells[7].innerHTML = db.update.stage;
-					
-					// HTML 5 canvas
-					var bar = row.cells[6].children[0];
-					var ctx = bar.getContext('2d');
-					if (ctx != null) {
-						bar.style.display = '';
-	
-						var p = db.update.progress * 98;
-						if (p > 98)
-							p = 98;
-	
-						ctx.strokeStyle = "#2f506c";
-						ctx.strokeRect(0, 0, 100, 10);
-	
-						ctx.fillStyle = "#c6d4e1";
-						ctx.fillRect(1, 1, p, 8);
-						
-						ctx.fillStyle = "#ffffff";
-						ctx.fillRect(p + 1, 1, 98 - p - 1, 8);
-					}
-				}
-*/
-			} else {
-				row.className = '';
-//				row.cells[7].innerHTML = '';
-//				row.cells[6].children[0].style.display = 'none';
 			}
 		}
 	},

@@ -99,7 +99,7 @@ addLoadEvent(updateFindAllStatus);
 			</mrs:iterate>
 			<mrs:if test="${db.hitCount gt db.hits.length}">
 			<tr>
-				<td colspan="2"><a href="search?db=${db.id}&amp;q=${q}">more...</a></td>
+				<td colspan="2"><a href="search?db=${db.id}&amp;q=${q};show=50">more...</a></td>
 			</tr>
 			</mrs:if>
 			</mrs:iterate>

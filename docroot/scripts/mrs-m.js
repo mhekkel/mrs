@@ -3,46 +3,49 @@
 var M6M = {
 	callActive: false,
 	
-	init: function(hitCount, db) {
+	init: function(hitCount, db, q) {
 		var results = $("#tabel");
-		
+
 		if (results != null && hitCount > 0)
 		{
-			$(window).scroll(function() {
+			$(window).scroll(function()
+			{
 				if (M6M.callActive)
 					return;
 				M6M.callActive = true;
-			
+
 				var pageHeight = document.documentElement.scrollHeight;
 				var clientHeight = document.documentElement.clientHeight;
 				if ((pageHeight - ($(window).scrollTop() + clientHeight)) < 50)
-					M6M.extend(results, hitCount, db);
+					M6M.extend(results, hitCount, db, q);
 				else
 					M6M.callActive = false;
 			});
 		}
 	},
 	
-	extend: function(results, hitCount, db) {
+	extend: function(results, hitCount, db, q) {
 		var rowCount = results.find("tr").length - 1;
 		var count = hitCount - rowCount;
-		if (count > 5)
-			count = 5;
+		if (count > 25)
+			count = 25;
 		if (rowCount < hitCount)
 		{
 			callActive = true;
 		
 			jQuery.post("ajax/search", {
-				db: db, q: 'rds', offset: rowCount, count: count
+				db: db, q: q, offset: rowCount, count: count
 			}, function(data, status, jqXHR) {
+
 				if (status == "success")
 				{
 					if (data.error != null && data.error.length > 0) {
 						alert(data.error);
 					}
-					
-					$(data.hits).each(function() {
-						var lastRow = results.find(" tr:last");
+
+					$(data.hits).each(function()
+					{
+						var lastRow = results.find("tr:last");
 						var newRow = lastRow.clone();
 						var cells = newRow.find("td");
 						

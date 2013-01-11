@@ -54,7 +54,7 @@ sub to_fasta
 	my ($self, $text, $db, $id, $title) = @_;
 
 	open(my $h, "<", \$text);
-	my ($state, $id, $chainid, %seq);
+	my ($state, $chainid, %seq);
 	
 	$state = 0;
 

@@ -3080,6 +3080,7 @@ void M6Server::handle_status(const zh::request& request, const el::scope& scope,
 	sub.put("statusDatabanks", el::object(databanks));
 
 	create_reply_from_template("status.html", sub, reply);
+	reply.set_header("Cache-Control", "no-cache");
 }
 
 void M6Server::handle_status_ajax(const zh::request& request, const el::scope& scope, zh::reply& reply)
@@ -3125,6 +3126,7 @@ void M6Server::handle_status_ajax(const zh::request& request, const el::scope& s
 	}
 
 	reply.set_content(el::object(databanks).toJSON(), "text/javascript");
+	reply.set_header("Cache-Control", "no-cache");
 }
 
 void M6Server::handle_info(const zh::request& request, const el::scope& scope, zh::reply& reply)

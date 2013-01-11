@@ -5,7 +5,7 @@
 	<li><a href=".">Home</a></li>
 	<mrs:if test="${blastEnabled and not mobile}"><li><a href="blast">Blast</a></li></mrs:if>
 	<mrs:if test="${alignEnabled and not mobile}"><li><a href="align">Align</a></li></mrs:if>
-	<li><a href="status">Status</a></li>
+	<li><a id="status-menu" href="status">Status</a></li>
 	<mrs:if test="${db and db != 'all' and not mobile}"><li><a href="info?db=${db}">Databank: ${db}</a></li></mrs:if>
 	<li class="help"><a href="admin">Admin</a></li>
 </ul>

@@ -9,7 +9,12 @@ Status =
 
 	init: function()
 	{
-		Status.timeout = setTimeout("Status.updateStatus()", 1000);
+		Status.updateStatus();
+		$("#status-menu").attr("href", "#");
+		$("#status-menu").click(function(event)
+		{
+			Status.updateStatus();
+		});
 	},
 
 	updateStatus: function()
@@ -19,6 +24,7 @@ Status =
 			{
 				if (status == "success") 
 					Status.updateList(data);
+//				Status.timeout = setTimeout("Status.updateStatus()", 10000);
 			}
 		);		
 	},

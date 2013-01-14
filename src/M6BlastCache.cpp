@@ -28,7 +28,8 @@
 #include <boost/iostreams/filter/gzip.hpp>
 #include <boost/algorithm/string.hpp>
 
-#include "sqlite-amalgamation/sqlite3.h"
+//#include "sqlite-amalgamation/sqlite3.h"
+#include <sqlite3.h>
 
 #include "M6Config.h"
 #include "M6Error.h"

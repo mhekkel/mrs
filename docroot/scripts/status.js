@@ -71,7 +71,7 @@ Status = {
 							p = 100;
 	
 						ctx.strokeStyle = "#2f506c";
-						ctx.strokeRect(0, 0, 100, 10);
+						ctx.strokeRect(0, 0, 102, 10);
 	
 						ctx.fillStyle = "#c6d4e1";
 						ctx.fillRect(1, 1, p, 8);

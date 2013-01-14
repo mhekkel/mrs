@@ -589,7 +589,7 @@ void M6FTPFetcherImpl::ListFiles(const string& inPattern,
 			else
 			{
 				t.tm_year = n.tm_year;
-				if (t.tm_mon >= n.tm_mon or (t.tm_mon == n.tm_mon and t.tm_mday >= n.tm_mday))
+				if (t.tm_mon > n.tm_mon or (t.tm_mon == n.tm_mon and t.tm_mday >= n.tm_mday))
 					t.tm_year -= 1;
 				
 				t.tm_hour = boost::lexical_cast<int>(m[5]);

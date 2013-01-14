@@ -42,6 +42,7 @@ Status =
 			{
 				$(row).find("#active").hide();
 				$(row).find("#idle").show();
+				row.className = '';
 			}
 			else
 			{

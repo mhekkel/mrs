@@ -209,7 +209,7 @@ tr1::tuple<M6BlastJobStatus,string,uint32,double> M6BlastCache::JobStatus(const 
 	string id = boost::lexical_cast<string>(inJobID);
 
 	sqlite3_reset(mSelectByIDStmt);
-	THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(mSelectByIDStmt, 1, id.c_str(), id.length(), SQLITE_STATIC), mCacheDB);
+	THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(mSelectByIDStmt, 1, id.c_str(), id.length(), SQLITE_TRANSIENT), mCacheDB);
 
 	int err = sqlite3_step(mSelectByIDStmt);
 	if (err != SQLITE_OK and err != SQLITE_ROW and err != SQLITE_DONE)
@@ -295,7 +295,7 @@ void M6BlastCache::FastaFilesForDatabank(const string& inDatabank, vector<fs::pa
 void M6BlastCache::CheckCacheForDB(const string& inDatabank, const vector<fs::path>& inFiles)
 {
 	sqlite3_reset(mFetchDbFilesStmt);
-	THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(mFetchDbFilesStmt, 1, inDatabank.c_str(), inDatabank.length(), SQLITE_STATIC), mCacheDB);
+	THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(mFetchDbFilesStmt, 1, inDatabank.c_str(), inDatabank.length(), SQLITE_TRANSIENT), mCacheDB);
 
 	uint32 n = inFiles.size();
 	bool clean = false;
@@ -325,7 +325,7 @@ void M6BlastCache::CheckCacheForDB(const string& inDatabank, const vector<fs::pa
 				&selectStmt, nullptr), mCacheDB);
 
 			THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(selectStmt, 1,
-				inDatabank.c_str(), inDatabank.length(), SQLITE_STATIC), mCacheDB);
+				inDatabank.c_str(), inDatabank.length(), SQLITE_TRANSIENT), mCacheDB);
 			
 			while (sqlite3_step(selectStmt) == SQLITE_ROW)
 			{
@@ -343,7 +343,7 @@ void M6BlastCache::CheckCacheForDB(const string& inDatabank, const vector<fs::pa
 				&deleteStmt, nullptr), mCacheDB);
 
 			THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(deleteStmt, 1,
-				inDatabank.c_str(), inDatabank.length(), SQLITE_STATIC), mCacheDB);
+				inDatabank.c_str(), inDatabank.length(), SQLITE_TRANSIENT), mCacheDB);
 				
 			THROW_IF_SQLITE3_ERROR(sqlite3_step(deleteStmt), mCacheDB);
 
@@ -357,8 +357,8 @@ void M6BlastCache::CheckCacheForDB(const string& inDatabank, const vector<fs::pa
 				
 				string path = file.string();
 
-				THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(updateStmt, 1, inDatabank.c_str(), inDatabank.length(), SQLITE_STATIC), mCacheDB);
-				THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(updateStmt, 2, path.c_str(), path.length(), SQLITE_STATIC), mCacheDB);
+				THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(updateStmt, 1, inDatabank.c_str(), inDatabank.length(), SQLITE_TRANSIENT), mCacheDB);
+				THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(updateStmt, 2, path.c_str(), path.length(), SQLITE_TRANSIENT), mCacheDB);
 				THROW_IF_SQLITE3_ERROR(sqlite3_bind_int64(updateStmt, 3, fs::last_write_time(file)), mCacheDB);
 				
 				THROW_IF_SQLITE3_ERROR(sqlite3_step(updateStmt), mCacheDB);
@@ -390,9 +390,9 @@ string M6BlastCache::Submit(const string& inDatabank,
 	string result;
 	
 	sqlite3_reset(mSelectByParamsStmt);
-	THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(mSelectByParamsStmt, 1, inDatabank.c_str(), inDatabank.length(), SQLITE_STATIC), mCacheDB);
-	THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(mSelectByParamsStmt, 2, inQuery.c_str(), inQuery.length(), SQLITE_STATIC), mCacheDB);
-	THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(mSelectByParamsStmt, 3, inMatrix.c_str(), inMatrix.length(), SQLITE_STATIC), mCacheDB);
+	THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(mSelectByParamsStmt, 1, inDatabank.c_str(), inDatabank.length(), SQLITE_TRANSIENT), mCacheDB);
+	THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(mSelectByParamsStmt, 2, inQuery.c_str(), inQuery.length(), SQLITE_TRANSIENT), mCacheDB);
+	THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(mSelectByParamsStmt, 3, inMatrix.c_str(), inMatrix.length(), SQLITE_TRANSIENT), mCacheDB);
 	THROW_IF_SQLITE3_ERROR(sqlite3_bind_int(mSelectByParamsStmt, 4, inWordSize), mCacheDB);
 	THROW_IF_SQLITE3_ERROR(sqlite3_bind_double(mSelectByParamsStmt, 5, inExpect), mCacheDB);
 	THROW_IF_SQLITE3_ERROR(sqlite3_bind_int(mSelectByParamsStmt, 6, inLowComplexityFilter), mCacheDB);
@@ -417,11 +417,11 @@ string M6BlastCache::Submit(const string& inDatabank,
 			sqlite3_reset(mUpdateStatusStmt);
 			
 			string status = "queued";
-			THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(mUpdateStatusStmt, 1, status.c_str(), status.length(), SQLITE_STATIC), mCacheDB);
-			THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(mUpdateStatusStmt, 2, "", 0, SQLITE_STATIC), mCacheDB);
+			THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(mUpdateStatusStmt, 1, status.c_str(), status.length(), SQLITE_TRANSIENT), mCacheDB);
+			THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(mUpdateStatusStmt, 2, "", 0, SQLITE_TRANSIENT), mCacheDB);
 			THROW_IF_SQLITE3_ERROR(sqlite3_bind_int(mUpdateStatusStmt, 3, 0), mCacheDB);
 			THROW_IF_SQLITE3_ERROR(sqlite3_bind_double(mUpdateStatusStmt, 4, 0), mCacheDB);
-			THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(mUpdateStatusStmt, 5, result.c_str(), result.length(), SQLITE_STATIC), mCacheDB);
+			THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(mUpdateStatusStmt, 5, result.c_str(), result.length(), SQLITE_TRANSIENT), mCacheDB);
 			
 			err = sqlite3_step(mUpdateStatusStmt);
 			if (err != SQLITE_OK and err != SQLITE_ROW and err != SQLITE_DONE)
@@ -438,10 +438,10 @@ string M6BlastCache::Submit(const string& inDatabank,
 		
 		sqlite3_reset(mInsertStmt);
 		
-		THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(mInsertStmt, 1, result.c_str(), result.length(), SQLITE_STATIC), mCacheDB);
-		THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(mInsertStmt, 2, inDatabank.c_str(), inDatabank.length(), SQLITE_STATIC), mCacheDB);
-		THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(mInsertStmt, 3, inQuery.c_str(), inQuery.length(), SQLITE_STATIC), mCacheDB);
-		THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(mInsertStmt, 4, inMatrix.c_str(), inMatrix.length(), SQLITE_STATIC), mCacheDB);
+		THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(mInsertStmt, 1, result.c_str(), result.length(), SQLITE_TRANSIENT), mCacheDB);
+		THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(mInsertStmt, 2, inDatabank.c_str(), inDatabank.length(), SQLITE_TRANSIENT), mCacheDB);
+		THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(mInsertStmt, 3, inQuery.c_str(), inQuery.length(), SQLITE_TRANSIENT), mCacheDB);
+		THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(mInsertStmt, 4, inMatrix.c_str(), inMatrix.length(), SQLITE_TRANSIENT), mCacheDB);
 		THROW_IF_SQLITE3_ERROR(sqlite3_bind_int(mInsertStmt, 5, inWordSize), mCacheDB);
 		THROW_IF_SQLITE3_ERROR(sqlite3_bind_double(mInsertStmt, 6, inExpect), mCacheDB);
 		THROW_IF_SQLITE3_ERROR(sqlite3_bind_int(mInsertStmt, 7, inLowComplexityFilter), mCacheDB);
@@ -520,7 +520,7 @@ void M6BlastCache::ExecuteJob(const string& inJobID)
 		SetJobStatus(inJobID, "running", "", 0, 0);
 		
 		sqlite3_reset(mFetchParamsStmt);
-		THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(mFetchParamsStmt, 1, inJobID.c_str(), inJobID.length(), SQLITE_STATIC), mCacheDB);
+		THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(mFetchParamsStmt, 1, inJobID.c_str(), inJobID.length(), SQLITE_TRANSIENT), mCacheDB);
 		int err = sqlite3_step(mFetchParamsStmt);
 
 		if (err != SQLITE_OK and err != SQLITE_ROW and err != SQLITE_DONE)
@@ -601,11 +601,11 @@ void M6BlastCache::SetJobStatus(const string inJobId, const string& inStatus, co
 	
 	sqlite3_reset(mUpdateStatusStmt);
 	
-	THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(mUpdateStatusStmt, 1, inStatus.c_str(), inStatus.length(), SQLITE_STATIC), mCacheDB);
-	THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(mUpdateStatusStmt, 2, inError.c_str(), inError.length(), SQLITE_STATIC), mCacheDB);
+	THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(mUpdateStatusStmt, 1, inStatus.c_str(), inStatus.length(), SQLITE_TRANSIENT), mCacheDB);
+	THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(mUpdateStatusStmt, 2, inError.c_str(), inError.length(), SQLITE_TRANSIENT), mCacheDB);
 	THROW_IF_SQLITE3_ERROR(sqlite3_bind_int(mUpdateStatusStmt, 3, inHitCount), mCacheDB);
 	THROW_IF_SQLITE3_ERROR(sqlite3_bind_double(mUpdateStatusStmt, 4, inBestScore), mCacheDB);
-	THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(mUpdateStatusStmt, 5, inJobId.c_str(), inJobId.length(), SQLITE_STATIC), mCacheDB);
+	THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(mUpdateStatusStmt, 5, inJobId.c_str(), inJobId.length(), SQLITE_TRANSIENT), mCacheDB);
 	
 	int err = sqlite3_step(mUpdateStatusStmt);
 	if (err != SQLITE_OK and err != SQLITE_ROW and err != SQLITE_DONE)

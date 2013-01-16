@@ -20,6 +20,37 @@ still have to implement the code to run MRS as a service.
 See the changelog file for an overview of what has changed since version 5.
 
 
+Indexing Databanks
+
+As an example, we will index the source code for MRS. First go to the Admin
+pages and click the 'add' button in the Databanks tab page. Select the newly
+created databank (first of the list) and enter an ID (e.g. m6src) and check
+the Enabled checkbox.
+
+Then you enter the path to the source files. If the path you enter is a
+relative path, MRS will prepend it with the 'raw files' directory specified
+in the Main tab. If the path is absolute however, it will take this path
+directly. So we enter for Source files:
+
+/home/me/m6-6.0.0/*.{cpp,h,inl,c}
+
+Now if you tick the Recursive checkbox, MRS will include all files that have
+a name that ends with either .cpp, .h, .inl or .c found in any directory
+under /home/me/m6-6.0.0/.
+
+As parser use the generic parser. This parser simply indexes all text and
+assigns an incrementing number as ID to each document. It assumes each file
+is a document.
+
+Now go the Main tab and click the Restart button (to save the configuration
+file) and in a terminal type
+
+m6 build m6src
+
+Restart the server again to load the newly created databank and you'll see
+the m6src is now searchable.
+
+
 Building MRS
 
 You need gcc 4.6 and boost >= 1.48 to build MRS. Intel compilers are supported

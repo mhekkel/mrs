@@ -91,7 +91,7 @@ my $man_dir = "$prefix/man";
 my $data_dir = "$srvdir/m6-data";
 my $log_dir = "/var/log/m6";
 my $run_dir = "/var/run";
-my $config_dir = "$sysconfdir/mrs";
+my $config_dir = "$sysconfdir/m6";
 
 # the compiler to use
 my $cxx = $ENV{CXX};
@@ -208,7 +208,7 @@ if (defined $cmd_line_prefix)
 
 	$bin_dir = "$prefix/bin";
 	$man_dir = "$prefix/man";
-	$config_dir = ($prefix eq '/usr' or $prefix eq '/usr/') ? '/etc' : "$prefix/etc/mrs";
+	$config_dir = ($prefix eq '/usr' or $prefix eq '/usr/') ? '/etc' : "$prefix/etc/m6";
 }
 
 $config_dir = $cmd_line_configdir		if (defined $cmd_line_configdir);

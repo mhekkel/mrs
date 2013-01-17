@@ -12,7 +12,7 @@
 # Do NOT "set -e"
 
 # PATH should only include /usr/* if it runs after the mountnfs.sh script
-PATH=__BIN_DIR__
+PATH=/bin:/usr/bin:__BIN_DIR__
 DESC="M6 server"
 NAME=m6
 PIDFILE=__MRS_RUN_DIR__/$NAME.pid

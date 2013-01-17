@@ -62,9 +62,9 @@
 		</mrs:if>
 
 		<mrs:if test="${mobile}">
-		<ul id="ul-db-list" class="status-list">
+		<ul id="ul-db-list" class="status-list" xmlns:m2="http://mrs.cmbi.ru.nl/mrs-web/nl/my-ns">
 			<mrs:iterate collection="statusDatabanks" var="db">
-			<li id="db-${db.id}">
+			<li id="db-${db.id}" m2:key="${db.buildDate}">
 				<ul class="status-sub-list">
 					<li>
 						<a href="info?db=${db.id}">${db.id}</a>

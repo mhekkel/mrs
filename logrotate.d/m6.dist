@@ -11,5 +11,5 @@ __MRS_LOG_DIR__/*.log {
 	endscript
 	compress
 	notifempty
-	create 640 __MRS_USER__ admin
+	create 640 __MRS_USER__ daemon
 }

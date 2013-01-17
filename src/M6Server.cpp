@@ -3073,7 +3073,8 @@ void M6Server::handle_status(const zh::request& request, const el::scope& scope,
 		databank["entries"] = info.mDocCount;
 		databank["version"] = info.mVersion;
 		databank["buildDate"] = info.mLastUpdate;
-		databank["size"] = info.mTotalSize;
+//		databank["size"] = info.mTotalSize;
+		databank["size"] = info.mRawTextSize;
 		
 		databanks.push_back(databank);
 	}

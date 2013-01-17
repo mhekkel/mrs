@@ -15,6 +15,31 @@ Status =
 		{
 			Status.updateStatus();
 		});
+
+		// sort the list (this is on date only, newest first)
+		var rows = jQuery.makeArray($("#ul-db-list > li"));
+
+		var rowArray = [];
+		for (var i = 0; i < rows.length; ++i)
+			rowArray[i] = rows[i];
+
+		rowArray.sort(function (a, b) {
+			var ka = a.attributes.getNamedItemNS("http://mrs.cmbi.ru.nl/mrs-web/nl/my-ns", "key").value;
+			var kb = b.attributes.getNamedItemNS("http://mrs.cmbi.ru.nl/mrs-web/nl/my-ns", "key").value;
+
+			var d = 0;
+			if (ka < kb) {
+				d = 1;
+			} else if (ka > kb) {
+				d = -1;
+			}
+			
+			return d;
+		});
+		
+		$(rowArray).remove().appendTo($("#ul-db-list"));
+	
+		delete rowArray;
 	},
 
 	updateStatus: function()

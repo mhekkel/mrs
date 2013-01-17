@@ -4,7 +4,7 @@ __MRS_LOG_DIR__/*.log {
 	rotate 7
 	sharedscripts
 	postrotate
-		if [ -e __MRS_LOG_DIR__/m6.pid ]; then
+		if [ -e __MRS_RUN_DIR__/m6.pid ]; then
 			invoke-rc.d --quiet m6 reload > /dev/null
 			sleep 10
 		fi

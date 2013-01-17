@@ -3307,10 +3307,15 @@ void M6Server::ValidateAuthentication(const zh::request& request,
 
 // --------------------------------------------------------------------
 
-void RunMainLoop(uint32 inNrOfThreads)
+void RunMainLoop(uint32 inNrOfThreads, bool inUseLogFiles)
 {
 	for (;;)
 	{
+		// (re-)open the log files.
+		fs::path logfile = fs::path(M6Config::GetDirectory("log")) / "access.log";
+		fs::path errfile = fs::path(M6Config::GetDirectory("log")) / "error.log";
+		OpenLogFile(logfile.string(), errfile.string());
+
 		using namespace boost::local_time;
 		using namespace boost::posix_time;
 
@@ -3399,21 +3404,14 @@ int M6Server::Start(const string& inRunAs, const string& inPidFile, bool inForeg
 		}
 
 		if (not inForeground)
-		{
 			Daemonize(runas, pidfile);
-			
-			fs::path logfile = fs::path(M6Config::GetDirectory("log")) / "access.log";
-			fs::path errfile = fs::path(M6Config::GetDirectory("log")) / "error.log";
-			
-			OpenLogFile(logfile.string(), errfile.string());
-		}
 
 		(void)M6Scheduler::Instance();
 		
 		uint32 nrOfThreads = boost::thread::hardware_concurrency();
 		//if (vm.count("threads"))
 		//	nrOfThreads = vm["threads"].as<uint32>();
-		RunMainLoop(nrOfThreads);
+		RunMainLoop(nrOfThreads, not inForeground);
 		
 		if (not pidfile.empty() and fs::exists(pidfile))
 		{

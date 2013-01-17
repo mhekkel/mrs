@@ -147,7 +147,7 @@ INSTALLDIRS = \
 		-e 's|__CLUSTALO__|$(CLUSTALO)|g' \
 		$< > $@
 
-install: m6 config/m6-config.xml m6.1 init.d/m6
+install: m6 config/m6-config.xml m6.1 init.d/m6 logrotate.d/m6
 	@ echo "Creating directories"
 	@ for d in $(INSTALLDIRS); do \
 		install $(MRS_USER:%=-o %) -m755 -d $$d; \
@@ -182,10 +182,16 @@ install: m6 config/m6-config.xml m6.1 init.d/m6
 	    echo ""; \
 	fi
 	@ if [ ! -f /etc/init.d/m6 ]; then \
-		@ install init.d/m6 /etc/init.d/m6 ; \
+		install init.d/m6 /etc/init.d/m6 ; \
 	  else \
 		echo ""; \
 		echo "Not overwriting /etc/init.d/m6 file" ; \
+	  fi
+	@ if [ ! -f /etc/logrotate.d/m6 ]; then \
+		install logrotate.d/m6 /etc/logrotate.d/m6 ; \
+	  else \
+		echo ""; \
+		echo "Not overwriting /etc/logrotate.d/m6 file" ; \
 	  fi
 
 DIST = m6-$(VERSION)

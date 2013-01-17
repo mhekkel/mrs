@@ -1,0 +1,15 @@
+__MRS_LOG_DIR__/*.log {
+	daily
+	missingok
+	rotate 7
+	sharedscripts
+	postrotate
+		if [ -e __MRS_LOG_DIR__/m6.pid ]; then
+			invoke-rc.d --quiet m6 reload > /dev/null
+			sleep 10
+		fi
+	endscript
+	compress
+	notifempty
+	create 640 __MRS_USER__ admin
+}

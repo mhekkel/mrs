@@ -94,12 +94,16 @@ void OpenLogFile(const string& inLogFile, const string& inErrFile)
 {
 	static ofstream outfile, errfile;
 	
+	if (outfile.is_open())
+		outfile.close();
 	outfile.open(inLogFile);
 	if (not outfile.is_open())
 		THROW(("Failed to create log file %s", inLogFile.c_str()));
 	
 	cout.rdbuf(outfile.rdbuf());
 	
+	if (errfile.is_open())
+		errfile.close();
 	errfile.open(inErrFile);
 	if (not errfile.is_open())
 		THROW(("Failed to create log file %s", inErrFile.c_str()));
@@ -374,6 +378,7 @@ void OpenLogFile(const string& inLogFile, const string& inErrFile)
 
 	// redirect stdout and stderr to the log file
 	dup2(fd, STDOUT_FILENO);
+	close(fd);
 
 	// open the error file
 	fd = open(inErrFile.c_str(), O_CREAT|O_APPEND|O_RDWR, 0644);
@@ -385,6 +390,7 @@ void OpenLogFile(const string& inLogFile, const string& inErrFile)
 
 	// redirect stdout and stderr to the log file
 	dup2(fd, STDERR_FILENO);
+	close(fd);
 }
 
 // --------------------------------------------------------------------

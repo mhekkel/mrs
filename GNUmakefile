@@ -14,7 +14,8 @@ BIN_DIR				?= /usr/local/bin
 MAN_DIR				?= /usr/local/man
 
 MRS_DATA_DIR		?= /srv/m6-data/
-MRS_LOG_DIR			?= $(MRS_DATA_DIR)log/
+MRS_LOG_DIR			?= /var/log/m6/
+MRS_RUN_DIR			?= /var/run/
 MRS_ETC_DIR			?= /usr/local/etc/mrs/
 
 MRS_BASE_URL		?= http://$(shell hostname -f)/
@@ -128,6 +129,7 @@ INSTALLDIRS = \
 	$(BIN_DIR) \
 	$(MAN_DIR)/man1 \
 	$(MRS_LOG_DIR) \
+	$(MRS_RUN_DIR) \
 	$(MRS_ETC_DIR) \
 	$(MRS_DATA_DIR)/raw \
 	$(MRS_DATA_DIR)/mrs \
@@ -140,6 +142,7 @@ INSTALLDIRS = \
 		-e 's|__BIN_DIR__|$(BIN_DIR)|g' \
 		-e 's|__MRS_ETC_DIR__|$(MRS_ETC_DIR)|g' \
 		-e 's|__MRS_LOG_DIR__|$(MRS_LOG_DIR)|g' \
+		-e 's|__MRS_RUN_DIR__|$(MRS_RUN_DIR)|g' \
 		-e 's|__MRS_USER__|$(MRS_USER)|g' \
 		-e 's|__MRS_BASE_URL__|$(MRS_BASE_URL)|g' \
 		-e 's|__MRS_PORT__|$(MRS_PORT)|g' \
@@ -150,7 +153,9 @@ INSTALLDIRS = \
 install: m6 config/m6-config.xml m6.1 init.d/m6 logrotate.d/m6
 	@ echo "Creating directories"
 	@ for d in $(INSTALLDIRS); do \
-		install $(MRS_USER:%=-o %) -m755 -d $$d; \
+		if [ ! -d $$d ]; then \
+			install $(MRS_USER:%=-o %) -m755 -d $$d; \
+		fi \
 	done
 	@ for d in `find docroot -type d | grep -v .svn`; do \
 		install $(MRS_USER:%=-o %) -m755 -d $(MRS_DATA_DIR)/$$d; \

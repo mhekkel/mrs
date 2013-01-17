@@ -89,7 +89,8 @@ my $srvdir			= "/srv";
 my $bin_dir = "$prefix/bin";
 my $man_dir = "$prefix/man";
 my $data_dir = "$srvdir/m6-data";
-my $log_dir = "$data_dir/log";
+my $log_dir = "/var/log/m6";
+my $run_dir = "/var/run";
 my $config_dir = "$sysconfdir/mrs";
 
 # the compiler to use
@@ -139,6 +140,7 @@ if (-f 'make.config')
 		elsif	($fld eq 'MAN_DIR')		 { $man_dir = $value; }
 		elsif	($fld eq 'MRS_ETC_DIR')	 { $config_dir = $value; }
 		elsif	($fld eq 'MRS_LOG_DIR')	 { $log_dir = $value; }
+		elsif	($fld eq 'MRS_RUN_DIR')	 { $run_dir = $value; }
 		elsif	($fld eq 'MRS_DATA_DIR') { $data_dir = $value; }
 		elsif	($fld eq 'MRS_USER')	 { $mrs_user = $value; }
 		elsif	($fld eq 'MRS_BASE_URL') { $base_url = $value; }
@@ -150,13 +152,14 @@ if (-f 'make.config')
 
 # That's it, now check the options
 my ($cmd_line_prefix, $cmd_line_configdir, $cmd_line_datadir, $cmd_line_logdir,
-	$cmd_line_mrs_user, $cmd_line_base_url, $cmd_line_port);
+	$cmd_line_rundir, $cmd_line_mrs_user, $cmd_line_base_url, $cmd_line_port);
 
 &GetOptions(
 	"prefix=s"				=> \$cmd_line_prefix,
 	"config-dir=s"			=> \$cmd_line_configdir,
 	"data-dir=s"			=> \$cmd_line_datadir,
 	"log-dir=s"				=> \$cmd_line_logdir,
+	"run-dir=s"				=> \$cmd_line_rundir,
 	"cxx=s"					=> \$cxx,
 	"rsync=s"				=> \$rsync,
 	"boost=s"				=> \$boost,
@@ -181,6 +184,8 @@ Usage: perl configure [OPTIONS]
                         Default is [$data_dir]
     --log-dir           The directory where the MRS server will store its log files.
                         Default is [$log_dir]
+    --run-dir           The directory where the MRS server will store its pid file.
+                        Default is [$run_dir]
     --mrs-user          User that owns the mrs datafiles. Default is $mrs_user
     --base-url          The base URL for the server pages, or the external address,
     					default is $base_url.
@@ -209,6 +214,7 @@ if (defined $cmd_line_prefix)
 $config_dir = $cmd_line_configdir		if (defined $cmd_line_configdir);
 $data_dir = $cmd_line_datadir			if (defined $cmd_line_datadir);
 $log_dir = $cmd_line_logdir				if (defined $cmd_line_logdir);
+$run_dir = $cmd_line_rundir				if (defined $cmd_line_rundir);
 $mrs_user = $cmd_line_mrs_user			if (defined $cmd_line_mrs_user);
 $base_url = $cmd_line_base_url			if (defined $cmd_line_base_url);
 $port = $cmd_line_port					if (defined $cmd_line_port);
@@ -475,6 +481,7 @@ MAN_DIR       = $man_dir
 MRS_ETC_DIR   = $config_dir
 MRS_DATA_DIR  = $data_dir
 MRS_LOG_DIR   = $log_dir
+MRS_RUN_DIR   = $run_dir
 EOF
 
 	open MCFG, ">make.config" or die "Could not open the file make.config for writing!\n";

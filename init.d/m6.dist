@@ -15,7 +15,7 @@
 PATH=__BIN_DIR__
 DESC="M6 server"
 NAME=m6
-PIDFILE=__MRS_LOG_DIR__/$NAME.pid
+PIDFILE=__MRS_RUN_DIR__/$NAME.pid
 DAEMON=__BIN_DIR__/$NAME
 #DAEMON_ARGS="--config=/etc/mrs/m6-config.xml --pid=$PIDFILE"
 SCRIPTNAME=/etc/init.d/$NAME

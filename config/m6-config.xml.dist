@@ -22,7 +22,7 @@
 <!--    <user name="scott" realm="M6 Administrator" password="b92ff7d60b994c8a0d2941ad9349e841"/>-->
   </users>
   <!-- Server section -->
-  <server addr="0.0.0.0" port="__MRS_PORT__" user="__MRS_USER__" pidfile="__MRS_DATA_DIR__/log/m6.pid">
+  <server addr="0.0.0.0" port="__MRS_PORT__" user="__MRS_USER__" pidfile="__MRS_RUN_DIR__/log/m6.pid">
     <admin realm="M6 Administrator"/>
     <base-url>__MRS_BASE_URL__</base-url>
     <web-service service="mrsws_search" ns="http://mrs.cmbi.ru.nl/mrsws/search" location="mrsws/search"/>

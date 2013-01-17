@@ -104,6 +104,7 @@ struct M6IBitStreamImpl
 						: mBufferPtr(inImpl.mBufferPtr), mBufferSize(inImpl.mBufferSize)
 					{
 					}
+	virtual				~M6IBitStreamImpl() {}
 
 	// using Clone, we can make ibitstreams copy constructable.
 	virtual M6IBitStreamImpl* Clone() = 0;

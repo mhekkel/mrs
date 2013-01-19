@@ -3312,10 +3312,13 @@ void RunMainLoop(uint32 inNrOfThreads, bool inUseLogFiles)
 {
 	for (;;)
 	{
-		// (re-)open the log files.
-		fs::path logfile = fs::path(M6Config::GetDirectory("log")) / "access.log";
-		fs::path errfile = fs::path(M6Config::GetDirectory("log")) / "error.log";
-		OpenLogFile(logfile.string(), errfile.string());
+		if (inUseLogFiles)
+		{
+			// (re-)open the log files.
+			fs::path logfile = fs::path(M6Config::GetDirectory("log")) / "access.log";
+			fs::path errfile = fs::path(M6Config::GetDirectory("log")) / "error.log";
+			OpenLogFile(logfile.string(), errfile.string());
+		}
 
 		using namespace boost::local_time;
 		using namespace boost::posix_time;

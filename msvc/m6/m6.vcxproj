@@ -14,7 +14,10 @@
     <ClCompile Include="..\..\..\sqlite-amalgamation\sqlite3.c" />
     <ClCompile Include="..\..\src\M6BitStream.cpp" />
     <ClCompile Include="..\..\src\M6Blast.cpp" />
-    <ClCompile Include="..\..\src\M6BlastCache.cpp" />
+    <ClCompile Include="..\..\src\M6BlastCache.cpp">
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(SolutionDir)..\..\sqlite-amalgamation;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(SolutionDir)..\..\sqlite-amalgamation;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
     <ClCompile Include="..\..\src\M6Builder.cpp" />
     <ClCompile Include="..\..\src\M6CmdLineDriver.cpp" />
     <ClCompile Include="..\..\src\M6Config.cpp" />

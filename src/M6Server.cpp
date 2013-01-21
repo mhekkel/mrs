@@ -135,6 +135,7 @@ M6Server::M6Server(const zx::element* inConfig)
 	LoadAllDatabanks();
 
 	set_docroot(M6Config::GetDirectory("docroot"));
+	log_forwarded(mConfig->get_attribute("log-forwarded") == "true");
 	
 	mount("",				boost::bind(&M6Server::handle_welcome, this, _1, _2, _3));
 	mount("download",		boost::bind(&M6Server::handle_download, this, _1, _2, _3));
@@ -1631,6 +1632,7 @@ void M6Server::ProcessNewConfig(const string& inPage, zeep::http::parameter_map&
 		zx::element* server = config->GetServer();
 		server->set_attribute("addr", inParams.get("addr", "").as<string>());
 		server->set_attribute("port", inParams.get("port", "").as<string>());
+		server->set_attribute("log-forwarded", inParams.get("log_forwarded", false).as<bool>() ? "true" : "false");
 		
 		zx::element* e = server->find_first("base-url");
 		string s = inParams.get("baseurl", "").as<string>();
@@ -2007,6 +2009,7 @@ void M6Server::handle_admin(const zh::request& request,
 		
 		server["addr"] = serverConfig->get_attribute("addr");
 		server["port"] = serverConfig->get_attribute("port");
+		server["log_forwarded"] = serverConfig->get_attribute("log-forwarded");
 
 		zx::node* n;
 		
@@ -3337,6 +3340,7 @@ void RunMainLoop(uint32 inNrOfThreads, bool inUseLogFiles)
 		
 		string addr = config->get_attribute("addr");
 		string port = config->get_attribute("port");
+		
 		if (port.empty())
 			port = "80";
 		

@@ -43,7 +43,7 @@
 						<h3>Directories</h3>
 						<div><label>MRS files</label><input type="text" value="${global.dirs['mrs']}" name="mrs"/></div>
 						<div><label>Raw files</label><input type="text" value="${global.dirs['raw']}" name="raw"/></div>
-						<div><label>Parser</label><input type="text" value="${global.dirs['parser']}" name="parser"/></div>
+						<div><label>Parsers</label><input type="text" value="${global.dirs['parser']}" name="parser"/></div>
 						<div><label>Docroot</label><input type="text" value="${global.dirs['docroot']}" name="docroot"/></div>
 						<div><label>Blast cache</label><input type="text" value="${global.dirs['blast']}" name="blast"/></div>
 						<h3>Tools</h3>
@@ -74,7 +74,11 @@
 						<h3>Server configuration</h3>
 						<div><label>Address</label><input type="text" value="${server.addr}" name="addr"/></div>
 						<div><label>Port</label><input type="text" value="${server.port}" name="port"/></div>
+						<p>The base URL is the URL by which users can access this server from outside your domain.</p>
 						<div><label>Base URL</label><input type="text" value="${server.baseurl}" name="baseurl"/></div>
+						<p>By default the client address is recorded in the log file, but if the server is behind a reverse proxy,
+						the last X-Forwarded-For entry might be more informative.</p>
+						<div><label>Log Forwarded</label><mrs:checkbox name="log_forwarded" checked="${server.log_forwarded}"/></div>
 						
 						<h3>Web Service Locations</h3>
 						<p>Leave empty to disable web service</p>
@@ -275,7 +279,9 @@
 								<mrs:option value="weekly" selected="${db.update}">weekly</mrs:option>
 								<mrs:option value="monthly" selected="${db.update}">monthly</mrs:option>
 							</select></div>
+							<p>The source files are expected to be located relative to the raw directory, unless you enter an absolute path.</p>
 							<div><label>Source files</label><input type="text" value="${db.source}" name="source"/></div>
+							<p>Upstream URL can either be ftp:// or rsync://</p>
 							<div><label>Upstream URL</label><input type="text" value="${db.fetch.src}" name="fetch"/></div>
 							<div><label>Delete stale files</label><mrs:checkbox name="delete" checked="${db.fetch.delete}"/></div>
 							<div><label>Recusive (rsync)</label><mrs:checkbox name="recursive" checked="${db.fetch.recursive}"/></div>
@@ -287,13 +293,14 @@
 									<mrs:options collection="parsers" value="id" label="id" selected="${db.parser}"/>
 								</select>
 							</div>
+							<p>FastA file is needed to be able to use the blast search function.</p>
 							<div><label>Create FastA</label><mrs:checkbox name="fasta" checked="${db.fasta}"/></div>
-<!--							<p>Filters are optional programs through which the raw data is fed, for the Gene databank-->
-<!--							you could e.g. enter <code>/usr/bin/gene2xml -bT</code> to convert ASN.1 into XML on the fly.</p>-->
+							<p>Filters are optional programs through which the raw data is fed, for the Gene databank
+							you could e.g. enter <code>/usr/bin/gene2xml -bT</code> to convert ASN.1 into XML on the fly.</p>
 							<div><label>Filter</label><input type="text" value="${db.filter}" name="filter"/></div>
 							
-<!--							<p>Formatting can be done with one of the defined formatters, or for XML databanks, with-->
-<!--							an XML Stylesheet.</p>-->
+							<p>Formatting can be done with one of the defined formatters, or for XML databanks, with
+							an XML Stylesheet.</p>
 							
 							<div><label>Formatter</label><select name="format" onchange="Admin.changeFormat('${db.id}');">
 									<option value="none">No format</option>

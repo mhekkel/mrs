@@ -10,8 +10,8 @@
 
 <!ELEMENT scheduler EMPTY>
 <!ATTLIST scheduler enabled (true|false) "true"
-		  time CDATA #REQUIRED
-		  weekday CDATA #REQUIRED>
+					time CDATA #REQUIRED
+					weekday CDATA #REQUIRED>
 	
 <!ELEMENT users (user*)>
 <!ELEMENT user (#PCDATA)>
@@ -23,6 +23,7 @@
 <!ATTLIST server addr NMTOKEN #REQUIRED
 				 port NMTOKEN #REQUIRED
 				 user NMTOKEN #IMPLIED
+				 log-forwarded (true|false) "false"
 				 pidfile CDATA #IMPLIED>
 <!ELEMENT admin EMPTY>
 <!ATTLIST admin realm CDATA #REQUIRED>

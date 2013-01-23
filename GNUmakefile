@@ -183,7 +183,7 @@ install: m6 config/m6-config.xml m6.1 init.d/m6 logrotate.d/m6
 	  else \
 	    echo ""; \
 	    echo "Not overwriting existing $(MRS_ETC_DIR)/m6-config.xml"; \
-	    echo "check the file $(MRS_ETC_DIR)/m6-config.xml.dist for chanages"; \
+	    echo "check the file $(MRS_ETC_DIR)/m6-config.xml.dist for changes"; \
 	    echo ""; \
 	fi
 	@ if [ ! -f /etc/init.d/m6 ]; then \

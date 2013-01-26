@@ -1,3 +1,7 @@
+- reimplement index description
+- Fix count for GetDatabankInfo, en andere velden
+
+
 BUGS:
 
 - embl CO section in format is missing

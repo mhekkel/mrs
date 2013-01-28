@@ -58,6 +58,7 @@ M6WSSearch::M6WSSearch(M6Server& inServer, const M6DbList& inLoadedDatabanks,
 	SOAP_XML_SET_STRUCT_NAME(Hit);
 	SOAP_XML_SET_STRUCT_NAME(FindResult);
 	SOAP_XML_SET_STRUCT_NAME(BooleanQuery);
+	SOAP_XML_SET_STRUCT_NAME(GetLinkedExResult);
 	
 	SOAP_XML_ADD_ENUM(Format, plain);
 	SOAP_XML_ADD_ENUM(Format, title);
@@ -144,6 +145,14 @@ M6WSSearch::M6WSSearch(M6Server& inServer, const M6DbList& inLoadedDatabanks,
 		"GetLinked", this, &M6WSSearch::GetLinked,
 		kGetLinkedArgs);
 	set_response_name("GetLinked", "FindResponse");
+	
+	const char* kGetLinkedExArgs[] = {
+		"db", "linkedDatabank", "id", "response"
+	};
+	register_action(
+		"GetLinkedEx", this, &M6WSSearch::GetLinkedEx,
+		kGetLinkedExArgs);
+	set_response_name("GetLinkedEx", "GetLinkedExResponse");
 	
 	// unimplemented calls
 //	
@@ -599,6 +608,43 @@ void M6WSSearch::GetLinked(const string& db, const string& id,
 		}
 
 		response.push_back(result);
+	}
+}
+
+void M6WSSearch::GetLinkedEx(const string& db, const string& linkedDb,
+	const vector<string>& ids, vector<WSSearchNS::GetLinkedExResult>& response)
+{
+	foreach (string id, ids)
+	{
+		uint32 docNr;
+		
+		M6Databank* sdb;
+		tr1::tie(sdb, docNr) = mServer.GetEntryDatabankAndNr(db, id);
+		if (sdb == nullptr)
+			THROW(("entry %s not found in %s", id.c_str(), db.c_str()));
+		
+		M6Databank* ddb = mServer.Load(linkedDb);
+		if (ddb == nullptr)
+			THROW(("linked databank not loaded"));
+		
+		// Collect the links
+		unique_ptr<M6Iterator> iter(ddb->GetLinkedDocuments(db, id));
+		
+		if (iter)
+		{
+			WSSearchNS::GetLinkedExResult links = { id };
+				
+			uint32 docNr;
+			float rank;
+			
+			for (int i = 0; i < 100 and iter->Next(docNr, rank); ++i)
+			{
+				unique_ptr<M6Document> doc(ddb->Fetch(docNr));
+				links.linked.push_back(doc->GetAttribute("id"));
+			}
+
+			response.push_back(links);
+		}
 	}
 }
 

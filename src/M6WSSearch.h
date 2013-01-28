@@ -145,6 +145,19 @@ struct FindResult
 	}
 };
 
+struct GetLinkedExResult
+{
+	std::string					id;
+	std::vector<std::string>	linked;
+
+	template<class Archive>
+	void serialize(Archive& ar, const unsigned int version)
+	{
+		ar & BOOST_SERIALIZATION_NVP(id)
+		   & BOOST_SERIALIZATION_NVP(linked);
+	}
+};
+
 // unimplemented:
 
 struct Cluster
@@ -204,6 +217,10 @@ class M6WSSearch : public zeep::dispatcher
 	void			GetLinked(const std::string& db, const std::string& id,
 						const std::string& linkedDb, int resultoffset, int maxresultcount,
 						std::vector<WSSearchNS::FindResult>& response);
+
+	void			GetLinkedEx(const std::string& db, const std::string& linkedDb,
+						const std::vector<std::string>& id,
+						std::vector<WSSearchNS::GetLinkedExResult>& response);
 
 	// unimplemented, old calls
 

@@ -1329,7 +1329,7 @@ M6DatabankImpl::M6DatabankImpl(M6Databank& inDatabank, const fs::path& inPath, M
 	// read uuid
 	if (fs::exists(mDbDirectory / "uuid"))
 	{
-		fs::ifstream file("uuid");
+		fs::ifstream file(mDbDirectory / "uuid");
 		getline(file, mUUID);
 	}
 

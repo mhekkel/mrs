@@ -13,53 +13,39 @@
 namespace WSSearchNS
 {
 
-struct FileInfo
+struct DatabankInfo
 {
 	std::string					id;
 	std::string					uuid;
+	std::string					name;
 	std::string					version;
+	std::string					url;
+	std::string					parser;
+	std::string					format;
+	bool						blastable;
 	std::string					path;
 	std::string					modificationDate;
 	uint32						entries;
 	uint64						fileSize;
 	uint64						rawDataSize;
-
+	
 	template<class Archive>
 	void serialize(Archive& ar, const unsigned int)
 	{
 		ar & BOOST_SERIALIZATION_NVP(id)
 		   & BOOST_SERIALIZATION_NVP(uuid)
+		   & BOOST_SERIALIZATION_NVP(name)
 		   & BOOST_SERIALIZATION_NVP(version)
+		   & BOOST_SERIALIZATION_NVP(url)
+		   & BOOST_SERIALIZATION_NVP(parser)
+		   & BOOST_SERIALIZATION_NVP(format)
+		   & BOOST_SERIALIZATION_NVP(blastable)
 		   & BOOST_SERIALIZATION_NVP(path)
 		   & BOOST_SERIALIZATION_NVP(modificationDate)
 		   & BOOST_SERIALIZATION_NVP(entries)
 		   & BOOST_SERIALIZATION_NVP(fileSize)
 		   & BOOST_SERIALIZATION_NVP(rawDataSize);
 	}
-};
-
-struct DatabankInfo
-{
-	std::string					id;
-	std::string					name;
-	std::string					url;
-	std::string					script;
-	bool						blastable;
-	std::vector<FileInfo>		files;
-	std::vector<std::string>	links;
-	
-	template<class Archive>
-	void serialize(Archive& ar, const unsigned int)
-	{
-		ar & BOOST_SERIALIZATION_NVP(id)
-		   & BOOST_SERIALIZATION_NVP(name)
-		   & BOOST_SERIALIZATION_NVP(url)
-		   & BOOST_SERIALIZATION_NVP(script)
-		   & BOOST_SERIALIZATION_NVP(blastable)
-		   & BOOST_SERIALIZATION_NVP(files)
-		   & BOOST_SERIALIZATION_NVP(links);
-	}
-
 };
 
 enum Format

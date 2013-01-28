@@ -478,6 +478,12 @@ void M6Server::Find(const string& inDatabank, const string& inQuery, bool inAllT
 	if (databank == nullptr)
 		THROW(("Invalid databank"));
 	
+	if (inQuery.length() > 1024)
+		THROW(("Query too long"));
+	
+	if (inResultOffset >= databank->size())	// no hits left
+		return;
+	
 	unique_ptr<M6Iterator> rset;
 	M6Iterator* filter = nullptr;
 	vector<string> queryTerms;

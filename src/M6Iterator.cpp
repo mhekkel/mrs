@@ -38,7 +38,7 @@ void M6Iterator::Intersect(vector<uint32>& ioDocs, M6Iterator* inIterator)
 		else if (*dr < db)
 			++dr;
 		else
-			inIterator->Next(db, r);
+			empty = inIterator->Next(db, r);
 	}
 }
 

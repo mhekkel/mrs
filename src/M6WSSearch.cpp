@@ -53,7 +53,6 @@ M6WSSearch::M6WSSearch(M6Server& inServer, const M6DbList& inLoadedDatabanks,
 {
 	using namespace WSSearchNS;
 
-	SOAP_XML_SET_STRUCT_NAME(FileInfo);
 	SOAP_XML_SET_STRUCT_NAME(DatabankInfo);
 	SOAP_XML_SET_STRUCT_NAME(Index);
 	SOAP_XML_SET_STRUCT_NAME(Hit);
@@ -202,13 +201,33 @@ void M6WSSearch::GetDatabankInfo(const string& databank,
 		
 		try
 		{
-			WSSearchNS::DatabankInfo dbInfo = { db.mID, db.mName };
+			WSSearchNS::DatabankInfo dbInfo;
+
+			M6DatabankInfo dbi;
+			db.mDatabank->GetInfo(dbi);
+
+			const zx::element* cdbi = M6Config::GetConfiguredDatabank(db.mID);
+			if (cdbi == nullptr)
+				continue;
 			
-//			dbInfo.url = ;
-//			dbInfo.script = ;
-//			dbInfo.blastable = ;
-//			dbInfo.files;
-//			dbInfo.links = ;
+			dbInfo.id = db.mID;
+			dbInfo.uuid = dbi.mUUID;
+			dbInfo.name = db.mName;
+			dbInfo.version = dbi.mVersion;
+			
+			const zx::element* e;
+			if ((e = cdbi->find_first("info")) != nullptr)
+				dbInfo.url = e->content();
+
+			dbInfo.parser = cdbi->get_attribute("parser");
+			dbInfo.format = cdbi->get_attribute("format");
+
+			dbInfo.blastable = db.mBlast;
+			dbInfo.path = dbi.mDbDirectory.make_preferred().string();
+			dbInfo.modificationDate = dbi.mLastUpdate;
+			dbInfo.entries = dbi.mDocCount;
+			dbInfo.fileSize = dbi.mTotalSize;
+			dbInfo.rawDataSize = dbi.mRawTextSize;
 			
 			info.push_back(dbInfo);
 		}

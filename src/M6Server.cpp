@@ -2466,7 +2466,7 @@ void M6Server::create_redirect(const string& databank, const string& inIndex, co
 			else
 			{
 				location =
-					(boost::format("http://%1%/search?db=%2%&q=%3%:%4%")
+					(boost::format("http://%1%/search?db=%2%&q=%3%:\"%4%\"")
 						% host
 						% zh::encode_url(databank)
 						% inIndex
@@ -3179,6 +3179,7 @@ void M6Server::handle_info(const zh::request& request, const el::scope& scope, z
 			el::object index;
 			
 			index["id"] = iinfo.mName;
+			index["desc"] = iinfo.mDesc;
 
 			switch (iinfo.mType)
 			{

@@ -49,6 +49,7 @@ struct M6ParserImpl
 	void				Parse(M6InputDocument* inDoc,
 							const string& inFileName, const string& inDbHeader);
 	string				GetVersion(const string& inSourceConfig);
+	void				GetIndexNames(vector<pair<string,string>>& outIndexNames);
 	void				ToFasta(const string& inDoc, const string& inDb, const string& inID,
 							const string& inTitle, string& outFasta);
 	
@@ -81,6 +82,7 @@ struct M6ParserImpl
 	string				operator[](const char* inEntry);
 	static string		GetString(SV* inScalar);
 	
+	string				mName;
 	PerlInterpreter*	mPerl;
 	SV*					mParser;
 	HV*					mParserHash;
@@ -96,7 +98,8 @@ M6ParserImpl* M6ParserImpl::sConstructingImp = nullptr;
 boost::mutex M6ParserImpl::sInitMutex;
 
 M6ParserImpl::M6ParserImpl(const string& inScriptName)
-	: mPerl(nullptr)
+	: mName(inScriptName)
+	, mPerl(nullptr)
 	, mParser(nullptr)
 	, mParserHash(nullptr)
 {
@@ -293,6 +296,50 @@ string M6ParserImpl::GetVersion(const string& inSourceConfig)
 		THROW(("Error calling version: %s", errmsg.c_str()));
 
 	return result;
+}
+
+void M6ParserImpl::GetIndexNames(vector<pair<string,string>>& outIndexNames)
+{
+	PERL_SET_CONTEXT(mPerl);
+
+	SV** sv = hv_fetch(mParserHash, "indices", 7, 0);
+	if (sv != nullptr)
+	{
+		HV* hv = nullptr;
+		
+		if (SvTYPE(*sv) == SVt_PVHV)
+			hv = (HV*)*sv;
+		else if (SvROK(*sv))
+		{
+			SV* rv = SvRV(*sv);
+			if (SvTYPE(rv) == SVt_PVHV)
+				hv = (HV*)rv;
+		}
+		
+		if (hv != nullptr)
+		{
+			uint32 n = hv_iterinit(hv);
+			
+			while (n-- > 0)
+			{
+				STRLEN len;
+				
+				HE* he = hv_iternext(hv);
+				
+				if (he == nullptr)
+					break;
+				
+				string id = HePV(he, len);
+				
+				SV* v = HeVAL(he);
+				if (v != nullptr)
+				{
+					string desc = SvPV(v, len);
+					outIndexNames.push_back(make_pair(id, desc));
+				}
+			}
+		}
+	}
 }
 
 void M6ParserImpl::ToFasta(const string& inDocument, const string& inDb, const string& inID,
@@ -975,20 +1022,9 @@ M6ParserImpl* M6Parser::Impl()
 	return mImpl.get();
 }
 	
-string M6Parser::GetVersion(const string& inName, const string& inSourceConfig)
+string M6Parser::GetVersion(const string& inSourceConfig)
 {
-	string result;
-	try
-	{
-		M6ParserImpl impl(inName);
-		result = impl.GetVersion(inSourceConfig);
-	}
-	catch (exception& e)
-	{
-		if (VERBOSE)
-			cerr << endl << e.what() << endl;
-	}
-	return result;
+	return Impl()->GetVersion(inSourceConfig);
 }
 
 void M6Parser::ParseDocument(M6InputDocument* inDoc,
@@ -1006,4 +1042,9 @@ void M6Parser::ToFasta(const string& inDoc, const string& inDb, const string& in
 	const string& inTitle, string& outFasta)
 {
 	Impl()->ToFasta(inDoc, inDb, inID, inTitle, outFasta);
+}
+
+void M6Parser::GetIndexNames(vector<pair<string,string>>& outIndexNames)
+{
+	Impl()->GetIndexNames(outIndexNames);
 }

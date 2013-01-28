@@ -547,7 +547,7 @@ void M6Processor::Process(vector<fs::path>& inFiles, M6Progress& inProgress,
 	else
 	{
 		if (inNrOfThreads > inFiles.size())
-			inNrOfThreads = inFiles.size();
+			inNrOfThreads = static_cast<uint32>(inFiles.size());
 
 		for (uint32 i = 0; i < inNrOfThreads; ++i)
 			mFileThreads.create_thread([&inProgress, this]() { this->ProcessFile(inProgress); });
@@ -668,12 +668,17 @@ void M6Builder::Build(uint32 inNrOfThreads)
 	if (source == nullptr)
 		THROW(("Missing source specification for databank '%s'", dbID.c_str()));
 	
-	string version = M6Parser::GetVersion(mConfig->get_attribute("parser"),
-		source->content());
+	string version;
+	vector<pair<string,string>> indexNames;
+	{
+		M6Parser parser(mConfig->get_attribute("parser"));
+		version = parser.GetVersion(source->content());
+		parser.GetIndexNames(indexNames);
+	}
 	
 	// TODO fetch version string?
 	
-	mDatabank = M6Databank::CreateNew(dbID, path.string(), version);
+	mDatabank = M6Databank::CreateNew(dbID, path.string(), version, indexNames);
 	mDatabank->StartBatchImport(mLexicon);
 	
 	vector<fs::path> files;
@@ -927,7 +932,7 @@ void M6Scheduler::Run()
 				*mLogFile << endl;
 			}
 		}
-		catch (boost::thread_interrupted& e)
+		catch (boost::thread_interrupted&)
 		{
 			M6Status::Instance().SetError(databank, "interrupted");
 			*mLogFile << "Stopping scheduler on interrupt" << endl;

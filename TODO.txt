@@ -1,6 +1,4 @@
 - reimplement index description
-- Fix count for GetDatabankInfo, en andere velden
-
 
 BUGS:
 

@@ -14,6 +14,29 @@ sub new
 	my $invocant = shift;
 	my $self = new M6::Script(
 		lastdocline => '//',
+		indices => {
+			ac			=> 'Accession number',
+			cc			=> 'Comments and Notes',
+			crc64		=> 'The CRC64 checksum for the sequence',
+			de			=> 'Description',
+			doi			=> 'Digital Object Indentifier (reference)',
+			dr			=> 'Database cross-reference',
+			dt			=> 'Date',
+			ft			=> 'Feature table data',
+			gn			=> 'Gene name',
+			id			=> 'Identification',
+			kw			=> 'Keywords',
+			'length'	=> 'The length of the sequence',
+			medline		=> 'Medline reference',
+			mw			=> 'Molecular weight',
+			oc			=> 'Organism classification',
+			og			=> 'Organelle',
+			oh			=> 'Organism host',
+			os			=> 'Organism species',
+			ox			=> 'Taxonomy cross-reference',
+			pe			=> 'Protein Existence (evidence)',
+			pubmed		=> 'PubMed reference'
+		},
 		@_
 	);
 	return bless $self, "M6::Script::uniprot";

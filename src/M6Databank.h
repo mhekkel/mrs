@@ -26,6 +26,7 @@ typedef std::map<std::string,std::set<M6Databank*>> M6LinkMap;
 struct M6IndexInfo
 {	// TODO: add unique flag here
 	std::string		mName;
+	std::string		mDesc;
 	M6IndexType		mType;
 	uint32			mCount;
 	int64			mFileSize;
@@ -56,7 +57,8 @@ class M6Databank
 
 	static M6Databank*
 					CreateNew(const std::string& inDatabankID,
-						const boost::filesystem::path& inPath, const std::string& inVersion);
+						const boost::filesystem::path& inPath, const std::string& inVersion,
+						const std::vector<std::pair<std::string,std::string>>& inIndexNames);
 
 	void			GetInfo(M6DatabankInfo& outInfo);
 	std::string		GetUUID() const;
@@ -132,7 +134,7 @@ class M6Databank
 
 					// private constructor to create a new databank
 					M6Databank(const std::string& inDatabankID, const boost::filesystem::path& inPath,
-						const std::string& inVersion);
+						const std::string& inVersion, const std::vector<std::pair<std::string,std::string>>& inIndexNames);
 
 	M6DatabankImpl*	mImpl;
 };

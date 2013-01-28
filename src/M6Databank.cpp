@@ -102,7 +102,8 @@ class M6DatabankImpl
 					M6DatabankImpl(M6Databank& inDatabank,
 						const fs::path& inPath, MOpenMode inMode);
 					M6DatabankImpl(M6Databank& inDatabank, const string& inID,
-						const fs::path& inPath, const string& inVersion);
+						const fs::path& inPath, const string& inVersion,
+						const vector<pair<string,string>>& inIndexNames);
 	virtual			~M6DatabankImpl();
 
 	void			GetInfo(M6DatabankInfo& outInfo);
@@ -159,10 +160,13 @@ class M6DatabankImpl
 
 	struct M6IndexDesc
 	{
+							M6IndexDesc(const string& inName, const string& inDesc, M6IndexType inType, M6BasicIndexPtr inIndex)
+								: mName(inName), mDesc(inDesc), mType(inType), mIndex(inIndex) {}
+
 							M6IndexDesc(const string& inName, M6IndexType inType, M6BasicIndexPtr inIndex)
 								: mName(inName), mType(inType), mIndex(inIndex) {}
 
-		string				mName;
+		string				mName, mDesc;
 		M6IndexType			mType;
 		M6BasicIndexPtr		mIndex;
 	};
@@ -1275,6 +1279,27 @@ M6DatabankImpl::M6DatabankImpl(M6Databank& inDatabank, const fs::path& inPath, M
 			mDocWeights.clear();
 		}
 	}
+	
+	map<string,string> indexNames;
+	if (fs::exists(mDbDirectory / "index-names.txt"))
+	{
+		fs::ifstream file(mDbDirectory / "index-names.txt");
+		for (;;)
+		{
+			string line;
+			getline(file, line);
+			if (line.empty())
+			{
+				if (file.eof())
+					break;
+				continue;
+			}
+			
+			string::size_type s = line.find('\t');
+			if (s != string::npos)
+				indexNames[line.substr(0, s)] = line.substr(s + 1);
+		}
+	}
 
 	fs::directory_iterator end;
 	for (fs::directory_iterator ix(mDbDirectory); ix != end; ++ix)
@@ -1287,7 +1312,7 @@ M6DatabankImpl::M6DatabankImpl(M6Databank& inDatabank, const fs::path& inPath, M
 			continue;
 
 		M6BasicIndexPtr index(M6BasicIndex::Load(ix->path()));
-		mIndices.push_back(M6IndexDesc(name, index->GetIndexType(), index));
+		mIndices.push_back(M6IndexDesc(name, indexNames[name], index->GetIndexType(), index));
 	}
 	
 	if (mDocWeights.empty())
@@ -1326,7 +1351,7 @@ M6DatabankImpl::M6DatabankImpl(M6Databank& inDatabank, const fs::path& inPath, M
 }
 
 M6DatabankImpl::M6DatabankImpl(M6Databank& inDatabank, const string& inDatabankID,
-		const fs::path& inPath, const string& inVersion)
+		const fs::path& inPath, const string& inVersion, const vector<pair<string,string>>& inIndexNames)
 	: mDatabank(inDatabank)
 	, mID(inDatabankID)
 	, mDbDirectory(inPath)
@@ -1355,6 +1380,13 @@ M6DatabankImpl::M6DatabankImpl(M6Databank& inDatabank, const string& inDatabankI
 		fs::ofstream versionFile(mDbDirectory / "version.txt");
 		versionFile << mVersion << endl;
 	}
+	
+	if (not inIndexNames.empty())
+	{
+		fs::ofstream nameFile(mDbDirectory / "index-names.txt");
+		foreach (auto n, inIndexNames)
+			nameFile << n.first << '\t' << n.second << endl;
+	}
 }
 
 M6DatabankImpl::~M6DatabankImpl()
@@ -1379,7 +1411,7 @@ void M6DatabankImpl::GetInfo(M6DatabankInfo& outInfo)
 	{
 		fs::path path(mDbDirectory / (desc.mName + ".index"));
 		
-		M6IndexInfo info = { desc.mName, desc.mType, desc.mIndex->size(), fs::file_size(path) };
+		M6IndexInfo info = { desc.mName, desc.mDesc, desc.mType, desc.mIndex->size(), fs::file_size(path) };
 		outInfo.mIndexInfo.push_back(info);
 	}
 	
@@ -2184,8 +2216,9 @@ M6Databank::M6Databank(const fs::path& inPath, MOpenMode inMode)
 {
 }
 
-M6Databank::M6Databank(const string& inDatabankID, const fs::path& inPath, const string& inVersion)
-	: mImpl(new M6DatabankImpl(*this, inDatabankID, inPath, inVersion))
+M6Databank::M6Databank(const string& inDatabankID, const fs::path& inPath, const string& inVersion,
+	const vector<pair<string,string>>& inIndexNames)
+	: mImpl(new M6DatabankImpl(*this, inDatabankID, inPath, inVersion, inIndexNames))
 {
 }
 
@@ -2209,12 +2242,13 @@ fs::path M6Databank::GetDbDirectory() const
 	return mImpl->GetDbDirectory();
 }
 
-M6Databank* M6Databank::CreateNew(const string& inDatabankID, const fs::path& inPath, const string& inVersion)
+M6Databank* M6Databank::CreateNew(const string& inDatabankID, const fs::path& inPath,
+	const string& inVersion, const vector<pair<string,string>>& inIndexNames)
 {
 	if (fs::exists(inPath))
 		fs::remove_all(inPath);
 
-	return new M6Databank(inDatabankID, inPath, inVersion);
+	return new M6Databank(inDatabankID, inPath, inVersion, inIndexNames);
 }
 
 void M6Databank::StartBatchImport(M6Lexicon& inLexicon)

@@ -92,6 +92,13 @@ M6WSSearch::M6WSSearch(M6Server& inServer, const M6DbList& inLoadedDatabanks,
 	register_action(
 		"GetDatabankInfo", this, &M6WSSearch::GetDatabankInfo, kGetDatabankInfoArgs);
 	
+	const char* kCountArgs[] = {
+		"db", "booleanquery", "response"
+	};
+	register_action(
+		"Count", this, &M6WSSearch::Count,
+		kCountArgs);
+
 	const char* kGetEntryArgs[] = {
 		"db", "id", "format", "entry"
 	};
@@ -139,56 +146,49 @@ M6WSSearch::M6WSSearch(M6Server& inServer, const M6DbList& inLoadedDatabanks,
 	set_response_name("GetLinked", "FindResponse");
 	
 	// unimplemented calls
-	
-	const char* kFindSimilarArgs[] = {
-		"db", "id", "algorithm", "resultoffset", "maxresultcount", "response"
-	};
-	register_action(
-		"FindSimilar", this, &M6WSSearch::FindSimilar,
-		kFindSimilarArgs);
-	set_response_name("FindSimilar", "FindResponse");
-	
-	const char* kCountArgs[] = {
-		"db", "booleanquery", "response"
-	};
-	register_action(
-		"Count", this, &M6WSSearch::Count,
-		kCountArgs);
-
-	const char* kCooccurrenceArgs[] = {
-		"db", "ids", "idf_cutoff", "resultoffset", "maxresultcount", "terms"
-	};	
-	register_action(
-		"Cooccurrence", this, &M6WSSearch::Cooccurrence,
-		kCooccurrenceArgs);
-
-	const char* kSpellCheckArgs[] = {
-		"db", "queryterm", "suggestions"
-	};
-	register_action(
-		"SpellCheck", this, &M6WSSearch::SpellCheck,
-		kSpellCheckArgs);
-	
-	const char* kSuggestSearchTermsArgs[] = {
-		"db", "queryterm", "suggestions"
-	};
-	register_action(
-		"SuggestSearchTerms", this, &M6WSSearch::SuggestSearchTerms,
-		kSuggestSearchTermsArgs);
-
-	const char* kCompareDocumentsArgs[] = {
-		"db", "doc_a", "doc_b", "similarity"
-	};
-	register_action(
-		"CompareDocuments", this, &M6WSSearch::CompareDocuments,
-		kCompareDocumentsArgs);
-
-	const char* kClusterDocumentsArgs[] = {
-		"db", "ids", "response"
-	};
-	register_action(
-		"ClusterDocuments", this, &M6WSSearch::ClusterDocuments,
-		kClusterDocumentsArgs);
+//	
+//	const char* kFindSimilarArgs[] = {
+//		"db", "id", "algorithm", "resultoffset", "maxresultcount", "response"
+//	};
+//	register_action(
+//		"FindSimilar", this, &M6WSSearch::FindSimilar,
+//		kFindSimilarArgs);
+//	set_response_name("FindSimilar", "FindResponse");
+//	
+//	const char* kCooccurrenceArgs[] = {
+//		"db", "ids", "idf_cutoff", "resultoffset", "maxresultcount", "terms"
+//	};	
+//	register_action(
+//		"Cooccurrence", this, &M6WSSearch::Cooccurrence,
+//		kCooccurrenceArgs);
+//
+//	const char* kSpellCheckArgs[] = {
+//		"db", "queryterm", "suggestions"
+//	};
+//	register_action(
+//		"SpellCheck", this, &M6WSSearch::SpellCheck,
+//		kSpellCheckArgs);
+//	
+//	const char* kSuggestSearchTermsArgs[] = {
+//		"db", "queryterm", "suggestions"
+//	};
+//	register_action(
+//		"SuggestSearchTerms", this, &M6WSSearch::SuggestSearchTerms,
+//		kSuggestSearchTermsArgs);
+//
+//	const char* kCompareDocumentsArgs[] = {
+//		"db", "doc_a", "doc_b", "similarity"
+//	};
+//	register_action(
+//		"CompareDocuments", this, &M6WSSearch::CompareDocuments,
+//		kCompareDocumentsArgs);
+//
+//	const char* kClusterDocumentsArgs[] = {
+//		"db", "ids", "response"
+//	};
+//	register_action(
+//		"ClusterDocuments", this, &M6WSSearch::ClusterDocuments,
+//		kClusterDocumentsArgs);
 }
 
 void M6WSSearch::GetDatabankInfo(const string& databank,
@@ -250,7 +250,7 @@ void M6WSSearch::GetIndices(const string& inDatabank, vector<WSSearchNS::Index>&
 	db->GetInfo(info);
 	foreach (M6IndexInfo& ii, info.mIndexInfo)
 	{
-		WSSearchNS::Index ix = { ii.mName, "", ii.mCount };
+		WSSearchNS::Index ix = { ii.mName, ii.mDesc, ii.mCount };
 		switch (ii.mType)
 		{
 			case eM6CharIndex:			ix.type = WSSearchNS::Unique; break;
@@ -265,6 +265,11 @@ void M6WSSearch::GetIndices(const string& inDatabank, vector<WSSearchNS::Index>&
 		
 		outIndices.push_back(ix);
 	}
+}
+
+void M6WSSearch::Count(const std::string& db, const std::string& booleanquery, uint32& response)
+{
+	response = mServer.Count(db, booleanquery);
 }
 
 void M6WSSearch::GetEntry(const string& inDatabank, const string& inID,
@@ -597,43 +602,38 @@ void M6WSSearch::GetLinked(const string& db, const string& id,
 	}
 }
 
-void M6WSSearch::FindSimilar(const std::string& db, const std::string& id, WSSearchNS::Algorithm algorithm, int resultoffset, int maxresultcount, std::vector<WSSearchNS::FindResult>& response)
-{
-	mServer.log() << "UNIMPLEMENTED: " << BOOST_CURRENT_FUNCTION << endl;
-	THROW(("Unimplemented SOAP call"));
-}
-
-void M6WSSearch::Count(const std::string& db, const std::string& booleanquery, uint32& response)
-{
-	response = mServer.Count(db, booleanquery);
-}
-
-void M6WSSearch::Cooccurrence(const std::string& db, const std::vector<std::string>& ids, float idf_cutoff, int resultoffset, int maxresultcount, std::vector<std::string>& terms)
-{
-	mServer.log() << "UNIMPLEMENTED: " << BOOST_CURRENT_FUNCTION << endl;
-	THROW(("Unimplemented SOAP call"));
-}
-
-void M6WSSearch::SpellCheck(const std::string& db, const std::string& queryterm, std::vector<std::string>& suggestions)
-{
-	mServer.log() << "UNIMPLEMENTED: " << BOOST_CURRENT_FUNCTION << endl;
-	THROW(("Unimplemented SOAP call"));
-}
-
-void M6WSSearch::SuggestSearchTerms(const std::string& db, const std::string& queryterm, std::vector<std::string>& suggestions)
-{
-	mServer.log() << "UNIMPLEMENTED: " << BOOST_CURRENT_FUNCTION << endl;
-	THROW(("Unimplemented SOAP call"));
-}
-
-void M6WSSearch::CompareDocuments(const std::string& db, const std::string& doc_a, const std::string& doc_b, float& similarity)
-{
-	mServer.log() << "UNIMPLEMENTED: " << BOOST_CURRENT_FUNCTION << endl;
-	THROW(("Unimplemented SOAP call"));
-}
-
-void M6WSSearch::ClusterDocuments(const std::string& db, const std::vector<std::string>& ids, WSSearchNS::Cluster& response)
-{
-	mServer.log() << "UNIMPLEMENTED: " << BOOST_CURRENT_FUNCTION << endl;
-	THROW(("Unimplemented SOAP call"));
-}
+//void M6WSSearch::FindSimilar(const std::string& db, const std::string& id, WSSearchNS::Algorithm algorithm, int resultoffset, int maxresultcount, std::vector<WSSearchNS::FindResult>& response)
+//{
+//	mServer.log() << "UNIMPLEMENTED: " << BOOST_CURRENT_FUNCTION << endl;
+//	THROW(("Unimplemented SOAP call"));
+//}
+//
+//void M6WSSearch::Cooccurrence(const std::string& db, const std::vector<std::string>& ids, float idf_cutoff, int resultoffset, int maxresultcount, std::vector<std::string>& terms)
+//{
+//	mServer.log() << "UNIMPLEMENTED: " << BOOST_CURRENT_FUNCTION << endl;
+//	THROW(("Unimplemented SOAP call"));
+//}
+//
+//void M6WSSearch::SpellCheck(const std::string& db, const std::string& queryterm, std::vector<std::string>& suggestions)
+//{
+//	mServer.log() << "UNIMPLEMENTED: " << BOOST_CURRENT_FUNCTION << endl;
+//	THROW(("Unimplemented SOAP call"));
+//}
+//
+//void M6WSSearch::SuggestSearchTerms(const std::string& db, const std::string& queryterm, std::vector<std::string>& suggestions)
+//{
+//	mServer.log() << "UNIMPLEMENTED: " << BOOST_CURRENT_FUNCTION << endl;
+//	THROW(("Unimplemented SOAP call"));
+//}
+//
+//void M6WSSearch::CompareDocuments(const std::string& db, const std::string& doc_a, const std::string& doc_b, float& similarity)
+//{
+//	mServer.log() << "UNIMPLEMENTED: " << BOOST_CURRENT_FUNCTION << endl;
+//	THROW(("Unimplemented SOAP call"));
+//}
+//
+//void M6WSSearch::ClusterDocuments(const std::string& db, const std::vector<std::string>& ids, WSSearchNS::Cluster& response)
+//{
+//	mServer.log() << "UNIMPLEMENTED: " << BOOST_CURRENT_FUNCTION << endl;
+//	THROW(("Unimplemented SOAP call"));
+//}

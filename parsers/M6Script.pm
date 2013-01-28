@@ -15,8 +15,10 @@ our $VERSION = '6.0';
 
 #use strict;
 #use warnings;
+use Data::Dumper;
 
 my %scripts;
+my %INDICES;
 
 sub valid_package_name
 {
@@ -39,6 +41,7 @@ sub load_script
 	my $package = valid_package_name($name);
 
 	my $script_name = "M6::Script";
+	my $indices;
 
 	if ($package ne 'default')
 	{

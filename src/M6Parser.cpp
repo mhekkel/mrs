@@ -1024,7 +1024,17 @@ M6ParserImpl* M6Parser::Impl()
 	
 string M6Parser::GetVersion(const string& inSourceConfig)
 {
-	return Impl()->GetVersion(inSourceConfig);
+	string result;
+	try
+	{
+		result = Impl()->GetVersion(inSourceConfig);
+	}
+	catch (exception& e)
+	{
+		if (VERBOSE)
+			cerr << endl << e.what() << endl;
+	}
+	return result;
 }
 
 void M6Parser::ParseDocument(M6InputDocument* inDoc,

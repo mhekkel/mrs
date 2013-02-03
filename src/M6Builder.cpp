@@ -671,9 +671,13 @@ void M6Builder::Build(uint32 inNrOfThreads)
 	string version;
 	vector<pair<string,string>> indexNames;
 	{
-		M6Parser parser(mConfig->get_attribute("parser"));
-		version = parser.GetVersion(source->content());
-		parser.GetIndexNames(indexNames);
+		try
+		{
+			M6Parser parser(mConfig->get_attribute("parser"));
+			version = parser.GetVersion(source->content());
+			parser.GetIndexNames(indexNames);
+		}
+		catch (...) {}
 	}
 	
 	// TODO fetch version string?

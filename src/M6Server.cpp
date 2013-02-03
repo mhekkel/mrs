@@ -5,6 +5,11 @@
 
 #include "M6Lib.h"
 
+#if ! defined(_MSC_VER)
+#include <signal.h>
+#include <sys/resource.h>
+#endif
+
 #include <iostream>
 #include <numeric>
 
@@ -3376,6 +3381,17 @@ void RunMainLoop(uint32 inNrOfThreads, bool inUseLogFiles)
 
 int M6Server::Start(const string& inRunAs, const string& inPidFile, bool inForeground)
 {
+#if ! defined(_MSC_VER)
+	// enable the dumping of cores to enable postmortem debugging
+	rlimit l;
+	if (getrlimit(RLIMIT_CORE, &l) == 0)
+	{
+		l.rlim_cur = l.rlim_max;
+		if (l.rlim_cur == 0 or setrlimit(RLIMIT_CORE, &l) < 0)
+			cerr << "Failed to set rlimit" << endl;
+	}
+#endif
+
 	int result = 0;
 	
 	const zx::element* config = M6Config::GetServer();

@@ -158,25 +158,6 @@ struct GetLinkedExResult
 	}
 };
 
-// unimplemented:
-
-struct Cluster
-{
-	std::string					id;
-	std::string					title;
-	float						similarity;
-	std::vector<Cluster>		children;
-
-	template<class Archive>
-	void serialize(Archive& ar, const unsigned int)
-	{
-		ar & BOOST_SERIALIZATION_NVP(id)
-		   & BOOST_SERIALIZATION_NVP(title)
-		   & BOOST_SERIALIZATION_NVP(similarity)
-		   & BOOST_SERIALIZATION_NVP(children);
-	}
-};
-
 }
 
 class M6WSSearch : public zeep::dispatcher

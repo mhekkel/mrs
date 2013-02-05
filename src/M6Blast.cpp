@@ -79,6 +79,9 @@ const uint32
 	
 	kMaxSequenceLength		= numeric_limits<uint16>::max();
 
+const uint8
+	kGapCode				= 23;
+
 const int32
 	kHitWindow				= 40;
 
@@ -1387,14 +1390,14 @@ void BlastQuery<WORDSIZE>::Report(Result& outResult)
 			for (sequence::const_iterator qf = hsp.mAlignedQuery.begin(), t = hsp.mAlignedTarget.begin();
 				qf != hsp.mAlignedQuery.end(); ++qf, ++t, ++qu)
 			{
-				char r = (*qf == '-' or *qf > 22) ? '-' : kResidues[*qf];
+				char r = *qf >= kGapCode ? '-' : kResidues[*qf];
 				if (r == 'X')
 					r = tolower(*qu);
 				assert((r >= 'a' and r <= 'z') or (r >= 'A' and r <= 'Z') or r == '-');
 				p.mQueryAlignment += r;
-				p.mTargetAlignment += *t == '-' ? '-' : kResidues[*t];
+				p.mTargetAlignment += *t >= kGapCode ? '-' : kResidues[*t];
 				
-				if (*t == 22 or r == '-')
+				if (*t >= kGapCode or r == '-')
 				{
 					if (r == '-')
 						--qu;
@@ -1807,7 +1810,7 @@ int32 BlastQuery<WORDSIZE>::AlignGappedSecond(const sequence& inTarget, HspData&
 		}
 		else if (y >= 1 and d1(x, y) < 0)
 		{
-			alignedQuery += '-';
+			alignedQuery += kGapCode;
 			alignedTarget += *si++;
 			--y;
 			ioHsp.mGapped = true;
@@ -1815,7 +1818,7 @@ int32 BlastQuery<WORDSIZE>::AlignGappedSecond(const sequence& inTarget, HspData&
 		else // if (x >= 1 and d1(x, y) > 0)
 		{
 			alignedQuery += *qi++;
-			alignedTarget += '-';
+			alignedTarget += kGapCode;
 			--x;
 			ioHsp.mGapped = true;
 		}
@@ -1854,7 +1857,7 @@ int32 BlastQuery<WORDSIZE>::AlignGappedSecond(const sequence& inTarget, HspData&
 		}
 		else if (y >= 1 and d2(x, y) < 0)
 		{
-			q += '-';
+			q += kGapCode;
 			s += *sri++;
 			--y;
 			ioHsp.mGapped = true;
@@ -1862,7 +1865,7 @@ int32 BlastQuery<WORDSIZE>::AlignGappedSecond(const sequence& inTarget, HspData&
 		else // if (x >= 1 and d2(x, y) > 0)
 		{
 			q += *qri++;
-			s += '-';
+			s += kGapCode;
 			--x;
 			ioHsp.mGapped = true;
 		}

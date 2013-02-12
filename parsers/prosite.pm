@@ -11,6 +11,19 @@ sub new
 	my $self = new M6::Script(
 		headerline => qr/^CC.+/,
 		lastdocline => '//',
+		indices => {
+			'id' => 'Identification',
+			'ac' => 'Accession number',
+			'cc' => 'Comments and Notes',
+			'de' => 'Description',
+			'do' => 'PROSITE documentation link',
+			'dr' => 'Database cross-reference',
+			'dt' => 'Date',
+			'pp' => 'Post-Processing Rule',
+			'pr' => 'Prorule link',
+			'ru' => 'Rule',
+			'type' => 'Type (PATTERN or MATRIX)'
+		},
 		@_
 	);
 	return bless $self, "M6::Script::prosite";

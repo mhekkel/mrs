@@ -21,6 +21,19 @@ sub new
 			'ForeName'			=> 'author',
 			'Initials'			=> 'author',
 		},
+		
+		indices => {
+			'id' => 'Identifier',
+		#	'abstract' => 'AbstractText',
+		#	'title' => 'ArticleTitle',
+		#	'keyword' => 'Keyword',
+			'abstract' => 'AbstractText',
+			'title' => 'ArticleTitle',
+			'keyword' => 'Keyword',
+			'mesh' => 'Descriptor field, MESH term',
+			'author' => 'Author name',
+			'text' => 'Other text'
+		},
 
 		@_
 	);

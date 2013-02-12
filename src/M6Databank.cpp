@@ -73,7 +73,7 @@ void unlock_memory(void* ptr, size_t size)
 	::VirtualUnlock(ptr, size);
 }
 
-#elif defined(linux) || defined(__linux__)
+#elif defined(linux) || defined(__linux__) || defined(__APPLE__)
 #include <sys/mman.h>
 
 void lock_memory(void* ptr, size_t size)

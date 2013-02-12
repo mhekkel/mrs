@@ -9,6 +9,25 @@ sub new
 	my $self = new M6::Script(
 		firstdocline => '# STOCKHOLM 1.0',
 		lastdocline => '//',
+		indices => {
+			'id' => 'Identification',
+			'ac' => 'Accession number',
+			'au' => 'Entry author',
+			'am' => 'Alignment method (localfirst, globalfirst or byscore)',
+			'cc' => 'Comments and Notes',
+			'dc' => 'Comment about database reference',
+			'de' => 'Description',
+			'dr' => 'Database cross-reference',
+			'gs' => 'UniProt sequence cross-reference',
+			'ne' => 'Pfam accession number nested domain',
+			'nseq' => 'The number of sequences per cluster',
+			'nl' => 'Location nested domain',
+			'pi' => 'Previous identifier',
+			'ref' => 'Any reference field',
+			'se' => 'Source of seed',
+			'sq' => 'Number of sequences in alignment',
+			'tp' => 'Type (Family, Domain, Motif or Repeat)',
+		},
 		@_
 	);
 	

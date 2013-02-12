@@ -197,7 +197,7 @@ void M6SignalCatcher::Signal(int inSignal)
 	M6SignalCatcherImpl::CtrlHandler(CTRL_BREAK_EVENT);
 }
 
-#elif defined(linux) || defined(__linux) || defined (__linux__)
+#elif defined(linux) || defined(__linux) || defined (__linux__) || defined(__APPLE__)
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -211,8 +211,13 @@ void M6SignalCatcher::Signal(int inSignal)
 #include <getopt.h>
 #include <cerrno>
 #include <pwd.h>
+#if defined(__APPLE__)
+#include <termios.h>
+#include <limits.h>
+#else
 #include <termio.h>
 #include <linux/limits.h>
+#endif
 #include <fcntl.h>
 
 namespace

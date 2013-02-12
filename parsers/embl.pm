@@ -7,6 +7,31 @@ sub new
 	my $invocant = shift;
 	my $self = new M6::Script(
 		lastdocline => '//',
+		indices => {
+			'id' => 'Identification',
+			'ac' => 'Accession number',
+			'co' => 'Contigs',
+			'cc' => 'Comments and Notes',
+			'dt' => 'Date',
+			'pr' => 'Project',
+			'de' => 'Description',
+			'gn' => 'Gene name',
+			'os' => 'Organism species',
+			'og' => 'Organelle',
+			'oc' => 'Organism classification',
+			'ox' => 'Taxonomy cross-reference',
+			'ref' => 'Any reference field',
+			'dr' => 'Database cross-reference',
+			'kw' => 'Keywords',
+			'ft' => 'Feature table data',
+			'sv' => 'Sequence version',
+			'fh' => 'Feature table header',
+			'topology'	=> 'Topology (circular or linear)',
+			'mt' => 'Molecule type',
+			'dc' => 'Data class',
+			'td' => 'Taxonomic division',
+			'length' => 'Sequence length'
+		},
 		@_
 	);
 	return bless $self, "M6::Script::embl";
@@ -18,7 +43,7 @@ sub parse
 
 	my %skip = ( XX => 1, DT => 1, RN => 1, RP => 1, FH => 1 );
 	
-	while ($text =~ m/^(?:([A-Z]{2})   ).+\n(?:\1.+\n)*+/mg)
+	while ($text =~ m/^(?:([A-Z]{2})   ).+\n(?:\1.+\n)*/mg)
 	{
 		my $key = $1;
 		my $value = $&;

@@ -8,6 +8,22 @@ sub new
 	my $self = new M6::Script(
 		firstdocline => '*RECORD*',
 		trailer => '*THEEND*',
+		indices => {
+			'no' => 'Number',
+			'id' => 'Number',
+			'ti' => 'Title',
+			'mn' => 'Mini-Mim',
+			'av' => 'Allelic variation',
+			'tx' => 'Text',
+			'sa' => 'See also',
+			'rf' => 'References',
+			'cs' => 'Clinical Synopsis',
+			'cn' => 'Contributor name',
+			'cd' => 'Creation name',
+			'cd_date' => 'Creation date',
+			'ed' => 'Edit history',
+			'ed_date' => 'Edit history (date)',
+		},
 		@_
 	);
 	return bless $self, "M6::Script::omim";

@@ -12,6 +12,13 @@ sub new
 	my $self = new M6::Script(
 		firstdocline => qr/^<entry .+/,
 		lastdocline => '</entry>',
+		indices		=> {
+			'id'		=> 'Identifier',
+			'title'		=> 'ArticleTitle',
+			'member'	=> 'Member ID',
+			'updated'	=> 'Updated',
+			'acc'		=> 'Member Accession',
+		},
 		@_
 	);
 	

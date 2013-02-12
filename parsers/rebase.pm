@@ -11,6 +11,17 @@ sub new
 	my $self = new M6::Script(
 		headerline => qr/^CC.+/,
 		lastdocline => '//',
+		indices => {
+			'id' => 'Identification',
+			'ac' => 'Accession number',
+			'com' => 'Commercial provider code (see REBASE commercial data)',
+			'et' => 'Enzyme type',
+			'os' => 'Organism species',
+			'pt' => 'Prototype enzyme',
+			'ref' => 'Any reference field',
+			'target' => 'Target',
+			'targetlen' => 'Target length',
+		},
 		@_
 	);
 

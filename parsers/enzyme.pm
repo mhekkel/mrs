@@ -7,6 +7,17 @@ sub new
 	my $invocant = shift;
 	my $self = new M6::Script(
 		lastdocline => '//',
+		indices => {
+			'id' => 'Identification',
+			'de' =>	'Description',
+			'an' => 'Alternate Name',
+			'ca' => 'Catalytic Activity',
+			'cf' => 'CoFactor',
+			'cc' => 'Comments',
+			'di' => 'Disease',
+			'pr' => 'Prosite Reference',
+			'dr' => 'Database Reference'
+		},
 		@_
 	);
 	return bless $self, "M6::Script::enzyme";

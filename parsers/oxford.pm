@@ -11,6 +11,21 @@ sub new
 	my $self = new M6::Script(
 		lastheaderline => qr/^-[- ]+$/,
 		firstdocline => qr/^\d+.+/,
+		indices => {
+			'id'		=> 'Unique ID',
+			'llhid'		=> 'Human EntrezGene ID',
+			'hsym'		=> 'Human Symbol',
+			'loc'		=> 'Human Chr',
+			'acc'		=> 'Mouse MGI Acc ID',
+			'llmid'		=> 'Mouse EntrezGene ID',
+			'msym'		=> 'Mouse Symbol',
+			'chr'		=> 'Mouse Chr',
+			'cm'		=> 'Mouse cM',
+			'cb'		=> 'Mouse Band',
+			'data'		=> 'Data Attributes',
+			'loc_min'	=> 'Cytoloc number min',
+			'loc_max'	=> 'Cytoloc number max'
+		},
 		@_
 	);
 	return bless $self, "M6::Script::oxford";

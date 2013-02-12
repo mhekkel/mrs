@@ -10,6 +10,9 @@ sub new
 	my $invocant = shift;
 	my $self = new M6::Script(
 		firstdocline => qr/^gc; .+/,
+		indices		=> {
+			gd => 'Description',
+		},
 		@_
 	);
 	return bless $self, "M6::Script::prints";

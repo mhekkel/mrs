@@ -28,7 +28,7 @@
 #include "M6Utilities.h"
 #include "M6Server.h"
 
-#if defined(__linux__) || defined(__INTEL_COMPILER_BUILD_DATE)
+#if defined(__linux__) || defined(__INTEL_COMPILER_BUILD_DATE) || defined(__APPLE__)
 #include <atomic>
 
 typedef std::atomic<int64>	M6Counter;

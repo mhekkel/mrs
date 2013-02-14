@@ -89,29 +89,25 @@ class M6MultiDocIterator : public M6Iterator
 {
   public:
 					M6MultiDocIterator(const M6IBitStream& inBits, uint32 inLength)
-						: mArray(inBits, inLength)
-						, mBegin(mArray.begin())
-						, mEnd(mArray.end())
+						: mIter(inBits, inLength)
+					{
+						mCount = inLength;
+					}
+
+					M6MultiDocIterator(M6IBitStream&& inBits, uint32 inLength)
+						: mIter(std::move(inBits), inLength)
 					{
 						mCount = inLength;
 					}
 
 	virtual bool	Next(uint32& outDoc, float& outRank)
 					{
-						bool result = false;
-						if (mBegin != mEnd)
-						{
-							result = true;
-							outDoc = *mBegin;
-							++mBegin;
-							outRank = 1.0f;
-						}
-						return result;
+						outRank = 1.0f;
+						return mIter.Next(outDoc);
 					}
 	
   private:
-	M6CompressedArray					mArray;
-	M6CompressedArray::const_iterator	mBegin, mEnd;
+	M6CompressedArrayIterator	mIter;
 };
 
 class M6NotIterator : public M6Iterator
@@ -198,6 +194,12 @@ class M6PhraseIterator : public M6Iterator
 		uint32				mIndex;
 		uint32				mDoc;
 		std::vector<uint32>	mIDL;
+		
+		M6PhraseIteratorPart&
+							operator=(const M6PhraseIteratorPart&);
+
+		M6PhraseIteratorPart&
+							operator=(M6PhraseIteratorPart&&);
 	
 		bool				operator>(const M6PhraseIteratorPart& inPart) const
 								{ return mDoc > inPart.mDoc; }
@@ -206,7 +208,7 @@ class M6PhraseIterator : public M6Iterator
 
 		void				ReadArray();
 	};
-	
+
 	typedef std::vector<M6PhraseIteratorPart> M6PhraseIteratorParts;
 
 	M6PhraseIteratorParts	mIterators;

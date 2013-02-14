@@ -38,7 +38,7 @@ void M6Iterator::Intersect(vector<uint32>& ioDocs, M6Iterator* inIterator)
 		else if (*dr < db)
 			++dr;
 		else
-			empty = inIterator->Next(db, r);
+			empty = not inIterator->Next(db, r);
 	}
 }
 
@@ -288,6 +288,36 @@ M6Iterator* M6IntersectionIterator::Create(M6Iterator* inA, M6Iterator* inB)
 }
 
 // --------------------------------------------------------------------
+
+M6PhraseIterator::M6PhraseIteratorPart&
+M6PhraseIterator::M6PhraseIteratorPart::operator=(const M6PhraseIteratorPart& rhs)
+{
+	if (this != &rhs)
+	{
+		mIter = rhs.mIter;
+		mBits = rhs.mBits;
+		mIndex = rhs.mIndex;
+		mDoc = rhs.mDoc;
+		mIDL = rhs.mIDL;
+	}
+	
+	return *this;
+}
+
+M6PhraseIterator::M6PhraseIteratorPart&
+M6PhraseIterator::M6PhraseIteratorPart::operator=(M6PhraseIteratorPart&& rhs)
+{
+	if (this != &rhs)
+	{
+		mIter = move(rhs.mIter);
+		mBits = move(rhs.mBits);
+		mIndex = move(rhs.mIndex);
+		mDoc = move(rhs.mDoc);
+		mIDL = move(rhs.mIDL);
+	}
+	
+	return *this;
+}
 
 void M6PhraseIterator::M6PhraseIteratorPart::ReadArray()
 {

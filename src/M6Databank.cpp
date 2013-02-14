@@ -218,12 +218,26 @@ class M6FullTextIx
 		uint32			term;
 		uint32			doc;
 		
+		M6BufferEntry&	operator=(M6BufferEntry&& rhs)
+						{
+							if (this != &rhs)
+							{
+								idl = move(rhs.idl);
+								ix = rhs.ix;
+								weight = rhs.weight;
+								term = rhs.term;
+								doc = rhs.doc;
+							}
+							
+							return *this;
+						}
+		
 		bool			operator<(const M6BufferEntry& inOther) const
 							{ return term < inOther.term or
 									(term == inOther.term and doc < inOther.doc); }
 	};
 
-	void			PushEntry(const M6BufferEntry& inEntry);
+	void			PushEntry(M6BufferEntry&& inEntry);
 	int64			Finish();
 	bool			NextEntry(M6BufferEntry& outEntry);
 	
@@ -390,24 +404,16 @@ void M6FullTextIx::FlushDoc(uint32 inDoc)
 			e.weight = 1;
 		
 		if (UsesInDocLocation(w->index))
-		{
 			WriteArray(e.idl, w->loc);
 
-			vector<uint32> loc;
-			M6IBitStream bits(e.idl);
-			ReadArray(bits, loc);
-			if (loc != w->loc)
-				THROW(("Ouch!"));
-		}
-
-		PushEntry(e);
+		PushEntry(move(e));
 	}
 	
 	mDocWords.clear();
 	mDocWordLocation = 1;
 }
 
-void M6FullTextIx::PushEntry(const M6BufferEntry& inEntry)
+void M6FullTextIx::PushEntry(M6BufferEntry&& inEntry)
 {
 	if (mEntryRun != nullptr and mEntryRun->mCount >= kM6BufferEntryCount)
 	{
@@ -421,7 +427,7 @@ void M6FullTextIx::PushEntry(const M6BufferEntry& inEntry)
 		mEntryRun->mCount = 0;
 	}
 	
-	mEntryRun->mEntries[mEntryRun->mCount] = inEntry;
+	mEntryRun->mEntries[mEntryRun->mCount] = move(inEntry);
 	++mEntryRun->mCount;
 	++mEntryCount;
 }

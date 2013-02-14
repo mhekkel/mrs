@@ -2677,8 +2677,7 @@ M6Iterator* M6IndexImplT<M6DataType>::GetIterator(uint32 inPage, uint32 inKeyNr)
 template<class M6DataType>
 M6Iterator* M6IndexImplT<M6DataType>::GetIterator(const M6DataType& inValue)
 {
-	M6IBitStream bits(new M6IBitVectorImpl(*this, inValue.mBitVector));
-	return new M6MultiDocIterator(bits, inValue.mCount);
+	return new M6MultiDocIterator(M6IBitStream(new M6IBitVectorImpl(*this, inValue.mBitVector)), inValue.mCount);
 }
 
 template<>
@@ -2690,11 +2689,10 @@ M6Iterator* M6IndexImplT<uint32>::GetIterator(const uint32& inValue)
 template<class M6DataType>
 uint32 M6IndexImplT<M6DataType>::AddHits(const M6DataType& inValue, vector<bool>& outBitmap)
 {
-	M6IBitStream bits(new M6IBitVectorImpl(*this, inValue.mBitVector));
-	
 	uint32 updated;
 	
-	ReadSimpleArray(bits, inValue.mCount, outBitmap, updated);
+	ReadSimpleArray(M6IBitStream(new M6IBitVectorImpl(*this, inValue.mBitVector)),
+		inValue.mCount, outBitmap, updated);
 	
 	return updated;
 }
@@ -2847,8 +2845,9 @@ M6Iterator* M6IndexImplT<M6MultiIDLData>::FindString(const string& inString)
 					break;
 				}
 
-				M6IBitStream bits(new M6IBitVectorImpl(*this, data.mBitVector));
-				iterators.push_back(tr1::make_tuple(new M6MultiDocIterator(bits, data.mCount), data.mIDLOffset, index));
+				iterators.push_back(tr1::make_tuple(
+					new M6MultiDocIterator(M6IBitStream(new M6IBitVectorImpl(*this, data.mBitVector)),
+							data.mCount), data.mIDLOffset, index));
 				++index;
 			}
 			else if (token == eM6TokenPunctuation)
@@ -3714,19 +3713,18 @@ void M6MultiBasicIndex::Insert(uint32 inKey, const vector<uint32>& inDocuments)
 	mImpl->Insert(inKey, data);
 }
 
-bool M6MultiBasicIndex::Find(const string& inKey, M6CompressedArray& outDocuments)
-{
-	bool result = false;
-	M6MultiData data;
-	if (mImpl->Find(inKey, data))
-	{
-		M6IBitStream bits(new M6IBitVectorImpl(*mImpl, data.mBitVector));
-		outDocuments = M6CompressedArray(bits, data.mCount);
-		
-		result = true;
-	}
-	return result;
-}
+//bool M6MultiBasicIndex::Find(const string& inKey, M6CompressedArray& outDocuments)
+//{
+//	bool result = false;
+//	M6MultiData data;
+//	if (mImpl->Find(inKey, data))
+//	{
+//		outDocuments = M6CompressedArray(M6IBitStream(new M6IBitVectorImpl(*mImpl, data.mBitVector)), data.mCount);
+//		
+//		result = true;
+//	}
+//	return result;
+//}
 
 // --------------------------------------------------------------------
 
@@ -3747,10 +3745,10 @@ void M6MultiIDLBasicIndex::Insert(uint32 inKey, int64 inIDLOffset, const vector<
 	mImpl->Insert(inKey, data);
 }
 
-bool M6MultiIDLBasicIndex::Find(const string& inKey, M6CompressedArray& outDocuments, int64& outIDLOffset)
-{
-	return false;
-}
+//bool M6MultiIDLBasicIndex::Find(const string& inKey, M6CompressedArray& outDocuments, int64& outIDLOffset)
+//{
+//	return false;
+//}
 
 // --------------------------------------------------------------------
 
@@ -3876,6 +3874,14 @@ M6WeightedBasicIndex::M6WeightedIterator::M6WeightedIterator(const M6WeightedIte
 {
 }
 
+M6WeightedBasicIndex::M6WeightedIterator::M6WeightedIterator(M6WeightedIterator&& inIter)
+	: mBits(move(inIter.mBits))
+	, mDocs(move(inIter.mDocs))
+	, mWeight(inIter.mWeight)
+	, mCount(inIter.mCount)
+{
+}
+
 M6WeightedBasicIndex::M6WeightedIterator&
 M6WeightedBasicIndex::M6WeightedIterator::operator=(const M6WeightedIterator& inIter)
 {
@@ -3883,6 +3889,20 @@ M6WeightedBasicIndex::M6WeightedIterator::operator=(const M6WeightedIterator& in
 	{
 		mBits = inIter.mBits;
 		mDocs = inIter.mDocs;
+		mCount = inIter.mCount;
+		mWeight = inIter.mWeight;
+	}
+
+	return *this;
+}
+
+M6WeightedBasicIndex::M6WeightedIterator&
+M6WeightedBasicIndex::M6WeightedIterator::operator=(M6WeightedIterator&& inIter)
+{
+	if (this != &inIter)
+	{
+		mBits = move(inIter.mBits);
+		mDocs = move(inIter.mDocs);
 		mCount = inIter.mCount;
 		mWeight = inIter.mWeight;
 	}

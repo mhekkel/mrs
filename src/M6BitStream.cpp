@@ -161,6 +161,15 @@ M6OBitStream::M6OBitStream(const M6OBitStream& inStream)
 		mImpl->Reference();
 }
 
+M6OBitStream::M6OBitStream(M6OBitStream&& inStream)
+	: mImpl(move(inStream.mImpl))
+	, mByteOffset(move(inStream.mByteOffset))
+	, mBitOffset(move(inStream.mBitOffset))
+{
+	memcpy(mData, inStream.mData, mByteOffset + 1);
+	inStream.mImpl = nullptr;
+}
+
 M6OBitStream& M6OBitStream::operator=(const M6OBitStream& inStream)
 {
 	if (((mImpl != nullptr or inStream.mImpl != nullptr) and mImpl != inStream.mImpl) or
@@ -173,6 +182,26 @@ M6OBitStream& M6OBitStream::operator=(const M6OBitStream& inStream)
 	
 		if (mImpl != nullptr)
 			mImpl->Reference();
+	
+		mByteOffset = inStream.mByteOffset;
+		mBitOffset = inStream.mBitOffset;
+		assert(mByteOffset < kBufferSize);
+		memcpy(mData, inStream.mData, mByteOffset + 1);
+	}
+
+	return *this;
+}
+
+M6OBitStream& M6OBitStream::operator=(M6OBitStream&& inStream)
+{
+	if (((mImpl != nullptr or inStream.mImpl != nullptr) and mImpl != inStream.mImpl) or
+		this != &inStream)
+	{
+		if (mImpl != nullptr)
+			mImpl->Release();
+
+		mImpl = move(inStream.mImpl);
+		inStream.mImpl = nullptr;
 	
 		mByteOffset = inStream.mByteOffset;
 		mBitOffset = inStream.mBitOffset;
@@ -419,6 +448,14 @@ M6IBitStream::M6IBitStream(const M6IBitStream& inStream)
 		mImpl = mImpl->Clone();
 }
 
+M6IBitStream::M6IBitStream(M6IBitStream&& inStream)
+	: mImpl(move(inStream.mImpl))
+	, mBitOffset(move(inStream.mBitOffset))
+	, mByte(move(inStream.mByte))
+{
+	inStream.mImpl = nullptr;
+}
+
 M6IBitStream& M6IBitStream::operator=(const M6IBitStream& inStream)
 {
 	if (this != &inStream)
@@ -427,6 +464,20 @@ M6IBitStream& M6IBitStream::operator=(const M6IBitStream& inStream)
 		mImpl = inStream.mImpl;
 		if (mImpl != nullptr)
 			mImpl = mImpl->Clone();
+		mBitOffset = inStream.mBitOffset;
+		mByte = inStream.mByte;
+	}
+	
+	return *this;
+}
+
+M6IBitStream& M6IBitStream::operator=(M6IBitStream&& inStream)
+{
+	if (this != &inStream)
+	{
+		delete mImpl;
+		mImpl = move(inStream.mImpl);
+		inStream.mImpl = nullptr;
 		mBitOffset = inStream.mBitOffset;
 		mByte = inStream.mByte;
 	}
@@ -668,43 +719,23 @@ void CompressSimpleArraySelector(M6OBitStream& inBits, const vector<uint32>& inA
 }
 
 // --------------------------------------------------------------------
-//	M6CompressedArray
+//	M6CompressedArrayIterator
 
-M6CompressedArray::M6CompressedArray()
-{
-}
-
-M6CompressedArray::M6CompressedArray(const M6CompressedArray& inArray)
-	: mBits(inArray.mBits)
-	, mSize(inArray.mSize)
-{
-}
-
-M6CompressedArray::M6CompressedArray(const M6IBitStream& inBits, uint32 inLength)
-	: mBits(inBits)
-	, mSize(inLength)
-{
-}
-
-M6CompressedArray& M6CompressedArray::operator=(const M6CompressedArray& inArray)
-{
-	if (this != &inArray)
-	{
-		mBits = inArray.mBits;
-		mSize = inArray.mSize;
-	}
-	return *this;
-}
-
-M6CompressedArray::const_iterator::const_iterator(const M6IBitStream& inBits, uint32 inLength)
+M6CompressedArrayIterator::M6CompressedArrayIterator(const M6IBitStream& inBits, uint32 inLength)
 	: mBits(inBits), mCount(inLength), mWidth(kStartWidth), mSpan(0), mCurrent(0)
 {
-	operator++();
 }
 
-M6CompressedArray::const_iterator& M6CompressedArray::const_iterator::operator++()
+M6CompressedArrayIterator::M6CompressedArrayIterator(M6IBitStream&& inBits, uint32 inLength)
+	: mBits(move(inBits)), mCount(inLength), mWidth(kStartWidth), mSpan(0), mCurrent(0)
 {
-	if (mCount != sSentinel and mCount > 0)
+}
+
+bool M6CompressedArrayIterator::Next(uint32& outValue)
+{
+	bool result = false;
+	
+	if (mCount > 0)
 	{
 		if (mSpan == 0)
 		{
@@ -726,15 +757,96 @@ M6CompressedArray::const_iterator& M6CompressedArray::const_iterator::operator++
 		}
 
 		mCurrent += 1;
+		outValue = mCurrent;
 
 		--mSpan;
 		--mCount;
+		result = true;
 	}
-	else
-		mCount = sSentinel;
 
-	return *this;
+	return result;
 }
+
+//// --------------------------------------------------------------------
+////	M6CompressedArray
+//
+//M6CompressedArray::M6CompressedArray()
+//{
+//}
+//
+//M6CompressedArray::M6CompressedArray(const M6CompressedArray& inArray)
+//	: mBits(inArray.mBits)
+//	, mSize(inArray.mSize)
+//{
+//}
+//
+//M6CompressedArray::M6CompressedArray(M6CompressedArray&& inArray)
+//	: mBits(move(inArray.mBits))
+//	, mSize(move(inArray.mSize))
+//{
+//}
+//
+//M6CompressedArray::M6CompressedArray(const M6IBitStream& inBits, uint32 inLength)
+//	: mBits(inBits)
+//	, mSize(inLength)
+//{
+//}
+//
+//M6CompressedArray::M6CompressedArray(M6IBitStream&& inBits, uint32 inLength)
+//	: mBits(move(inBits))
+//	, mSize(inLength)
+//{
+//}
+//
+//M6CompressedArray& M6CompressedArray::operator=(const M6CompressedArray& inArray)
+//{
+//	if (this != &inArray)
+//	{
+//		mBits = inArray.mBits;
+//		mSize = inArray.mSize;
+//	}
+//	return *this;
+//}
+//
+//M6CompressedArray::const_iterator::const_iterator(const M6IBitStream& inBits, uint32 inLength)
+//	: mBits(inBits), mCount(inLength), mWidth(kStartWidth), mSpan(0), mCurrent(0)
+//{
+//	operator++();
+//}
+//
+//M6CompressedArray::const_iterator& M6CompressedArray::const_iterator::operator++()
+//{
+//	if (mCount != sSentinel and mCount > 0)
+//	{
+//		if (mSpan == 0)
+//		{
+//			uint32 selector;
+//			ReadBinary(mBits, 4, selector);
+//			mSpan = kSelectors[selector].span;
+//			
+//			if (selector == 0)
+//				mWidth = kMaxWidth;
+//			else
+//				mWidth += kSelectors[selector].databits;
+//		}
+//
+//		if (mWidth > 0)
+//		{
+//			uint32 delta;
+//			ReadBinary(mBits, mWidth, delta);
+//			mCurrent += delta;
+//		}
+//
+//		mCurrent += 1;
+//
+//		--mSpan;
+//		--mCount;
+//	}
+//	else
+//		mCount = sSentinel;
+//
+//	return *this;
+//}
 
 // --------------------------------------------------------------------
 //	Array Routines

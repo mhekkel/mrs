@@ -194,7 +194,7 @@ class M6MultiBasicIndex : public M6BasicIndex
 					M6MultiBasicIndex(const boost::filesystem::path& inPath, M6IndexType inIndexType, MOpenMode inMode);
 
 	void			Insert(const std::string& inKey, const std::vector<uint32>& inDocuments);
-	bool			Find(const std::string& inKey, M6CompressedArray& outDocuments);
+//	bool			Find(const std::string& inKey, M6CompressedArray& outDocuments);
 
 	// for batch mode only:
 	void			Insert(uint32 inKey, const std::vector<uint32>& inDocuments);
@@ -211,7 +211,7 @@ class M6MultiIDLBasicIndex : public M6BasicIndex
 					M6MultiIDLBasicIndex(const boost::filesystem::path& inPath, M6IndexType inIndexType, MOpenMode inMode);
 
 	void			Insert(const std::string& inKey, int64 inIDLOffset, const std::vector<uint32>& inDocuments);
-	bool			Find(const std::string& inKey, M6CompressedArray& outDocuments, int64& outIDLOffset);
+//	bool			Find(const std::string& inKey, M6CompressedArray& outDocuments, int64& outIDLOffset);
 
 	// for batch mode only:
 	void			Insert(uint32 inKey, int64 inIDLOffset, const std::vector<uint32>& inDocuments);
@@ -232,8 +232,11 @@ class M6WeightedBasicIndex : public M6BasicIndex
 						M6WeightedIterator();
 						M6WeightedIterator(M6IndexImpl& inIndex, const M6BitVector& inBitVector, uint32 inCount);
 						M6WeightedIterator(const M6WeightedIterator&);
+						M6WeightedIterator(M6WeightedIterator&&);
 		M6WeightedIterator&
 						operator=(const M6WeightedIterator&);
+		M6WeightedIterator&
+						operator=(M6WeightedIterator&&);
 
 		bool			Next(uint32& outDocNr, uint8& outWeight);
 

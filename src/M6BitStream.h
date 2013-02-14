@@ -47,8 +47,10 @@ class M6OBitStream
 						M6OBitStream();
 	explicit			M6OBitStream(M6File& inFile);
 						M6OBitStream(const M6OBitStream& inStream);
+						M6OBitStream(M6OBitStream&& inStream);
 						~M6OBitStream();
 	M6OBitStream&		operator=(const M6OBitStream& inStream);
+	M6OBitStream&		operator=(M6OBitStream&& inStream);
 	void				swap(M6OBitStream& ioStream);
 
 	//
@@ -104,7 +106,8 @@ struct M6IBitStreamImpl
 						: mBufferPtr(inImpl.mBufferPtr), mBufferSize(inImpl.mBufferSize)
 					{
 					}
-	virtual				~M6IBitStreamImpl() {}
+
+	virtual			~M6IBitStreamImpl() {}
 
 	// using Clone, we can make ibitstreams copy constructable.
 	virtual M6IBitStreamImpl* Clone() = 0;
@@ -125,8 +128,10 @@ class M6IBitStream
 						M6IBitStream(M6IBitStreamImpl* inImpl);
 						M6IBitStream(M6File& inFile, int64 inOffset, uint32 inBitBufferSize = kM6DefaultBitBufferSize);
 						M6IBitStream(const M6IBitStream& inBits);
+						M6IBitStream(M6IBitStream&& other);
 	explicit			M6IBitStream(const M6OBitStream& inBits);
 	M6IBitStream&		operator=(const M6IBitStream& inStream);
+	M6IBitStream&		operator=(M6IBitStream&& inStream);
 						~M6IBitStream();
 	
 	// 
@@ -257,57 +262,82 @@ void ReadSimpleArray(M6IBitStream& inBits, uint32 inCount,
 	std::vector<bool>& outArray, uint32& outSet);
 
 // To iterate over array elements stored in a bitstream, you can use
-// the M6CompressedArray class. It has a const_iterator for your convenience.
+// the M6CompressedArrayIterator class.
 
-class M6CompressedArray
+class M6CompressedArrayIterator
 {
   public:
-				M6CompressedArray();
-				M6CompressedArray(const M6CompressedArray& inArray);
-				M6CompressedArray(const M6IBitStream& inBits, uint32 inLength);
-	M6CompressedArray&
-				operator=(const M6CompressedArray& inArray);
-	
-	struct const_iterator : public std::iterator<std::forward_iterator_tag, const uint32>
-	{
-		typedef std::iterator<std::forward_iterator_tag, const uint32>	base_type;
-		typedef base_type::reference									reference;
-		typedef base_type::pointer										pointer;
-		
-						const_iterator();
-						const_iterator(const const_iterator& iter);
-						const_iterator(const M6IBitStream& inBits, uint32 inCount);
-		const_iterator&	operator=(const const_iterator& iter);
+					M6CompressedArrayIterator(const M6IBitStream& inBits, uint32 inLength);
+					M6CompressedArrayIterator(M6IBitStream&& inBits, uint32 inLength);
 
-		reference		operator*() const								{ return mCurrent; }
-		pointer			operator->() const								{ return &mCurrent; }
-
-		const_iterator&	operator++();
-		const_iterator	operator++(int)									{ const_iterator iter(*this); operator++(); return iter; }
-
-		bool			operator==(const const_iterator& iter) const	{ return mCount == iter.mCount; }
-		bool			operator!=(const const_iterator& iter) const	{ return not operator==(iter); }
-
-	  private:
-		static const uint32 sSentinel = ~0;
-
-		M6IBitStream	mBits;
-		uint32			mCount;
-		int32			mWidth;
-		uint32			mSpan;
-		uint32			mCurrent;
-	};
-	
-	const_iterator		begin() const;
-	const_iterator		end() const;
-	
-	uint32				size() const									{ return mSize; }
-	bool				empty() const									{ return mSize == 0; }
+	bool			Next(uint32& outValue);
 
   private:
-	M6IBitStream		mBits;
-	uint32				mSize;
+					M6CompressedArrayIterator(const M6CompressedArrayIterator&);
+	M6CompressedArrayIterator&
+					operator=(const M6CompressedArrayIterator&);
+
+	M6IBitStream	mBits;
+	uint32			mCount;
+	int32			mWidth;
+	uint32			mSpan, mCurrent;
 };
+//
+//
+//// To iterate over array elements stored in a bitstream, you can use
+//// the M6CompressedArray class. It has a const_iterator for your convenience.
+//
+//class M6CompressedArray
+//{
+//  public:
+//				M6CompressedArray();
+//				M6CompressedArray(const M6CompressedArray& inArray);
+//				M6CompressedArray(M6CompressedArray&& inArray);
+//				M6CompressedArray(const M6IBitStream& inBits, uint32 inLength);
+//				M6CompressedArray(M6IBitStream&& inBits, uint32 inLength);
+//	M6CompressedArray&
+//				operator=(const M6CompressedArray& inArray);
+//	
+//	struct const_iterator : public std::iterator<std::forward_iterator_tag, const uint32>
+//	{
+//		typedef std::iterator<std::forward_iterator_tag, const uint32>	base_type;
+//		typedef base_type::reference									reference;
+//		typedef base_type::pointer										pointer;
+//		
+//						const_iterator();
+//						const_iterator(const const_iterator& iter);
+//						const_iterator(const M6IBitStream& inBits, uint32 inCount);
+//		const_iterator&	operator=(const const_iterator& iter);
+//
+//		reference		operator*() const								{ return mCurrent; }
+//		pointer			operator->() const								{ return &mCurrent; }
+//
+//		const_iterator&	operator++();
+//		const_iterator	operator++(int)									{ const_iterator iter(*this); operator++(); return iter; }
+//
+//		bool			operator==(const const_iterator& iter) const	{ return mCount == iter.mCount; }
+//		bool			operator!=(const const_iterator& iter) const	{ return not operator==(iter); }
+//
+//	  private:
+//		static const uint32 sSentinel = ~0;
+//
+//		M6IBitStream	mBits;
+//		uint32			mCount;
+//		int32			mWidth;
+//		uint32			mSpan;
+//		uint32			mCurrent;
+//	};
+//	
+//	const_iterator		begin() const;
+//	const_iterator		end() const;
+//	
+//	uint32				size() const									{ return mSize; }
+//	bool				empty() const									{ return mSize == 0; }
+//
+//  private:
+//	M6IBitStream		mBits;
+//	uint32				mSize;
+//};
 
 // --------------------------------------------------------------------
 //
@@ -368,42 +398,42 @@ inline int M6IBitStream::operator()()
 	return result;
 }
 
-// --------------------------------------------------------------------
-
-inline M6CompressedArray::const_iterator::const_iterator()
-	: mCount(sSentinel), mWidth(0), mSpan(0), mCurrent(0)
-{
-}
-
-inline M6CompressedArray::const_iterator::const_iterator(const const_iterator& iter)
-	: mBits(iter.mBits)
-	, mCount(iter.mCount)
-	, mWidth(iter.mWidth)
-	, mSpan(iter.mSpan)
-	, mCurrent(iter.mCurrent)
-{
-}
-
-inline M6CompressedArray::const_iterator& M6CompressedArray::const_iterator::operator=(const const_iterator& iter)
-{
-	if (this != &iter)
-	{
-		mBits = iter.mBits;
-		mCount = iter.mCount;
-		mWidth = iter.mWidth;
-		mSpan = iter.mSpan;
-		mCurrent = iter.mCurrent;
-	}
-	
-	return *this;
-}
-
-inline M6CompressedArray::const_iterator M6CompressedArray::begin() const
-{
-	return const_iterator(mBits, mSize);
-}
-
-inline M6CompressedArray::const_iterator M6CompressedArray::end() const
-{
-	return const_iterator();
-}
+//// --------------------------------------------------------------------
+//
+//inline M6CompressedArray::const_iterator::const_iterator()
+//	: mCount(sSentinel), mWidth(0), mSpan(0), mCurrent(0)
+//{
+//}
+//
+//inline M6CompressedArray::const_iterator::const_iterator(const const_iterator& iter)
+//	: mBits(iter.mBits)
+//	, mCount(iter.mCount)
+//	, mWidth(iter.mWidth)
+//	, mSpan(iter.mSpan)
+//	, mCurrent(iter.mCurrent)
+//{
+//}
+//
+//inline M6CompressedArray::const_iterator& M6CompressedArray::const_iterator::operator=(const const_iterator& iter)
+//{
+//	if (this != &iter)
+//	{
+//		mBits = iter.mBits;
+//		mCount = iter.mCount;
+//		mWidth = iter.mWidth;
+//		mSpan = iter.mSpan;
+//		mCurrent = iter.mCurrent;
+//	}
+//	
+//	return *this;
+//}
+//
+//inline M6CompressedArray::const_iterator M6CompressedArray::begin() const
+//{
+//	return const_iterator(mBits, mSize);
+//}
+//
+//inline M6CompressedArray::const_iterator M6CompressedArray::end() const
+//{
+//	return const_iterator();
+//}

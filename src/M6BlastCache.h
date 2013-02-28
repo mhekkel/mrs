@@ -44,7 +44,7 @@ class M6BlastCache
 
 	M6BlastResultPtr			JobResult(const std::string& inJobID);
 	
-	std::string					Submit(const std::string& inDatabank,
+	std::string					Submit(const std::string& Databank,
 									std::string inQuery, //std::string inProgram,
 									std::string inMatrix, uint32 inWordSize,
 									double inExpect, bool inLowComplexityFilter,
@@ -62,6 +62,13 @@ class M6BlastCache
 
 	void						Work();
 	void						ExecuteJob(const std::string& inJobID);
+	void						GetJobParameters(const std::string& inJobID,
+									std::string& outDatabank, std::string& outQuery, //std::string& outProgram,
+									std::string& outMatrix, uint32& outWordSize,
+									double& outExpect, bool& outLowComplexityFilter,
+									bool& outGapped, int32& outGapOpen, int32& outGapExtend,
+									uint32& outReportLimit);
+
 	void						SetJobStatus(const std::string inJobID, const std::string& inStatus,
 									const std::string& inError, uint32 inHitCount, double inBestScore);
 	void						CacheResult(const std::string& inJobID, M6BlastResultPtr inResult);

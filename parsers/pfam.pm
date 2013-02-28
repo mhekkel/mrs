@@ -93,31 +93,33 @@ sub parse
 	}
 }
 
-sub version
-{
-	my ($self) = @_;
-	my $vers;
-
-	my $raw_dir = $self->{raw_dir} or die "raw_dir is not defined\n";
-	
-	my $fh;
-
-	open($fh, "zcat $raw_dir/relnotes.txt.Z|");
-
-	while (my $line = <$fh>)
-	{
-		if ($line =~ /^\s+(RELEASE [0-9.]+)/)
-		{
-			$vers = $1;
-			last;
-		}
-	}
-
-	close($fh);
-
-	chomp($vers);
-
-	return $vers;
-}
+#sub version
+#{
+#	my ($self, $config) = @_;
+#	my $vers;
+#
+#print STDERR "'$config'\n";
+#
+#	my $raw_dir = $self->{raw_dir} or die "raw_dir is not defined\n";
+#	
+#	my $fh;
+#
+#	open($fh, "zcat $raw_dir/relnotes.txt.Z|");
+#
+#	while (my $line = <$fh>)
+#	{
+#		if ($line =~ /^\s+(RELEASE [0-9.]+)/)
+#		{
+#			$vers = $1;
+#			last;
+#		}
+#	}
+#
+#	close($fh);
+#
+#	chomp($vers);
+#
+#	return $vers;
+#}
 
 1;

@@ -472,16 +472,15 @@ void M6BlastCache::Work()
 	{
 		try
 		{
-			int err = sqlite3_reset(mSelectByStatusStmt);
-			if (err != SQLITE_OK and err != SQLITE_ROW and err != SQLITE_DONE)
-				THROW_IF_SQLITE3_ERROR(err, mCacheDB);
+			// ignore errors by sqlite3_reset
+			(void)sqlite3_reset(mSelectByStatusStmt);
 			
-			err = sqlite3_step(mSelectByStatusStmt);
+			int err = sqlite3_step(mSelectByStatusStmt);
 			if (err != SQLITE_OK and err != SQLITE_ROW and err != SQLITE_DONE)
 				THROW_IF_SQLITE3_ERROR(err, mCacheDB);
 
 			if (err != SQLITE_ROW)
-			{		
+			{
 				mEmptyCondition.wait(lock);
 				continue;
 			}
@@ -513,70 +512,81 @@ void M6BlastCache::Work()
 	}
 }
 
+void M6BlastCache::GetJobParameters(const string& inJobID, std::string& outDatabank, string& outQuery, /*string& outProgram, */
+	string& outMatrix, uint32& outWordSize, double& outExpect, bool& outLowComplexityFilter,
+	bool& outGapped, int32& outGapOpen, int32& outGapExtend, uint32& outReportLimit)
+{
+	boost::mutex::scoped_lock lock(mDbMutex);
+
+	sqlite3_reset(mFetchParamsStmt);
+
+	THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(mFetchParamsStmt, 1, inJobID.c_str(), inJobID.length(), SQLITE_TRANSIENT), mCacheDB);
+	int err = sqlite3_step(mFetchParamsStmt);
+
+	if (err != SQLITE_ROW)
+		throw runtime_error("job missing in cache");
+	
+	// db, query, matrix, wordsize, expect, filter, gapped, gapopen, gapextend
+
+	const char* text = reinterpret_cast<const char*>(sqlite3_column_text(mFetchParamsStmt, 0));
+	uint32 length = sqlite3_column_bytes(mFetchParamsStmt, 0);
+	outDatabank.assign(text, length);
+	
+	text = reinterpret_cast<const char*>(sqlite3_column_text(mFetchParamsStmt, 1));
+	length = sqlite3_column_bytes(mFetchParamsStmt, 1);
+	outQuery.assign(text, length);
+
+	text = reinterpret_cast<const char*>(sqlite3_column_text(mFetchParamsStmt, 2));
+	length = sqlite3_column_bytes(mFetchParamsStmt, 2);
+	outMatrix.assign(text, length);
+	
+	outWordSize = sqlite3_column_int(mFetchParamsStmt, 3);
+	outExpect = sqlite3_column_double(mFetchParamsStmt, 4);
+	outLowComplexityFilter = sqlite3_column_int(mFetchParamsStmt, 5) != 0;
+	outGapped = sqlite3_column_int(mFetchParamsStmt, 6) != 0;
+	outGapOpen = sqlite3_column_int(mFetchParamsStmt, 7);
+	outGapExtend = sqlite3_column_int(mFetchParamsStmt, 8);
+}
+
 void M6BlastCache::ExecuteJob(const string& inJobID)
 {
 	try
 	{
 		SetJobStatus(inJobID, "running", "", 0, 0);
 		
-		sqlite3_reset(mFetchParamsStmt);
-		THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(mFetchParamsStmt, 1, inJobID.c_str(), inJobID.length(), SQLITE_TRANSIENT), mCacheDB);
-		int err = sqlite3_step(mFetchParamsStmt);
-
-		if (err != SQLITE_OK and err != SQLITE_ROW and err != SQLITE_DONE)
-			THROW_IF_SQLITE3_ERROR(err, mCacheDB);
+		string db, query, matrix;
+		uint32 wordsize, reportlimit = 250;
+		int32 gapopen, gapextend;
+		bool filter, gapped;
+		double expect;
 		
-		if (err != SQLITE_ROW)
-			SetJobStatus(inJobID, "error", "job missing", 0, 0);
-		else
-		{
-			// db, query, matrix, wordsize, expect, filter, gapped, gapopen, gapextend
+		GetJobParameters(inJobID, db, query, matrix, wordsize, expect, filter, gapped, gapopen, gapextend, reportlimit);
+		
+		vector<fs::path> files;
+		FastaFilesForDatabank(db, files);
+		
+		M6BlastResultPtr result(M6Blast::Search(files, query, "blastp",
+			matrix, wordsize, expect, filter, gapped, gapopen, gapextend, reportlimit));
+		
+		zeep::xml::document doc("<blast-result/>");
+		zeep::xml::serializer sr(doc.child(), false);
+		sr & boost::serialization::make_nvp("blast-result", const_cast<M6Blast::Result&>(*result));
 			
-			const char* text = reinterpret_cast<const char*>(sqlite3_column_text(mFetchParamsStmt, 0));
-			uint32 length = sqlite3_column_bytes(mFetchParamsStmt, 0);
-			string db(text, length);
-			
-			text = reinterpret_cast<const char*>(sqlite3_column_text(mFetchParamsStmt, 1));
-			length = sqlite3_column_bytes(mFetchParamsStmt, 1);
-			string query(text, length);
+		fs::ofstream file(mCacheDir / (inJobID + ".xml.bz2"), ios_base::out|ios_base::trunc|ios_base::binary);
+		io::filtering_stream<io::output> out;
 
-			text = reinterpret_cast<const char*>(sqlite3_column_text(mFetchParamsStmt, 2));
-			length = sqlite3_column_bytes(mFetchParamsStmt, 2);
-			string matrix(text, length);
-			
-			int wordsize = sqlite3_column_int(mFetchParamsStmt, 3);
-			double expect = sqlite3_column_double(mFetchParamsStmt, 4);
-			bool filter = sqlite3_column_int(mFetchParamsStmt, 5) != 0;
-			bool gapped = sqlite3_column_int(mFetchParamsStmt, 6) != 0;
-			int gapopen = sqlite3_column_int(mFetchParamsStmt, 7);
-			int gapextend = sqlite3_column_int(mFetchParamsStmt, 8);
-			
-			vector<fs::path> files;
-			FastaFilesForDatabank(db, files);
-			
-			M6BlastResultPtr result(M6Blast::Search(files, query, "blastp",
-				matrix, wordsize, expect, filter, gapped, gapopen, gapextend, 250));
-			
-			zeep::xml::document doc("<blast-result/>");
-			zeep::xml::serializer sr(doc.child(), false);
-			sr & boost::serialization::make_nvp("blast-result", const_cast<M6Blast::Result&>(*result));
-				
-			fs::ofstream file(mCacheDir / (inJobID + ".xml.bz2"), ios_base::out|ios_base::trunc|ios_base::binary);
-			io::filtering_stream<io::output> out;
+		if (not file.is_open())
+			throw runtime_error("could not create output file");
+		
+		out.push(io::bzip2_compressor());
+		out.push(file);
 
-			if (not file.is_open())
-				throw runtime_error("could not create output file");
-			
-			out.push(io::bzip2_compressor());
-			out.push(file);
-
-			out << doc;
-			
-			CacheResult(inJobID, result);
-			
-			SetJobStatus(inJobID, "finished", "", result->mHits.size(),
-				result->mHits.empty() or result->mHits.front().mHsps.empty() ? 0 : result->mHits.front().mHsps.front().mExpect);
-		}
+		out << doc;
+		
+		CacheResult(inJobID, result);
+		
+		SetJobStatus(inJobID, "finished", "", result->mHits.size(),
+			result->mHits.empty() or result->mHits.front().mHsps.empty() ? 0 : result->mHits.front().mHsps.front().mExpect);
 	}
 	catch (exception& e)
 	{

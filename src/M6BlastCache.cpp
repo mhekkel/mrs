@@ -117,6 +117,7 @@ M6BlastCache::M6BlastCache()
 			"gapped INTEGER, "
 			"gapopen INTEGER, "
 			"gapextend INTEGER, "
+			"report INTEGER, "
 			"UNIQUE(id)"
 		")"
 	);
@@ -139,12 +140,12 @@ M6BlastCache::M6BlastCache()
 
 	THROW_IF_SQLITE3_ERROR(sqlite3_prepare_v2(mCacheDB,
 		"SELECT id FROM blast_cache WHERE "
-		"db = ? AND query = ? AND matrix = ? AND wordsize = ? AND expect = ? AND filter = ? AND gapped = ? AND gapopen = ? AND gapextend = ? ", -1,
+		"db = ? AND query = ? AND matrix = ? AND wordsize = ? AND expect = ? AND filter = ? AND gapped = ? AND gapopen = ? AND gapextend = ? AND report >= ? ", -1,
 		&mSelectByParamsStmt, nullptr), mCacheDB);
 
 	THROW_IF_SQLITE3_ERROR(sqlite3_prepare_v2(mCacheDB,
-		"INSERT INTO blast_cache (id, status, db, query, matrix, wordsize, expect, filter, gapped, gapopen, gapextend) "
-		"VALUES (?, 'queued', ?, ?, ?, ?, ?, ?, ?, ?, ?)", -1,
+		"INSERT INTO blast_cache (id, status, db, query, matrix, wordsize, expect, filter, gapped, gapopen, gapextend, report) "
+		"VALUES (?, 'queued', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", -1,
 		&mInsertStmt, nullptr), mCacheDB);
 
 	THROW_IF_SQLITE3_ERROR(sqlite3_prepare_v2(mCacheDB,
@@ -156,7 +157,7 @@ M6BlastCache::M6BlastCache()
 		&mUpdateStatusStmt, nullptr), mCacheDB);
 
 	THROW_IF_SQLITE3_ERROR(sqlite3_prepare_v2(mCacheDB,
-		"SELECT db, query, matrix, wordsize, expect, filter, gapped, gapopen, gapextend FROM blast_cache WHERE id = ? ", -1,
+		"SELECT db, query, matrix, wordsize, expect, filter, gapped, gapopen, gapextend, report FROM blast_cache WHERE id = ? ", -1,
 		&mFetchParamsStmt, nullptr), mCacheDB);
 
 	THROW_IF_SQLITE3_ERROR(sqlite3_prepare_v2(mCacheDB,
@@ -381,8 +382,11 @@ string M6BlastCache::Submit(const string& inDatabank,
 	bool inGapped, int32 inGapOpen, int32 inGapExtend,
 	uint32 inReportLimit)
 {
-	boost::mutex::scoped_lock lock(mDbMutex);
+	if (inReportLimit > 1000)
+		THROW(("Report limit exceeds maximum of 1000 hits"));
 
+	boost::mutex::scoped_lock lock(mDbMutex);
+	
 	vector<fs::path> files;
 	FastaFilesForDatabank(inDatabank, files);
 	CheckCacheForDB(inDatabank, files);
@@ -399,6 +403,7 @@ string M6BlastCache::Submit(const string& inDatabank,
 	THROW_IF_SQLITE3_ERROR(sqlite3_bind_int(mSelectByParamsStmt, 7, inGapped), mCacheDB);
 	THROW_IF_SQLITE3_ERROR(sqlite3_bind_int(mSelectByParamsStmt, 8, inGapOpen), mCacheDB);
 	THROW_IF_SQLITE3_ERROR(sqlite3_bind_int(mSelectByParamsStmt, 9, inGapExtend), mCacheDB);
+	THROW_IF_SQLITE3_ERROR(sqlite3_bind_int(mSelectByParamsStmt, 10, inReportLimit), mCacheDB);
 
 	int err = sqlite3_step(mSelectByParamsStmt);
 	if (err != SQLITE_OK and err != SQLITE_ROW and err != SQLITE_DONE)
@@ -448,6 +453,7 @@ string M6BlastCache::Submit(const string& inDatabank,
 		THROW_IF_SQLITE3_ERROR(sqlite3_bind_int(mInsertStmt, 8, inGapped), mCacheDB);
 		THROW_IF_SQLITE3_ERROR(sqlite3_bind_int(mInsertStmt, 9, inGapOpen), mCacheDB);
 		THROW_IF_SQLITE3_ERROR(sqlite3_bind_int(mInsertStmt, 10, inGapExtend), mCacheDB);
+		THROW_IF_SQLITE3_ERROR(sqlite3_bind_int(mInsertStmt, 11, inReportLimit), mCacheDB);
 		
 		int err = sqlite3_step(mInsertStmt);
 		if (err != SQLITE_OK and err != SQLITE_ROW and err != SQLITE_DONE)
@@ -546,6 +552,7 @@ void M6BlastCache::GetJobParameters(const string& inJobID, std::string& outDatab
 	outGapped = sqlite3_column_int(mFetchParamsStmt, 6) != 0;
 	outGapOpen = sqlite3_column_int(mFetchParamsStmt, 7);
 	outGapExtend = sqlite3_column_int(mFetchParamsStmt, 8);
+	outReportLimit = sqlite3_column_int(mFetchParamsStmt, 9);
 }
 
 void M6BlastCache::ExecuteJob(const string& inJobID)

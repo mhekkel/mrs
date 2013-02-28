@@ -522,7 +522,7 @@ bool M6FullTextIx::NextEntry(M6BufferEntry& outEntry)
 		pop_heap(mEntryQueue.begin(), mEntryQueue.end(), CompareEntryIterator());
 		M6BufferEntryIterator* iter = mEntryQueue.back();
 		
-		outEntry = iter->mEntry;
+		outEntry = move(iter->mEntry);
 		
 		if (iter->Next())
 			push_heap(mEntryQueue.begin(), mEntryQueue.end(), CompareEntryIterator());

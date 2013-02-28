@@ -2691,8 +2691,8 @@ uint32 M6IndexImplT<M6DataType>::AddHits(const M6DataType& inValue, vector<bool>
 {
 	uint32 updated;
 	
-	ReadSimpleArray(M6IBitStream(new M6IBitVectorImpl(*this, inValue.mBitVector)),
-		inValue.mCount, outBitmap, updated);
+	M6IBitStream bits(new M6IBitVectorImpl(*this, inValue.mBitVector));
+	ReadSimpleArray(bits, inValue.mCount, outBitmap, updated);
 	
 	return updated;
 }

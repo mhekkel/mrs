@@ -1980,7 +1980,11 @@ Result* Search(const vector<fs::path>& inDatabanks,
 
 	result->mParams.mProgram = inProgram;
 	foreach (const fs::path& db, inDatabanks)
-		result->mDb += db.filename().string();
+	{
+		if (not result->mDb.empty())
+			result->mDb += ',';
+		result->mDb += db.string();
+	}
 	result->mParams.mExpect = inExpect;
 	result->mQueryID = queryID;
 	result->mQueryDef = queryDef;

@@ -914,7 +914,8 @@ void M6Server::handle_entry(const zh::request& request, const el::scope& scope, 
 	{
 		docNr = boost::lexical_cast<uint32>(nr);
 		unique_ptr<M6Document> doc(mdb->Fetch(docNr));
-		id = doc->GetAttribute("id");
+		if (doc)
+			id = doc->GetAttribute("id");
 	}
 	
 	unique_ptr<M6Document> document(mdb->Fetch(docNr));

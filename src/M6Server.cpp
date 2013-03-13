@@ -441,6 +441,8 @@ string M6Server::GetEntry(M6Databank* inDatabank, const string& inFormat, uint32
 				string fasta;
 				db.mParser->ToFasta(result, db.mID, doc->GetAttribute("id"), 
 					doc->GetAttribute("title"), fasta);
+
+
 				result = fasta;
 				break;
 			}
@@ -468,9 +470,60 @@ string M6Server::GetEntry(const string& inDB, const string& inID, const string& 
 	M6Databank* db;
 	uint32 docNr;
 	
-	tr1::tie(db, docNr) = GetEntryDatabankAndNr(inDB, inID);
+	string id(inID), chain;
+	string::size_type s;
 	
-	return GetEntry(db, inFormat, docNr);
+	if (inFormat == "fasta" and (s = id.find('/')) != string::npos)
+	{
+		id = inID.substr(0, s);
+		chain = inID.substr(s + 1);
+	}
+
+	tr1::tie(db, docNr) = GetEntryDatabankAndNr(inDB, id);
+
+	string result = GetEntry(db, inFormat, docNr);
+	
+	// in case we only need one chain in the fasta formatted entry
+	if (not chain.empty())
+	{
+		istringstream rs(result);
+		result.clear();
+		
+		const string rxs("^>gnl\\|");
+		boost::regex rx(rxs + inDB + "\\|" + id + "\\|" + chain + "(?: .*)?", boost::regex::icase);
+		
+		enum { search, copy, done } state = search;
+		
+		while (state != done)
+		{
+			string line;
+			getline(rs, line);
+			if (line.empty() and rs.eof())
+				break;
+			
+			switch (state)
+			{
+				case search:
+					if (boost::regex_match(line, rx))
+					{
+						result = line + '\n';
+						state = copy;
+					}
+					break;
+				
+				case copy:
+					if (ba::starts_with(line, ">"))
+						state = done;
+					else
+						result += line + '\n';
+					break;
+				
+				case done: break;
+			}
+		}
+	}
+	
+	return result;
 }
 
 void M6Server::Find(const string& inDatabank, const string& inQuery, bool inAllTermsRequired,
@@ -2998,13 +3051,10 @@ void M6Server::handle_align(const zh::request& request, const el::scope& scope, 
 		
 		foreach (string& ts, seqs)
 		{
-			vector<string> t;
-			ba::split(t, ts, ba::is_any_of("/"));
-			
-			if (t.size() < 2 or t.size() > 3)
+			string::size_type s = ts.find('/');
+			if (s == string::npos)
 				THROW(("Invalid parameters passed for align"));
-			
-			fasta += GetEntry(t[0], t[1], "fasta");
+			fasta += GetEntry(ts.substr(0, s), ts.substr(s + 1), "fasta");
 		}
 
 		sub.put("input", el::object(fasta));

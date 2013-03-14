@@ -699,6 +699,15 @@ M6BlastJobDescList M6BlastCache::GetJobList()
 
 void M6BlastCache::DeleteJob(const string& inJobID)
 {
+	try
+	{
+		(void)boost::lexical_cast<boost::uuids::uuid>(inJobID);
+	}
+	catch (boost::bad_lexical_cast&)
+	{
+		THROW(("Invalid job id"));
+	}
+	
 	boost::mutex::scoped_lock lockdb(mDbMutex);
 	
 	sqlite3_reset(mDeleteJobStmt);

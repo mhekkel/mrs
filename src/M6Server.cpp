@@ -175,8 +175,9 @@ M6Server::M6Server(const zx::element* inConfig)
 	mount("info",			boost::bind(&M6Server::handle_info, this, _1, _2, _3));
 	mount("browse",			boost::bind(&M6Server::handle_browse, this, _1, _2, _3));
 
-	mount("admin",			boost::bind(&M6Server::handle_admin, this, _1, _2, _3));
-//	mount("admin/rename",	boost::bind(&M6Server::handle_admin_rename_ajax, this, _1, _2, _3));
+	mount("admin",				boost::bind(&M6Server::handle_admin, this, _1, _2, _3));
+	mount("ajax/blast/queue",	boost::bind(&M6Server::handle_admin_blast_queue_ajax, this, _1, _2, _3));
+	mount("ajax/blast/delete",	boost::bind(&M6Server::handle_admin_blast_delete_ajax, this, _1, _2, _3));
 
 	add_processor("link",	boost::bind(&M6Server::process_mrs_link, this, _1, _2, _3));
 	add_processor("enable",	boost::bind(&M6Server::process_mrs_enable, this, _1, _2, _3));
@@ -2252,24 +2253,42 @@ void M6Server::handle_admin(const zh::request& request,
 	create_reply_from_template("admin.html", sub, reply);
 }
 
-//void M6Server::handle_admin_rename_ajax(const zh::request& request,
-//	const el::scope& scope, zh::reply& reply)
-//{
-//	ValidateAuthentication(request, mAdminRealm);
-//	
-//	zeep::http::parameter_map params;
-//	get_parameters(scope, params);
-//
-//	string db = params.get("db", "").as<string>();
-//	string prop = params.get("prop", "").as<string>();
-//	string value = params.get("value", "").as<string>();
-//
-//	el::object result;
-//
-//	result["value"] = value;
-//
-//	reply.set_content(result.toJSON(), "text/javascript");
-//}
+void M6Server::handle_admin_blast_queue_ajax(const zh::request& request,
+	const el::scope& scope, zh::reply& reply)
+{
+	ValidateAuthentication(request, mAdminRealm);
+	
+	zeep::http::parameter_map params;
+	get_parameters(scope, params);
+
+	vector<el::object> jobs;
+
+	foreach (const M6BlastJobDesc& jobDesc, M6BlastCache::Instance().GetJobList())
+	{
+		el::object job;
+		job["id"] = jobDesc.id;
+		job["db"] = jobDesc.db;
+		job["queryLength"] = jobDesc.queryLength;
+		job["status"] = jobDesc.status;
+		jobs.push_back(job);
+	}
+
+	reply.set_content(el::object(jobs).toJSON(), "text/javascript");
+}
+
+void M6Server::handle_admin_blast_delete_ajax(const zh::request& request,
+	const el::scope& scope, zh::reply& reply)
+{
+	ValidateAuthentication(request, mAdminRealm);
+	
+	zeep::http::parameter_map params;
+	get_parameters(scope, params);
+
+	string id = params.get("job", "").as<string>();
+	
+	M6BlastCache::Instance().DeleteJob(id);
+	reply.set_content(el::object("ok").toJSON(), "text/javascript");
+}
 
 // --------------------------------------------------------------------
 //	REST calls

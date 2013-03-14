@@ -954,5 +954,8 @@ ul.browse
 	padding-left: 10px;
 }
 
-
+.jobID {
+	white-space: nowrap;
+	font-family: fixed;
+}
 

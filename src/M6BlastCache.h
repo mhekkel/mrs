@@ -34,6 +34,16 @@ enum M6BlastJobStatus
 
 typedef std::shared_ptr<const M6Blast::Result> M6BlastResultPtr;
 
+struct M6BlastJobDesc
+{
+	std::string		id;
+	std::string		db;
+	uint32			queryLength;
+	std::string		status;
+};
+
+typedef std::list<M6BlastJobDesc> M6BlastJobDescList;
+
 class M6BlastCache
 {
   public:
@@ -52,6 +62,9 @@ class M6BlastCache
 									uint32 inReportLimit);
 
 	void						Purge(bool inDeleteFiles = false);
+
+	M6BlastJobDescList			GetJobList();
+	void						DeleteJob(const std::string& inJobID);
 
   private:
 
@@ -89,6 +102,9 @@ class M6BlastCache
 	sqlite3_stmt*				mUpdateStatusStmt;
 	sqlite3_stmt*				mFetchParamsStmt;
 	sqlite3_stmt*				mFetchDbFilesStmt;
+	sqlite3_stmt*				mListJobsStmt;
+	sqlite3_stmt*				mDeleteJobStmt;
+	bool						mStopWorkingFlag;
 	boost::thread				mWorkerThread;
 	boost::mutex				mDbMutex, mCacheMutex;
 	boost::condition			mEmptyCondition, mWorkCondition;

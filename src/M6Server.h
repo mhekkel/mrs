@@ -133,7 +133,8 @@ class M6Server : public zh::webapp
 	void			handle_browse(const zh::request& request, const el::scope& scope, zh::reply& reply);
 
 	void			handle_admin(const zh::request& request, const el::scope& scope, zh::reply& reply);
-//	void			handle_admin_ajax(const zh::request& request, const el::scope& scope, zh::reply& reply);
+	void			handle_admin_blast_queue_ajax(const zh::request& request, const el::scope& scope, zh::reply& reply);
+	void			handle_admin_blast_delete_ajax(const zh::request& request, const el::scope& scope, zh::reply& reply);
 	
 	void			process_mrs_link(zx::element* node, const el::scope& scope, boost::filesystem::path dir);
 	void			process_mrs_enable(zx::element* node, const el::scope& scope, boost::filesystem::path dir);

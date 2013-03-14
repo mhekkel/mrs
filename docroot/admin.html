@@ -32,6 +32,7 @@
 				<li><a href="#" id="formats">Formats</a></li>
 				<li><a href="#" id="databanks">Databanks</a></li>
 				<li><a href="#" id="scheduler">Scheduler</a></li>
+				<li><a href="#" id="blast">Blast Queue</a></li>
 			</ul>
 		</div>
 
@@ -345,9 +346,37 @@
 					</fieldset>
 				</form>
 			</div>
-		
+
+			<div id="blast" class="section">
+				<form class="admin_form" method="POST">
+					<input type='hidden' name='submit' value='blast'/>
+					<fieldset>
+						<h3>Blast Queue</h3>
+
+						<table id="blastQueue" cellspacing="0" cellpadding="0" class="select_form status" style="min-width:400px;">
+							<caption>Known jobs</caption>
+							<thead>
+								<tr>
+									<th>ID</th>
+									<th>Length</th>
+									<th>Databank</th>
+									<th>Status</th>
+									<th/>
+								</tr>
+							</thead>
+							
+							<tbody>
+							<mrs:if test="${empty blastJobs}">
+								<tr id="nohits">
+									<td colspan="5">There are no known blast jobs.</td>
+								</tr>
+							</mrs:if>
+							</tbody>
+						</table>
+					</fieldset>
+				</form>
+			</div>
 		</div>
-		
 	</div>
 </body>
 </html>

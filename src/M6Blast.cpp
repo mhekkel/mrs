@@ -1280,7 +1280,16 @@ void BlastQuery<WORDSIZE>::Search(const vector<fs::path>& inDatabanks, M6Progres
 				length -= n;
 			}
 			
-			t.join_all();
+			try
+			{
+				t.join_all();
+			}
+			catch (boost::thread_interrupted&)
+			{
+				t.interrupt_all();
+				t.join_all();
+				throw;
+			}
 		}
 	}
 	
@@ -1326,7 +1335,17 @@ void BlastQuery<WORDSIZE>::Search(const vector<fs::path>& inDatabanks, M6Progres
 				}
 			});
 		}
-		t.join_all();
+
+		try
+		{
+			t.join_all();
+		}
+		catch (boost::thread_interrupted&)
+		{
+			t.interrupt_all();
+			t.join_all();
+			throw;
+		}
 
 		if (not (ex == exception_ptr()))
 			rethrow_exception(ex);
@@ -1460,6 +1479,9 @@ void BlastQuery<WORDSIZE>::SearchPart(const char* inFasta, size_t inLength, M6Pr
 	
 	while (inFasta != end)
 	{
+		// make it possible to interrupt a search
+		boost::this_thread::interruption_point();
+		
 		if (hit)
 		{
 			AddHit(hit, outHits);

@@ -81,6 +81,10 @@ M6BlastCache::M6BlastCache()
 	, mInsertStmt(nullptr)
 	, mUpdateStatusStmt(nullptr)
 	, mFetchParamsStmt(nullptr)
+	, mFetchDbFilesStmt(nullptr)
+	, mListJobsStmt(nullptr)
+	, mDeleteJobStmt(nullptr)
+	, mStopWorkingFlag(false)
 {
 	boost::mutex::scoped_lock lock(mDbMutex);
 	
@@ -164,11 +168,25 @@ M6BlastCache::M6BlastCache()
 		"SELECT file, time_t FROM blast_db_file WHERE db = ? ", -1,
 		&mFetchDbFilesStmt, nullptr), mCacheDB);
 
+	THROW_IF_SQLITE3_ERROR(sqlite3_prepare_v2(mCacheDB,
+		"SELECT id, db, length(query), status FROM blast_cache", -1,
+		&mListJobsStmt, nullptr), mCacheDB);
+
+	THROW_IF_SQLITE3_ERROR(sqlite3_prepare_v2(mCacheDB,
+		"SELECT id, db, length(query), status FROM blast_cache", -1,
+		&mListJobsStmt, nullptr), mCacheDB);
+
+	THROW_IF_SQLITE3_ERROR(sqlite3_prepare_v2(mCacheDB,
+		"DELETE FROM blast_cache WHERE id = ?", -1,
+		&mDeleteJobStmt, nullptr), mCacheDB);
+
 	mWorkerThread = boost::thread([this](){ this->Work(); });
 }
 
 M6BlastCache::~M6BlastCache()
 {
+	mStopWorkingFlag = true;
+	
 	if (mWorkerThread.joinable())
 	{
 		mWorkerThread.interrupt();
@@ -181,6 +199,9 @@ M6BlastCache::~M6BlastCache()
 	if (mInsertStmt != nullptr) 		sqlite3_finalize(mInsertStmt);
 	if (mUpdateStatusStmt != nullptr) 	sqlite3_finalize(mUpdateStatusStmt);
 	if (mFetchParamsStmt != nullptr) 	sqlite3_finalize(mFetchParamsStmt);
+	if (mFetchDbFilesStmt != nullptr)	sqlite3_finalize(mFetchDbFilesStmt);
+	if (mListJobsStmt != nullptr)		sqlite3_finalize(mListJobsStmt);
+	if (mDeleteJobStmt != nullptr)		sqlite3_finalize(mDeleteJobStmt);
 
 	sqlite3_close(mCacheDB);
 }
@@ -474,8 +495,10 @@ void M6BlastCache::Work()
 
 	boost::mutex::scoped_lock lock(mDbMutex);
 	
-	for (;;)
+	while (mStopWorkingFlag == false)
 	{
+		boost::thread t;
+
 		try
 		{
 			// ignore errors by sqlite3_reset
@@ -495,15 +518,17 @@ void M6BlastCache::Work()
 			uint32 length = sqlite3_column_bytes(mSelectByStatusStmt, 0);
 			string id(text, length);
 			
-			boost::thread thr(boost::bind(&M6BlastCache::ExecuteJob, this, id));
+			t = boost::thread(boost::bind(&M6BlastCache::ExecuteJob, this, id));
 
 			mWorkCondition.wait(lock);
-
-			thr.join();
 		}
 		catch (boost::thread_interrupted&)
 		{
-			break;
+			if (t.joinable())
+			{
+				t.interrupt();
+				t.join();
+			}
 		}
 		catch (exception& e)
 		{
@@ -639,4 +664,61 @@ void M6BlastCache::Purge(bool inDeleteFiles)
 	{
 		// TODO implement
 	}
+}
+
+M6BlastJobDescList M6BlastCache::GetJobList()
+{
+	boost::mutex::scoped_lock lock(mDbMutex);
+	sqlite3_reset(mListJobsStmt);
+	
+	M6BlastJobDescList result;
+	
+	while (sqlite3_step(mListJobsStmt) == SQLITE_ROW)
+	{
+		M6BlastJobDesc desc;
+		
+		const char* text = reinterpret_cast<const char*>(sqlite3_column_text(mListJobsStmt, 0));
+		uint32 length = sqlite3_column_bytes(mListJobsStmt, 0);
+		desc.id = string(text, length);
+
+		text = reinterpret_cast<const char*>(sqlite3_column_text(mListJobsStmt, 1));
+		length = sqlite3_column_bytes(mListJobsStmt, 1);
+		desc.db = string(text, length);
+		
+		desc.queryLength = sqlite3_column_int(mListJobsStmt, 2);
+		
+		text = reinterpret_cast<const char*>(sqlite3_column_text(mListJobsStmt, 3));
+		length = sqlite3_column_bytes(mListJobsStmt, 3);
+		desc.status = string(text, length);
+		
+		result.push_back(desc);
+	}
+	
+	return result;
+}
+
+void M6BlastCache::DeleteJob(const string& inJobID)
+{
+	boost::mutex::scoped_lock lockdb(mDbMutex);
+	
+	sqlite3_reset(mDeleteJobStmt);
+	THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(mDeleteJobStmt, 1, inJobID.c_str(), inJobID.length(), SQLITE_TRANSIENT), mCacheDB);
+
+	int err = sqlite3_step(mDeleteJobStmt);
+	if (err != SQLITE_OK and err != SQLITE_ROW and err != SQLITE_DONE)
+		THROW_IF_SQLITE3_ERROR(err, mCacheDB);
+
+	boost::mutex::scoped_lock lockcache(mCacheMutex);
+
+	list<Cached>::iterator c = find_if(mResultCache.begin(), mResultCache.end(),
+		[&inJobID](Cached& e) -> bool { return e.id == inJobID; });
+	
+	if (c != mResultCache.end())
+		mResultCache.erase(c);
+	
+	fs::path file(mCacheDir / (inJobID + ".xml.bz2"));
+	if (fs::exists(file))
+		fs::remove(file);
+
+	mWorkerThread.interrupt();
 }

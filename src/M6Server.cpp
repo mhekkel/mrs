@@ -632,6 +632,8 @@ uint32 M6Server::Count(const string& inDatabank, const string& inQuery)
 		vector<string> queryTerms;
 		
 		M6Databank* db = Load(inDatabank);
+		if (db == nullptr)
+			THROW(("Databank %s not loaded", inDatabank.c_str()));
 		
 		ParseQuery(*db, inQuery, true, queryTerms, filter);
 		if (queryTerms.empty())
@@ -709,6 +711,8 @@ void M6Server::GetLinkedDbs(const string& inDb, const string& inId,
 						continue;
 					
 					M6Databank* db = Load(alias);
+					if (db == nullptr)
+						continue;
 
 					foreach (const string& id, l.second)
 					{
@@ -877,7 +881,11 @@ void M6Server::handle_download(const zh::request& request, const el::scope& scop
 		}
 		else if (p.first == "nr")
 		{
-			ss << GetEntry(Load(db), format, boost::lexical_cast<uint32>(p.second.as<string>()));
+			M6Databank* databank = Load(db);
+			if (databank == nullptr)
+				THROW(("Databank %s not loaded", databank.c_str()));
+			
+			ss << GetEntry(databank, format, boost::lexical_cast<uint32>(p.second.as<string>()));
 			++n;
 		}
 	}

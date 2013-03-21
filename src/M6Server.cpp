@@ -883,7 +883,7 @@ void M6Server::handle_download(const zh::request& request, const el::scope& scop
 		{
 			M6Databank* databank = Load(db);
 			if (databank == nullptr)
-				THROW(("Databank %s not loaded", databank.c_str()));
+				THROW(("Databank %s not loaded", db.c_str()));
 			
 			ss << GetEntry(databank, format, boost::lexical_cast<uint32>(p.second.as<string>()));
 			++n;

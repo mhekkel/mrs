@@ -6,6 +6,7 @@
 #include "M6Lib.h"
 
 #include <iostream>
+#include <set>
 
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
@@ -28,9 +29,6 @@
 #include <boost/iostreams/filter/gzip.hpp>
 #include <boost/algorithm/string.hpp>
 
-//#include "sqlite-amalgamation/sqlite3.h"
-#include <sqlite3.h>
-
 #include "M6Config.h"
 #include "M6Error.h"
 #include "M6BlastCache.h"
@@ -41,28 +39,39 @@ namespace fs = boost::filesystem;
 namespace io = boost::iostreams;
 namespace ba = boost::algorithm;
 
+const uint32 kMaxCachedEntryResults = 100;
+const char* kBlastFileExtensions[] = { ".xml.bz2", ".job", ".err" };
+
 // --------------------------------------------------------------------
 
-void ThrowDbException(sqlite3* conn, int err, const char* stmt, const char* file, int line, const char* func)
+bool M6BlastJob::IsJobFor(const string& inDatabank, const string& inQuery, const string& inProgram,
+	const string& inMatrix, uint32 inWordSize, double inExpect, bool inLowComplexityFilter,
+	bool inGapped, int32 inGapOpen, int32 inGapExtend, uint32 inReportLimit) const
 {
-	const char* errmsg = sqlite3_errmsg(conn);
-	cerr << "sqlite3 error '" << errmsg << "' in " << file << ':' << line << ": " << func << endl;
-	throw M6Exception(errmsg);
+	return db == inDatabank and
+		query == inQuery and
+		program == inProgram and
+		matrix == inMatrix and
+		wordsize == inWordSize and
+		expect == inExpect and
+		filter == inLowComplexityFilter and
+		gapped == inGapped and
+		gapOpen == inGapOpen and
+		gapExtend == inGapExtend and
+		reportLimit >= inReportLimit;		// <-- report limit at least inReportLimit
 }
 
-#define THROW_IF_SQLITE3_ERROR(e,conn) \
-	do { int _e(e); if (_e != SQLITE_OK and _e != SQLITE_DONE) ThrowDbException(conn, e, #e, __FILE__, __LINE__, BOOST_CURRENT_FUNCTION); } while (false)
-
-// --------------------------------------------------------------------
-
-M6BlastJobStatus ParseStatus(const string& inStatus)
+bool M6BlastJob::IsStillValid(const vector<fs::path>& inFiles) const
 {
-	M6BlastJobStatus result = bj_Unknown;
-	if (inStatus == "queued")			result = bj_Queued;
-	else if (inStatus == "running")		result = bj_Running;
-	else if (inStatus == "finished")	result = bj_Finished;
-	else if (inStatus == "error")		result = bj_Error;
-	return result;
+	vector<M6BlastDbInfo> fileInfo;
+	
+	foreach (const fs::path& file, inFiles)
+	{
+		M6BlastDbInfo info = { file.string(), boost::posix_time::from_time_t(fs::last_write_time(file)) };
+		fileInfo.push_back(info);
+	}
+
+	return files == fileInfo;
 }
 
 // --------------------------------------------------------------------
@@ -74,20 +83,7 @@ M6BlastCache& M6BlastCache::Instance()
 }
 
 M6BlastCache::M6BlastCache()
-	: mCacheDB(nullptr)
-	, mSelectByParamsStmt(nullptr)
-	, mSelectByStatusStmt(nullptr)
-	, mSelectByIDStmt(nullptr)
-	, mInsertStmt(nullptr)
-	, mUpdateStatusStmt(nullptr)
-	, mFetchParamsStmt(nullptr)
-	, mFetchDbFilesStmt(nullptr)
-	, mListJobsStmt(nullptr)
-	, mDeleteJobStmt(nullptr)
-	, mStopWorkingFlag(false)
 {
-	boost::mutex::scoped_lock lock(mDbMutex);
-	
 	string s = M6Config::GetDirectory("blast");
 	if (s.empty())
 		THROW(("Missing blastdir configuration"));
@@ -95,91 +91,39 @@ M6BlastCache::M6BlastCache()
 	mCacheDir = fs::path(s);
 	if (not fs::exists(mCacheDir))
 		fs::create_directory(mCacheDir);
+
+	// read cached entries in result cache
+	fs::directory_iterator end;
+	for (fs::directory_iterator iter(mCacheDir); iter != end; ++iter)
+	{
+		if (iter->path().extension().string() == ".job" and iter->path().filename().string().length() > 4)
+		{
+			fs::ifstream file(iter->path());
+			if (not file.is_open())
+				continue;
 	
-	s = (mCacheDir / "index.db").string();
+			CacheEntry e;
 
-	sqlite3_config(SQLITE_CONFIG_MULTITHREAD);
+			e.id = iter->path().filename().stem().string();
+			e.hitCount = 0;
+			e.bestScore = -1;
+			
+			zeep::xml::document doc(file);
+			doc.deserialize("blastjob", e.job);
+			
+			if (fs::exists(mCacheDir / (e.id + ".err")))
+				e.status = bj_Error;
+			else if (fs::exists(mCacheDir / (e.id + ".xml.bz2")))
+				e.status = bj_Finished;
+			else
+				e.status = bj_Queued;
+			
+			mResultCache.push_back(e);
+		}
+	}
 
-	THROW_IF_SQLITE3_ERROR(sqlite3_open_v2(s.c_str(), &mCacheDB,
-		SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, nullptr), nullptr);
-
-	sqlite3_extended_result_codes(mCacheDB, true);
-	
-	ExecuteStatement(
-		"CREATE TABLE IF NOT EXISTS blast_cache ( "
-			"id TEXT, "
-			"status TEXT, "
-			"error TEXT, "
-			"hitcount INTEGER, "
-			"bestscore REAL, "
-			"db TEXT, "
-			"query TEXT, "
-			"matrix TEXT, "
-			"wordsize INTEGER, "
-			"expect REAL, "
-			"filter INTEGER, "
-			"gapped INTEGER, "
-			"gapopen INTEGER, "
-			"gapextend INTEGER, "
-			"report INTEGER, "
-			"UNIQUE(id)"
-		")"
-	);
-	
-	ExecuteStatement(
-		"CREATE TABLE IF NOT EXISTS blast_db_file ( "
-			"db TEXT, "
-			"file TEXT, "
-			"time_t INTEGER, "
-			"PRIMARY KEY (db, file)"
-		")"
-	);
-
-//	ExecuteStatement("DELETE FROM blast_cache");
-	ExecuteStatement("DELETE FROM blast_cache WHERE status = 'running' ");
-
-	THROW_IF_SQLITE3_ERROR(sqlite3_prepare_v2(mCacheDB,
-		"SELECT status, error, hitcount, bestscore FROM blast_cache WHERE id = ? ", -1,
-		&mSelectByIDStmt, nullptr), mCacheDB);
-
-	THROW_IF_SQLITE3_ERROR(sqlite3_prepare_v2(mCacheDB,
-		"SELECT id FROM blast_cache WHERE "
-		"db = ? AND query = ? AND matrix = ? AND wordsize = ? AND expect = ? AND filter = ? AND gapped = ? AND gapopen = ? AND gapextend = ? AND report >= ? ", -1,
-		&mSelectByParamsStmt, nullptr), mCacheDB);
-
-	THROW_IF_SQLITE3_ERROR(sqlite3_prepare_v2(mCacheDB,
-		"INSERT INTO blast_cache (id, status, db, query, matrix, wordsize, expect, filter, gapped, gapopen, gapextend, report) "
-		"VALUES (?, 'queued', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", -1,
-		&mInsertStmt, nullptr), mCacheDB);
-
-	THROW_IF_SQLITE3_ERROR(sqlite3_prepare_v2(mCacheDB,
-		"SELECT id FROM blast_cache WHERE status = 'queued' ", -1,
-		&mSelectByStatusStmt, nullptr), mCacheDB);
-
-	THROW_IF_SQLITE3_ERROR(sqlite3_prepare_v2(mCacheDB,
-		"UPDATE blast_cache SET status = ?, error = ?, hitcount = ?, bestscore = ? WHERE id = ? ", -1,
-		&mUpdateStatusStmt, nullptr), mCacheDB);
-
-	THROW_IF_SQLITE3_ERROR(sqlite3_prepare_v2(mCacheDB,
-		"SELECT db, query, matrix, wordsize, expect, filter, gapped, gapopen, gapextend, report FROM blast_cache WHERE id = ? ", -1,
-		&mFetchParamsStmt, nullptr), mCacheDB);
-
-	THROW_IF_SQLITE3_ERROR(sqlite3_prepare_v2(mCacheDB,
-		"SELECT file, time_t FROM blast_db_file WHERE db = ? ", -1,
-		&mFetchDbFilesStmt, nullptr), mCacheDB);
-
-	THROW_IF_SQLITE3_ERROR(sqlite3_prepare_v2(mCacheDB,
-		"SELECT id, db, length(query), status FROM blast_cache", -1,
-		&mListJobsStmt, nullptr), mCacheDB);
-
-	THROW_IF_SQLITE3_ERROR(sqlite3_prepare_v2(mCacheDB,
-		"SELECT id, db, length(query), status FROM blast_cache", -1,
-		&mListJobsStmt, nullptr), mCacheDB);
-
-	THROW_IF_SQLITE3_ERROR(sqlite3_prepare_v2(mCacheDB,
-		"DELETE FROM blast_cache WHERE id = ?", -1,
-		&mDeleteJobStmt, nullptr), mCacheDB);
-
+	// finally start the worker thread
+	mStopWorkingFlag = false;
 	mWorkerThread = boost::thread([this](){ this->Work(); });
 }
 
@@ -192,113 +136,143 @@ M6BlastCache::~M6BlastCache()
 		mWorkerThread.interrupt();
 		mWorkerThread.join();
 	}
-
-	if (mSelectByParamsStmt != nullptr) sqlite3_finalize(mSelectByParamsStmt);
-	if (mSelectByStatusStmt != nullptr) sqlite3_finalize(mSelectByStatusStmt);
-	if (mSelectByIDStmt != nullptr) 	sqlite3_finalize(mSelectByIDStmt);
-	if (mInsertStmt != nullptr) 		sqlite3_finalize(mInsertStmt);
-	if (mUpdateStatusStmt != nullptr) 	sqlite3_finalize(mUpdateStatusStmt);
-	if (mFetchParamsStmt != nullptr) 	sqlite3_finalize(mFetchParamsStmt);
-	if (mFetchDbFilesStmt != nullptr)	sqlite3_finalize(mFetchDbFilesStmt);
-	if (mListJobsStmt != nullptr)		sqlite3_finalize(mListJobsStmt);
-	if (mDeleteJobStmt != nullptr)		sqlite3_finalize(mDeleteJobStmt);
-
-	sqlite3_close(mCacheDB);
-}
-
-void M6BlastCache::ExecuteStatement(const string& stmt)
-{
-	if (VERBOSE)
-		cerr << stmt << endl;
-
-	char* errmsg = NULL;
-	int err = sqlite3_exec(mCacheDB, stmt.c_str(), nullptr, nullptr, &errmsg);
-	if (errmsg != NULL)
-	{
-		cerr << errmsg << endl;
-		sqlite3_free(errmsg);
-	}
-	
-	THROW_IF_SQLITE3_ERROR(err, mCacheDB);
 }
 
 tr1::tuple<M6BlastJobStatus,string,uint32,double> M6BlastCache::JobStatus(const string& inJobID)
 {
-	boost::mutex::scoped_lock lock(mDbMutex);
+	boost::mutex::scoped_lock lock(mCacheMutex);
 
 	tr1::tuple<M6BlastJobStatus,string,uint32,double> result;
+
+	get<0>(result) = bj_Unknown;
+
+	auto i = find_if(mResultCache.begin(), mResultCache.end(), [&inJobID](CacheEntry& e) -> bool
+				{ return e.id == inJobID; });
 	
-	string id = boost::lexical_cast<string>(inJobID);
-
-	sqlite3_reset(mSelectByIDStmt);
-	THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(mSelectByIDStmt, 1, id.c_str(), id.length(), SQLITE_TRANSIENT), mCacheDB);
-
-	int err = sqlite3_step(mSelectByIDStmt);
-	if (err != SQLITE_OK and err != SQLITE_ROW and err != SQLITE_DONE)
-		THROW_IF_SQLITE3_ERROR(err, mCacheDB);
-
-	if (err == SQLITE_ROW)
+	if (i != mResultCache.end())
 	{
-		const char* text = reinterpret_cast<const char*>(sqlite3_column_text(mSelectByIDStmt, 0));
-		uint32 length = sqlite3_column_bytes(mSelectByIDStmt, 0);
-		string status(text, length);
+		get<0>(result) = i->status;
+		
+		try
+		{
+			if (i->status == bj_Finished)
+			{
+				if (i->bestScore < 0)
+				{
+					M6BlastResultPtr jobResult = JobResult(inJobID);
+					
+					if (jobResult)
+					{
+						i->hitCount = static_cast<uint32>(jobResult->mHits.size());
+						if (not jobResult->mHits.empty() and not jobResult->mHits.front().mHsps.empty())
+							i->bestScore = jobResult->mHits.front().mHsps.front().mExpect;
+					}
+				}
+				
+				get<2>(result) = i->hitCount;
+				get<3>(result) = i->bestScore;
+			}
+			else if (i->status == bj_Error)
+			{
+				fs::path errPath(mCacheDir / (inJobID + ".err"));
+				if (fs::exists(errPath))
+				{
+					fs::ifstream file(errPath);
+					getline(file, get<1>(result));
+				}
+				else
+					get<1>(result) = "missing error message";
+			}
+		}
+		catch (exception& ex)
+		{
+			get<0>(result) = bj_Error;
+			get<1>(result) = ex.what();
+		}
 
-		text = reinterpret_cast<const char*>(sqlite3_column_text(mSelectByIDStmt, 1));
-		length = sqlite3_column_bytes(mSelectByIDStmt, 1);
-		string error(text, length);
-
-		result = tr1::make_tuple(ParseStatus(status), error, sqlite3_column_int(mSelectByIDStmt, 2), sqlite3_column_double(mSelectByIDStmt, 3));
+		auto j = i;
+		advance(j, 1);
+		if (i != mResultCache.begin())
+			mResultCache.splice(mResultCache.begin(), mResultCache, i, j);
 	}
-	else
-		result = tr1::make_tuple(bj_Unknown, "", 0, 0);
-
+	
 	return result;
 }
 
 M6BlastResultPtr M6BlastCache::JobResult(const string& inJobID)
 {
-	M6BlastResultPtr result;
+	io::filtering_stream<io::input> in;
+	fs::ifstream file(mCacheDir / (inJobID + ".xml.bz2"), ios::binary);
+	if (not file.is_open())
+		throw M6Exception("missing blast result file");
 
-	{	
-		boost::mutex::scoped_lock lock(mCacheMutex);
-
-		foreach (auto& c, mResultCache)
-		{
-			if (c.id == inJobID)
-			{
-				result = c.result;
-				break;
-			}
-		}
-	}
+	in.push(io::bzip2_decompressor());
+	in.push(file);
 	
-	if (not result)
-	{
-		io::filtering_stream<io::input> in;
-		fs::ifstream file(mCacheDir / (inJobID + ".xml.bz2"), ios::binary);
-		if (not file.is_open())
-			throw M6Exception("missing blast result file");
+	M6BlastResultPtr result(new M6Blast::Result);
 
-		in.push(io::bzip2_decompressor());
-		in.push(file);
-		
-		zeep::xml::document doc(in);
-		zeep::xml::deserializer d(doc.root());
-	
-		M6Blast::Result* r = new M6Blast::Result;
-		result.reset(r);
-		d & boost::serialization::make_nvp("blast-result", *r);
-		
-		CacheResult(inJobID, result);
-	}
+	zeep::xml::document doc(in);
+	doc.deserialize("blast-result", const_cast<M6Blast::Result&>(*result));
 
 	return result;
+}
+
+void M6BlastCache::CacheResult(const string& inJobID, M6BlastResultPtr inResult)
+{
+	boost::mutex::scoped_lock lock(mCacheMutex);
+	
+	auto i = find_if(mResultCache.begin(), mResultCache.end(), [&inJobID](CacheEntry& e) -> bool
+				{ return e.id == inJobID; });
+	
+	if (i != mResultCache.end())
+	{
+		i->status = bj_Finished;
+
+		i->hitCount = static_cast<uint32>(inResult->mHits.size());
+		if (not inResult->mHits.empty() and not inResult->mHits.front().mHsps.empty())
+			i->bestScore = inResult->mHits.front().mHsps.front().mExpect;
+		else
+			i->bestScore = 0;
+		
+		zeep::xml::document doc;
+		doc.serialize("blast-result", *inResult);
+	
+		fs::ofstream file(mCacheDir / (inJobID + ".xml.bz2"), ios_base::out|ios_base::trunc|ios_base::binary);
+		io::filtering_stream<io::output> out;
+
+		if (not file.is_open())
+			throw runtime_error("could not create output file");
+	
+		out.push(io::bzip2_compressor());
+		out.push(file);
+
+		out << doc;
+		
+		auto j = i;
+		advance(j, 1);
+		if (i != mResultCache.begin())
+			mResultCache.splice(mResultCache.begin(), mResultCache, i, j);
+	}
+
+	// do some housekeeping
+	while (mResultCache.size() > kMaxCachedEntryResults)
+	{
+		foreach (const char* ext, kBlastFileExtensions)
+		{
+			boost::system::error_code ec;
+			fs::remove(mCacheDir / (mResultCache.back().id + ext), ec);
+		}
+		
+		mResultCache.pop_back();
+	}
 }
 
 void M6BlastCache::FastaFilesForDatabank(const string& inDatabank, vector<fs::path>& outFiles)
 {
 	vector<string> dbs;
 	ba::split(dbs, inDatabank, ba::is_any_of(";"));
+	
+	sort(dbs.begin(), dbs.end());
 	
 	foreach (string& db, dbs)
 	{
@@ -314,91 +288,8 @@ void M6BlastCache::FastaFilesForDatabank(const string& inDatabank, vector<fs::pa
 		THROW(("Databank '%s' does not contain a fasta file", inDatabank.c_str()));
 }
 
-void M6BlastCache::CheckCacheForDB(const string& inDatabank, const vector<fs::path>& inFiles)
-{
-	sqlite3_reset(mFetchDbFilesStmt);
-	THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(mFetchDbFilesStmt, 1, inDatabank.c_str(), inDatabank.length(), SQLITE_TRANSIENT), mCacheDB);
-
-	uint32 n = inFiles.size();
-	bool clean = false;
-
-	while (clean == false and sqlite3_step(mFetchDbFilesStmt) == SQLITE_ROW)
-	{
-		const char* text = reinterpret_cast<const char*>(sqlite3_column_text(mFetchDbFilesStmt, 0));
-		uint32 length = sqlite3_column_bytes(mFetchDbFilesStmt, 0);
-		string file(text, length);
-		
-		time_t timestamp = sqlite3_column_int64(mFetchDbFilesStmt, 1);
-
-		clean = not fs::exists(file) or fs::last_write_time(file) != timestamp;
-		--n;
-	}
-
-	if (clean or n > 0)
-	{
-		sqlite3_stmt* selectStmt = nullptr;
-		sqlite3_stmt* deleteStmt = nullptr;
-		sqlite3_stmt* updateStmt = nullptr;
-		
-		try
-		{
-			THROW_IF_SQLITE3_ERROR(sqlite3_prepare_v2(mCacheDB,
-				"SELECT id FROM blast_cache WHERE db = ? ", -1,
-				&selectStmt, nullptr), mCacheDB);
-
-			THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(selectStmt, 1,
-				inDatabank.c_str(), inDatabank.length(), SQLITE_TRANSIENT), mCacheDB);
-			
-			while (sqlite3_step(selectStmt) == SQLITE_ROW)
-			{
-				const char* text = reinterpret_cast<const char*>(sqlite3_column_text(selectStmt, 0));
-				uint32 length = sqlite3_column_bytes(selectStmt, 0);
-
-				fs::path file = mCacheDir / (string(text, length) + ".xml.bz2");
-				
-				if (fs::exists(file))
-					fs::remove(file);
-			}
-			
-			THROW_IF_SQLITE3_ERROR(sqlite3_prepare_v2(mCacheDB,
-				"DELETE FROM blast_cache WHERE db = ? ", -1,
-				&deleteStmt, nullptr), mCacheDB);
-
-			THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(deleteStmt, 1,
-				inDatabank.c_str(), inDatabank.length(), SQLITE_TRANSIENT), mCacheDB);
-				
-			THROW_IF_SQLITE3_ERROR(sqlite3_step(deleteStmt), mCacheDB);
-
-			THROW_IF_SQLITE3_ERROR(sqlite3_prepare_v2(mCacheDB,
-				"INSERT OR REPLACE INTO blast_db_file(db, file, time_t) VALUES(?, ?, ?)", -1,
-				&updateStmt, nullptr), mCacheDB);
-
-			foreach (const fs::path& file, inFiles)
-			{
-				sqlite3_reset(updateStmt);
-				
-				string path = file.string();
-
-				THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(updateStmt, 1, inDatabank.c_str(), inDatabank.length(), SQLITE_TRANSIENT), mCacheDB);
-				THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(updateStmt, 2, path.c_str(), path.length(), SQLITE_TRANSIENT), mCacheDB);
-				THROW_IF_SQLITE3_ERROR(sqlite3_bind_int64(updateStmt, 3, fs::last_write_time(file)), mCacheDB);
-				
-				THROW_IF_SQLITE3_ERROR(sqlite3_step(updateStmt), mCacheDB);
-			}
-		}
-		catch (exception& e)
-		{
-			cerr << "blast-cache exception: " << e.what() << endl;
-		}
-
-		if (selectStmt != nullptr) sqlite3_finalize(selectStmt);
-		if (deleteStmt != nullptr) sqlite3_finalize(deleteStmt);
-		if (updateStmt != nullptr) sqlite3_finalize(updateStmt);
-	}
-}
-
-string M6BlastCache::Submit(const string& inDatabank,
-	string inQuery, string inMatrix, uint32 inWordSize,
+string M6BlastCache::Submit(const string& inDatabank, const string& inQuery,
+	const string& inProgram, const string& inMatrix, uint32 inWordSize,
 	double inExpect, bool inLowComplexityFilter,
 	bool inGapped, int32 inGapOpen, int32 inGapExtend,
 	uint32 inReportLimit)
@@ -406,129 +297,118 @@ string M6BlastCache::Submit(const string& inDatabank,
 	if (inReportLimit > 1000)
 		THROW(("Report limit exceeds maximum of 1000 hits"));
 
-	boost::mutex::scoped_lock lock(mDbMutex);
-	
 	vector<fs::path> files;
 	FastaFilesForDatabank(inDatabank, files);
-	CheckCacheForDB(inDatabank, files);
-	
+
 	string result;
+	boost::mutex::scoped_lock lock(mCacheMutex);
 	
-	sqlite3_reset(mSelectByParamsStmt);
-	THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(mSelectByParamsStmt, 1, inDatabank.c_str(), inDatabank.length(), SQLITE_TRANSIENT), mCacheDB);
-	THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(mSelectByParamsStmt, 2, inQuery.c_str(), inQuery.length(), SQLITE_TRANSIENT), mCacheDB);
-	THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(mSelectByParamsStmt, 3, inMatrix.c_str(), inMatrix.length(), SQLITE_TRANSIENT), mCacheDB);
-	THROW_IF_SQLITE3_ERROR(sqlite3_bind_int(mSelectByParamsStmt, 4, inWordSize), mCacheDB);
-	THROW_IF_SQLITE3_ERROR(sqlite3_bind_double(mSelectByParamsStmt, 5, inExpect), mCacheDB);
-	THROW_IF_SQLITE3_ERROR(sqlite3_bind_int(mSelectByParamsStmt, 6, inLowComplexityFilter), mCacheDB);
-	THROW_IF_SQLITE3_ERROR(sqlite3_bind_int(mSelectByParamsStmt, 7, inGapped), mCacheDB);
-	THROW_IF_SQLITE3_ERROR(sqlite3_bind_int(mSelectByParamsStmt, 8, inGapOpen), mCacheDB);
-	THROW_IF_SQLITE3_ERROR(sqlite3_bind_int(mSelectByParamsStmt, 9, inGapExtend), mCacheDB);
-	THROW_IF_SQLITE3_ERROR(sqlite3_bind_int(mSelectByParamsStmt, 10, inReportLimit), mCacheDB);
-
-	int err = sqlite3_step(mSelectByParamsStmt);
-	if (err != SQLITE_OK and err != SQLITE_ROW and err != SQLITE_DONE)
-		THROW_IF_SQLITE3_ERROR(err, mCacheDB);
-
-	if (err == SQLITE_ROW)
+	// see if the job is already done before
+	foreach (CacheEntry& e, mResultCache)
 	{
-		const char* text = reinterpret_cast<const char*>(sqlite3_column_text(mSelectByParamsStmt, 0));
-		uint32 length = sqlite3_column_bytes(mSelectByParamsStmt, 0);
+		if (not e.job.IsJobFor(inDatabank, inQuery, inProgram, inMatrix, inWordSize, inExpect,
+				inLowComplexityFilter, inGapped, inGapOpen, inGapExtend, inReportLimit))
+			continue;
 
-		result.assign(text, length);
-		
-		// now resubmit job if cache file is missing
-		if (not fs::exists(mCacheDir / (result + ".xml.bz2")))
+		result = e.id;
+
+		if ((e.status == bj_Finished or e.status == bj_Error) and not e.job.IsStillValid(files))
 		{
-			sqlite3_reset(mUpdateStatusStmt);
-			
-			string status = "queued";
-			THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(mUpdateStatusStmt, 1, status.c_str(), status.length(), SQLITE_TRANSIENT), mCacheDB);
-			THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(mUpdateStatusStmt, 2, "", 0, SQLITE_TRANSIENT), mCacheDB);
-			THROW_IF_SQLITE3_ERROR(sqlite3_bind_int(mUpdateStatusStmt, 3, 0), mCacheDB);
-			THROW_IF_SQLITE3_ERROR(sqlite3_bind_double(mUpdateStatusStmt, 4, 0), mCacheDB);
-			THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(mUpdateStatusStmt, 5, result.c_str(), result.length(), SQLITE_TRANSIENT), mCacheDB);
-			
-			err = sqlite3_step(mUpdateStatusStmt);
-			if (err != SQLITE_OK and err != SQLITE_ROW and err != SQLITE_DONE)
-				THROW_IF_SQLITE3_ERROR(err, mCacheDB);
+			e.status = bj_Queued;
+			StoreJob(e.id, e.job);	// need to store the job again, since the timestamps changed
 
-			mEmptyCondition.notify_one();
+			mWorkCondition.notify_one();
+			
+			// clean up stale files
+			if (fs::exists(mCacheDir / (e.id + ".xml.bz2")))
+				fs::remove(mCacheDir / (e.id + ".xml.bz2"));
+			
+			if (fs::exists(mCacheDir / (e.id + ".err")))
+				fs::remove(mCacheDir / (e.id + ".err"));
 		}
+
+		break;
 	}
-	else
+	
+	if (result.empty()) // new job, add to the queue
 	{
-		boost::uuids::random_generator gen;
-		boost::uuids::uuid id = gen();
-		result = boost::lexical_cast<string>(id);
+		static boost::uuids::random_generator gen;
+
+		CacheEntry e;
+
+		e.id = boost::lexical_cast<string>(gen());
+		e.status = bj_Queued;
+
+		e.job.db = inDatabank;
+		e.job.query = inQuery;
+		e.job.program = inProgram;
+		e.job.matrix = inMatrix;
+		e.job.wordsize = inWordSize;
+		e.job.expect = inExpect;
+		e.job.filter = inLowComplexityFilter;
+		e.job.gapped = inGapped;
+		e.job.gapOpen = inGapOpen;
+		e.job.gapExtend = inGapExtend;
+		e.job.reportLimit = inReportLimit;
 		
-		sqlite3_reset(mInsertStmt);
+		foreach (fs::path& file, files)
+		{
+			M6BlastDbInfo info = { file.string(), boost::posix_time::from_time_t(fs::last_write_time(file)) };
+			e.job.files.push_back(info);
+		}
+	
+		StoreJob(e.id, e.job);
 		
-		THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(mInsertStmt, 1, result.c_str(), result.length(), SQLITE_TRANSIENT), mCacheDB);
-		THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(mInsertStmt, 2, inDatabank.c_str(), inDatabank.length(), SQLITE_TRANSIENT), mCacheDB);
-		THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(mInsertStmt, 3, inQuery.c_str(), inQuery.length(), SQLITE_TRANSIENT), mCacheDB);
-		THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(mInsertStmt, 4, inMatrix.c_str(), inMatrix.length(), SQLITE_TRANSIENT), mCacheDB);
-		THROW_IF_SQLITE3_ERROR(sqlite3_bind_int(mInsertStmt, 5, inWordSize), mCacheDB);
-		THROW_IF_SQLITE3_ERROR(sqlite3_bind_double(mInsertStmt, 6, inExpect), mCacheDB);
-		THROW_IF_SQLITE3_ERROR(sqlite3_bind_int(mInsertStmt, 7, inLowComplexityFilter), mCacheDB);
-		THROW_IF_SQLITE3_ERROR(sqlite3_bind_int(mInsertStmt, 8, inGapped), mCacheDB);
-		THROW_IF_SQLITE3_ERROR(sqlite3_bind_int(mInsertStmt, 9, inGapOpen), mCacheDB);
-		THROW_IF_SQLITE3_ERROR(sqlite3_bind_int(mInsertStmt, 10, inGapExtend), mCacheDB);
-		THROW_IF_SQLITE3_ERROR(sqlite3_bind_int(mInsertStmt, 11, inReportLimit), mCacheDB);
-		
-		int err = sqlite3_step(mInsertStmt);
-		if (err != SQLITE_OK and err != SQLITE_ROW and err != SQLITE_DONE)
-			THROW_IF_SQLITE3_ERROR(err, mCacheDB);
-		
-		mEmptyCondition.notify_one();
+		mResultCache.push_back(e);
+		mWorkCondition.notify_one();
+
+		result = e.id;
 	}
 
 	return result;
+}
+
+void M6BlastCache::StoreJob(const string& inJobID, const M6BlastJob& inJob)
+{
+	// store the job in the cache directory
+	zeep::xml::document doc;
+	doc.serialize("blastjob", inJob);
+		
+	fs::ofstream file(mCacheDir / (inJobID + ".job"), ios_base::out|ios_base::trunc);
+	file << doc;
 }
 
 void M6BlastCache::Work()
 {
 	using namespace boost::posix_time;
 
-	// wait a little at start up
-	boost::this_thread::sleep(seconds(1));
+	boost::mutex::scoped_lock lock(mWorkMutex);
 
-	boost::mutex::scoped_lock lock(mDbMutex);
-	
-	while (mStopWorkingFlag == false)
+	while (not mStopWorkingFlag)
 	{
-		boost::thread t;
-
 		try
 		{
-			// ignore errors by sqlite3_reset
-			(void)sqlite3_reset(mSelectByStatusStmt);
+			string next;
 			
-			int err = sqlite3_step(mSelectByStatusStmt);
-			if (err != SQLITE_OK and err != SQLITE_ROW and err != SQLITE_DONE)
-				THROW_IF_SQLITE3_ERROR(err, mCacheDB);
-
-			if (err != SQLITE_ROW)
 			{
-				mEmptyCondition.wait(lock);
-				continue;
+				// fetch the first queued entry
+				boost::mutex::scoped_lock lock2(mCacheMutex);
+				foreach (CacheEntry& e, mResultCache)
+				{
+					if (e.status != bj_Queued)
+						continue;
+					next = e.id;
+					break;
+				}
 			}
 			
-			const char* text = reinterpret_cast<const char*>(sqlite3_column_text(mSelectByStatusStmt, 0));
-			uint32 length = sqlite3_column_bytes(mSelectByStatusStmt, 0);
-			string id(text, length);
-			
-			t = boost::thread(boost::bind(&M6BlastCache::ExecuteJob, this, id));
-
-			mWorkCondition.wait(lock);
+			if (next.empty())
+				mWorkCondition.wait(lock);
+			else
+				ExecuteJob(next);
 		}
 		catch (boost::thread_interrupted&)
 		{
-			if (t.joinable())
-			{
-				t.interrupt();
-				t.join();
-			}
 		}
 		catch (exception& e)
 		{
@@ -543,123 +423,64 @@ void M6BlastCache::Work()
 	}
 }
 
-void M6BlastCache::GetJobParameters(const string& inJobID, std::string& outDatabank, string& outQuery, /*string& outProgram, */
-	string& outMatrix, uint32& outWordSize, double& outExpect, bool& outLowComplexityFilter,
-	bool& outGapped, int32& outGapOpen, int32& outGapExtend, uint32& outReportLimit)
-{
-	boost::mutex::scoped_lock lock(mDbMutex);
-
-	sqlite3_reset(mFetchParamsStmt);
-
-	THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(mFetchParamsStmt, 1, inJobID.c_str(), inJobID.length(), SQLITE_TRANSIENT), mCacheDB);
-	int err = sqlite3_step(mFetchParamsStmt);
-
-	if (err != SQLITE_ROW)
-		throw runtime_error("job missing in cache");
-	
-	// db, query, matrix, wordsize, expect, filter, gapped, gapopen, gapextend
-
-	const char* text = reinterpret_cast<const char*>(sqlite3_column_text(mFetchParamsStmt, 0));
-	uint32 length = sqlite3_column_bytes(mFetchParamsStmt, 0);
-	outDatabank.assign(text, length);
-	
-	text = reinterpret_cast<const char*>(sqlite3_column_text(mFetchParamsStmt, 1));
-	length = sqlite3_column_bytes(mFetchParamsStmt, 1);
-	outQuery.assign(text, length);
-
-	text = reinterpret_cast<const char*>(sqlite3_column_text(mFetchParamsStmt, 2));
-	length = sqlite3_column_bytes(mFetchParamsStmt, 2);
-	outMatrix.assign(text, length);
-	
-	outWordSize = sqlite3_column_int(mFetchParamsStmt, 3);
-	outExpect = sqlite3_column_double(mFetchParamsStmt, 4);
-	outLowComplexityFilter = sqlite3_column_int(mFetchParamsStmt, 5) != 0;
-	outGapped = sqlite3_column_int(mFetchParamsStmt, 6) != 0;
-	outGapOpen = sqlite3_column_int(mFetchParamsStmt, 7);
-	outGapExtend = sqlite3_column_int(mFetchParamsStmt, 8);
-	outReportLimit = sqlite3_column_int(mFetchParamsStmt, 9);
-}
-
 void M6BlastCache::ExecuteJob(const string& inJobID)
 {
 	try
 	{
-		SetJobStatus(inJobID, "running", "", 0, 0);
+		SetJobStatus(inJobID, bj_Running);
 		
-		string db, query, matrix;
-		uint32 wordsize, reportlimit = 250;
-		int32 gapopen, gapextend;
-		bool filter, gapped;
-		double expect;
+		M6BlastJob job;
+	
+		fs::ifstream file(mCacheDir / (inJobID + ".job"));
+		if (not file.is_open())
+		{
+			SetJobStatus(inJobID, bj_Error);
+			return;
+		}
 		
-		GetJobParameters(inJobID, db, query, matrix, wordsize, expect, filter, gapped, gapopen, gapextend, reportlimit);
+		{
+			zeep::xml::document doc(file);
+			doc.deserialize("blastjob", job);
+		}
 		
 		vector<fs::path> files;
-		FastaFilesForDatabank(db, files);
+		transform(job.files.begin(), job.files.end(), back_inserter(files),
+			[](M6BlastDbInfo& dbi) { return dbi.path; });
 		
-		M6BlastResultPtr result(M6Blast::Search(files, query, "blastp",
-			matrix, wordsize, expect, filter, gapped, gapopen, gapextend, reportlimit));
-		
-		zeep::xml::document doc("<blast-result/>");
-		zeep::xml::serializer sr(doc.child(), false);
-		sr & boost::serialization::make_nvp("blast-result", const_cast<M6Blast::Result&>(*result));
-			
-		fs::ofstream file(mCacheDir / (inJobID + ".xml.bz2"), ios_base::out|ios_base::trunc|ios_base::binary);
-		io::filtering_stream<io::output> out;
-
-		if (not file.is_open())
-			throw runtime_error("could not create output file");
-		
-		out.push(io::bzip2_compressor());
-		out.push(file);
-
-		out << doc;
+		M6BlastResultPtr result(M6Blast::Search(files, job.query, job.program,
+			job.matrix, job.wordsize, job.expect, job.filter, job.gapped,
+			job.gapOpen, job.gapExtend, job.reportLimit));
 		
 		CacheResult(inJobID, result);
-		
-		SetJobStatus(inJobID, "finished", "", result->mHits.size(),
-			result->mHits.empty() or result->mHits.front().mHsps.empty() ? 0 : result->mHits.front().mHsps.front().mExpect);
 	}
 	catch (exception& e)
 	{
-		SetJobStatus(inJobID, "error", e.what(), 0, 0);
+		SetJobStatus(inJobID, bj_Error);
+
+		fs::ofstream file(mCacheDir / (inJobID + ".err"));
+		if (file.is_open())	// silenty ignore errors.... what else?
+			file << e.what();
+		
+		throw;
 	}
-	
-	mWorkCondition.notify_one();
 }
 
-void M6BlastCache::CacheResult(const string& inJobID, M6BlastResultPtr inResult)
+void M6BlastCache::SetJobStatus(const string inJobId, M6BlastJobStatus inStatus)
 {
 	boost::mutex::scoped_lock lock(mCacheMutex);
-
-	Cached c = { inJobID, inResult };
-	mResultCache.push_front(c);
-}
-
-void M6BlastCache::SetJobStatus(const string inJobId, const string& inStatus, const string& inError,
-	uint32 inHitCount, double inBestScore)
-{
-	boost::mutex::scoped_lock lock(mDbMutex);
 	
-	sqlite3_reset(mUpdateStatusStmt);
-	
-	THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(mUpdateStatusStmt, 1, inStatus.c_str(), inStatus.length(), SQLITE_TRANSIENT), mCacheDB);
-	THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(mUpdateStatusStmt, 2, inError.c_str(), inError.length(), SQLITE_TRANSIENT), mCacheDB);
-	THROW_IF_SQLITE3_ERROR(sqlite3_bind_int(mUpdateStatusStmt, 3, inHitCount), mCacheDB);
-	THROW_IF_SQLITE3_ERROR(sqlite3_bind_double(mUpdateStatusStmt, 4, inBestScore), mCacheDB);
-	THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(mUpdateStatusStmt, 5, inJobId.c_str(), inJobId.length(), SQLITE_TRANSIENT), mCacheDB);
-	
-	int err = sqlite3_step(mUpdateStatusStmt);
-	if (err != SQLITE_OK and err != SQLITE_ROW and err != SQLITE_DONE)
-		THROW_IF_SQLITE3_ERROR(err, mCacheDB);
+	foreach (CacheEntry& e, mResultCache)
+	{
+		if (e.id != inJobId)
+			continue;
+		
+		e.status = inStatus;
+		break;
+	}
 }
 
 void M6BlastCache::Purge(bool inDeleteFiles)
 {
-	boost::mutex::scoped_lock lock(mDbMutex);
-	
-	ExecuteStatement("DELETE FROM blast_cache");
-	
 	if (inDeleteFiles)
 	{
 		// TODO implement
@@ -668,28 +489,26 @@ void M6BlastCache::Purge(bool inDeleteFiles)
 
 M6BlastJobDescList M6BlastCache::GetJobList()
 {
-	boost::mutex::scoped_lock lock(mDbMutex);
-	sqlite3_reset(mListJobsStmt);
-	
+	boost::mutex::scoped_lock lock(mCacheMutex);
+
 	M6BlastJobDescList result;
 	
-	while (sqlite3_step(mListJobsStmt) == SQLITE_ROW)
+	foreach (CacheEntry& e, mResultCache)
 	{
 		M6BlastJobDesc desc;
 		
-		const char* text = reinterpret_cast<const char*>(sqlite3_column_text(mListJobsStmt, 0));
-		uint32 length = sqlite3_column_bytes(mListJobsStmt, 0);
-		desc.id = string(text, length);
-
-		text = reinterpret_cast<const char*>(sqlite3_column_text(mListJobsStmt, 1));
-		length = sqlite3_column_bytes(mListJobsStmt, 1);
-		desc.db = string(text, length);
+		desc.id = e.id;
+		desc.db = e.job.db;
+		desc.queryLength = static_cast<uint32>(e.job.query.length());
 		
-		desc.queryLength = sqlite3_column_int(mListJobsStmt, 2);
-		
-		text = reinterpret_cast<const char*>(sqlite3_column_text(mListJobsStmt, 3));
-		length = sqlite3_column_bytes(mListJobsStmt, 3);
-		desc.status = string(text, length);
+		switch (e.status)
+		{
+			case bj_Unknown:	desc.status = "unknown"; break;
+			case bj_Error:		desc.status = "error"; break;
+			case bj_Queued:		desc.status = "queued"; break;
+			case bj_Running:	desc.status = "running"; break;
+			case bj_Finished:	desc.status = "finished"; break;
+		}
 		
 		result.push_back(desc);
 	}
@@ -707,27 +526,23 @@ void M6BlastCache::DeleteJob(const string& inJobID)
 	{
 		THROW(("Invalid job id"));
 	}
+
+	boost::mutex::scoped_lock lockdb(mCacheMutex);
 	
-	boost::mutex::scoped_lock lockdb(mDbMutex);
-	
-	sqlite3_reset(mDeleteJobStmt);
-	THROW_IF_SQLITE3_ERROR(sqlite3_bind_text(mDeleteJobStmt, 1, inJobID.c_str(), inJobID.length(), SQLITE_TRANSIENT), mCacheDB);
-
-	int err = sqlite3_step(mDeleteJobStmt);
-	if (err != SQLITE_OK and err != SQLITE_ROW and err != SQLITE_DONE)
-		THROW_IF_SQLITE3_ERROR(err, mCacheDB);
-
-	boost::mutex::scoped_lock lockcache(mCacheMutex);
-
-	list<Cached>::iterator c = find_if(mResultCache.begin(), mResultCache.end(),
-		[&inJobID](Cached& e) -> bool { return e.id == inJobID; });
+	auto c = find_if(mResultCache.begin(), mResultCache.end(),
+		[&inJobID](CacheEntry& e) -> bool { return e.id == inJobID; });
 	
 	if (c != mResultCache.end())
 		mResultCache.erase(c);
-	
-	fs::path file(mCacheDir / (inJobID + ".xml.bz2"));
-	if (fs::exists(file))
-		fs::remove(file);
 
-	mWorkerThread.interrupt();
+	if (mWorkerThread.joinable())
+		mWorkerThread.interrupt();
+	
+	foreach (const char* ext, kBlastFileExtensions)
+	{
+		boost::system::error_code ec;
+		fs::remove(mCacheDir / (inJobID + ext), ec);
+	}
+	
+	mWorkCondition.notify_one();
 }

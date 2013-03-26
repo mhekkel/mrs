@@ -3038,7 +3038,7 @@ void M6Server::handle_blast_submit_ajax(
 		}
 		
 		string jobId = M6BlastCache::Instance().Submit(
-			db, query, matrix, wordSize,
+			db, query, program, matrix, wordSize,
 			boost::lexical_cast<double>(expect), filter,
 			gapped, gapOpen, gapExtend, reportLimit);
 	

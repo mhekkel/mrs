@@ -112,7 +112,7 @@ void M6WSBlast::Blast(const string& query, const string& program, const string& 
 //	M6Matrix matrix(params.matrix, params.gapOpen, params.gapExtend);
 
 	response = M6BlastCache::Instance().Submit(
-		ba::join(dbs, ";"), query, params.matrix, params.wordSize,
+		ba::join(dbs, ";"), query, program, params.matrix, params.wordSize,
 		params.expect, params.lowComplexityFilter,
 		params.gapped, params.gapOpen, params.gapExtend, reportLimit);
 }

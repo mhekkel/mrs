@@ -16,11 +16,6 @@
 
 // --------------------------------------------------------------------
 
-struct sqlite3;
-struct sqlite3_stmt;
-
-// --------------------------------------------------------------------
-
 enum M6BlastJobStatus
 {
 	bj_Unknown,
@@ -28,6 +23,68 @@ enum M6BlastJobStatus
 	bj_Running,
 	bj_Finished,
 	bj_Error
+};
+
+// --------------------------------------------------------------------
+
+struct M6BlastDbInfo
+{
+	std::string					path;
+	boost::posix_time::ptime	timestamp;
+	
+	bool operator==(const M6BlastDbInfo& rhs) const	{ return path == rhs.path and timestamp == rhs.timestamp; }
+
+	template<class Archive>
+	void serialize(Archive& ar, const unsigned int version)
+	{
+		ar & BOOST_SERIALIZATION_NVP(path) & BOOST_SERIALIZATION_NVP(timestamp);
+	}
+};
+
+struct M6BlastJob
+{
+	// actual parameters
+	std::string					db;
+	std::string					query;
+	std::string					program;
+	std::string					matrix;
+	uint32						wordsize;
+	double						expect;
+	bool						filter;
+	bool						gapped;
+	int32						gapOpen;
+	int32						gapExtend;
+	uint32						reportLimit;
+	
+	// administrative info
+	std::vector<M6BlastDbInfo>	files;
+	
+	// convenience
+	bool						IsJobFor(const std::string& inDatabank,
+									const std::string& inQuery, const std::string& inProgram,
+									const std::string& inMatrix, uint32 inWordSize,
+									double inExpect, bool inLowComplexityFilter,
+									bool inGapped, int32 inGapOpen, int32 inGapExtend,
+									uint32 inReportLimit) const;
+
+	bool						IsStillValid(const std::vector<boost::filesystem::path>& inFiles) const;
+	
+	template<class Archive>
+	void serialize(Archive& ar, const unsigned int version)
+	{
+		ar & BOOST_SERIALIZATION_NVP(db)
+		   & BOOST_SERIALIZATION_NVP(query)
+		   & BOOST_SERIALIZATION_NVP(program)
+		   & BOOST_SERIALIZATION_NVP(matrix)
+		   & BOOST_SERIALIZATION_NVP(wordsize)
+		   & BOOST_SERIALIZATION_NVP(expect)
+		   & BOOST_SERIALIZATION_NVP(filter)
+		   & BOOST_SERIALIZATION_NVP(gapped)
+		   & BOOST_SERIALIZATION_NVP(gapOpen)
+		   & BOOST_SERIALIZATION_NVP(gapExtend)
+		   & BOOST_SERIALIZATION_NVP(reportLimit)
+		   & BOOST_SERIALIZATION_NVP(files);
+	}
 };
 
 // --------------------------------------------------------------------
@@ -54,9 +111,9 @@ class M6BlastCache
 
 	M6BlastResultPtr			JobResult(const std::string& inJobID);
 	
-	std::string					Submit(const std::string& Databank,
-									std::string inQuery, //std::string inProgram,
-									std::string inMatrix, uint32 inWordSize,
+	std::string					Submit(const std::string& inDatabank,
+									const std::string& inQuery, const std::string& inProgram,
+									const std::string& inMatrix, uint32 inWordSize,
 									double inExpect, bool inLowComplexityFilter,
 									bool inGapped, int32 inGapOpen, int32 inGapExtend,
 									uint32 inReportLimit);
@@ -75,18 +132,9 @@ class M6BlastCache
 
 	void						Work();
 	void						ExecuteJob(const std::string& inJobID);
-	void						GetJobParameters(const std::string& inJobID,
-									std::string& outDatabank, std::string& outQuery, //std::string& outProgram,
-									std::string& outMatrix, uint32& outWordSize,
-									double& outExpect, bool& outLowComplexityFilter,
-									bool& outGapped, int32& outGapOpen, int32& outGapExtend,
-									uint32& outReportLimit);
-
-	void						SetJobStatus(const std::string inJobID, const std::string& inStatus,
-									const std::string& inError, uint32 inHitCount, double inBestScore);
-	void						CacheResult(const std::string& inJobID, M6BlastResultPtr inResult);
-	void						CheckCacheForDB(const std::string& inDatabank,
-									const std::vector<boost::filesystem::path>& inFiles);
+	void						StoreJob(const std::string& inJobID, const M6BlastJob& inJob);
+	void						SetJobStatus(const std::string inJobId, M6BlastJobStatus inStatus);
+	void						CacheResult(const std::string& inJobId, M6BlastResultPtr inResult);
 
 	void						FastaFilesForDatabank(const std::string& inDatabank,
 									std::vector<boost::filesystem::path>& outFiles);
@@ -94,26 +142,19 @@ class M6BlastCache
 	void						ExecuteStatement(const std::string& inStatement);
 
 	boost::filesystem::path		mCacheDir;
-	sqlite3*					mCacheDB;
-	sqlite3_stmt*				mSelectByParamsStmt;
-	sqlite3_stmt*				mSelectByStatusStmt;
-	sqlite3_stmt*				mSelectByIDStmt;
-	sqlite3_stmt*				mInsertStmt;
-	sqlite3_stmt*				mUpdateStatusStmt;
-	sqlite3_stmt*				mFetchParamsStmt;
-	sqlite3_stmt*				mFetchDbFilesStmt;
-	sqlite3_stmt*				mListJobsStmt;
-	sqlite3_stmt*				mDeleteJobStmt;
-	bool						mStopWorkingFlag;
 	boost::thread				mWorkerThread;
-	boost::mutex				mDbMutex, mCacheMutex;
-	boost::condition			mEmptyCondition, mWorkCondition;
+	boost::mutex				mCacheMutex, mWorkMutex;
+	boost::condition			mWorkCondition;
+	bool						mStopWorkingFlag;
 	
-	struct Cached
+	struct CacheEntry
 	{
 		std::string				id;
-		M6BlastResultPtr		result;
+		M6BlastJob				job;
+		M6BlastJobStatus		status;
+		uint32					hitCount;
+		double					bestScore;
 	};
 	
-	std::list<Cached>			mResultCache;
+	std::list<CacheEntry>		mResultCache;
 };

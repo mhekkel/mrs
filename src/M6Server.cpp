@@ -242,7 +242,7 @@ M6Server::M6Server(const zx::element* inConfig)
 		});
 	}
 	
-	if (sInstance != nullptr)
+	if (sInstance == nullptr)
 		sInstance = this;
 }
 

@@ -441,7 +441,11 @@ int ForkExec(vector<const char*>& args, double maxRunTime, istream& stdin, ostre
 	if (pid == 0)	// the child
 	{
 		if (ioService != nullptr)
+		{
 			ioService->notify_fork(boost::asio::io_service::fork_child);
+
+			M6Server::Instance()->stop();
+		}
 		
 		setpgid(0, 0);		// detach from the process group, create new
 

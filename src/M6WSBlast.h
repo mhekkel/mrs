@@ -85,11 +85,10 @@ struct Hsp
 
 struct Hit
 {
-	std::string			id;
-	std::vector<std::string>		// make this a vector so it won't be an empty
-						sequenceId;	// string in case we have no chain
-	std::string			title;
-	std::vector<Hsp>	hsps;
+	std::string						id;
+	boost::optional<std::string>	sequenceId;
+	std::string						title;
+	std::vector<Hsp>				hsps;
 
 	template<class Archive>
 	void serialize(Archive& ar, const unsigned int version)

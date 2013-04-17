@@ -170,7 +170,7 @@ void M6WSBlast::BlastJobResult(string job_id, M6WSBlastNS::BlastResult& response
 		h.id = hit.mID;
 		h.title = hit.mDefLine;
 		if (not hit.mChain.empty())
-			h.sequenceId.push_back(hit.mChain);
+			h.sequenceId.reset(hit.mChain);
 		
 		foreach (const M6Blast::Hsp& hsp, hsps)
 		{

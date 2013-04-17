@@ -62,11 +62,11 @@ eval
 		exit 1;
 	}
 
-	$request = $proxy->compileClient('BlastJobStatus');
+	$request = $proxy->compileClient('BlastJobStatus', xml_format => 1);
 	my $job_id = $answer->{parameters}->{jobId};
 
 	# simply test whether the job was accepted in the queue
-	$answer = $request->( 'jobId' => $job_id );
+	($answer, $trace) = $request->( 'jobId' => $job_id );
 
 	if (not defined $answer or not defined $answer->{parameters}->{status})
 	{
@@ -99,7 +99,12 @@ eval
 	
 	if ($status eq 'finished') {
 		$request = $proxy->compileClient('BlastJobResult');
-		$answer = $request->( 'jobId' => $job_id );
+		($answer, $trace) = $request->( 'jobId' => $job_id );
+
+open(my $log, ">trace.log");
+$trace->printRequest($log);
+$trace->printResponse($log);
+close($log);
 
 		print "passed\n";
 		exit(0);

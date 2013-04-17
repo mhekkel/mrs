@@ -1,5 +1,3 @@
-- reimplement index description
-
 BUGS:
 
 - embl CO section in format is missing

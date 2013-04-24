@@ -1159,8 +1159,12 @@ void M6Server::create_link_tags(zx::element* node, boost::regex& expr,
 		{
 			boost::smatch m;
 
-			string s = text->str();
 			// somehow boost::regex_search works incorrectly with a const std::string...
+			string s = text->str();
+
+			if (s.length() > 1024 * 1024)	// if text is more than 1 MB we give up...
+				break;
+
 			if (not boost::regex_search(s, m, expr) or not m[0].matched or m[0].length() == 0)
 				break;
 

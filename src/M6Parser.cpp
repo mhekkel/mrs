@@ -869,7 +869,7 @@ XS(_M6_Script_index_number)
 	
 	ptr = SvPV(ST(2), len);
 	if (ptr == nullptr or len == 0)
-		croak("Error, value is undefined in call to IndexValue");
+		croak("Error, value is undefined in call to index_number");
 
 	try
 	{

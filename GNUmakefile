@@ -199,7 +199,7 @@ install: m6 config/m6-config.xml m6.1 init.d/m6 logrotate.d/m6
 		echo "Not overwriting /etc/logrotate.d/m6 file" ; \
 	  fi
 
-DIST = m6-$(VERSION)
+DIST = mrs-$(VERSION)
 
 dist:
 	rm -rf $(DIST)

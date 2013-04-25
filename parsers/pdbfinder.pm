@@ -34,7 +34,7 @@ sub parse
 {
 	my ($self, $text) = @_;
 
-	while ($text =~ m/^\s*([^: ]+)\s+:(.+)\n/mg)
+	while ($text =~ m/^\s*([^: ]+)\s+:\s+(.+)\n/mg)
 	{
 		my $key = lc $1;
 		my $value = $2;

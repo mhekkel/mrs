@@ -69,10 +69,6 @@ M6WSSearch::M6WSSearch(M6Server& inServer, const M6DbList& inLoadedDatabanks,
 	SOAP_XML_ADD_ENUM(IndexType, Number);
 	SOAP_XML_ADD_ENUM(IndexType, Date);
 	
-	SOAP_XML_ADD_ENUM(Algorithm, Vector);
-	SOAP_XML_ADD_ENUM(Algorithm, Dice);
-	SOAP_XML_ADD_ENUM(Algorithm, Jaccard);
-	
 	SOAP_XML_ADD_ENUM(BooleanQueryOperation, CONTAINS);
 	SOAP_XML_ADD_ENUM(BooleanQueryOperation, LT);
 	SOAP_XML_ADD_ENUM(BooleanQueryOperation, LE);
@@ -123,7 +119,7 @@ M6WSSearch::M6WSSearch(M6Server& inServer, const M6DbList& inLoadedDatabanks,
 		"GetIndices", this, &M6WSSearch::GetIndices, kGetIndicesArgs);
 
 	const char* kFindArgs[] = {
-		"db", "queryterms", "algorithm", "alltermsrequired",
+		"db", "queryterms", "alltermsrequired",
 		"booleanfilter", "resultoffset", "maxresultcount", "response"
 	};	
 	register_action(
@@ -151,51 +147,6 @@ M6WSSearch::M6WSSearch(M6Server& inServer, const M6DbList& inLoadedDatabanks,
 		"GetLinkedEx", this, &M6WSSearch::GetLinkedEx,
 		kGetLinkedExArgs);
 	set_response_name("GetLinkedEx", "GetLinkedExResponse");
-	
-	// unimplemented calls
-//	
-//	const char* kFindSimilarArgs[] = {
-//		"db", "id", "algorithm", "resultoffset", "maxresultcount", "response"
-//	};
-//	register_action(
-//		"FindSimilar", this, &M6WSSearch::FindSimilar,
-//		kFindSimilarArgs);
-//	set_response_name("FindSimilar", "FindResponse");
-//	
-//	const char* kCooccurrenceArgs[] = {
-//		"db", "ids", "idf_cutoff", "resultoffset", "maxresultcount", "terms"
-//	};	
-//	register_action(
-//		"Cooccurrence", this, &M6WSSearch::Cooccurrence,
-//		kCooccurrenceArgs);
-//
-//	const char* kSpellCheckArgs[] = {
-//		"db", "queryterm", "suggestions"
-//	};
-//	register_action(
-//		"SpellCheck", this, &M6WSSearch::SpellCheck,
-//		kSpellCheckArgs);
-//	
-//	const char* kSuggestSearchTermsArgs[] = {
-//		"db", "queryterm", "suggestions"
-//	};
-//	register_action(
-//		"SuggestSearchTerms", this, &M6WSSearch::SuggestSearchTerms,
-//		kSuggestSearchTermsArgs);
-//
-//	const char* kCompareDocumentsArgs[] = {
-//		"db", "doc_a", "doc_b", "similarity"
-//	};
-//	register_action(
-//		"CompareDocuments", this, &M6WSSearch::CompareDocuments,
-//		kCompareDocumentsArgs);
-//
-//	const char* kClusterDocumentsArgs[] = {
-//		"db", "ids", "response"
-//	};
-//	register_action(
-//		"ClusterDocuments", this, &M6WSSearch::ClusterDocuments,
-//		kClusterDocumentsArgs);
 }
 
 void M6WSSearch::GetDatabankInfo(const string& databank,
@@ -280,9 +231,9 @@ void M6WSSearch::Count(const std::string& db, const std::string& booleanquery, u
 }
 
 void M6WSSearch::GetEntry(const string& inDatabank, const string& inID,
-	WSSearchNS::Format inFormat, string& outEntry)
+	boost::optional<WSSearchNS::Format> inFormat, string& outEntry)
 {
-	switch (inFormat)
+	switch (boost::get_optional_value_or(inFormat, WSSearchNS::plain))
 	{
 		case WSSearchNS::plain:
 			outEntry = mServer.GetEntry(inDatabank, inID, "plain");
@@ -345,8 +296,9 @@ void M6WSSearch::GetMetaData(const string& inDatabank, const string& inID, const
 }
 
 void M6WSSearch::Find(const string& db, const vector<string>& queryterms,
-	WSSearchNS::Algorithm algorithm, bool alltermsrequired, const string& booleanfilter,
-	int resultoffset, int maxresultcount, vector<WSSearchNS::FindResult>& response)
+	boost::optional<bool> alltermsrequired, boost::optional<string> booleanfilter,
+	boost::optional<int> resultoffset, boost::optional<int> maxresultcount,
+	vector<WSSearchNS::FindResult>& response)
 {
 	if (db == "all" or db == "*" or db.empty())
 	{
@@ -355,35 +307,41 @@ void M6WSSearch::Find(const string& db, const vector<string>& queryterms,
 
 		foreach (const M6LoadedDatabank& ldb, mLoadedDatabanks)
 		{
-			Find(ldb.mID, queryterms, algorithm, alltermsrequired, booleanfilter,
+			Find(ldb.mID, queryterms, alltermsrequired, booleanfilter,
 				resultoffset, maxresultcount, response);
 		}
 	}
 	else if (M6Databank* databank = mServer.Load(db))
 	{
-		if (maxresultcount <= 0)
-			maxresultcount = 15;
+		uint32 max_result_count = boost::get_optional_value_or(maxresultcount, 15);
+		uint32 result_offset = boost::get_optional_value_or(resultoffset, 0);
+		bool all_terms_required = boost::get_optional_value_or(alltermsrequired, true);
+		
+		if (max_result_count <= 0)
+			max_result_count = 15;
 
 		M6Iterator* filter = nullptr;
 		vector<string> terms;
-			
-		if (not booleanfilter.empty())
-			ParseQuery(*databank, booleanfilter, alltermsrequired, terms, filter);
+		
+		if (booleanfilter.is_initialized() and not booleanfilter.get().empty())
+			ParseQuery(*databank, booleanfilter.get(), all_terms_required, terms, filter);
 			
 		unique_ptr<M6Iterator> iter(
-			databank->Find(queryterms, filter, alltermsrequired, resultoffset + maxresultcount));
+			databank->Find(queryterms, filter, all_terms_required, result_offset + max_result_count));
 			
+		WSSearchNS::FindResult result = { db, 0 };
+
 		if (iter)
 		{
-			WSSearchNS::FindResult result = { db, iter->GetCount() };
-				
+			result.count = iter->GetCount();
+			
 			uint32 docNr;
 			float rank;
 				
-			while (resultoffset-- > 0 and iter->Next(docNr, rank))
+			while (result_offset-- > 0 and iter->Next(docNr, rank))
 				;
 				
-			while (maxresultcount-- > 0 and iter->Next(docNr, rank))
+			while (max_result_count-- > 0 and iter->Next(docNr, rank))
 			{
 				WSSearchNS::Hit h;
 					
@@ -395,18 +353,18 @@ void M6WSSearch::Find(const string& db, const vector<string>& queryterms,
 					
 				result.hits.push_back(h);
 			}
-
-			response.push_back(result);
 		}
+
+		response.push_back(result);
 	}
 	else
 	{
-		if (maxresultcount <= 0)
-			maxresultcount = 5;
+		if (not maxresultcount.is_initialized())
+			maxresultcount.reset(5);
 
 		foreach (const string& adb, mServer.UnAlias(db))
 		{
-			Find(adb, queryterms, algorithm, alltermsrequired, booleanfilter,
+			Find(adb, queryterms, alltermsrequired, booleanfilter,
 				resultoffset, maxresultcount, response);
 		}
 	}
@@ -507,20 +465,24 @@ M6Iterator* ParseQuery(M6Databank* inDatabank, const WSSearchNS::BooleanQuery& i
 }
 
 void M6WSSearch::FindBoolean(const string& inDatabank, const WSSearchNS::BooleanQuery& inQuery,
-	int resultoffset, int maxresultcount, vector<WSSearchNS::FindResult>& response)
+	boost::optional<int> resultoffset, boost::optional<int> maxresultcount,
+	vector<WSSearchNS::FindResult>& response)
 {
 	if (inDatabank == "*" or inDatabank == "all" or inDatabank == "")
 	{
-		if (maxresultcount > 5 or maxresultcount <= 0)
-			maxresultcount = 3;
+		if (not maxresultcount.is_initialized() or (maxresultcount.get() > 5 or maxresultcount.get() <= 0))
+			maxresultcount.reset(3);
 
 		foreach (const M6LoadedDatabank& ldb, mLoadedDatabanks)
 			FindBoolean(ldb.mID, inQuery, resultoffset, maxresultcount, response);
 	}
 	else if (M6Databank* databank = mServer.Load(inDatabank))
 	{
-		if (maxresultcount <= 0)
-			maxresultcount = 15;
+		uint32 max_result_count = boost::get_optional_value_or(maxresultcount, 15);
+		uint32 result_offset = boost::get_optional_value_or(resultoffset, 0);
+		
+		if (max_result_count <= 0)
+			max_result_count = 15;
 
 		unique_ptr<M6Iterator> iter(ParseQuery(databank, inQuery));
 			
@@ -531,10 +493,10 @@ void M6WSSearch::FindBoolean(const string& inDatabank, const WSSearchNS::Boolean
 			uint32 docNr;
 			float rank;
 				
-			while (resultoffset-- > 0 and iter->Next(docNr, rank))
+			while (result_offset-- > 0 and iter->Next(docNr, rank))
 				;
 				
-			while (maxresultcount-- > 0 and iter->Next(docNr, rank))
+			while (max_result_count-- > 0 and iter->Next(docNr, rank))
 			{
 				WSSearchNS::Hit h;
 					
@@ -552,16 +514,16 @@ void M6WSSearch::FindBoolean(const string& inDatabank, const WSSearchNS::Boolean
 	}
 	else
 	{
-		if (maxresultcount <= 0)
-			maxresultcount = 5;
+		if (not maxresultcount.is_initialized())
+			maxresultcount.reset(5);
 
 		foreach (const string& db, mServer.UnAlias(inDatabank))
 			FindBoolean(db, inQuery, resultoffset, maxresultcount, response);
 	}
 }
 
-void M6WSSearch::GetLinked(const string& db, const string& id,
-	const string& linkedDb, int resultoffset, int maxresultcount,
+void M6WSSearch::GetLinked(const string& db, const string& id, const string& linkedDb,
+	boost::optional<int> resultoffset, boost::optional<int> maxresultcount,
 	vector<WSSearchNS::FindResult>& response)
 {
 	M6Databank* sdb;
@@ -581,18 +543,21 @@ void M6WSSearch::GetLinked(const string& db, const string& id,
 
 	if (iter)
 	{
-		if (maxresultcount <= 0)
-			maxresultcount = 15;
+		uint32 max_result_count = boost::get_optional_value_or(maxresultcount, 15);
+		uint32 result_offset = boost::get_optional_value_or(resultoffset, 0);
+		
+		if (max_result_count <= 0)
+			max_result_count = 15;
 		
 		WSSearchNS::FindResult result = { linkedDb, iter->GetCount() };
 			
 		uint32 docNr;
 		float rank;
 			
-		while (resultoffset-- > 0 and iter->Next(docNr, rank))
+		while (result_offset-- > 0 and iter->Next(docNr, rank))
 			;
 			
-		while (maxresultcount-- > 0 and iter->Next(docNr, rank))
+		while (max_result_count-- > 0 and iter->Next(docNr, rank))
 		{
 			WSSearchNS::Hit h;
 				

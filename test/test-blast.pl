@@ -42,10 +42,10 @@ eval
 	# Calling the service and getting the response
 	my ($answer, $trace) = $request->(
 		db => $db,
-		mrsBooleanQuery => '',
+#		mrsBooleanQuery => '',
 		query => $seq,
 		program => 'blastp',
-		params => \%params,
+#		params => \%params,
 		'reportLimit' => 25
 	);
 

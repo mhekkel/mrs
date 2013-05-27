@@ -18,15 +18,15 @@ namespace M6WSBlastNS
 
 struct Parameters
 {
-	std::string					matrix;
-	uint32						wordSize;
-	double						expect;
-	bool						lowComplexityFilter;
-	bool						gapped;
-	uint32						gapOpen;
-	uint32						gapExtend;
+	boost::optional<std::string>	matrix;
+	boost::optional<uint32>			wordSize;
+	boost::optional<double>			expect;
+	boost::optional<bool>			lowComplexityFilter;
+	boost::optional<bool>			gapped;
+	boost::optional<uint32>			gapOpen;
+	boost::optional<uint32>			gapExtend;
 	
-								Parameters();
+									Parameters();
 	
 	template<class Archive>
 	void serialize(Archive& ar, const unsigned int version)
@@ -132,8 +132,8 @@ class M6WSBlast : public zeep::dispatcher
 	virtual		~M6WSBlast();
 	
 	void		Blast(const std::string& query, const std::string& program, const std::string& db,
-					const std::string& mrsBooleanQuery, const M6WSBlastNS::Parameters& params,
-					uint32 reportLimit, std::string& jobId);
+					boost::optional<M6WSBlastNS::Parameters> params,
+					boost::optional<uint32> reportLimit, std::string& jobId);
 		
 	void		BlastJobStatus(std::string jobId, M6WSBlastNS::JobStatus& status);
 	void		BlastJobResult(std::string jobId, M6WSBlastNS::BlastResult& result);
@@ -141,5 +141,4 @@ class M6WSBlast : public zeep::dispatcher
 	
   protected:
 	M6Server&	mServer;
-//	std::vector<std::string> mDbTable;
 };

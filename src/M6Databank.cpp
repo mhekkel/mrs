@@ -1726,6 +1726,9 @@ M6Iterator* M6DatabankImpl::Find(const vector<string>& inQueryTerms,
 	term_list terms;
 	bool foundAllTerms = true;
 	
+	if (inAllTermsRequired and inFilter)
+		inAllTermsRequired = false;
+
 	// collect search terms, their iterator, and sort them based on IDF
 	foreach (const string& term, inQueryTerms)
 	{

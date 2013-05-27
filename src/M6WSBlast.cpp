@@ -64,7 +64,7 @@ M6WSBlast::M6WSBlast(M6Server& inServer, const string& inNS, const string& inSer
 	SOAP_XML_ADD_ENUM(JobStatus, finished);
 	
 	const char* kBlastArgs[] = {
-		"query", "program", "db", "mrsBooleanQuery", "params", "reportLimit", "jobId"
+		"query", "program", "db", "params", "reportLimit", "jobId"
 	};
 	register_action("Blast", this, &M6WSBlast::Blast, kBlastArgs);
 		
@@ -89,8 +89,8 @@ M6WSBlast::~M6WSBlast()
 }
 
 void M6WSBlast::Blast(const string& query, const string& program, const string& db,
-	const string& mrsBooleanQuery, const M6WSBlastNS::Parameters& params,
-	uint32 reportLimit, string& response)
+	boost::optional<M6WSBlastNS::Parameters> params,
+	boost::optional<uint32> reportLimit, string& response)
 {
 	// check the program parameter
 	if (program != "blastp")
@@ -111,10 +111,19 @@ void M6WSBlast::Blast(const string& query, const string& program, const string& 
 //	// try to load the matrix, fails if the parameters are incorrect
 //	M6Matrix matrix(params.matrix, params.gapOpen, params.gapExtend);
 
+	if (not params.is_initialized())
+		params.reset(M6WSBlastNS::Parameters());
+
 	response = M6BlastCache::Instance().Submit(
-		ba::join(dbs, ";"), query, program, params.matrix, params.wordSize,
-		params.expect, params.lowComplexityFilter,
-		params.gapped, params.gapOpen, params.gapExtend, reportLimit);
+		ba::join(dbs, ";"), query, program,
+		params.get().matrix.get(),
+		params.get().wordSize.get(),
+		params.get().expect.get(),
+		params.get().lowComplexityFilter.get(),
+		params.get().gapped.get(),
+		params.get().gapOpen.get(),
+		params.get().gapExtend.get(),
+		reportLimit.is_initialized() ? reportLimit.get() : 100);
 }
 
 void M6WSBlast::BlastJobStatus(string job_id, M6WSBlastNS::JobStatus& response)

@@ -121,13 +121,6 @@ struct Hit
 	}
 };
 
-enum Algorithm
-{
-	Vector,
-	Dice,
-	Jaccard
-};
-
 struct FindResult
 {
 	std::string					db;
@@ -173,7 +166,7 @@ class M6WSSearch : public zeep::dispatcher
 	void			Count(const std::string& db, const std::string& booleanquery, uint32& response);
 
 	void			GetEntry(const std::string& db, const std::string& id,
-						WSSearchNS::Format format, std::string& entry);
+						boost::optional<WSSearchNS::Format> format, std::string& entry);
 
 	void			GetEntryLinesMatchingRegularExpression(const std::string& db,
 						const std::string& id, const std::string& regularExpression,
@@ -185,16 +178,18 @@ class M6WSSearch : public zeep::dispatcher
 	void			GetIndices(const std::string& db, std::vector<WSSearchNS::Index>& indices);
 
 	void			Find(const std::string& db, const std::vector<std::string>& queryterms,
-						WSSearchNS::Algorithm algorithm, bool alltermsrequired,
-						const std::string& booleanfilter, int resultoffset,
-						int maxresultcount, std::vector<WSSearchNS::FindResult>& response);
+						boost::optional<bool> alltermsrequired,
+						boost::optional<std::string> booleanfilter,
+						boost::optional<int> resultoffset, boost::optional<int> maxresultcount,
+						std::vector<WSSearchNS::FindResult>& response);
 
 	void			FindBoolean(const std::string& db, const WSSearchNS::BooleanQuery& query,
-						int resultoffset, int maxresultcount,
+						boost::optional<int> resultoffset, boost::optional<int> maxresultcount,
 						std::vector<WSSearchNS::FindResult>& response);
 
 	void			GetLinked(const std::string& db, const std::string& id,
-						const std::string& linkedDb, int resultoffset, int maxresultcount,
+						const std::string& linkedDb,
+						boost::optional<int> resultoffset, boost::optional<int> maxresultcount,
 						std::vector<WSSearchNS::FindResult>& response);
 
 	void			GetLinkedEx(const std::string& db, const std::string& linkedDb,

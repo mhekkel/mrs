@@ -1903,12 +1903,17 @@ M6Iterator* M6DatabankImpl::FindPattern(const string& inIndex, const string& inP
 	vector<bool> hits(GetDocStore().NextDocumentNumber() + 1);
 	uint32 count = 0;
 	
-	foreach (const M6IndexDesc& desc, mIndices)
+	if (ba::iequals(inIndex, "full-text"))
+		mAllTextIndex->FindPattern(pattern, hits, count);
+	else
 	{
-		if (inIndex != "*" and not ba::iequals(inIndex, desc.mName))
-			continue;
+		foreach (const M6IndexDesc& desc, mIndices)
+		{
+			if (inIndex != "*" and not ba::iequals(inIndex, desc.mName))
+				continue;
 
-		desc.mIndex->FindPattern(pattern, hits, count);
+			desc.mIndex->FindPattern(pattern, hits, count);
+		}
 	}
 	
 	return new M6BitmapIterator(hits, count);

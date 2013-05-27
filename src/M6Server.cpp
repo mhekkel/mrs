@@ -635,14 +635,19 @@ uint32 M6Server::Count(const string& inDatabank, const string& inQuery)
 		if (db == nullptr)
 			THROW(("Databank %s not loaded", inDatabank.c_str()));
 		
-		ParseQuery(*db, inQuery, true, queryTerms, filter);
-		if (queryTerms.empty())
-			rset.reset(filter);
+		if (inQuery == "*")
+			result = db->size();
 		else
-			rset.reset(db->Find(queryTerms, filter, true, 1));
-		
-		if (rset)
-			result = rset->GetCount();
+		{
+			ParseQuery(*db, inQuery, true, queryTerms, filter);
+			if (queryTerms.empty())
+				rset.reset(filter);
+			else
+				rset.reset(db->Find(queryTerms, filter, true, 1));
+
+			if (rset)
+				result = rset->GetCount();
+		}
 	}
 	
 	return result;

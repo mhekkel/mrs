@@ -52,9 +52,7 @@ enum Format
 {
 	plain,
 	title,
-	html,
-	fasta,
-	sequence
+	fasta
 };
 
 enum IndexType

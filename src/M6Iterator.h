@@ -47,7 +47,10 @@ class M6Iterator
 class M6AllDocIterator : public M6Iterator
 {
   public:
-					M6AllDocIterator(uint32 inMax) : mCur(1), mMax(inMax) {}
+					M6AllDocIterator(uint32 inMax) : mCur(1), mMax(inMax)
+					{
+						mCount = mMax;
+					}
 
 	virtual bool	Next(uint32& outDoc, float& outRank)
 					{

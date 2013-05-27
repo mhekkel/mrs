@@ -62,9 +62,7 @@ M6WSSearch::M6WSSearch(M6Server& inServer, const M6DbList& inLoadedDatabanks,
 	
 	SOAP_XML_ADD_ENUM(Format, plain);
 	SOAP_XML_ADD_ENUM(Format, title);
-//	SOAP_XML_ADD_ENUM(Format, html);
 	SOAP_XML_ADD_ENUM(Format, fasta);
-	SOAP_XML_ADD_ENUM(Format, sequence);
 
 	SOAP_XML_ADD_ENUM(IndexType, Unique);
 	SOAP_XML_ADD_ENUM(IndexType, FullText);

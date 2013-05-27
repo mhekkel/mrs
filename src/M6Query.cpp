@@ -186,7 +186,12 @@ M6Iterator* M6QueryParser::ParseTest()
 				result.reset(ParseTest());
 			}
 			else if (mDatabank != nullptr)
-				result.reset(mDatabank->FindPattern("full-text", pat));
+			{
+				if (pat == "*")
+					result.reset(new M6AllDocIterator(mDatabank->size()));
+				else
+					result.reset(mDatabank->FindPattern("full-text", pat));
+			}
 			break;
 		}
 

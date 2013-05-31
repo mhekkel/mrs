@@ -1213,7 +1213,7 @@ void M6BatchIndexProcessor::Finish(uint32 inDocCount)
 
 	do
 	{
-		assert(ie.term > lastTerm or ie.term == lastTerm and ie.doc >= lastDoc);
+		assert(ie.term > lastTerm or (ie.term == lastTerm and ie.doc >= lastDoc));
 
 		++entriesRead;
 	

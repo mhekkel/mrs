@@ -499,7 +499,7 @@ M6DataSource::~M6DataSource()
  */
 
 compress_decompressor::compress_decompressor()
-	: end_of_stream(false), inited(false)
+	: inited(false), end_of_stream(false)
 {
 }
 

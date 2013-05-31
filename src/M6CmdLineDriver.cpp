@@ -682,6 +682,7 @@ int M6InfoDriver::Exec(const string& inCommand, po::variables_map& vm)
 			case eM6NumberMultiIndex:	desc = "number            "; break;
 			case eM6CharMultiIDLIndex:	desc = "word with position"; break;
 			case eM6CharWeightedIndex:	desc = "weighted word     "; break;
+			case eM6LinkIndex:			desc = "link              "; break;
 		}
 		return desc;
 	};

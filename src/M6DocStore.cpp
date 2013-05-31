@@ -422,7 +422,7 @@ uint32 M6DocStoreDataPage::Load(uint32 inDocNr, uint8* outData, uint32 inSize)
 {
 	// first search the document in mText
 	uint32 docNr = 0;
-	uint16 size;
+	uint16 size = 0;
 	uint8* src = mData->mText;
 
 	while (src < mData->mText + mData->mN)

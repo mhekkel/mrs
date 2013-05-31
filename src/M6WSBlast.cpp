@@ -47,8 +47,8 @@ Parameters::Parameters()
 // 
 
 M6WSBlast::M6WSBlast(M6Server& inServer, const string& inNS, const string& inService)
-	: mServer(inServer)
-	, zeep::dispatcher(inNS, inService)
+	: zeep::dispatcher(inNS, inService)
+	, mServer(inServer)
 {
 	using namespace M6WSBlastNS;
 	

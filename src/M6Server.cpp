@@ -1470,7 +1470,7 @@ void M6Server::handle_link(const zh::request& request, const el::scope& scope, z
 void M6Server::handle_linked(const zh::request& request, const el::scope& scope, zh::reply& reply)
 {
 	string sdb, ddb;
-	uint32 page, hitCount = 0, firstDocNr = 0, nr, hits_per_page = 15;
+	uint32 page, nr, hits_per_page = 15;
 
 	zeep::http::parameter_map params;
 	get_parameters(scope, params);
@@ -2051,7 +2051,7 @@ void M6Server::handle_admin(const zh::request& request,
 			
 			el::scope sub(scope);
 			zx::element* n;
-			if (n = mConfigCopy->GetServer()->find_first("base-url"))
+			if ((n = mConfigCopy->GetServer()->find_first("base-url")) != nullptr)
 				sub.put("baseurl", n->content());
 			
 			create_reply_from_template("restarting.html", sub, reply);
@@ -2096,7 +2096,7 @@ void M6Server::handle_admin(const zh::request& request,
 
 		zx::node* n;
 		
-		if (n = serverConfig->find_first("base-url"))
+		if ((n = serverConfig->find_first("base-url")) != nullptr)
 			server["baseurl"] = n->str();
 			
 		const char* wss[] = { "mrsws_search", "mrsws_blast", "mrsws_align" };
@@ -2104,7 +2104,7 @@ void M6Server::handle_admin(const zh::request& request,
 
 		foreach (const char* ws, wss)
 		{
-			if (n = serverConfig->find_first_node((boost::format("web-service[@service='%1%']/@location") % ws).str().c_str()))
+			if ((n = serverConfig->find_first_node((boost::format("web-service[@service='%1%']/@location") % ws).str().c_str())) != nullptr)
 				wsc[ws] = n->str();
 		}
 		server["ws"] = wsc;
@@ -2945,6 +2945,9 @@ void M6Server::handle_blast_status_ajax(const zeep::http::request& request, cons
 				case bj_Error:
 					jjob["error"] = error;
 					break;
+				
+				default:
+					break;
 			}
 			
 			jjobs.push_back(jjob);
@@ -3126,7 +3129,7 @@ void M6Server::handle_align_submit_ajax(const zh::request& request, const el::sc
 			double maxRunTime = 30;
 			stringstream in(fasta), out, err;
 			
-			int r = ForkExec(args, maxRunTime, in, out, err);
+			(void)ForkExec(args, maxRunTime, in, out, err);
 
 			result["alignment"] = out.str();
 			if (not err.str().empty())

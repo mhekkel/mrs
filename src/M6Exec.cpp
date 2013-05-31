@@ -531,9 +531,8 @@ int ForkExec(vector<const char*>& args, double maxRunTime, istream& stdin, ostre
 	while (not errDone and not outDone)
 	{
 		char buffer[1024];
-		int r, n;
+		int r;
 		
-		n = 0;
 		while (not outDone)
 		{
 			r = read(ofd[0], buffer, sizeof(buffer));
@@ -546,7 +545,6 @@ int ForkExec(vector<const char*>& args, double maxRunTime, istream& stdin, ostre
 				break;
 		}
 		
-		n = 0;
 		while (not errDone)
 		{
 			r = read(efd[0], buffer, sizeof(buffer));
@@ -671,8 +669,6 @@ streamsize M6ProcessImpl::read(char* s, streamsize n)
 					cerr << "Starting executable " << args.front() << endl;
 			
 				// ready to roll
-				double startTime = system_time();
-			
 				int ifd[2], ofd[2], err;
 				
 				err = pipe(ifd); if (err < 0) THROW(("Pipe error: %s", strerror(errno)));
@@ -742,9 +738,9 @@ streamsize M6ProcessImpl::read(char* s, streamsize n)
 					int status = 0;
 					waitpid(pid, &status, 0);
 					
-					int result = -1;
-					if (WIFEXITED(status))
-						result = WEXITSTATUS(status);
+//					int result = -1;
+//					if (WIFEXITED(status))
+//						result = WEXITSTATUS(status);
 				}
 			}
 			catch (exception& e)

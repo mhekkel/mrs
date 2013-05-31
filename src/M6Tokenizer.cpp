@@ -52,6 +52,8 @@ ostream& operator<<(ostream& os, M6Token inToken)
 		case eM6TokenLessEqual:			os << "'<='"; break;
 		case eM6TokenGreaterEqual:		os << "'>='"; break;
 		case eM6TokenGreaterThan:		os << "'>'"; break;
+		case eM6TokenDocNr:				os << "document number"; break;
+		case eM6TokenNOT:				os << "NOT"; break;
 	}
 	
 	return os;
@@ -560,7 +562,7 @@ inline void M6Tokenizer::Retract(uint32 inUnicode)
 inline void M6Tokenizer::WriteUTF8(uint32 inString[], size_t inLength)
 {
 	char* t = mTokenText;
-	for (int i = 0; i < inLength; ++i)
+	for (uint32 i = 0; i < inLength; ++i)
 	{
 		if (t + 6 > mTokenText + kTokenBufferLength)
 			THROW(("Token buffer overflow"));
@@ -684,7 +686,7 @@ M6Token M6Tokenizer::GetNextQueryToken()
 	uint32 token[kMaxTokenLength];
 	uint32* t = token;
 	bool hasCombiningMarks = false, isPattern = false;
-	uint32 quote;
+	uint32 quote = 0;	// keep compiler silent
 		
 	int state = 10;
 	while (result == eM6TokenNone)

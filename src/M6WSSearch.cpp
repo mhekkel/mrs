@@ -48,8 +48,8 @@ const string kSearchNS = "http://mrs.cmbi.ru.nl/mrsws/search";
 
 M6WSSearch::M6WSSearch(M6Server& inServer, const M6DbList& inLoadedDatabanks,
 		const string& inNS, const string& inService)
-	: mServer(inServer), mLoadedDatabanks(inLoadedDatabanks)
-	, zeep::dispatcher(inNS, inService)
+	: zeep::dispatcher(inNS, inService)
+	, mServer(inServer), mLoadedDatabanks(inLoadedDatabanks)
 {
 	using namespace WSSearchNS;
 

@@ -1037,8 +1037,8 @@ class M6IndexImplT : public M6IndexImpl
 // --------------------------------------------------------------------
 
 M6BasicPage::M6BasicPage(M6IndexPageData* inData, uint32 inPageNr)
-	: mPageNr(inPageNr)
-	, mData(&inData->branch)
+	: mData(&inData->branch)
+	, mPageNr(inPageNr)
 	, mDirty(false)
 {
 }
@@ -1959,15 +1959,17 @@ M6IndexImpl::M6IndexImpl(M6BasicIndex& inIndex, const fs::path& inPath, M6IndexT
 	, mFile(inPath, inMode)
 	, mIndexType(inType)
 	, mIndex(inIndex)
-	, mDirty(false)
 	, mAutoCommit(true)
 	, mBatchFile(nullptr)
 	, mLexicon(nullptr)
+	, mDirty(false)
 	, mCache(nullptr), mLRUHead(nullptr), mLRUTail(nullptr), mCacheCount(0)
 {
 	if (inMode == eReadWrite and mFile.Size() == 0)
 	{
-		M6IxFileHeaderPage page = { inType, sizeof(M6IxFileHeader) };
+		M6IxFileHeaderPage page;
+		page.mHeader.mSignature = inType;
+		page.mHeader.mHeaderSize = sizeof(M6IxFileHeader);
 		mFile.PWrite(&page, kM6IndexPageSize, 0);
 
 		mHeader = page.mHeader;
@@ -3861,24 +3863,24 @@ M6WeightedBasicIndex::M6WeightedIterator::M6WeightedIterator()
 M6WeightedBasicIndex::M6WeightedIterator::M6WeightedIterator(M6IndexImpl& inIndex,
 	const M6BitVector& inBitVector, uint32 inCount)
 	: mBits(new M6IBitVectorImpl(inIndex, inBitVector))
-	, mWeight(kM6MaxWeight + 1)
 	, mCount(inCount)
+	, mWeight(kM6MaxWeight + 1)
 {
 }
 
 M6WeightedBasicIndex::M6WeightedIterator::M6WeightedIterator(const M6WeightedIterator& inIter)
 	: mBits(inIter.mBits)
 	, mDocs(inIter.mDocs)
-	, mWeight(inIter.mWeight)
 	, mCount(inIter.mCount)
+	, mWeight(inIter.mWeight)
 {
 }
 
 M6WeightedBasicIndex::M6WeightedIterator::M6WeightedIterator(M6WeightedIterator&& inIter)
 	: mBits(move(inIter.mBits))
 	, mDocs(move(inIter.mDocs))
-	, mWeight(inIter.mWeight)
 	, mCount(inIter.mCount)
+	, mWeight(inIter.mWeight)
 {
 }
 

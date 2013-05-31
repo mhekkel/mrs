@@ -912,7 +912,7 @@ bool WordHitIterator<WORDSIZE>::Next(uint16& outQueryOffset, uint16& outTargetOf
 
 struct DiagonalStartTable
 {
-			DiagonalStartTable() : mTable(nullptr) {}
+			DiagonalStartTable() : mTable(nullptr), mTableLength(0) {}
 			~DiagonalStartTable() { delete[] mTable; }
 	
 	void	Reset(int32 inQueryLength, int32 inTargetLength)

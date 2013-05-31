@@ -31,6 +31,8 @@ sub parse
 	{
 		my $key = $1;
 		my $value = $&;
+
+		chomp($value);
 		
 		$value =~ s/^$key   //gm;
 		

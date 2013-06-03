@@ -27,6 +27,7 @@ class M6QueryParser
 						bool inAllTermsRequired);
 	
 	void			Parse(vector<string>& outTerms, M6Iterator*& outFilter);
+	bool			IsBooleanQuery() const	{ return mIsBooleanQuery; }
 
   private:
 	M6Iterator*		ParseQuery();
@@ -446,12 +447,14 @@ void AnalyseQuery(const string& inQuery, vector<string>& outTerms)
 }
 
 void ParseQuery(M6Databank& inDatabank, const string& inQuery,
-	bool inAllTermsRequired, vector<string>& outTerms, M6Iterator*& outFilter)
+	bool inAllTermsRequired, vector<string>& outTerms, M6Iterator*& outFilter,
+	bool& outIsBooleanQuery)
 {
 	M6QueryParser parser(&inDatabank, inQuery, inAllTermsRequired);
 	try
 	{
 		parser.Parse(outTerms, outFilter);
+		outIsBooleanQuery = parser.IsBooleanQuery();
 	}
 	catch (...)
 	{

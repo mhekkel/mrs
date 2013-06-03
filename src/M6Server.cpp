@@ -546,10 +546,11 @@ void M6Server::Find(const string& inDatabank, const string& inQuery, bool inAllT
 	unique_ptr<M6Iterator> rset;
 	M6Iterator* filter = nullptr;
 	vector<string> queryTerms;
+	bool isBooleanQuery = false;
 	
 	try
 	{
-		ParseQuery(*databank, inQuery, inAllTermsRequired, queryTerms, filter);
+		ParseQuery(*databank, inQuery, inAllTermsRequired, queryTerms, filter, isBooleanQuery);
 	}
 	catch (exception& e)
 	{
@@ -567,8 +568,11 @@ void M6Server::Find(const string& inDatabank, const string& inQuery, bool inAllT
 				q << tokenizer.GetTokenString() << ' ';
 		}
 
-		ParseQuery(*databank, q.str(), inAllTermsRequired, queryTerms, filter);
-	}	
+		ParseQuery(*databank, q.str(), inAllTermsRequired, queryTerms, filter, isBooleanQuery);
+	}
+	
+	if (isBooleanQuery)
+		inAllTermsRequired = false;
 		
 	if (queryTerms.empty())
 		rset.reset(filter);
@@ -630,6 +634,7 @@ uint32 M6Server::Count(const string& inDatabank, const string& inQuery)
 		unique_ptr<M6Iterator> rset;
 		M6Iterator* filter;
 		vector<string> queryTerms;
+		bool isBooleanQuery;
 		
 		M6Databank* db = Load(inDatabank);
 		if (db == nullptr)
@@ -639,11 +644,11 @@ uint32 M6Server::Count(const string& inDatabank, const string& inQuery)
 			result = db->size();
 		else
 		{
-			ParseQuery(*db, inQuery, true, queryTerms, filter);
+			ParseQuery(*db, inQuery, true, queryTerms, filter, isBooleanQuery);
 			if (queryTerms.empty())
 				rset.reset(filter);
 			else
-				rset.reset(db->Find(queryTerms, filter, true, 1));
+				rset.reset(db->Find(queryTerms, filter, not isBooleanQuery, 1));
 
 			if (rset)
 				result = rset->GetCount();

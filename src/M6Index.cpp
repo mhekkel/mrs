@@ -1967,7 +1967,7 @@ M6IndexImpl::M6IndexImpl(M6BasicIndex& inIndex, const fs::path& inPath, M6IndexT
 {
 	if (inMode == eReadWrite and mFile.Size() == 0)
 	{
-		M6IxFileHeaderPage page;
+		M6IxFileHeaderPage page = {};
 		page.mHeader.mSignature = inType;
 		page.mHeader.mHeaderSize = sizeof(M6IxFileHeader);
 		mFile.PWrite(&page, kM6IndexPageSize, 0);

@@ -1696,7 +1696,12 @@ M6Iterator* M6DatabankImpl::Find(const string& inQuery, bool inAllTermsRequired,
 	M6Iterator* filter = nullptr;
 	
 	vector<string> terms;
-	ParseQuery(mDatabank, inQuery, true, terms, filter);
+	bool isBooleanQuery;
+	
+	ParseQuery(mDatabank, inQuery, true, terms, filter, isBooleanQuery);
+
+	if (isBooleanQuery)
+		inAllTermsRequired = false;
 	
 	if (terms.empty())
 		result = filter;
@@ -1726,8 +1731,8 @@ M6Iterator* M6DatabankImpl::Find(const vector<string>& inQueryTerms,
 	term_list terms;
 	bool foundAllTerms = true;
 	
-	if (inAllTermsRequired and inFilter)
-		inAllTermsRequired = false;
+	//if (inAllTermsRequired and inFilter)
+	//	inAllTermsRequired = false;
 
 	// collect search terms, their iterator, and sort them based on IDF
 	foreach (const string& term, inQueryTerms)

@@ -16,4 +16,5 @@ void AnalyseQuery(const std::string& inQuery,
 
 void ParseQuery(M6Databank& inDatabank, const std::string& inQuery,
 	bool inAllTermsRequired,
-	std::vector<std::string>& outTerms, M6Iterator*& outFilter);
+	std::vector<std::string>& outTerms, M6Iterator*& outFilter,
+	bool& outIsBooleanQuery);

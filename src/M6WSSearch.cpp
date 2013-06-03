@@ -324,7 +324,10 @@ void M6WSSearch::Find(const string& db, const vector<string>& queryterms,
 		vector<string> terms;
 		
 		if (booleanfilter.is_initialized() and not booleanfilter.get().empty())
-			ParseQuery(*databank, booleanfilter.get(), all_terms_required, terms, filter);
+		{
+			bool isBooleanQuery;
+			ParseQuery(*databank, booleanfilter.get(), all_terms_required, terms, filter, isBooleanQuery);
+		}
 			
 		unique_ptr<M6Iterator> iter(
 			databank->Find(queryterms, filter, all_terms_required, result_offset + max_result_count));

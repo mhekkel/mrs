@@ -129,7 +129,7 @@
     <databank id="sprot" parser="uniprot" format="uniprot" update="daily" enabled="true" fasta="true">
       <aliases>
         <alias name="UniProt">uniprot</alias>
-        <alias>UniProtKB/TrEMBL</alias>
+        <alias>UniProtKB/SwissProt</alias>
       </aliases>
       <name>SwissProt</name>
       <info>http://www.uniprot.org/</info>

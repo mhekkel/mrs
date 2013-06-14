@@ -152,7 +152,7 @@ M6WSSearch::M6WSSearch(M6Server& inServer, const M6DbList& inLoadedDatabanks,
 void M6WSSearch::GetDatabankInfo(const string& databank,
 	vector<WSSearchNS::DatabankInfo>& info)
 {
-	vector<string> unaliased(UnAlias(databank));
+	vector<string> unaliased(mServer.UnAlias(databank));
 	
 	foreach (const M6LoadedDatabank& db, mLoadedDatabanks)
 	{
@@ -173,6 +173,7 @@ void M6WSSearch::GetDatabankInfo(const string& databank,
 			dbInfo.id = db.mID;
 			dbInfo.uuid = dbi.mUUID;
 			dbInfo.name = db.mName;
+			copy(db.mAliases.begin(), db.mAliases.end(), back_inserter(dbInfo.aliases));
 			dbInfo.version = dbi.mVersion;
 			
 			const zx::element* e;

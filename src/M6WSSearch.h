@@ -18,6 +18,7 @@ struct DatabankInfo
 	std::string					id;
 	std::string					uuid;
 	std::string					name;
+	std::vector<std::string>	aliases;
 	std::string					version;
 	std::string					url;
 	std::string					parser;
@@ -35,6 +36,7 @@ struct DatabankInfo
 		ar & BOOST_SERIALIZATION_NVP(id)
 		   & BOOST_SERIALIZATION_NVP(uuid)
 		   & BOOST_SERIALIZATION_NVP(name)
+		   & BOOST_SERIALIZATION_NVP(aliases)
 		   & BOOST_SERIALIZATION_NVP(version)
 		   & BOOST_SERIALIZATION_NVP(url)
 		   & BOOST_SERIALIZATION_NVP(parser)

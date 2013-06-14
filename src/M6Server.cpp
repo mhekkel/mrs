@@ -631,7 +631,7 @@ uint32 M6Server::Count(const string& inDatabank, const string& inQuery)
 	}
 	else
 	{
-		foreach (const string& databank, mServer.UnAlias(inDatabank))
+		foreach (const string& databank, UnAlias(inDatabank))
 		{
 			unique_ptr<M6Iterator> rset;
 			M6Iterator* filter;

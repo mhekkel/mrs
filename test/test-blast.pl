@@ -22,7 +22,7 @@ my $db = 'pdb';
 eval
 {	
 	# Retreiving and processing the WSDL
-	my $wsdl = get('http://localhost:18090/mrsws/blast/wsdl');
+	my $wsdl = get('http://mrs.cmbi.ru.nl/m6/mrsws/blast/wsdl');
 	$wsdl  = XML::LibXML->load_xml(string => $wsdl);
 	my $proxy = XML::Compile::WSDL11->new($wsdl);
 	
@@ -105,6 +105,8 @@ open(my $log, ">trace.log");
 $trace->printRequest($log);
 $trace->printResponse($log);
 close($log);
+
+print Dumper($answer->{parameters});
 
 		print "passed\n";
 		exit(0);

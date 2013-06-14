@@ -152,9 +152,11 @@ M6WSSearch::M6WSSearch(M6Server& inServer, const M6DbList& inLoadedDatabanks,
 void M6WSSearch::GetDatabankInfo(const string& databank,
 	vector<WSSearchNS::DatabankInfo>& info)
 {
+	vector<string> unaliased(UnAlias(databank));
+	
 	foreach (const M6LoadedDatabank& db, mLoadedDatabanks)
 	{
-		if (databank != "all" and db.mID != databank)
+		if (databank != "all" and db.mID != databank and find(unaliased.begin(), unaliased.end(), db.mID) == unaliased.end())
 			continue;
 		
 		try

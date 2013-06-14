@@ -631,27 +631,30 @@ uint32 M6Server::Count(const string& inDatabank, const string& inQuery)
 	}
 	else
 	{
-		unique_ptr<M6Iterator> rset;
-		M6Iterator* filter;
-		vector<string> queryTerms;
-		bool isBooleanQuery;
-		
-		M6Databank* db = Load(inDatabank);
-		if (db == nullptr)
-			THROW(("Databank %s not loaded", inDatabank.c_str()));
-		
-		if (inQuery == "*")
-			result = db->size();
-		else
+		foreach (const string& databank, mServer.UnAlias(inDatabank))
 		{
-			ParseQuery(*db, inQuery, true, queryTerms, filter, isBooleanQuery);
-			if (queryTerms.empty())
-				rset.reset(filter);
+			unique_ptr<M6Iterator> rset;
+			M6Iterator* filter;
+			vector<string> queryTerms;
+			bool isBooleanQuery;
+			
+			M6Databank* db = Load(databank);
+			if (db == nullptr)
+				THROW(("Databank %s not loaded", databank.c_str()));
+			
+			if (inQuery == "*")
+				result = db->size();
 			else
-				rset.reset(db->Find(queryTerms, filter, not isBooleanQuery, 1));
-
-			if (rset)
-				result = rset->GetCount();
+			{
+				ParseQuery(*db, inQuery, true, queryTerms, filter, isBooleanQuery);
+				if (queryTerms.empty())
+					rset.reset(filter);
+				else
+					rset.reset(db->Find(queryTerms, filter, not isBooleanQuery, 1));
+	
+				if (rset)
+					result += rset->GetCount();
+			}
 		}
 	}
 	

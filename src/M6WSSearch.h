@@ -13,50 +13,6 @@
 namespace WSSearchNS
 {
 
-struct DatabankInfo
-{
-	std::string					id;
-	std::string					uuid;
-	std::string					name;
-	std::vector<std::string>	aliases;
-	std::string					version;
-	std::string					url;
-	std::string					parser;
-	std::string					format;
-	bool						blastable;
-	std::string					path;
-	std::string					modificationDate;
-	uint32						entries;
-	uint64						fileSize;
-	uint64						rawDataSize;
-	
-	template<class Archive>
-	void serialize(Archive& ar, const unsigned int)
-	{
-		ar & BOOST_SERIALIZATION_NVP(id)
-		   & BOOST_SERIALIZATION_NVP(uuid)
-		   & BOOST_SERIALIZATION_NVP(name)
-		   & BOOST_SERIALIZATION_NVP(aliases)
-		   & BOOST_SERIALIZATION_NVP(version)
-		   & BOOST_SERIALIZATION_NVP(url)
-		   & BOOST_SERIALIZATION_NVP(parser)
-		   & BOOST_SERIALIZATION_NVP(format)
-		   & BOOST_SERIALIZATION_NVP(blastable)
-		   & BOOST_SERIALIZATION_NVP(path)
-		   & BOOST_SERIALIZATION_NVP(modificationDate)
-		   & BOOST_SERIALIZATION_NVP(entries)
-		   & BOOST_SERIALIZATION_NVP(fileSize)
-		   & BOOST_SERIALIZATION_NVP(rawDataSize);
-	}
-};
-
-enum Format
-{
-	plain,
-	title,
-	fasta
-};
-
 enum IndexType
 {
 	Unique,
@@ -80,6 +36,53 @@ struct Index
 		   & BOOST_SERIALIZATION_NVP(count)
 		   & BOOST_SERIALIZATION_NVP(type);
 	}
+};
+
+struct DatabankInfo
+{
+	std::string					id;
+	std::string					uuid;
+	std::string					name;
+	std::vector<std::string>	aliases;
+	std::string					version;
+	std::string					url;
+	std::string					parser;
+	std::string					format;
+	bool						blastable;
+	std::string					path;
+	std::string					modificationDate;
+	uint32						entries;
+	uint64						fileSize;
+	uint64						rawDataSize;
+	std::vector<WSSearchNS::Index>
+								indices;
+	
+	template<class Archive>
+	void serialize(Archive& ar, const unsigned int)
+	{
+		ar & BOOST_SERIALIZATION_NVP(id)
+		   & BOOST_SERIALIZATION_NVP(uuid)
+		   & BOOST_SERIALIZATION_NVP(name)
+		   & BOOST_SERIALIZATION_NVP(aliases)
+		   & BOOST_SERIALIZATION_NVP(version)
+		   & BOOST_SERIALIZATION_NVP(url)
+		   & BOOST_SERIALIZATION_NVP(parser)
+		   & BOOST_SERIALIZATION_NVP(format)
+		   & BOOST_SERIALIZATION_NVP(blastable)
+		   & BOOST_SERIALIZATION_NVP(path)
+		   & BOOST_SERIALIZATION_NVP(modificationDate)
+		   & BOOST_SERIALIZATION_NVP(entries)
+		   & BOOST_SERIALIZATION_NVP(fileSize)
+		   & BOOST_SERIALIZATION_NVP(rawDataSize)
+		   & BOOST_SERIALIZATION_NVP(indices);
+	}
+};
+
+enum Format
+{
+	plain,
+	title,
+	fasta
 };
 
 enum BooleanQueryOperation
@@ -177,7 +180,7 @@ class M6WSSearch : public zeep::dispatcher
 	void			GetMetaData(const std::string& db, const std::string& id,
 						const std::string& meta, std::string& data);
 
-	void			GetIndices(const std::string& db, std::vector<WSSearchNS::Index>& indices);
+//	void			GetIndices(const std::string& db, std::vector<WSSearchNS::Index>& indices);
 
 	void			Find(const std::string& db, const std::vector<std::string>& queryterms,
 						boost::optional<bool> alltermsrequired,

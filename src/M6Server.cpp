@@ -643,7 +643,7 @@ uint32 M6Server::Count(const string& inDatabank, const string& inQuery)
 				THROW(("Databank %s not loaded", databank.c_str()));
 			
 			if (inQuery == "*")
-				result = db->size();
+				result += db->size();
 			else
 			{
 				ParseQuery(*db, inQuery, true, queryTerms, filter, isBooleanQuery);

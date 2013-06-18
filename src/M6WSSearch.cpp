@@ -112,11 +112,11 @@ M6WSSearch::M6WSSearch(M6Server& inServer, const M6DbList& inLoadedDatabanks,
 	register_action(
 		"GetMetaData", this, &M6WSSearch::GetMetaData, kGetMetaDataArgs);
 	
-	const char* kGetIndicesArgs[] = {
-		"db", "indices"
-	};
-	register_action(
-		"GetIndices", this, &M6WSSearch::GetIndices, kGetIndicesArgs);
+//	const char* kGetIndicesArgs[] = {
+//		"db", "indices"
+//	};
+//	register_action(
+//		"GetIndices", this, &M6WSSearch::GetIndices, kGetIndicesArgs);
 
 	const char* kFindArgs[] = {
 		"db", "queryterms", "alltermsrequired",
@@ -219,48 +219,6 @@ void M6WSSearch::GetDatabankInfo(const string& databank,
 	if (databank != "all" and info.size() == 0)
 		THROW(("Unknown databank '%s'", databank.c_str()));
 }
-
-//void M6WSSearch::GetIndices(const string& inDatabank, vector<WSSearchNS::Index>& outIndices)
-//{
-//	map<string,WSSearchNS::Index> indices;
-//	
-//	foreach (const string& adb, mServer.UnAlias(inDatabank))
-//	{
-//		M6Databank* db = mServer.Load(inDatabank);
-//		
-//		if (db == nullptr)
-//			continue;
-//		
-//		M6DatabankInfo info;
-//		db->GetInfo(info);
-//
-//		foreach (M6IndexInfo& ii, info.mIndexInfo)
-//		{
-//			if (indices.find(ii.mName) == indices.end())
-//			{
-//				WSSearchNS::Index ix = { ii.mName, ii.mDesc, ii.mCount };
-//				indices[ii.mName] = ix;
-//
-//				switch (ii.mType)
-//				{
-//					case eM6CharIndex:			ix.type = WSSearchNS::Unique; break;
-//					case eM6NumberIndex:		ix.type = WSSearchNS::Number; break;
-//					//case eM6DateIndex:			ix.type = WSSearchNS::Date; break;
-//					case eM6CharMultiIndex:		ix.type = WSSearchNS::Unique; break;
-//					case eM6NumberMultiIndex:	ix.type = WSSearchNS::Number; break;
-//					//case eM6DateMultiIndex:		ix.type = WSSearchNS::Date; break;
-//					case eM6CharMultiIDLIndex:	ix.type = WSSearchNS::Unique; break;
-//					case eM6CharWeightedIndex:	ix.type = WSSearchNS::FullText; break;
-//				}
-//			}
-//			else
-//				indices[ii.mName].count += ii.mCount;
-//		}
-//	}		
-//
-//	if (indices.empty())
-//		THROW(("Databank %s not loaded?", inDatabank.c_str()));
-//}
 
 void M6WSSearch::Count(const std::string& db, const std::string& booleanquery, uint32& response)
 {

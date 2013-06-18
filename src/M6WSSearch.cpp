@@ -203,29 +203,44 @@ void M6WSSearch::GetDatabankInfo(const string& databank,
 
 void M6WSSearch::GetIndices(const string& inDatabank, vector<WSSearchNS::Index>& outIndices)
 {
-	M6Databank* db = mServer.Load(inDatabank);
-	if (db == nullptr)
-		THROW(("Databank %s not loaded", inDatabank.c_str()));
+	map<string,WSSearchNS::Index> indices;
 	
-	M6DatabankInfo info;
-	db->GetInfo(info);
-	foreach (M6IndexInfo& ii, info.mIndexInfo)
+	foreach (const string& adb, mServer.UnAlias(inDatabank))
 	{
-		WSSearchNS::Index ix = { ii.mName, ii.mDesc, ii.mCount };
-		switch (ii.mType)
-		{
-			case eM6CharIndex:			ix.type = WSSearchNS::Unique; break;
-			case eM6NumberIndex:		ix.type = WSSearchNS::Number; break;
-			//case eM6DateIndex:			ix.type = WSSearchNS::Date; break;
-			case eM6CharMultiIndex:		ix.type = WSSearchNS::Unique; break;
-			case eM6NumberMultiIndex:	ix.type = WSSearchNS::Number; break;
-			//case eM6DateMultiIndex:		ix.type = WSSearchNS::Date; break;
-			case eM6CharMultiIDLIndex:	ix.type = WSSearchNS::Unique; break;
-			case eM6CharWeightedIndex:	ix.type = WSSearchNS::FullText; break;
-		}
+		M6Databank* db = mServer.Load(inDatabank);
 		
-		outIndices.push_back(ix);
-	}
+		if (db == nullptr)
+			continue;
+		
+		M6DatabankInfo info;
+		db->GetInfo(info);
+
+		foreach (M6IndexInfo& ii, info.mIndexInfo)
+		{
+			if (indices.find(ii.mName) == indices.end())
+			{
+				WSSearchNS::Index ix = { ii.mName, ii.mDesc, ii.mCount };
+				indices[ii.mName] = ix;
+
+				switch (ii.mType)
+				{
+					case eM6CharIndex:			ix.type = WSSearchNS::Unique; break;
+					case eM6NumberIndex:		ix.type = WSSearchNS::Number; break;
+					//case eM6DateIndex:			ix.type = WSSearchNS::Date; break;
+					case eM6CharMultiIndex:		ix.type = WSSearchNS::Unique; break;
+					case eM6NumberMultiIndex:	ix.type = WSSearchNS::Number; break;
+					//case eM6DateMultiIndex:		ix.type = WSSearchNS::Date; break;
+					case eM6CharMultiIDLIndex:	ix.type = WSSearchNS::Unique; break;
+					case eM6CharWeightedIndex:	ix.type = WSSearchNS::FullText; break;
+				}
+			}
+			else
+				indices[ii.mName].count += ii.mCount;
+		}
+	}		
+
+	if (indices.empty())
+		THROW(("Databank %s not loaded?", inDatabank.c_str()));
 }
 
 void M6WSSearch::Count(const std::string& db, const std::string& booleanquery, uint32& response)
@@ -280,17 +295,11 @@ void M6WSSearch::GetEntryLinesMatchingRegularExpression(
 
 void M6WSSearch::GetMetaData(const string& inDatabank, const string& inID, const string& inMeta, string& outData)
 {
-	M6Databank* db = mServer.Load(inDatabank);
-	if (db == nullptr)
-		THROW(("Databank %s not loaded", inDatabank.c_str()));
-
-	unique_ptr<M6Iterator> iter(db->Find("id", inID));
+	M6Databank* db;
 	uint32 docNr;
-	float rank;
-
-	if (not (iter and iter->Next(docNr, rank)))
-		THROW(("Entry %s not found", inID.c_str()));
-
+	
+	tr1::tie(db, docNr) = mServer.GetEntryDatabankAndNr(inDatabank, inID);
+	
 	unique_ptr<M6Document> doc(db->Fetch(docNr));
 	if (not doc)
 		THROW(("Unable to fetch document %s", inID.c_str()));

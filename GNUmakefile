@@ -5,7 +5,7 @@
 #    (See accompanying file LICENSE_1_0.txt or copy at
 #          http://www.boost.org/LICENSE_1_0.txt)
 
-VERSION				= 6.0.1
+VERSION				= 6.0.2
 
 include make.config
 
@@ -24,28 +24,22 @@ MRS_USER			?= $(shell whoami)
 
 PERL				?= $(which perl)
 
-# in case you have boost >= 1.48 installed somewhere else on your disk
-#BOOST_LIB_SUFFIX	= # e.g. '-mt', not usually needed anymore
-BOOST				?= $(HOME)/projects/boost
-BOOST_LIB_DIR		= $(BOOST)/lib
-BOOST_INC_DIR		= $(BOOST)/include
-
 DEFINES				+= MRS_ETC_DIR='"$(MRS_ETC_DIR)"' \
 					   MRS_USER='"$(MRS_USER)"' 
 
 BOOST_LIBS			= system thread filesystem regex math_c99 math_c99f program_options date_time iostreams timer random chrono
 BOOST_LIBS			:= $(BOOST_LIBS:%=boost_%$(BOOST_LIB_SUFFIX))
-LIBS				= m pthread rt z bz2 sqlite3
+LIBS				= m pthread rt z bz2 zeep
 
 CXX					?= c++
 
 CXXFLAGS			?= -std=c++0x
-CFLAGS				+= $(BOOST_INC_DIR:%=-I%) -I. -pthread -I libzeep/
+CFLAGS				+= $(INCLUDE_DIR:%=-I%) -I. -pthread
 CFLAGS				+= -Wno-deprecated -Wno-multichar 
 CFLAGS				+= $(shell $(PERL) -MExtUtils::Embed -e perl_inc)
 CFLAGS				+= $(DEFINES:%=-D%)
 
-LDFLAGS				+= $(BOOST_LIB_DIR:%=-L %) $(BOOST_LIBS:%=-l%) -g -L libzeep/ $(LIBS:%=-l%) 
+LDFLAGS				+= $(LIBRARY_DIR:%=-L %) $(LIBS:%=-l%) $(BOOST_LIBS:%=-l%) -g 
 LDFLAGS				+= $(shell $(PERL) -MExtUtils::Embed -e ldopts)
 
 OBJDIR				= obj
@@ -97,17 +91,13 @@ OBJECTS = \
 
 all: m6 config/m6-config.xml m6.1 init.d/m6
 
-m6: $(OBJECTS) libzeep/libzeep.a
+m6: $(OBJECTS)
 	@ echo ">>" $@
 	@ $(CXX) -o $@ -I. $^ $(LDFLAGS)
 
 $(OBJDIR)/%.o: %.cpp | $(OBJDIR)
 	@ echo ">>" $<
 	@ $(CXX) -MD -c -o $@ $< $(CFLAGS) $(CXXFLAGS)
-
-$(OBJDIR)/sqlite.o: src/sqlite-amalgamation/sqlite3.c
-	@ echo ">>" $<
-	@ $(CXX) -x c -MD -c -o $@ $< $(CFLAGS)
 
 $(OBJDIR)/M6Config.o: make.config
 
@@ -118,12 +108,8 @@ $(OBJECTS:.o=.d):
 $(OBJDIR):
 	@ test -d $@ || mkdir -p $@
 
-libzeep/libzeep.a:
-	$(MAKE) -C libzeep BOOST=$(BOOST) CXX=$(CXX)
-
 clean:
 	rm -rf $(OBJDIR)/* m6 config/m6-config.xml
-	$(MAKE) -C libzeep clean
 	
 INSTALLDIRS = \
 	$(BIN_DIR) \
@@ -169,6 +155,7 @@ install: m6 config/m6-config.xml m6.1 init.d/m6 logrotate.d/m6
 	done
 	install -m755 m6 $(BIN_DIR)/m6
 	install m6.1 $(MAN_DIR)/man1/m6.1; gzip -f $(MAN_DIR)/man1/m6.1
+	ln -Tfs $(MAN_DIR)/man1/m6.1.gz $(MAN_DIR)/man1/mrs.1.gz
 	install $(MRS_USER:%=-o %) -m444 config/m6-config.dtd $(MRS_ETC_DIR)/m6-config.dtd
 	install $(MRS_USER:%=-o %) -m644 config/m6-config.xml $(MRS_ETC_DIR)/m6-config.xml.dist
 	@ if [ ! -f $(MRS_ETC_DIR)/m6-config.xml ]; then \
@@ -204,10 +191,9 @@ DIST = mrs-$(VERSION)
 dist:
 	rm -rf $(DIST)
 	svn export . $(DIST)
-	svn export ../libzeep $(DIST)/libzeep
-	rm -rf $(DIST)/test $(DIST)/libzeep/tests
 	tar cvjf $(DIST).tbz $(DIST)/
 	rm -rf $(DIST)
+	cp $(DIST).tbz ../ppa/mrs_$(VERSION).orig.tar.bz2
 	
 make.config:
 	@ echo "Please run configure before running make" && exit 1

@@ -140,26 +140,26 @@ install: m6 config/m6-config.xml m6.1 init.d/m6 logrotate.d/m6
 	@ echo "Creating directories"
 	@ for d in $(INSTALLDIRS); do \
 		if [ ! -d $$d ]; then \
-			install $(MRS_USER:%=-o %) -m755 -d $$d; \
+			install -m755 -d $$d; \
 		fi \
 	done
 	@ for d in `find docroot -type d | grep -v .svn`; do \
-		install $(MRS_USER:%=-o %) -m755 -d $(MRS_DATA_DIR)/$$d; \
+		install -m755 -d $(MRS_DATA_DIR)/$$d; \
 	done
 	@ echo "Copying files"
 	@ for f in `find docroot -type f | grep -v .svn`; do \
-		install $(MRS_USER:%=-o %) -m644 $$f $(MRS_DATA_DIR)/$$f; \
+		install -m644 $$f $(MRS_DATA_DIR)/$$f; \
 	done
 	@ for f in `find parsers -type f | grep -v .svn`; do \
-		install $(MRS_USER:%=-o %) -m644 $$f $(MRS_DATA_DIR)/$$f; \
+		install -m644 $$f $(MRS_DATA_DIR)/$$f; \
 	done
 	install -m755 m6 $(BIN_DIR)/m6
 	install m6.1 $(MAN_DIR)/man1/m6.1; gzip -f $(MAN_DIR)/man1/m6.1
 	ln -Tfs $(MAN_DIR)/man1/m6.1.gz $(MAN_DIR)/man1/mrs.1.gz
-	install $(MRS_USER:%=-o %) -m444 config/m6-config.dtd $(MRS_ETC_DIR)/m6-config.dtd
-	install $(MRS_USER:%=-o %) -m644 config/m6-config.xml $(MRS_ETC_DIR)/m6-config.xml.dist
+	install -m444 config/m6-config.dtd $(MRS_ETC_DIR)/m6-config.dtd
+	install -m644 config/m6-config.xml $(MRS_ETC_DIR)/m6-config.xml.dist
 	@ if [ ! -f $(MRS_ETC_DIR)/m6-config.xml ]; then \
-		install $(MRS_USER:%=-o %) -m644 config/m6-config.xml $(MRS_ETC_DIR)/m6-config.xml; \
+		install -m644 config/m6-config.xml $(MRS_ETC_DIR)/m6-config.xml; \
 		echo ""; \
 		echo ""; \
 		echo "     PLEASE NOTE"; \

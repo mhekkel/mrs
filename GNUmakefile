@@ -18,8 +18,8 @@ MRS_LOG_DIR			?= /var/log/m6/
 MRS_RUN_DIR			?= /var/run/
 MRS_ETC_DIR			?= /usr/local/etc/mrs/
 
-MRS_BASE_URL		?= http://$(shell hostname -f)/
 MRS_PORT			?= 18090
+MRS_BASE_URL		?= http://$(shell hostname -f):$(MRS_PORT)/
 MRS_USER			?= $(shell whoami)
 
 PERL				?= $(which perl)
@@ -33,7 +33,7 @@ LIBS				= m pthread rt z bz2 zeep
 
 CXX					?= c++
 
-CXXFLAGS			?= -std=c++0x
+CXXFLAGS			+= -std=c++0x
 CFLAGS				+= $(INCLUDE_DIR:%=-I%) -I. -pthread
 CFLAGS				+= -Wno-deprecated -Wno-multichar 
 CFLAGS				+= $(shell $(PERL) -MExtUtils::Embed -e perl_inc)
@@ -194,6 +194,8 @@ dist:
 	tar cvjf $(DIST).tbz $(DIST)/
 	rm -rf $(DIST)
 	cp $(DIST).tbz ../ppa/mrs_$(VERSION).orig.tar.bz2
+
+distclean:
 	
 make.config:
-	@ echo "Please run configure before running make" && exit 1
+	@ echo "Please run configure before running make"

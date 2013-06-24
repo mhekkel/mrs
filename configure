@@ -154,7 +154,8 @@ if (-f 'make.config')
 
 # That's it, now check the options
 my ($cmd_line_prefix, $cmd_line_configdir, $cmd_line_datadir, $cmd_line_logdir,
-	$cmd_line_rundir, $cmd_line_mrs_user, $cmd_line_base_url, $cmd_line_port);
+	$cmd_line_rundir, $cmd_line_mrs_user, $cmd_line_base_url, $cmd_line_port,
+	$cmd_line_mandir, $cmd_line_perl);
 
 &GetOptions(
 	"prefix=s"				=> \$cmd_line_prefix,
@@ -162,6 +163,8 @@ my ($cmd_line_prefix, $cmd_line_configdir, $cmd_line_datadir, $cmd_line_logdir,
 	"data-dir=s"			=> \$cmd_line_datadir,
 	"log-dir=s"				=> \$cmd_line_logdir,
 	"run-dir=s"				=> \$cmd_line_rundir,
+	"man-dir=s"				=> \$cmd_line_mandir,
+	"perl=s"				=> \$cmd_line_perl,
 	"cxx=s"					=> \$cxx,
 	"rsync=s"				=> \$rsync,
 	"boost=s"				=> \$boost,
@@ -187,6 +190,8 @@ Usage: perl configure [OPTIONS]
                         Default is [$data_dir]
     --log-dir           The directory where the MRS server will store its log files.
                         Default is [$log_dir]
+    --man-dir           The directory where the manual page will be installed.
+                        Default is [$man_dir]
     --run-dir           The directory where the MRS server will store its pid file.
                         Default is [$run_dir]
     --mrs-user          User that owns the mrs datafiles. Default is $mrs_user
@@ -194,6 +199,7 @@ Usage: perl configure [OPTIONS]
     					default is $base_url.
     --port              The network port for the server to listen to,
     					default is $port.
+    --perl              The Perl executable to use for MRS. Default is [$perlpath]
     --cxx               The compiler to use, must be a GCC >= 4.6 or equivalent.
                         Default is [$cxx]
     --boost=[path]      The path where the boost files are installed
@@ -219,9 +225,11 @@ $config_dir = $cmd_line_configdir		if (defined $cmd_line_configdir);
 $data_dir = $cmd_line_datadir			if (defined $cmd_line_datadir);
 $log_dir = $cmd_line_logdir				if (defined $cmd_line_logdir);
 $run_dir = $cmd_line_rundir				if (defined $cmd_line_rundir);
+$man_dir = $cmd_line_mandir				if (defined $cmd_line_mandir);
 $mrs_user = $cmd_line_mrs_user			if (defined $cmd_line_mrs_user);
 $base_url = $cmd_line_base_url			if (defined $cmd_line_base_url);
 $port = $cmd_line_port					if (defined $cmd_line_port);
+$perlpath = $cmd_line_perl				if (defined $cmd_line_perl);
 
 &ValidateOptions();
 &WriteMakefiles();

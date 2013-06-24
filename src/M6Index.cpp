@@ -1365,7 +1365,7 @@ bool M6LeafPage<M6DataType>::Underflow(LeafPage& inRight, uint32 inIndex, Branch
 	{
 		// join the pages
 		mAccess.MoveEntries(inRight.mAccess, mAccess, 0, mData->mN, inRight.mData->mN);
-		SetLink(inRight.GetLink());
+		this->SetLink(inRight.GetLink());
 	
 		inParent->EraseEntry(inIndex);
 		inRight.Deallocate();

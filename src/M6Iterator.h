@@ -198,9 +198,9 @@ class M6PhraseIterator : public M6Iterator
 		uint32				mDoc;
 		std::vector<uint32>	mIDL;
 		
-		M6PhraseIteratorPart&
-							operator=(const M6PhraseIteratorPart&);
-
+		M6PhraseIteratorPart(M6Iterator* inIter, M6IBitStream&& inIBitStream, uint32 inIndex);
+		M6PhraseIteratorPart(M6PhraseIteratorPart&& rhs);
+		
 		M6PhraseIteratorPart&
 							operator=(M6PhraseIteratorPart&&);
 	

@@ -289,19 +289,17 @@ M6Iterator* M6IntersectionIterator::Create(M6Iterator* inA, M6Iterator* inB)
 
 // --------------------------------------------------------------------
 
-M6PhraseIterator::M6PhraseIteratorPart&
-M6PhraseIterator::M6PhraseIteratorPart::operator=(const M6PhraseIteratorPart& rhs)
+M6PhraseIterator::M6PhraseIteratorPart::M6PhraseIteratorPart(
+	M6Iterator* inIter, M6IBitStream&& inIBitStream, uint32 inIndex)
+	: mIter(inIter), mBits(std::move(inIBitStream)), mIndex(inIndex), mDoc(0)
 {
-	if (this != &rhs)
-	{
-		mIter = rhs.mIter;
-		mBits = rhs.mBits;
-		mIndex = rhs.mIndex;
-		mDoc = rhs.mDoc;
-		mIDL = rhs.mIDL;
-	}
-	
-	return *this;
+}
+
+M6PhraseIterator::M6PhraseIteratorPart::M6PhraseIteratorPart(
+	M6PhraseIteratorPart&& rhs)
+	: mIter(rhs.mIter), mBits(std::move(rhs.mBits)), mIndex(rhs.mIndex)
+	, mDoc(rhs.mDoc), mIDL(std::move(rhs.mIDL))
+{
 }
 
 M6PhraseIterator::M6PhraseIteratorPart&
@@ -333,8 +331,7 @@ M6PhraseIterator::M6PhraseIterator(fs::path& inIDLFile,
 	
 	foreach (auto i, inIterators)
 	{
-		M6PhraseIteratorPart p = {
-			tr1::get<0>(i), M6IBitStream(mIDLFile, tr1::get<1>(i)), tr1::get<2>(i) };
+		M6PhraseIteratorPart p(tr1::get<0>(i), M6IBitStream(mIDLFile, tr1::get<1>(i)), tr1::get<2>(i));
 	
 		float r;
 		if (not p.mIter->Next(p.mDoc, r))
@@ -346,7 +343,7 @@ M6PhraseIterator::M6PhraseIterator(fs::path& inIDLFile,
 		if (mCount < p.mIter->GetCount())
 			mCount = p.mIter->GetCount();
 
-		mIterators.push_back(p);
+		mIterators.push_back(move(p));
 		mIterators.back().ReadArray();
 	}
 	

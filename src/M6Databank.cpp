@@ -217,6 +217,10 @@ class M6FullTextIx
 		uint8			weight;	// for weighted keys
 		uint32			term;
 		uint32			doc;
+
+		M6BufferEntry() : ix(0), weight(0), term(0), doc(0) {}
+		M6BufferEntry(const M6BufferEntry& rhs)
+			: idl(rhs.idl), ix(rhs.ix), weight(rhs.weight), term(rhs.term), doc(rhs.doc) {}
 		
 		M6BufferEntry&	operator=(M6BufferEntry&& rhs)
 						{

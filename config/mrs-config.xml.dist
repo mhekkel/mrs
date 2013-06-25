@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE m6-config SYSTEM "http://mrs.cmbi.ru.nl/dtd/m6-config.dtd">
-<m6-config>
+<!DOCTYPE mrs-config SYSTEM "http://mrs.cmbi.ru.nl/dtd/mrs-config.dtd">
+<mrs-config>
   <!-- Paths where all the data and files are stored -->
   <directories>
     <directory id="mrs">__MRS_DATA_DIR__/mrs</directory>
@@ -17,12 +17,12 @@
   </tools>
   <!-- Scheduler section -->
   <scheduler enabled="true" time="20:00" weekday="friday"/>
-  <!-- Users section, users can be added or modified using the command "m6 password" -->
+  <!-- Users section, users can be added or modified using the command "mrs password" -->
   <users>
 <!--    <user name="scott" realm="M6 Administrator" password="b92ff7d60b994c8a0d2941ad9349e841"/>-->
   </users>
   <!-- Server section -->
-  <server addr="0.0.0.0" port="__MRS_PORT__" user="__MRS_USER__" pidfile="__MRS_RUN_DIR__/m6.pid">
+  <server addr="0.0.0.0" port="__MRS_PORT__" user="__MRS_USER__" pidfile="__MRS_RUN_DIR__/mrs.pid">
     <admin realm="M6 Administrator"/>
     <base-url>__MRS_BASE_URL__</base-url>
     <web-service service="mrsws_search" ns="http://mrs.cmbi.ru.nl/mrsws/search" location="mrsws/search"/>
@@ -283,4 +283,4 @@
       <source fetch="ftp://ftp.ncbi.nih.gov/pub/pmc" delete="false">pmc/articles*.tar.gz</source>
     </databank>
   </databanks>
-</m6-config>
+</mrs-config>

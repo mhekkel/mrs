@@ -1,4 +1,4 @@
-<!ELEMENT m6-config (directories,tools,scheduler,users,server,formats,parsers,databanks)>
+<!ELEMENT mrs-config (directories,tools,scheduler,users,server,formats,parsers,databanks)>
 
 <!ELEMENT directories (directory+)>
 <!ELEMENT directory (#PCDATA)>

@@ -397,7 +397,7 @@ void M6FullTextIx::FlushDoc(uint32 inDoc)
 		if (w->freq == 0)
 			continue;
 		
-		M6BufferEntry e = {};
+		M6BufferEntry e;
 		
 		e.term = w->word;
 		e.doc = inDoc;
@@ -1202,7 +1202,7 @@ void M6BatchIndexProcessor::Finish(uint32 inDocCount)
 	
 	// the next loop is very *hot*, make sure it is optimized as much as possible.
 	// 
-	M6FullTextIx::M6BufferEntry ie = {};
+	M6FullTextIx::M6BufferEntry ie;
 	if (not mFullTextIndex.NextEntry(ie))
 		THROW(("Nothing was indexed..."));
 

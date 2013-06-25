@@ -27,7 +27,6 @@
 #pragma warning (disable : 4800)	// BOOL conversion
 
 #pragma comment ( lib, "libzeep" )
-#pragma comment ( lib, "libm6" )
 
 #if defined(_DEBUG)
 #	define DEBUG	1

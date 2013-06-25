@@ -914,9 +914,9 @@ void M6Scheduler::Run()
 				if (databank.empty())
 					break;
 				
-				fs::path m6(GetExecutablePath());
+				fs::path mrs(GetExecutablePath());
 				
-				string exe = m6.string();
+				string exe = mrs.string();
 				vector<const char*> args;
 				args.push_back(exe.c_str());
 				args.push_back(action.c_str());

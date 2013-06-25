@@ -3394,7 +3394,7 @@ void M6Server::ValidateAuthentication(const zh::request& request,
 
 	bool authorized = false, stale = false;
 
-	boost::format f("/m6-config/users/user[@name='%1%' and @realm='%2%']");
+	boost::format f("/mrs-config/users/user[@name='%1%' and @realm='%2%']");
 	if (zx::element* user = mConfig->find_first((f % info["username"] % info["realm"]).str()))
 	{
 		string ha1 = user->get_attribute("password");
@@ -3529,7 +3529,7 @@ int M6Server::Start(const string& inRunAs, const string& inPidFile, bool inForeg
 		}
 		catch (exception& e)
 		{
-			THROW(("Is m6 running already? %s", e.what()));
+			THROW(("Is mrs running already? %s", e.what()));
 		}
 
 		if (not inForeground)
@@ -3597,13 +3597,13 @@ int M6Server::Status(const string& inPidFile)
 	if (IsPIDFileForExecutable(pidfile))
 	{
 		if (VERBOSE)
-			cerr << "m6 server is running" << endl;
+			cerr << "mrs server is running" << endl;
 		result = 0;
 	}
 	else
 	{
 		if (VERBOSE)
-			cerr << "m6 server is not running" << endl;
+			cerr << "mrs server is not running" << endl;
 		result = 1;
 	}
 	
@@ -3634,7 +3634,7 @@ int M6Server::Reload(const string& inPidFile)
 	else
 	{
 		if (VERBOSE)
-			cerr << "m6 server is not running" << endl;
+			cerr << "mrs server is not running" << endl;
 		result = 1;
 	}
 	

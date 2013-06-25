@@ -236,7 +236,7 @@ int M6CmdLineDriver::Exec(int argc, char* const argv[])
 				 << endl;
 		}
 		
-		cout << "Usage: m6 command [options]" << endl
+		cout << "Usage: mrs command [options]" << endl
 			 << endl
 			 << "  Command can be one of:" << endl
 			 << endl;
@@ -245,13 +245,13 @@ int M6CmdLineDriver::Exec(int argc, char* const argv[])
 			cout << "    " << di.name << string(12 - di.name.length(), ' ') << di.description << endl;
 		
 		cout << endl
-			 << "  Use m6 command --help for more info on each command" << endl
+			 << "  Use mrs command --help for more info on each command" << endl
 			 << endl;
 		
 		exit(1);
 	}
 
-	po::options_description desc(string("m6 ") + argv[1]);
+	po::options_description desc(string("mrs ") + argv[1]);
 	po::variables_map vm;
 	unique_ptr<po::positional_options_description> p;
 
@@ -1001,14 +1001,14 @@ int main(int argc, char* argv[])
 	catch (exception& e)
 	{
 		cerr << endl
-			 << "m6 exited with an exception:" << endl
+			 << "mrs exited with an exception:" << endl
 			 << e.what() << endl;
 		result = 1;
 	}
 	catch (...)
 	{
 		cerr << endl
-			 << "m6 exited with an uncaught exception" << endl;
+			 << "mrs exited with an uncaught exception" << endl;
 		result = 1;
 	}
 	

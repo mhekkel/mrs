@@ -31,7 +31,7 @@ namespace fs = boost::filesystem;
 namespace M6Config
 {
 
-fs::path sConfigFile = MRS_ETC_DIR "/m6-config.xml";
+fs::path sConfigFile = MRS_ETC_DIR "/mrs-config.xml";
 unique_ptr<File> sInstance;
 
 File::File()
@@ -68,9 +68,9 @@ void SetConfigFilePath(const fs::path& inConfigFile)
 
 istream* File::LoadDTD(const string& inBase, const string& inPublicID, const string& inSystemID)
 {
-	if (inSystemID == "http://mrs.cmbi.ru.nl/dtd/m6-config.dtd")
+	if (inSystemID == "http://mrs.cmbi.ru.nl/dtd/mrs-config.dtd")
 	{
-		fs::path p(sConfigFile.parent_path() / "m6-config.dtd");
+		fs::path p(sConfigFile.parent_path() / "mrs-config.dtd");
 		return new fs::ifstream(p);
 	}
 	
@@ -90,7 +90,7 @@ void File::Validate()
 	
 	zx::writer w(xml, true);
 	w.xml_decl(false);
-	w.doctype("m6-config", "", "http://mrs.cmbi.ru.nl/dtd/m6-config.dtd");
+	w.doctype("mrs-config", "", "http://mrs.cmbi.ru.nl/dtd/mrs-config.dtd");
 	mConfig.write(w);
 	
 	zx::document doc;
@@ -121,7 +121,7 @@ void File::WriteOut()
 	
 	zx::writer w(configFileStream, true);
 	w.xml_decl(false);
-	w.doctype("m6-config", "", "http://mrs.cmbi.ru.nl/dtd/m6-config.dtd");
+	w.doctype("mrs-config", "", "http://mrs.cmbi.ru.nl/dtd/mrs-config.dtd");
 	mConfig.write(w);
 }	
 
@@ -137,13 +137,13 @@ zx::element* File::FindFirst(const boost::format& inFmt)
 
 zx::element* File::GetDirectory(const string& inID)
 {
-	zx::element* e = FindFirst(boost::format("/m6-config/directories/directory[@id='%1%']") % inID);
+	zx::element* e = FindFirst(boost::format("/mrs-config/directories/directory[@id='%1%']") % inID);
 	if (e == nullptr)
 	{
 		e = new zx::element("directory");
 		e->set_attribute("id", inID);
 		
-		zx::element* p = mConfig.find_first("/m6-config/directories");
+		zx::element* p = mConfig.find_first("/mrs-config/directories");
 		// p exists, otherwise the configfile would not validate
 		p->append(e);
 	}
@@ -153,13 +153,13 @@ zx::element* File::GetDirectory(const string& inID)
 
 zx::element* File::GetTool(const string& inID)
 {
-	zx::element* e = FindFirst(boost::format("/m6-config/tools/tool[@id='%1%']") % inID);
+	zx::element* e = FindFirst(boost::format("/mrs-config/tools/tool[@id='%1%']") % inID);
 	if (e == nullptr)
 	{
 		e = new zx::element("tool");
 		e->set_attribute("id", inID);
 		
-		zx::element* p = mConfig.find_first("/m6-config/tools");
+		zx::element* p = mConfig.find_first("/mrs-config/tools");
 		// p exists, otherwise the configfile would not validate
 		p->append(e);
 	}
@@ -169,20 +169,20 @@ zx::element* File::GetTool(const string& inID)
 
 zx::element* File::GetSchedule()
 {
-	return mConfig.find_first("/m6-config/scheduler");
+	return mConfig.find_first("/mrs-config/scheduler");
 }
 
 zx::element* File::GetUser(const string& inName, const string& inRealm)
 {
-	return FindFirst(boost::format("/m6-config/users/user[@name='%1%' and @realm='%2%']") % inName % inRealm);
+	return FindFirst(boost::format("/mrs-config/users/user[@name='%1%' and @realm='%2%']") % inName % inRealm);
 }
 
 zx::element* File::CreateUser(const string& inName, const string& inRealm)
 {
-	zx::element* user = FindFirst(boost::format("/m6-config/users/user[@name='%1%' and @realm='%2%']") % inName % inRealm);
+	zx::element* user = FindFirst(boost::format("/mrs-config/users/user[@name='%1%' and @realm='%2%']") % inName % inRealm);
 	if (user == nullptr)
 	{
-		zx::element* users = mConfig.find_first("/m6-config/users");
+		zx::element* users = mConfig.find_first("/mrs-config/users");
 		
 		user = new zx::element("user");
 		user->set_attribute("name", inName);
@@ -194,31 +194,31 @@ zx::element* File::CreateUser(const string& inName, const string& inRealm)
 
 zx::element* File::GetServer()
 {
-	return FindFirst(boost::format("/m6-config/server"));
+	return FindFirst(boost::format("/mrs-config/server"));
 }
 
 zx::element_set File::GetFormats()
 {
-	return Find(boost::format("/m6-config/formats/format"));
+	return Find(boost::format("/mrs-config/formats/format"));
 }
 
 zx::element* File::GetFormat(const string& inID)
 {
-	return FindFirst(boost::format("/m6-config/formats/format[@id='%1%']") % inID);
+	return FindFirst(boost::format("/mrs-config/formats/format[@id='%1%']") % inID);
 }
 
 zx::element* File::CreateFormat()
 {
 	zx::element* result = new zx::element("format");
 
-	boost::format testId("/m6-config/formats/format[id='format-%1%']");
+	boost::format testId("/mrs-config/formats/format[id='format-%1%']");
 	uint32 nr = 1;
 	while (FindFirst(testId % nr) != nullptr)
 		++nr;
 
 	result->set_attribute("id", (boost::format("format-%1%") % nr).str());
 
-	zx::element* formats = mConfig.find_first("/m6-config/formats");
+	zx::element* formats = mConfig.find_first("/mrs-config/formats");
 	formats->append(result);
 
 	return result;
@@ -226,24 +226,24 @@ zx::element* File::CreateFormat()
 
 zx::element_set File::GetParsers()
 {
-	return Find(boost::format("/m6-config/parsers/parser"));
+	return Find(boost::format("/mrs-config/parsers/parser"));
 }
 
 zx::element* File::GetParser(const string& inID)
 {
-	return FindFirst(boost::format("/m6-config/parsers/parser[@id='%1%']") % inID);
+	return FindFirst(boost::format("/mrs-config/parsers/parser[@id='%1%']") % inID);
 }
 
 zx::element_set File::GetDatabanks()
 {
-	return Find(boost::format("/m6-config/databanks/databank"));
+	return Find(boost::format("/mrs-config/databanks/databank"));
 }
 
 zx::element_set File::GetDatabanks(const string& inID)
 {
-	zx::element_set result = Find(boost::format("/m6-config/databanks/databank[@id='%1%' and @enabled='true']") % inID);
+	zx::element_set result = Find(boost::format("/mrs-config/databanks/databank[@id='%1%' and @enabled='true']") % inID);
 	if (result.empty())
-		result = Find(boost::format("/m6-config/databanks/databank[aliases/alias='%1%' and @enabled='true']") % inID);
+		result = Find(boost::format("/mrs-config/databanks/databank[aliases/alias='%1%' and @enabled='true']") % inID);
 	return result;
 }
 
@@ -261,14 +261,14 @@ zx::element* File::GetEnabledDatabank(const string& inID)
 
 zx::element* File::GetConfiguredDatabank(const string& inID)
 {
-	return FindFirst(boost::format("/m6-config/databanks/databank[@id='%1%']") % inID);
+	return FindFirst(boost::format("/mrs-config/databanks/databank[@id='%1%']") % inID);
 }
 
 zx::element* File::CreateDatabank()
 {
 	zx::element* result = new zx::element("databank");
 
-	boost::format testId("/m6-config/databanks/databank[id='databank-%1%']");
+	boost::format testId("/mrs-config/databanks/databank[id='databank-%1%']");
 	uint32 nr = 1;
 	while (FindFirst(testId % nr) != nullptr)
 		++nr;
@@ -276,7 +276,7 @@ zx::element* File::CreateDatabank()
 	result->set_attribute("id", (boost::format("databank-%1%") % nr).str());
 	result->set_attribute("parser", "generic");
 
-	zx::element* dbs = mConfig.find_first("/m6-config/databanks");
+	zx::element* dbs = mConfig.find_first("/mrs-config/databanks");
 	dbs->append(result);
 
 	return result;

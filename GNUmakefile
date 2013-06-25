@@ -1,4 +1,4 @@
-# Makefile for m6
+# Makefile for mrs-6
 #
 #  Copyright Maarten L. Hekkelman, Radboud University 2012.
 # Distributed under the Boost Software License, Version 1.0.
@@ -13,8 +13,8 @@ include make.config
 BIN_DIR				?= /usr/local/bin
 MAN_DIR				?= /usr/local/man
 
-MRS_DATA_DIR		?= /srv/m6-data/
-MRS_LOG_DIR			?= /var/log/m6/
+MRS_DATA_DIR		?= /srv/mrs-data/
+MRS_LOG_DIR			?= /var/log/mrs/
 MRS_RUN_DIR			?= /var/run/
 MRS_ETC_DIR			?= /usr/local/etc/mrs/
 
@@ -89,9 +89,9 @@ OBJECTS = \
 	$(OBJDIR)/M6WSBlast.o \
 	$(OBJDIR)/M6WSSearch.o \
 
-all: m6 config/m6-config.xml m6.1 init.d/m6
+all: mrs config/mrs-config.xml mrs.1 init.d/mrs
 
-m6: $(OBJECTS)
+mrs: $(OBJECTS)
 	@ echo ">>" $@
 	@ $(CXX) -o $@ -I. $^ $(LDFLAGS)
 
@@ -109,7 +109,7 @@ $(OBJDIR):
 	@ test -d $@ || mkdir -p $@
 
 clean:
-	rm -rf $(OBJDIR)/* m6 config/m6-config.xml
+	rm -rf $(OBJDIR)/* mrs config/mrs-config.xml
 	
 INSTALLDIRS = \
 	$(BIN_DIR) \
@@ -136,7 +136,7 @@ INSTALLDIRS = \
 		-e 's|__CLUSTALO__|$(CLUSTALO)|g' \
 		$< > $@
 
-install: m6 config/m6-config.xml m6.1 init.d/m6 logrotate.d/m6
+install: mrs config/mrs-config.xml mrs.1 init.d/mrs logrotate.d/mrs
 	@ echo "Creating directories"
 	@ for d in $(INSTALLDIRS); do \
 		if [ ! -d $$d ]; then \
@@ -153,37 +153,36 @@ install: m6 config/m6-config.xml m6.1 init.d/m6 logrotate.d/m6
 	@ for f in `find parsers -type f | grep -v .svn`; do \
 		install -m644 $$f $(MRS_DATA_DIR)/$$f; \
 	done
-	install -m755 m6 $(BIN_DIR)/m6
-	install m6.1 $(MAN_DIR)/man1/m6.1; gzip -f $(MAN_DIR)/man1/m6.1
-	ln -Tfs $(MAN_DIR)/man1/m6.1.gz $(MAN_DIR)/man1/mrs.1.gz
-	install -m444 config/m6-config.dtd $(MRS_ETC_DIR)/m6-config.dtd
-	install -m644 config/m6-config.xml $(MRS_ETC_DIR)/m6-config.xml.dist
-	@ if [ ! -f $(MRS_ETC_DIR)/m6-config.xml ]; then \
-		install -m644 config/m6-config.xml $(MRS_ETC_DIR)/m6-config.xml; \
+	install -m755 mrs $(BIN_DIR)/mrs
+	install mrs.1 $(MAN_DIR)/man1/mrs.1; gzip -f $(MAN_DIR)/man1/mrs.1
+	install -m444 config/mrs-config.dtd $(MRS_ETC_DIR)/mrs-config.dtd
+	install -m644 config/mrs-config.xml $(MRS_ETC_DIR)/mrs-config.xml.dist
+	@ if [ ! -f $(MRS_ETC_DIR)/mrs-config.xml ]; then \
+		install -m644 config/mrs-config.xml $(MRS_ETC_DIR)/mrs-config.xml; \
 		echo ""; \
 		echo ""; \
 		echo "     PLEASE NOTE"; \
 		echo ""; \
-		echo "Don't forget to create an admin user for the MRS server by running the command $(BIN_DIR)/m6 password"; \
+		echo "Don't forget to create an admin user for the MRS server by running the command $(BIN_DIR)/mrs password"; \
 		echo ""; \
 		echo ""; \
 	  else \
 	    echo ""; \
-	    echo "Not overwriting existing $(MRS_ETC_DIR)/m6-config.xml"; \
-	    echo "check the file $(MRS_ETC_DIR)/m6-config.xml.dist for changes"; \
+	    echo "Not overwriting existing $(MRS_ETC_DIR)/mrs-config.xml"; \
+	    echo "check the file $(MRS_ETC_DIR)/mrs-config.xml.dist for changes"; \
 	    echo ""; \
 	fi
-	@ if [ ! -f /etc/init.d/m6 ]; then \
-		install init.d/m6 /etc/init.d/m6 ; \
+	@ if [ ! -f /etc/init.d/mrs ]; then \
+		install init.d/mrs /etc/init.d/mrs ; \
 	  else \
 		echo ""; \
-		echo "Not overwriting /etc/init.d/m6 file" ; \
+		echo "Not overwriting /etc/init.d/mrs file" ; \
 	  fi
-	@ if [ ! -f /etc/logrotate.d/m6 ]; then \
-		install -m644 logrotate.d/m6 /etc/logrotate.d/m6 ; \
+	@ if [ ! -f /etc/logrotate.d/mrs ]; then \
+		install -m644 logrotate.d/mrs /etc/logrotate.d/mrs ; \
 	  else \
 		echo ""; \
-		echo "Not overwriting /etc/logrotate.d/m6 file" ; \
+		echo "Not overwriting /etc/logrotate.d/mrs file" ; \
 	  fi
 
 DIST = mrs-$(VERSION)

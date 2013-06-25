@@ -1,17 +1,28 @@
-.TH m6 1 "03-jan-2013" "version 6.0" "USER COMMANDS"
+.TH mrs 1 "03-jan-2013" "version 6.0" "USER COMMANDS"
 .SH NAME
-m6 \- A tool to build and manipulate a MRS 6 server and its data files
+mrs \- A tool to build and manipulate a MRS 6 server and its data files
 .SH SYNOPSIS
 .TP
-\fBm6\fP \fIcommand\fP [\fIoptions\fP] [\fIargs\fP]
+\fBmrs\fP \fIcommand\fP [\fIoptions\fP] [\fIargs\fP]
 .SH OVERVIEW
 MRS is a full text indexing toolkit. It is used to index large, text based
 databanks containing biological or medical information.
 
-Run `m6 help` to access the built-in tool documentation.
+Run `mrs help` to access the built-in tool documentation.
+
+.SH INSTALLATION
+Before using MRS the first time, you should set the administrator password
+for the web application. You can do so by typing e.g.:
+
+.B mrs password mrs-dba
+
+This will prompt you for a password and store it in the \fBmrs-config.xml\fP
+file. You can use then use this username/password combination to log in to
+the admin pages.
+
 .SH FILES
 .TP
-.B __MRS_ETC_DIR__/m6-config.xml
+.B __MRS_ETC_DIR__/mrs-config.xml
 file containing all the configuration details.
 .TP
 .B __MRS_DATA_DIR__/mrs

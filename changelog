@@ -1,3 +1,12 @@
+Changes in MRS version 6.0.2
+
+- Several web service changes to make implementation of MRS::Client easier:
+	- removed GetIndices, data is now in GetDatankInfo
+	- aliases are now accepted in all calls
+- Renamed m6 to mrs. Which is a bit more consistent name.
+- Various changes made to installation due to creating a debian package.
+- Changed some code to work around weird gcc 4.7 crashes.
+
 Changes in MRS version 6
 
 - Single file databanks have been replaced with one directory per databank.

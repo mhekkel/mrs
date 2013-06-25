@@ -88,10 +88,10 @@ my $srvdir			= "/srv";
 # derived installation directories
 my $bin_dir = "$prefix/bin";
 my $man_dir = "$prefix/man";
-my $data_dir = "$srvdir/m6-data";
-my $log_dir = "/var/log/m6";
+my $data_dir = "$srvdir/mrs-data";
+my $log_dir = "/var/log/mrs";
 my $run_dir = "/var/run";
-my $config_dir = "$sysconfdir/m6";
+my $config_dir = "$sysconfdir/mrs";
 
 # the compiler to use
 my $cxx = $ENV{CXX};

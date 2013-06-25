@@ -1,11 +1,11 @@
 #! /bin/sh
 ### BEGIN INIT INFO
-# Provides:          m6
+# Provides:          mrs
 # Default-Start:     2 3 4 5
 # Default-Stop:      0 1 6
 # Required-Start:	 $remote_fs
 # Required-Stop:	 $remote_fs
-# Short-Description: Start or stop the M6 server
+# Short-Description: Start or stop the MRS server
 # Description:       This is the startup script for the MRS 6 server
 ### END INIT INFO
 
@@ -15,11 +15,11 @@
 
 # PATH should only include /usr/* if it runs after the mountnfs.sh script
 PATH=/bin:/usr/bin:__BIN_DIR__
-DESC="M6 server"
-NAME=m6
+DESC="MRS server"
+NAME=mrs
 PIDFILE=__MRS_RUN_DIR__/$NAME.pid
 DAEMON=__BIN_DIR__/$NAME
-#DAEMON_ARGS="--config=/etc/mrs/m6-config.xml --pid=$PIDFILE"
+#DAEMON_ARGS="--config=/etc/mrs/mrs-config.xml --pid=$PIDFILE"
 SCRIPTNAME=/etc/init.d/$NAME
 
 # Exit if the package is not installed
@@ -77,10 +77,10 @@ case "$1" in
   status)
   	$DAEMON server status --pidfile=$PIDFILE
   	case "$?" in
-  		0)	log_success_msg "M6 Server is running"
+  		0)	log_success_msg "MRS Server is running"
 			exit 0
 			;;
-		*)	log_failure_msg "M6Server is NOT running"
+		*)	log_failure_msg "MRS Server is NOT running"
 			exit 1
 			;;
 	esac

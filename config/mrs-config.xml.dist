@@ -10,7 +10,7 @@
     <directory id="parser">__MRS_DATA_DIR__/parsers</directory>
     <directory id="docroot">__MRS_DATA_DIR__/docroot</directory>
   </directories>
-  <!-- Tools section, specify external executables used by M6 -->
+  <!-- Tools section, specify external executables used by MRS -->
   <tools>
     <tool id="clustalo">__CLUSTALO__</tool>
     <tool id="rsync">__RSYNC__</tool>
@@ -19,11 +19,11 @@
   <scheduler enabled="true" time="20:00" weekday="friday"/>
   <!-- Users section, users can be added or modified using the command "mrs password" -->
   <users>
-<!--    <user name="scott" realm="M6 Administrator" password="b92ff7d60b994c8a0d2941ad9349e841"/>-->
+<!--    <user name="scott" realm="MRS Administrator" password="b92ff7d60b994c8a0d2941ad9349e841"/>-->
   </users>
   <!-- Server section -->
   <server addr="0.0.0.0" port="__MRS_PORT__" user="__MRS_USER__" pidfile="__MRS_RUN_DIR__/mrs.pid">
-    <admin realm="M6 Administrator"/>
+    <admin realm="MRS Administrator"/>
     <base-url>__MRS_BASE_URL__</base-url>
     <web-service service="mrsws_search" ns="http://mrs.cmbi.ru.nl/mrsws/search" location="mrsws/search"/>
     <web-service service="mrsws_blast" ns="http://mrs.cmbi.ru.nl/mrsws/blast" location="mrsws/blast"/>

@@ -32,11 +32,11 @@ relative path, MRS will prepend it with the 'raw files' directory specified
 in the Main tab. If the path is absolute however, it will take this path
 directly. So we enter for Source files:
 
-/home/me/m6-6.0.0/*.{cpp,h,inl,c}
+/home/me/mrs-6.0.0/*.{cpp,h,inl,c}
 
 Now if you tick the Recursive checkbox, MRS will include all files that have
 a name that ends with either .cpp, .h, .inl or .c found in any directory
-under /home/me/m6-6.0.0/.
+under /home/me/mrs-6.0.0/.
 
 As parser use the generic parser. This parser simply indexes all text and
 assigns an incrementing number as ID to each document. It assumes each file
@@ -45,7 +45,7 @@ is a document.
 Now go the Main tab and click the Restart button (to save the configuration
 file) and in a terminal type
 
-m6 build m6src
+mrs build m6src
 
 Restart the server again to load the newly created databank and you'll see
 the m6src is now searchable.
@@ -73,7 +73,7 @@ make install
 You can set several options using the configure script, see ./configure --help
 to see which options are available.
 
-After installing you have a single executable called 'm6'. This program works
+After installing you have a single executable called 'mrs'. This program works
 with command as the first parameter followed by options depending on the
 command.
 
@@ -97,7 +97,7 @@ command and add a new user/password for the admin account. The password is
 stored encrypted in the configuration file. You then start a server using
 the command:
 
-	m6 server start
+	mrs server start
 
 If this was successful you can now access the MRS website at the address of
 the local machine and the port specified (default: 18090). Use your web
@@ -105,7 +105,7 @@ browser to go to this address and click the Admin link on the right top of
 the page. Then follow the instructions there.
 
 The default setup will automatically update the enabled databanks. You can
-update databanks manually as well of course using the 'm6 update db' command.
+update databanks manually as well of course using the 'mrs update db' command.
 
 For Windows:
 
@@ -114,7 +114,7 @@ experience building Windows software using Visual Studio.
 
 First of all, you need to have MSVC set up correctly to build 64 bit
 executables. You then need to build the Boost libraries with static
-runtime libraries. The m6 project file assumes you've installed Boost in
+runtime libraries. The mrs project file assumes you've installed Boost in
 C:\Boost and you're using version 1.48. Also, make sure you build Boost
 with zlib and bz2 support. The way I did it is, download boost, extract it,
 run boostrap and then:

@@ -86,7 +86,7 @@
   <targets>
     <target kind="Executable">
       <name>mrs-ws Debug</name>
-      <linkTarget>m6</linkTarget>
+      <linkTarget>mrs</linkTarget>
       <compiler>/usr/bin/c++</compiler>
       <defines>
         <define>DEBUG</define>

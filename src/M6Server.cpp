@@ -909,7 +909,7 @@ void M6Server::handle_download(const zh::request& request, const el::scope& scop
 		id = "mrs-data";
 
 	reply.set_header("Content-disposition",
-		(boost::format("attachement; filename=%1%.txt") % id).str());
+		(boost::format("attachment; filename=%1%.txt") % id).str());
 }
 
 void M6Server::handle_entry(const zh::request& request, const el::scope& scope, zh::reply& reply)

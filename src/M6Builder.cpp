@@ -396,7 +396,7 @@ void M6Processor::ProcessFile(M6Progress& inProgress)
 			catch (exception& e)
 			{
 				cerr << endl
-					 << "Error processsing " << path << endl
+					 << "Error processing " << path << endl
 					 << e.what() << endl;
 			}
 		}

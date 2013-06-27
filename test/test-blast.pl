@@ -21,7 +21,7 @@ my $db = 'pdb';
 
 eval
 {	
-	# Retreiving and processing the WSDL
+	# Retrieving and processing the WSDL
 	my $wsdl = get('http://mrs.cmbi.ru.nl/m6/mrsws/blast/wsdl');
 	$wsdl  = XML::LibXML->load_xml(string => $wsdl);
 	my $proxy = XML::Compile::WSDL11->new($wsdl);

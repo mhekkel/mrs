@@ -1,3 +1,8 @@
+Changes in MRS version 6.0.3
+
+- Bug fix in Blast web service, incorrect handling of optional Parameters
+  block resulted in crashes.
+
 Changes in MRS version 6.0.2
 
 - Several web service changes to make implementation of MRS::Client easier:

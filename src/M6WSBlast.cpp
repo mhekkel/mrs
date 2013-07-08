@@ -38,6 +38,27 @@ Parameters::Parameters()
 	, gapExtend(1)
 {
 }
+
+Parameters::Parameters(boost::optional<Parameters>& rhs)
+	: matrix("BLOSUM62")
+	, wordSize(3)
+	, expect(10)
+	, lowComplexityFilter(true)
+	, gapped(true)
+	, gapOpen(11)
+	, gapExtend(1)
+{
+	if (rhs)
+	{
+		matrix =				boost::get_optional_value_or(rhs.get().matrix, "BLOSUM62");
+		wordSize =				boost::get_optional_value_or(rhs.get().wordSize, 3);
+		expect =				boost::get_optional_value_or(rhs.get().expect, 10);
+		lowComplexityFilter =	boost::get_optional_value_or(rhs.get().lowComplexityFilter, true);
+		gapped =				boost::get_optional_value_or(rhs.get().gapped, true);
+		gapOpen =				boost::get_optional_value_or(rhs.get().gapOpen, 11);
+		gapExtend =				boost::get_optional_value_or(rhs.get().gapExtend, 1);
+	}
+}
 	
 }
 
@@ -104,6 +125,8 @@ void M6WSBlast::Blast(const string& query, const string& program, const string& 
 	foreach (string adb, dbs)
 	{
 		M6Databank* mdb = mServer.Load(adb);
+		if (mdb == nullptr)
+			THROW(("Databank '%s' not configured", adb.c_str()));
 		if (not fs::exists(mdb->GetDbDirectory() / "fasta"))
 			THROW(("Databank does not have blastable sequences (%s/%s)", db.c_str(), adb.c_str()));
 	}
@@ -111,19 +134,18 @@ void M6WSBlast::Blast(const string& query, const string& program, const string& 
 //	// try to load the matrix, fails if the parameters are incorrect
 //	M6Matrix matrix(params.matrix, params.gapOpen, params.gapExtend);
 
-	if (not params.is_initialized())
-		params.reset(M6WSBlastNS::Parameters());
-
+	M6WSBlastNS::Parameters p(params);
+	
 	response = M6BlastCache::Instance().Submit(
 		ba::join(dbs, ";"), query, program,
-		params.get().matrix.get(),
-		params.get().wordSize.get(),
-		params.get().expect.get(),
-		params.get().lowComplexityFilter.get(),
-		params.get().gapped.get(),
-		params.get().gapOpen.get(),
-		params.get().gapExtend.get(),
-		reportLimit.is_initialized() ? reportLimit.get() : 100);
+		p.matrix.get(),
+		p.wordSize.get(),
+		p.expect.get(),
+		p.lowComplexityFilter.get(),
+		p.gapped.get(),
+		p.gapOpen.get(),
+		p.gapExtend.get(),
+		reportLimit ? reportLimit.get() : 100);
 }
 
 void M6WSBlast::BlastJobStatus(string job_id, M6WSBlastNS::JobStatus& response)

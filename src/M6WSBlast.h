@@ -27,6 +27,7 @@ struct Parameters
 	boost::optional<uint32>			gapExtend;
 	
 									Parameters();
+									Parameters(boost::optional<Parameters>& rhs);
 	
 	template<class Archive>
 	void serialize(Archive& ar, const unsigned int version)

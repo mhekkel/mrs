@@ -312,7 +312,7 @@ void M6WSSearch::Find(const string& db, const vector<string>& queryterms,
 		M6Iterator* filter = nullptr;
 		vector<string> terms;
 		
-		if (booleanfilter.is_initialized() and not booleanfilter.get().empty())
+		if (booleanfilter and not booleanfilter.get().empty())
 		{
 			bool isBooleanQuery;
 			ParseQuery(*databank, booleanfilter.get(), all_terms_required, terms, filter, isBooleanQuery);
@@ -351,8 +351,8 @@ void M6WSSearch::Find(const string& db, const vector<string>& queryterms,
 	}
 	else
 	{
-		if (not maxresultcount.is_initialized())
-			maxresultcount.reset(5);
+		if (not maxresultcount)
+			maxresultcount = 5;
 
 		foreach (const string& adb, mServer.UnAlias(db))
 		{
@@ -462,8 +462,8 @@ void M6WSSearch::FindBoolean(const string& inDatabank, const WSSearchNS::Boolean
 {
 	if (inDatabank == "*" or inDatabank == "all" or inDatabank == "")
 	{
-		if (not maxresultcount.is_initialized() or (maxresultcount.get() > 5 or maxresultcount.get() <= 0))
-			maxresultcount.reset(3);
+		if (not maxresultcount or (maxresultcount.get() > 5 or maxresultcount.get() <= 0))
+			maxresultcount = 3;
 
 		foreach (const M6LoadedDatabank& ldb, mLoadedDatabanks)
 			FindBoolean(ldb.mID, inQuery, resultoffset, maxresultcount, response);
@@ -506,8 +506,8 @@ void M6WSSearch::FindBoolean(const string& inDatabank, const WSSearchNS::Boolean
 	}
 	else
 	{
-		if (not maxresultcount.is_initialized())
-			maxresultcount.reset(5);
+		if (not maxresultcount)
+			maxresultcount = 5;
 
 		foreach (const string& db, mServer.UnAlias(inDatabank))
 			FindBoolean(db, inQuery, resultoffset, maxresultcount, response);

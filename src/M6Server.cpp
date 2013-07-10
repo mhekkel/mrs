@@ -24,6 +24,7 @@
 #include <boost/program_options.hpp>
 #include <boost/uuid/uuid_io.hpp>
 #include <boost/random/random_device.hpp>
+#include <boost/chrono.hpp>
 
 #include <zeep/envelope.hpp>
 
@@ -3134,14 +3135,24 @@ void M6Server::handle_align_submit_ajax(const zh::request& request, const el::sc
 			args.push_back("-");
 			args.push_back(nullptr);
 
-			double maxRunTime = 30;
+			double maxRunTime = M6Config::GetMaxRunTime("clustalo");
+			if (maxRunTime == 0)
+				maxRunTime = 30;
 			stringstream in(fasta), out, err;
 			
-			(void)ForkExec(args, maxRunTime, in, out, err);
+			if (ForkExec(args, maxRunTime, in, out, err) == 0)
+			{
+				result["alignment"] = out.str();
+				if (not err.str().empty())
+					result["error"] = err.str();
+			}
+			else
+			{
+				string error_message = "Error running clustalo";
+				error_message += err.str();
 
-			result["alignment"] = out.str();
-			if (not err.str().empty())
-				result["error"] = err.str();
+				result["error"] = error_message;
+			}
 		}
 		catch (exception& e)
 		{
@@ -3468,7 +3479,15 @@ void RunMainLoop(uint32 inNrOfThreads, bool inUseLogFiles)
 		int sig = catcher.WaitForSignal();
 		
 		server.stop();
-		thread.join();
+#ifdef BOOST_CHRONO_EXTENSIONS
+		if (not thread.try_join_for(boost::chrono::seconds(5)))
+#else
+		if (not thread.timed_join(boost::posix_time::seconds(5)))
+#endif
+		{
+			thread.interrupt();
+			thread.detach();
+		}
 	
 		if (sig == SIGHUP)
 			continue;

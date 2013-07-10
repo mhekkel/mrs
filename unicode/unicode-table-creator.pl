@@ -11,6 +11,24 @@ use Data::Dumper;
 
 $| = 1;
 
+unless ( -f 'UnicodeData.txt' and -f 'CaseFolding.txt')
+{
+	use Net::FTP;
+
+	print STDERR "Fetching Unicode data...";
+
+	my $ftp = Net::FTP->new("ftp.unicode.org", Debug => 0)
+		or die "Cannot connect to ftp.unicode.org: $@";
+	$ftp->login("anonymous", '-anonymous@')
+		or die "Cannot login ", $ftp->message;
+	$ftp->cwd("/Public/UNIDATA")
+		or die "Cannot change working directory ", $ftp->message;
+	$ftp->get("UnicodeData.txt")
+		or die "get UnicodeData.txt failed ", $ftp->message;
+	$ftp->get("CaseFolding.txt")
+		or die "get CaseFolding.txt failed ", $ftp->message;
+}
+
 my $kUC_COUNT = 1114112;
 my $kUC_PAGE_COUNT = 4352;
 

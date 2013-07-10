@@ -60,6 +60,7 @@ void SetConfigFilePath(const boost::filesystem::path& inConfigFile);
 void							Reload();
 std::string						GetDirectory(const std::string& inID);
 std::string						GetTool(const std::string& inID);
+uint32							GetMaxRunTime(const std::string& inID);
 const zeep::xml::element*		GetUser(const std::string& inName, const std::string& inRealm);
 const zeep::xml::element*		GetServer();
 const zeep::xml::element_set	GetFormats();
@@ -91,6 +92,15 @@ inline std::string GetTool(const std::string& inID)
 	zeep::xml::element* e = File::Instance().GetTool(inID);
 	if (e != nullptr)
 		result = e->content();
+	return result;
+}
+
+inline uint32 GetMaxRunTime(const std::string& inID)
+{
+	uint32 result = 0;
+	zeep::xml::element* e = File::Instance().GetTool(inID);
+	if (e != nullptr and not e->get_attribute("max-run-time").empty())
+		result = atoi(e->get_attribute("max-run-time").c_str());
 	return result;
 }
 

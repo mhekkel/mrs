@@ -347,7 +347,8 @@ void M6CmdLineDriver::SigHandler(int inSignal)
 		 << msg << endl;
 
 	M6Status::Instance().SetError(sDatabank, msg);
-	exit(1);
+//	exit(1);
+	abort();
 }
 
 #if defined _MSC_VER
@@ -833,7 +834,7 @@ void M6PasswordDriver::AddOptions(po::options_description& desc,
 	desc.add_options()
 		("config,c",	po::value<string>(),	"Configuration file")
 		("user,u", po::value<string>(),			"User to modify")
-		("realm,r", po::value<string>(),		"Realm to modify (default is 'M6 Administrator'")
+		("realm,r", po::value<string>(),		"Realm to modify")
 		("help,h",								"Display help message")
 		;
 
@@ -850,7 +851,13 @@ bool M6PasswordDriver::Validate(po::variables_map& vm)
 
 int M6PasswordDriver::Exec(const string& inCommand, po::variables_map& vm)
 {
-	string username, realm = "M6 Administrator", password, pwcheck;
+	string username, realm, password, pwcheck;
+
+	if (const zx::element* e = M6Config::GetServer())
+	{
+		if (const zx::node* r = e->find_first_node("admin/@realm"))
+			realm = r->str();
+	}
 
 	if (vm.count("user"))
 		username = vm["user"].as<string>();

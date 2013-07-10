@@ -101,6 +101,9 @@ $(OBJDIR)/%.o: %.cpp | $(OBJDIR)
 
 $(OBJDIR)/M6Config.o: make.config
 
+unicode/M6UnicodeTables.h src/../unicode/M6UnicodeTables.h:
+	cd unicode; $(PERL) unicode-table-creator.pl > $(@F)
+
 include $(OBJECTS:%.o=%.d)
 
 $(OBJECTS:.o=.d):
@@ -190,9 +193,9 @@ DIST = mrs-$(VERSION)
 dist:
 	rm -rf $(DIST)
 	svn export . $(DIST)
+	rm -rf $(DIST)/unicode/CaseFolding.txt $(DIST)/unicode/UnicodeData.txt
 	tar cvjf $(DIST).tbz $(DIST)/
 	rm -rf $(DIST)
-	cp $(DIST).tbz ../ppa/mrs_$(VERSION).orig.tar.bz2
 
 distclean:
 	

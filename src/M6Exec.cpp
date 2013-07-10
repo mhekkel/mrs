@@ -528,7 +528,7 @@ int ForkExec(vector<const char*>& args, double maxRunTime, istream& stdin, ostre
 	
 	bool errDone = false, outDone = false, killed = false;
 	
-	while (not errDone and not outDone)
+	while (not errDone and not outDone and not killed)
 	{
 		char buffer[1024];
 		int r;
@@ -561,13 +561,12 @@ int ForkExec(vector<const char*>& args, double maxRunTime, istream& stdin, ostre
 		{
 			if (not killed and maxRunTime > 0 and startTime + maxRunTime < system_time())
 			{
-				kill(pid, SIGINT);
+				kill(pid, SIGKILL);
 				killed = true;
-	
-				int status = 0;
-				waitpid(pid, &status, 0);
-	
-				THROW(("%s was killed since its runtime exceeded the limit of %d seconds", args.front(), maxRunTime));
+
+				stderr << endl
+					   << "maximum run time exceeded"
+					   << endl;
 			}
 			else
 				sleep(1);
@@ -578,7 +577,7 @@ int ForkExec(vector<const char*>& args, double maxRunTime, istream& stdin, ostre
 	
 	close(ofd[0]);
 	close(efd[0]);
-	
+
 	// no zombies please, removed the WNOHANG. the forked application should really stop here.
 	int status = 0;
 	waitpid(pid, &status, 0);

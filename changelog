@@ -2,6 +2,10 @@ Changes in MRS version 6.0.3
 
 - Bug fix in Blast web service, incorrect handling of optional Parameters
   block resulted in crashes.
+- Restart of server should now be more robust using timed_join for server
+  thread.
+- Max run time for external tools (clustalo e.g.) can be set in config file.
+- Better handling of time out for clustalo.
 
 Changes in MRS version 6.0.2
 

@@ -5,10 +5,6 @@ our @ISA = "M6::Script";
 use strict;
 use warnings;
 
-our $commentLine1 = "-----------------------------------------------------------------------";
-our $commentLine2 = "Copyrighted by the UniProt Consortium, see http://www.uniprot.org/terms";
-our $commentLine3 = "Distributed under the Creative Commons Attribution-NoDerivs License";
-
 sub new
 {
 	my $invocant = shift;
@@ -111,7 +107,9 @@ sub parse
 			while ($value =~ m/.+/gm)
 			{
 				$self->index_text('cc', $&)
-					unless ($& eq $commentLine1 or $& eq $commentLine2 or $& eq $commentLine3);
+					unless ($& eq "-----------------------------------------------------------------------" or
+							$& eq "Copyrighted by the UniProt Consortium, see http://www.uniprot.org/terms" or
+							$& eq "Distributed under the Creative Commons Attribution-NoDerivs License");
 			}
 		}
 		elsif ($key eq 'RX')

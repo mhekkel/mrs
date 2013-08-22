@@ -59,7 +59,7 @@ struct M6DataSource
 		M6DataFile*		mDataFile;
 	};
 	
-	iterator			begin()										{ return iterator(mImpl); }
+	iterator			begin()										{ return mImpl ? iterator(mImpl): iterator(); }
 	iterator			end()										{ return iterator(); }
 
   private:

@@ -319,6 +319,7 @@ END
 	push @libs, "boost_thread";
 	push @libs, "boost_filesystem";
 	push @libs, "boost_math_c99";
+	push @libs, "rt";
 
 	if (not CheckLib("zeep", $header_check, $lib_check))
 	{

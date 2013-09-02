@@ -1,3 +1,8 @@
+Changes in MRS version 6.0.4
+
+- Fixes for building on CentOS
+- Fixed some license issues
+
 Changes in MRS version 6.0.3
 
 - Bug fix in Blast web service, incorrect handling of optional Parameters

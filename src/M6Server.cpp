@@ -236,12 +236,12 @@ M6Server::M6Server(const zx::element* inConfig)
 				}
 				else
 				{
-					el::scope scope(req);
+					el::scope scope(request);
 					init_scope(scope);
 					
 					scope.put("errormsg", "This is a SOAP server, please POST a valid SOAP request.");
 			
-					create_reply_from_template("error.html", scope, rep);
+					create_reply_from_template("error.html", scope, reply);
 				}
 			}
 		});

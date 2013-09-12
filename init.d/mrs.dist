@@ -9,7 +9,7 @@
 # Description:       This is the startup script for the MRS 6 server
 ### END INIT INFO
 
-# Author: Maarten L. Hekkelman <m.hekkelman@cmbi.ru.nl>
+# Author: Maarten L. Hekkelman <maarten@hekkelman.com>
 
 # Do NOT "set -e"
 

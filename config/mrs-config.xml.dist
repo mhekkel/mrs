@@ -165,7 +165,7 @@
     <databank id="pdb" parser="pdb" enabled="true" update="daily" fasta="true">
       <name>PDB</name>
       <info>http://www.rcsb.org/pdb/</info>
-      <source delete="true" fetch="ftp://ftp.wwpdb.org/pub/pdb/data/structures/divided/pdb/">pdb/??/pdb????.ent.gz</source>
+      <source delete="true" fetch="rsync://ftp.wwpdb.org/ftp/data/structures/divided/pdb/" recursive="true">pdb/??/pdb????.ent.gz</source>
     </databank>
     <databank id="dssp" parser="dssp" enabled="true" update="daily" fasta="false">
       <name>DSSP</name>

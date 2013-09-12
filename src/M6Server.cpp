@@ -217,20 +217,32 @@ M6Server::M6Server(const zx::element* inConfig)
 		
 		mount(location, [this, d] (const zh::request& request, const el::scope& scope, zh::reply& reply)
 		{
-			zx::document doc;
-			doc.read(request.payload);
-			zeep::envelope env(doc);
-		
 			try
 			{
+				zx::document doc;
+				doc.read(request.payload);
+				zeep::envelope env(doc);
+			
 				zx::element* request = env.request();
 				reply.set_content(zeep::make_envelope(d->dispatch(request)));
 				log() << request->name();
 			}
 			catch (exception& e)
 			{
-				reply.set_content(zeep::make_fault(e));
-				log() << "SOAP Fault";
+				if (request.method == "POST")
+				{
+					reply.set_content(zeep::make_fault(e));
+					log() << "SOAP Fault";
+				}
+				else
+				{
+					el::scope scope(req);
+					init_scope(scope);
+					
+					scope.put("errormsg", "This is a SOAP server, please POST a valid SOAP request.");
+			
+					create_reply_from_template("error.html", scope, rep);
+				}
 			}
 		});
 		

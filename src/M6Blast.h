@@ -75,6 +75,7 @@ struct Hit
 						   //& boost::serialization::make_nvp("acc", mAccession)
 						   & boost::serialization::make_nvp("chain", mChain)
 						   & boost::serialization::make_nvp("def", mDefLine)
+						   & boost::serialization::make_nvp("title", mTitle)
 						   & boost::serialization::make_nvp("seq", mSequence)
 						   & boost::serialization::make_nvp("hsp", mHsps)
 						   ;

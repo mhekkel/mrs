@@ -39,7 +39,7 @@ namespace fs = boost::filesystem;
 namespace io = boost::iostreams;
 namespace ba = boost::algorithm;
 
-const uint32 kMaxCachedEntryResults = 100;
+const uint32 kMaxCachedEntryResults = 1000;
 const char* kBlastFileExtensions[] = { ".xml.bz2", ".job", ".err" };
 
 // --------------------------------------------------------------------

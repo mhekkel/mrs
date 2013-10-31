@@ -162,6 +162,15 @@
       <info>http://www.ncbi.nlm.nih.gov/entrez/query.fcgi?db=Taxonomy</info>
       <source fetch="ftp://ftp.ebi.ac.uk/pub/databases/taxonomy/" delete="false">taxonomy/taxonomy.dat</source>
     </databank>
+    <databank enabled="false" fasta="false" id="nlwiki" parser="dbest" update="never">
+      <name>Wikipedia - Nederlandstalig</name>
+      <source delete="false" recursive="false">nlwiki/nlwiki-latest-pages-articles.xml.bz2</source>
+    </databank>
+    <databank enabled="true" fasta="true" id="pdb_redo" parser="pdb" update="weekly">
+      <name>PDB Redo</name>
+      <info>http://www.cmbi.ru.nl/pdb_redo</info>
+      <source delete="true" fetch="ftp://ftp.cmbi.ru.nl/pub/molbio/data/pdb_redo" recursive="true">pdb_redo/??/????/????_final.pdb</source>
+    </databank>
     <databank id="pdb" parser="pdb" enabled="true" update="daily" fasta="true">
       <name>PDB</name>
       <info>http://www.rcsb.org/pdb/</info>
@@ -281,6 +290,25 @@
       <name>PubMed Central</name>
       <info>http://www.pubmedcentral.nih.gov/</info>
       <source fetch="ftp://ftp.ncbi.nih.gov/pub/pmc" delete="false">pmc/articles*.tar.gz</source>
+    </databank>
+    <databank enabled="false" fasta="false" id="hssp3" parser="hssp3" update="daily">
+      <name>HSSP3, the original</name>
+      <info>http://www.cmbi.ru.nl/hssp</info>
+      <source delete="true" fetch="rsync://rsync.cmbi.ru.nl/hssp3/" recursive="false">hssp3/????.hssp.bz2</source>
+    </databank>
+    <databank enabled="true" fasta="false" id="ptt" parser="ptt" update="weekly">
+      <name>PTT</name>
+      <source fetch="ftp://ftp.ncbi.nih.gov/genomes/">ptt/Bacteria/*/*.ptt</source>
+    </databank>
+    <databank enabled="true" fasta="false" id="pdbreport" parser="pdbreport" update="weekly">
+      <name>PDB Reports</name>
+      <info>http://swift.cmbi.ru.nl/gv/pdbreport/index.html</info>
+      <source delete="true" fetch="rsync://cmbi4/data/pdbreport/" recursive="true">pdbreport/??/????/pdbout.txt</source>
+    </databank>
+    <databank enabled="true" fasta="true" id="mmcif" parser="mmcif" update="daily">
+      <name>mmCIF - macromolecular Crystallographic Information File</name>
+      <info>http://mmcif.rcsb.org/</info>
+      <source delete="false" fetch="ftp://ftp.wwpdb.org/pub/pdb/data/structures/divided/mmCIF" recursive="false">mmCIF/??/????.cif.gz</source>
     </databank>
   </databanks>
 </mrs-config>

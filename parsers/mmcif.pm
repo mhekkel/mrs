@@ -1,4 +1,4 @@
-package M6::Script::mmCIF;
+package M6::Script::mmcif;
 
 use strict;
 use warnings;
@@ -34,7 +34,7 @@ sub new
 {
 	my $invocant = shift;
 	my $self = new M6::Script(@_);
-	return bless $self, "M6::Script::mmCIF";
+	return bless $self, "M6::Script::mmcif";
 }
 
 sub parse
@@ -190,6 +190,19 @@ sub parse
 	}
 }
 
+sub unquote
+{
+	my $str = $_[0];
+
+	if ($str =~ m/^\"(.*)\"$/ ) {
+	    $str =~ s/^\"(.*)\"$/$1/;
+	} elsif ($str =~ m/^\'(.*)\'$/ ) {
+		$str =~ s/^\'(.*)\'$/$1/;
+	}
+
+    return $str;
+}
+
 sub parse_values_line
 {
 	my $line = $_[0];
@@ -214,11 +227,11 @@ sub parse_values_line
 				$i++;
 			}
 
-			push @values, $value;
+			push @values, &unquote($value);
 		}
 		else
 		{
-			push @values, $words[$i];
+			push @values, &unquote($words[$i]) if (length $words[$i])>0;
 			$i++;
 		}
 	}
@@ -262,9 +275,10 @@ sub parse_mmcif
 			my ($varid,$value);
 
 			die "Syntax error for variable ID on line \"$line\"\n"
-				unless ($line =~ m/([^\s]+)\.([^\s]+)\s+([^\'\"\s]+|\".+\"|\'.+\'|)/ );
+				unless ($line =~ m/([^\s]+)\.([^\s]+)(\s+[^\'\"\s]+|\s+\".+\"|\s+\'.+\'|)/ );
 
 			($catid,$varid,$value) = ( $1, $2, $3 );
+			$value =~ s/^\s+//;
 
 			$categories->{$catid}=[] if not defined $categories->{$catid};
 			
@@ -279,9 +293,10 @@ sub parse_mmcif
 					$categories->{$catid} = [ {} ];
 				}
 
-				if( not $value ) # expect the value to be on the next line:
+				if( (length $value)==0 ) # expect the value to be on the next line:
 				{
 					$line = <$h>;
+					chomp $line;
 					if ( $line =~ m/^;/ )
 					{
 						$value = substr($line,1);
@@ -300,9 +315,7 @@ sub parse_mmcif
 					}
 				}
 
-				$value =~ s/^\"(.*)\"$/$1/;
-
-				$categories->{$catid}->[0]->{$varid}=$value;
+				$categories->{$catid}->[0]->{$varid}=&unquote($value);
 			}
 		}
 		elsif ($loop)
@@ -342,7 +355,7 @@ sub parse_mmcif
 			elsif ( $nval > $nvar )
 			{
 				my $val='[' . (join ' , ',@values) . ']';
-				die "Too many values (length of $val > $nvar)\n";
+				die "Too many values in $catid: (length of $val > $nvar)\n";
 			}
 		}
 	}
@@ -387,16 +400,16 @@ sub to_fasta
 	return $result;
 }
 
-if( (scalar @ARGV) eq 1)
-{
-	open FILE, $ARGV[0] or die "Couldn't open file: $ARGV[0]";
-	my $string='';
-	while (my $line=<FILE>)
-	{
-		$string .= $line;
-	}
-	close FILE;
-	my $data=&parse_mmcif( $string );
-}
+#if( (scalar @ARGV) eq 1)
+#{
+#	open FILE, $ARGV[0] or die "Couldn't open file: $ARGV[0]";
+#	my $string='';
+#	while (my $line=<FILE>)
+#	{
+#		$string .= $line;
+#	}
+#	close FILE;
+#	my $data=&parse_mmcif( $string );
+#}
 
 1;

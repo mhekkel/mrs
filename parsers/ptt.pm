@@ -13,6 +13,8 @@ sub parse
 {
 	my ($self, $text, $filename) = @_;
 
+	print "entry parse $filename\n";
+
 	die "invalid file: $filename\n" unless $filename =~ m|([^/]+).ptt$|;
 	my $id = $1;
 	$self->index_unique_string('id', $id);

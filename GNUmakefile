@@ -4,6 +4,9 @@
 # Distributed under the Boost Software License, Version 1.0.
 #    (See accompanying file LICENSE_1_0.txt or copy at
 #          http://www.boost.org/LICENSE_1_0.txt)
+#  Also distributed under the Lesser General Public License, Version 2.1.
+#     (See accompanying file lgpl-2.1.txt or copy at
+#           https://www.gnu.org/licenses/lgpl-2.1.txt)
 
 VERSION				= 6.0.5
 
@@ -29,7 +32,7 @@ DEFINES				+= MRS_ETC_DIR='"$(MRS_ETC_DIR)"' \
 
 BOOST_LIBS			= system thread filesystem regex math_c99 math_c99f program_options date_time iostreams timer random chrono
 BOOST_LIBS			:= $(BOOST_LIBS:%=boost_%$(BOOST_LIB_SUFFIX))
-LIBS				= m pthread rt z bz2 zeep
+LIBS				= m pthread rt z bz2 zeep log4cpp
 
 CXX					?= c++
 
@@ -66,6 +69,7 @@ OBJECTS = \
 	$(OBJDIR)/M6Builder.o \
 	$(OBJDIR)/M6CmdLineDriver.o \
 	$(OBJDIR)/M6Config.o \
+	$(OBJDIR)/M6Log.o \
 	$(OBJDIR)/M6Databank.o \
 	$(OBJDIR)/M6DataSource.o \
 	$(OBJDIR)/M6Dictionary.o \
@@ -92,7 +96,7 @@ OBJECTS = \
 all: mrs config/mrs-config.xml mrs.1 init.d/mrs
 
 mrs: $(OBJECTS)
-	@ echo ">>" $@
+	@ echo "$(CXX) -o $@ -I. $^ $(LDFLAGS)"
 	@ $(CXX) -o $@ -I. $^ $(LDFLAGS)
 
 $(OBJDIR)/%.o: %.cpp | $(OBJDIR)

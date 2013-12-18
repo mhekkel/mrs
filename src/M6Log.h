@@ -8,16 +8,9 @@
 
 #pragma once
 
-#include <string>
-#include <vector>
+#include <log4cpp/Category.hh>
 
-class M6Databank;
-class M6Iterator;
+void InitLogs();
 
-void AnalyseQuery(const std::string& inQuery,
-	std::vector<std::string>& outTerms);
-
-void ParseQuery(M6Databank& inDatabank, const std::string& inQuery,
-	bool inAllTermsRequired,
-	std::vector<std::string>& outTerms, M6Iterator*& outFilter,
-	bool& outIsBooleanQuery);
+// log4cpp instance names for logging gategories:
+#define LOG_DEBUG "debug"

@@ -2,6 +2,9 @@
 //  Distributed under the Boost Software License, Version 1.0.
 //     (See accompanying file LICENSE_1_0.txt or copy at
 //           http://www.boost.org/LICENSE_1_0.txt)
+//  Also distributed under the Lesser General Public License, Version 2.1.
+//     (See accompanying file lgpl-2.1.txt or copy at
+//           https://www.gnu.org/licenses/lgpl-2.1.txt)
 
 #include "M6Lib.h"
 
@@ -18,6 +21,7 @@
 #include <boost/thread.hpp>
 #include <boost/foreach.hpp>
 #define foreach BOOST_FOREACH
+#define reverse_foreach BOOST_REVERSE_FOREACH
 #include <boost/format.hpp>
 #include <boost/filesystem/fstream.hpp>
 #include <boost/iostreams/filtering_streambuf.hpp>
@@ -32,12 +36,15 @@
 #include "M6Config.h"
 #include "M6Error.h"
 #include "M6BlastCache.h"
+#include "M6Log.h"
 
 using namespace std;
 
 namespace fs = boost::filesystem;
 namespace io = boost::iostreams;
 namespace ba = boost::algorithm;
+
+log4cpp::Category& debugLogger = log4cpp::Category::getInstance(std::string(LOG_DEBUG));
 
 const uint32 kMaxCachedEntryResults = 1000;
 const char* kBlastFileExtensions[] = { ".xml.bz2", ".job", ".err" };
@@ -92,7 +99,7 @@ M6BlastCache::M6BlastCache()
 	if (not fs::exists(mCacheDir))
 		fs::create_directory(mCacheDir);
 
-	// read cached entries in result cache
+	// read cached entries in result cache (unspecified order)
 	fs::directory_iterator end;
 	for (fs::directory_iterator iter(mCacheDir); iter != end; ++iter)
 	{
@@ -149,7 +156,7 @@ tr1::tuple<M6BlastJobStatus,string,uint32,double> M6BlastCache::JobStatus(const 
 	auto i = find_if(mResultCache.begin(), mResultCache.end(), [&inJobID](CacheEntry& e) -> bool
 				{ return e.id == inJobID; });
 	
-	if (i != mResultCache.end())
+	if (i != mResultCache.end()) // is requested job id in list ?
 	{
 		get<0>(result) = i->status;
 		
@@ -190,6 +197,7 @@ tr1::tuple<M6BlastJobStatus,string,uint32,double> M6BlastCache::JobStatus(const 
 			get<1>(result) = ex.what();
 		}
 
+		// Place the job with requested id at the beginning of the list
 		auto j = i;
 		advance(j, 1);
 		if (i != mResultCache.begin())
@@ -219,12 +227,14 @@ M6BlastResultPtr M6BlastCache::JobResult(const string& inJobID)
 
 void M6BlastCache::CacheResult(const string& inJobID, M6BlastResultPtr inResult)
 {
+	// A job has just been completed and must be cached.
+
 	boost::mutex::scoped_lock lock(mCacheMutex);
 	
 	auto i = find_if(mResultCache.begin(), mResultCache.end(), [&inJobID](CacheEntry& e) -> bool
 				{ return e.id == inJobID; });
 	
-	if (i != mResultCache.end())
+	if (i != mResultCache.end()) // is requested job id in list ?
 	{
 		i->status = bj_Finished;
 
@@ -248,13 +258,14 @@ void M6BlastCache::CacheResult(const string& inJobID, M6BlastResultPtr inResult)
 
 		out << doc;
 		
+		// Place the job with requested id at the beginning of the list
 		auto j = i;
 		advance(j, 1);
 		if (i != mResultCache.begin())
 			mResultCache.splice(mResultCache.begin(), mResultCache, i, j);
 	}
 
-	// do some housekeeping
+	// do some housekeeping, jobs at the back are first to be removed.
 	while (mResultCache.size() > kMaxCachedEntryResults)
 	{
 		foreach (const char* ext, kBlastFileExtensions)
@@ -303,7 +314,7 @@ string M6BlastCache::Submit(const string& inDatabank, const string& inQuery,
 	string result;
 	boost::mutex::scoped_lock lock(mCacheMutex);
 	
-	// see if the job is already done before
+	// see if the job has already been submitted before
 	foreach (CacheEntry& e, mResultCache)
 	{
 		if (not e.job.IsJobFor(inDatabank, inQuery, inProgram, inMatrix, inWordSize, inExpect,
@@ -326,6 +337,8 @@ string M6BlastCache::Submit(const string& inDatabank, const string& inQuery,
 			if (fs::exists(mCacheDir / (e.id + ".err")))
 				fs::remove(mCacheDir / (e.id + ".err"));
 		}
+
+		debugLogger.debug("Returning existing job id: %s",result.c_str());
 
 		break;
 	}
@@ -359,10 +372,13 @@ string M6BlastCache::Submit(const string& inDatabank, const string& inQuery,
 	
 		StoreJob(e.id, e.job);
 		
-		mResultCache.push_back(e);
+		// New jobs are added to the front, because jobs at the back are first to be removed when the queue is full.
+		mResultCache.push_front(e);
 		mWorkCondition.notify_one();
 
 		result = e.id;
+
+		debugLogger.debug("Returning newly created job id: %s",result.c_str());
 	}
 
 	return result;
@@ -391,9 +407,10 @@ void M6BlastCache::Work()
 			string next;
 			
 			{
-				// fetch the first queued entry
+				// New submissions are pushed at the front of the list,
+				// so fetch the backmost queued entry first.
 				boost::mutex::scoped_lock lock2(mCacheMutex);
-				foreach (CacheEntry& e, mResultCache)
+				reverse_foreach (CacheEntry& e, mResultCache)
 				{
 					if (e.status != bj_Queued)
 						continue;
@@ -402,7 +419,7 @@ void M6BlastCache::Work()
 				}
 			}
 			
-			if (next.empty())
+			if (next.empty()) // if no new job, wait
 				mWorkCondition.wait(lock);
 			else
 				ExecuteJob(next);
@@ -532,13 +549,13 @@ void M6BlastCache::DeleteJob(const string& inJobID)
 	auto c = find_if(mResultCache.begin(), mResultCache.end(),
 		[&inJobID](CacheEntry& e) -> bool { return e.id == inJobID; });
 	
-	if (c != mResultCache.end())
+	if (c != mResultCache.end()) // if the ID was found, remove the job from the list
 		mResultCache.erase(c);
 
 	if (mWorkerThread.joinable())
 		mWorkerThread.interrupt();
 	
-	foreach (const char* ext, kBlastFileExtensions)
+	foreach (const char* ext, kBlastFileExtensions) // remove job files from the cache directory
 	{
 		boost::system::error_code ec;
 		fs::remove(mCacheDir / (inJobID + ext), ec);

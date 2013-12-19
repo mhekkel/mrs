@@ -2,9 +2,6 @@
 //  Distributed under the Boost Software License, Version 1.0.
 //     (See accompanying file LICENSE_1_0.txt or copy at
 //           http://www.boost.org/LICENSE_1_0.txt)
-//  Also distributed under the Lesser General Public License, Version 2.1.
-//     (See accompanying file lgpl-2.1.txt or copy at
-//           https://www.gnu.org/licenses/lgpl-2.1.txt)
 
 #include "M6Lib.h"
 
@@ -3448,18 +3445,16 @@ void M6Server::ValidateAuthentication(const zh::request& request,
 
 // --------------------------------------------------------------------
 
-void RunMainLoop(uint32 inNrOfThreads, bool inUseLogFiles)
+void RunMainLoop(uint32 inNrOfThreads, bool redirectOutputToLog)
 {
 	for (;;)
 	{
-		if (inUseLogFiles)
+		if (redirectOutputToLog)
 		{
 			// (re-)open the log files.
 			fs::path logfile = fs::path(M6Config::GetDirectory("log")) / "access.log";
 			fs::path errfile = fs::path(M6Config::GetDirectory("log")) / "error.log";
 			OpenLogFile(logfile.string(), errfile.string());
-
-			InitLogs();
 		}
 
 		using namespace boost::local_time;

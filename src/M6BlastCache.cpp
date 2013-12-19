@@ -2,9 +2,6 @@
 //  Distributed under the Boost Software License, Version 1.0.
 //     (See accompanying file LICENSE_1_0.txt or copy at
 //           http://www.boost.org/LICENSE_1_0.txt)
-//  Also distributed under the Lesser General Public License, Version 2.1.
-//     (See accompanying file lgpl-2.1.txt or copy at
-//           https://www.gnu.org/licenses/lgpl-2.1.txt)
 
 #include "M6Lib.h"
 
@@ -43,8 +40,6 @@ using namespace std;
 namespace fs = boost::filesystem;
 namespace io = boost::iostreams;
 namespace ba = boost::algorithm;
-
-log4cpp::Category& debugLogger = log4cpp::Category::getInstance(std::string(LOG_DEBUG));
 
 const uint32 kMaxCachedEntryResults = 1000;
 const char* kBlastFileExtensions[] = { ".xml.bz2", ".job", ".err" };
@@ -246,6 +241,8 @@ void M6BlastCache::CacheResult(const string& inJobID, M6BlastResultPtr inResult)
 		
 		zeep::xml::document doc;
 		doc.serialize("blast-result", *inResult);
+
+		LOG(DEBUG,"Storing result of blast job with id: %s",inJobID.c_str());
 	
 		fs::ofstream file(mCacheDir / (inJobID + ".xml.bz2"), ios_base::out|ios_base::trunc|ios_base::binary);
 		io::filtering_stream<io::output> out;
@@ -338,7 +335,7 @@ string M6BlastCache::Submit(const string& inDatabank, const string& inQuery,
 				fs::remove(mCacheDir / (e.id + ".err"));
 		}
 
-		debugLogger.debug("Returning existing job id: %s",result.c_str());
+		LOG(DEBUG,"Returning existing blast job id: %s",result.c_str());
 
 		break;
 	}
@@ -378,7 +375,7 @@ string M6BlastCache::Submit(const string& inDatabank, const string& inQuery,
 
 		result = e.id;
 
-		debugLogger.debug("Returning newly created job id: %s",result.c_str());
+		LOG(DEBUG,"Returning newly created blast job id: %s",result.c_str());
 	}
 
 	return result;

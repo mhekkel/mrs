@@ -714,6 +714,11 @@ void M6RSyncFetcherImpl::Mirror(bool inDryRun, ostream& out)
 		args.push_back("--recursive");
 	if (source->get_attribute("delete") == "true")
 		args.push_back("--delete");
+	if (!source->get_attribute("port").empty())
+	{
+		args.push_back("--port");
+		args.push_back(source->get_attribute("port").c_str());
+	}
 	if (inDryRun)
 		args.push_back("--dry-run");
 	args.push_back(fetch.c_str());
@@ -781,7 +786,7 @@ M6Fetcher::M6Fetcher(const zx::element* inConfig)
 		THROW(("Missing source?"));
 	
 	string fetch = source->get_attribute("fetch");
-	if (ba::starts_with(fetch, "rsync://"))
+	if (ba::starts_with(fetch, "rsync://") || ba::starts_with(fetch, "rsync.") && ba::contains(fetch,"::"))
 		mImpl = new M6RSyncFetcherImpl(inConfig);
 	else if (ba::starts_with(fetch, "ftp://"))
 		mImpl = new M6FTPFetcherImpl(inConfig);

@@ -77,5 +77,6 @@
 <!ELEMENT source (#PCDATA)>
 <!ATTLIST source fetch CDATA #IMPLIED
 				 delete (true|false) "false"
-				 recursive (true|false) "false">
+				 recursive (true|false) "false"
+				 port CDATA #IMPLIED>
 <!ELEMENT filter (#PCDATA)>

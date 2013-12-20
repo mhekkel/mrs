@@ -174,7 +174,7 @@
     <databank id="pdb" parser="pdb" enabled="true" update="daily" fasta="true">
       <name>PDB</name>
       <info>http://www.rcsb.org/pdb/</info>
-      <source delete="true" fetch="rsync://ftp.wwpdb.org/pub/pdb/data/structures/divided/pdb/" recursive="true">pdb/??/pdb????.ent.gz</source>
+      <source delete="true" fetch="rsync.wwpdb.org::ftp_data/structures/divided/pdb/" port="33444" recursive="true">pdb/??/pdb????.ent.gz</source>
     </databank>
     <databank id="dssp" parser="dssp" enabled="true" update="daily" fasta="false">
       <name>DSSP</name>
@@ -308,7 +308,7 @@
     <databank enabled="true" fasta="true" id="mmcif" parser="mmcif" update="daily">
       <name>mmCIF - macromolecular Crystallographic Information File</name>
       <info>http://mmcif.rcsb.org/</info>
-      <source delete="false" fetch="ftp://ftp.wwpdb.org/pub/pdb/data/structures/divided/mmCIF" recursive="false">mmCIF/??/????.cif.gz</source>
+      <source delete="true" fetch="rsync.wwpdb.org::ftp_data/structures/divided/mmCIF" port="33444" recursive="true">mmCIF/??/????.cif.gz</source>
     </databank>
   </databanks>
 </mrs-config>

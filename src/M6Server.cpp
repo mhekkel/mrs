@@ -2244,6 +2244,7 @@ void M6Server::handle_admin(const zh::request& request,
 			fetch["src"] = e->get_attribute("fetch");
 			fetch["delete"] = e->get_attribute("delete");
 			fetch["recursive"] = e->get_attribute("recursive");
+			fetch["port"] = e->get_attribute("port");
 			databank["fetch"] = fetch;
 		}
 		

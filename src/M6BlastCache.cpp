@@ -404,10 +404,9 @@ void M6BlastCache::Work()
 			string next;
 			
 			{
-				// New submissions are pushed at the front of the list,
-				// so fetch the backmost queued entry first.
+				// Pick the frontmost queued entry. An alternative would be to use 'reverse_foreach'.
 				boost::mutex::scoped_lock lock2(mCacheMutex);
-				reverse_foreach (CacheEntry& e, mResultCache)
+				foreach (CacheEntry& e, mResultCache)
 				{
 					if (e.status != bj_Queued)
 						continue;

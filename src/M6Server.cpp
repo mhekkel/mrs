@@ -1987,6 +1987,7 @@ void M6Server::ProcessNewConfig(const string& inPage, zeep::http::parameter_map&
 
 			zx::element* source = db->find_first("source");
 			string fetch = inParams.get("fetch", "").as<string>();
+			string port = inParams.get("port", "").as<string>();
 			
 			if (not fetch.empty() and source == nullptr)
 				THROW(("invalid: fetch contains text but source is empty"));
@@ -2005,6 +2006,11 @@ void M6Server::ProcessNewConfig(const string& inPage, zeep::http::parameter_map&
 				source->set_attribute("recursive", "true");
 			else
 				source->remove_attribute("recursive");
+
+			if (port.empty())
+				source->remove_attribute("port");
+			else
+				source->set_attribute("port", port);
 		}
 	}
 	else if (inPage == "scheduler")

@@ -1,4 +1,4 @@
-<!ELEMENT mrs-config (directories,tools,scheduler,users,server,formats,parsers,databanks)>
+<!ELEMENT mrs-config (directories,tools,scheduler,logger,users,server,formats,parsers,databanks)>
 
 <!ELEMENT directories (directory+)>
 <!ELEMENT directory (#PCDATA)>
@@ -13,6 +13,10 @@
 <!ATTLIST scheduler enabled (true|false) "true"
 					time CDATA #REQUIRED
 					weekday CDATA #REQUIRED>
+
+<!ELEMENT logger EMPTY>
+<!ATTLIST logger enabled (true|false) "true"
+					priority (EMERG|ALERT|CRIT|ERROR|WARN|NOTICE|INFO|DEBUG) #REQUIRED>
 	
 <!ELEMENT users (user*)>
 <!ELEMENT user (#PCDATA)>

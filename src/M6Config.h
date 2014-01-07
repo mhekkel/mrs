@@ -42,6 +42,7 @@ class File
 	zeep::xml::element*		GetConfiguredDatabank(const std::string& inID);
 	zeep::xml::element*		CreateDatabank();
 	zeep::xml::element*		GetSchedule();
+	zeep::xml::element*		GetLogger();
 
   private:
 	zeep::xml::element_set	Find(const boost::format& inFmt);
@@ -58,6 +59,7 @@ void SetConfigFilePath(const boost::filesystem::path& inConfigFile);
 // Prototypes
 
 void							Reload();
+const zeep::xml::element*		GetLogger();
 std::string						GetDirectory(const std::string& inID);
 std::string						GetTool(const std::string& inID);
 uint32							GetMaxRunTime(const std::string& inID);
@@ -76,6 +78,11 @@ void							GetSchedule(bool& outEnabled, boost::posix_time::ptime& outTime,
 									std::string& outWeekDay);
 
 // Inlines
+
+inline const zeep::xml::element* GetLogger()
+{
+	return File::Instance().GetLogger();
+}
 
 inline std::string GetDirectory(const std::string& inID)
 {

@@ -171,6 +171,10 @@ zx::element* File::GetSchedule()
 {
 	return mConfig.find_first("/mrs-config/scheduler");
 }
+zx::element* File::GetLogger()
+{
+	return mConfig.find_first("/mrs-config/logger");
+}
 
 zx::element* File::GetUser(const string& inName, const string& inRealm)
 {

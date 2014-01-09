@@ -5,7 +5,7 @@
 
 #pragma once
 
-#define LOG(level, msg,...) M6Logger::GetLogger().Log(level, msg, __VA_ARGS__)
+#define LOG(level, msg,...) M6Logger::GetLogger().Log(level, msg, ##__VA_ARGS__)
 
 #include <log4cpp/Category.hh>
 
@@ -41,4 +41,5 @@ class M6Logger
 
   private:
     log4cpp::Category& mLog4cppLogger;
+    bool bEnabled;
 };

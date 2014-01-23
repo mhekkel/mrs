@@ -46,6 +46,8 @@ typedef boost::uint32_t		uint32;
 typedef boost::int64_t		int64;
 typedef boost::uint64_t		uint64;
 
+#define MRS_CURRENT_VERSION "6.0.5"
+
 // --------------------------------------------------------------------
 // some types used throughout m6
 

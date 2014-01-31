@@ -218,6 +218,8 @@ M6Server::M6Server(const zx::element* inConfig)
 		
 		mount(location, [this, d] (const zh::request& request, const el::scope& scope, zh::reply& reply)
 		{
+			string remote_address=request.remote_address;
+
 			try
 			{
 				zx::document doc;
@@ -225,6 +227,17 @@ M6Server::M6Server(const zx::element* inConfig)
 				zeep::envelope env(doc);
 			
 				zx::element* request = env.request();
+
+				if (request->name()=="Blast") {
+
+					string args="";
+					foreach(zx::node* p_arg, request->children<zx::node>())
+						args+="\t"+p_arg->qname()+"="+p_arg->str()+"\n";
+
+					if (args.size()>0)
+						LOG(INFO, "Recieved Webservice Blast request from %s :\n%s",remote_address.c_str(),args.c_str());
+				}
+
 				reply.set_content(zeep::make_envelope(d->dispatch(request)));
 				log() << request->name();
 			}
@@ -3000,6 +3013,14 @@ void M6Server::handle_blast_submit_ajax(
 
 	zeep::http::parameter_map params;
 	get_parameters(scope, params);
+
+	// logging
+	string s_args="";
+	foreach(zeep::http::parameter_map::value_type arg_pair, params)
+		s_args+="\t"+arg_pair.first+"="+arg_pair.second.as<string>()+"\n";
+
+	if (s_args.size()>0)
+		LOG(INFO,"Recieved ajax blast request from %s:\n%s", request.remote_address.c_str(), s_args.c_str());
 
 	// fetch the parameters
 	id = params.get("id", "").as<string>();			// id is used by the client

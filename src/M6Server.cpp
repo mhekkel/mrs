@@ -3564,7 +3564,11 @@ int M6Server::Start(const string& inRunAs, const string& inPidFile, bool inForeg
 	
 	// check to see if we're running already
 	if (not inForeground and IsPIDFileForExecutable(pidfile))
+	{
+		cout << "Server is already running.\n";
+
 		result = 1;
+	}
 	else
 	{
 		// make sure we can listen to the port before forking off as daemon
@@ -3639,6 +3643,9 @@ int M6Server::Stop(const string& inPidFile)
 				fs::remove(pidfile);
 		}
 		catch (...) {}
+
+	} else {
+		THROW(("Not my pid file: %s", pidfile.c_str()));
 	}
 	
 	return result;

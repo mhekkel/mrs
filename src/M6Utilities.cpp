@@ -275,6 +275,9 @@ bool IsPIDFileForExecutable(const fs::path& inPidFile)
 	
 			result = (exe == path) or
 				(ba::ends_with(path, " (deleted)") and ba::starts_with(path, exe));
+
+		} else if (errno == ENOENT) { // link file doesn't exist
+			result = false;
 		} else {
 			THROW(("Failed to read executable link : %s", strerror(errno)));
 		}
@@ -336,7 +339,7 @@ void Daemonize(const string& inUser, const string& inPidFile)
 		ofstream pidFile(inPidFile);
 		if(!pidFile.is_open())
 		{
-			cerr << "Failed to open " << inPidFile << ": " << strerror(errno) << endl;
+			cerr << "Failed to write to " << inPidFile << ": " << strerror(errno) << endl;
 			exit(1);
 		}
 		pidFile << getpid() << endl;

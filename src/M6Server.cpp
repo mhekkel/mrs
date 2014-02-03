@@ -123,6 +123,29 @@ bool M6AuthInfo::Validate(const string& inMethod, const string& inURI,
 
 // --------------------------------------------------------------------
 
+string get_client(const zh::request& req)
+{
+	string client = req.remote_address;
+
+	foreach (const zh::header& h, req.headers)
+	{
+		if (h.name == "X-Forwarded-For")
+		{
+			client = h.value;
+			string::size_type comma = client.rfind(',');
+			if (comma != string::npos)
+			{
+				if (comma < client.length() - 1 and client[comma + 1] == ' ')
+					++comma;
+				client = client.substr(comma + 1, string::npos);
+			}
+		}
+	}
+	return client;
+}
+
+// --------------------------------------------------------------------
+
 struct M6Redirect
 {
 	string	db;
@@ -218,7 +241,7 @@ M6Server::M6Server(const zx::element* inConfig)
 		
 		mount(location, [this, d] (const zh::request& request, const el::scope& scope, zh::reply& reply)
 		{
-			string remote_address=request.remote_address;
+			const string client = get_client(request);
 
 			try
 			{
@@ -235,7 +258,7 @@ M6Server::M6Server(const zx::element* inConfig)
 						args+="\t"+p_arg->qname()+"="+p_arg->str()+"\n";
 
 					if (args.size()>0)
-						LOG(INFO, "Recieved Webservice Blast request from %s :\n%s",remote_address.c_str(),args.c_str());
+						LOG(INFO, "Recieved Webservice Blast request from %s :\n%s",client.c_str(),args.c_str());
 				}
 
 				reply.set_content(zeep::make_envelope(d->dispatch(request)));
@@ -3015,12 +3038,14 @@ void M6Server::handle_blast_submit_ajax(
 	get_parameters(scope, params);
 
 	// logging
+	const string client = get_client(request);
+
 	string s_args="";
 	foreach(zeep::http::parameter_map::value_type arg_pair, params)
 		s_args+="\t"+arg_pair.first+"="+arg_pair.second.as<string>()+"\n";
 
 	if (s_args.size()>0)
-		LOG(INFO,"Recieved ajax blast request from %s:\n%s", request.remote_address.c_str(), s_args.c_str());
+		LOG(INFO,"Recieved ajax blast request from %s:\n%s", client.c_str(), s_args.c_str());
 
 	// fetch the parameters
 	id = params.get("id", "").as<string>();			// id is used by the client

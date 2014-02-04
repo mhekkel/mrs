@@ -3543,6 +3543,19 @@ void RunMainLoop(uint32 inNrOfThreads, bool redirectOutputToLog)
 		catcher.UnblockSignals();
 		
 		int sig = catcher.WaitForSignal();
+
+		// signal logging
+		string sigstr;
+		switch(sig)
+		{
+		case SIGINT : sigstr = "SIGINT";  break;
+		case SIGHUP : sigstr = "SIGHUP";  break;
+		case SIGSEGV: sigstr = "SIGSEGV"; break;
+		case SIGQUIT: sigstr = "SIGQUIT"; break;
+		case SIGTERM: sigstr = "SIGTERM"; break;
+		default: sigstr = boost::lexical_cast<string>(sig); break;
+		}
+		cerr << "RunMainLoop recieved signal: " << sigstr << endl;
 		
 		server.stop();
 #ifdef BOOST_CHRONO_EXTENSIONS

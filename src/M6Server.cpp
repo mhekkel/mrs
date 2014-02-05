@@ -3555,7 +3555,7 @@ void RunMainLoop(uint32 inNrOfThreads, bool redirectOutputToLog)
 		case SIGTERM: sigstr = "SIGTERM"; break;
 		default: sigstr = boost::lexical_cast<string>(sig); break;
 		}
-		cerr << "RunMainLoop recieved signal: " << sigstr << endl;
+		cerr << local_date_time(second_clock::local_time(), time_zone_ptr()) << " RunMainLoop recieved signal: " << sigstr << endl;
 		
 		server.stop();
 #ifdef BOOST_CHRONO_EXTENSIONS

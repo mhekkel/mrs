@@ -125,11 +125,11 @@ bool M6AuthInfo::Validate(const string& inMethod, const string& inURI,
 
 string get_client(const zh::request& req)
 {
-	string client = req.remote_address;
+	string client;
 
 	foreach (const zh::header& h, req.headers)
 	{
-		if (h.name == "X-Forwarded-For")
+		if (h.name == "X-Forwarded-For" )
 		{
 			client = h.value;
 			string::size_type comma = client.rfind(',');
@@ -141,6 +141,10 @@ string get_client(const zh::request& req)
 			}
 		}
 	}
+
+	if(client.empty())
+		 client = req.remote_address;
+
 	return client;
 }
 
@@ -253,12 +257,22 @@ M6Server::M6Server(const zx::element* inConfig)
 
 				if (request->name()=="Blast") {
 
-					string args="";
+					string query,db;
 					foreach(zx::node* p_arg, request->children<zx::node>())
-						args+="\t"+p_arg->qname()+"="+p_arg->str()+"\n";
+					{
+						string id=p_arg->qname();
+						string::size_type colon = id.rfind(':');
+			                        if (colon != string::npos)
+							id=id.substr(colon + 1);
 
-					if (args.size()>0)
-						LOG(INFO, "Recieved Webservice Blast request from %s :\n%s",client.c_str(),args.c_str());
+						if(id=="query")
+							query=p_arg->str();
+						else if(id=="db")
+							db=p_arg->str();
+					}
+
+					if (!query.empty() and !db.empty())
+						LOG(INFO, "Recieved Webservice Blast submission from %s, with query length %d and databank %s",client.c_str(),query.size(),db.c_str());
 				}
 
 				reply.set_content(zeep::make_envelope(d->dispatch(request)));
@@ -3037,16 +3051,6 @@ void M6Server::handle_blast_submit_ajax(
 	zeep::http::parameter_map params;
 	get_parameters(scope, params);
 
-	// logging
-	const string client = get_client(request);
-
-	string s_args="";
-	foreach(zeep::http::parameter_map::value_type arg_pair, params)
-		s_args+="\t"+arg_pair.first+"="+arg_pair.second.as<string>()+"\n";
-
-	if (s_args.size()>0)
-		LOG(INFO,"Recieved ajax blast request from %s:\n%s", client.c_str(), s_args.c_str());
-
 	// fetch the parameters
 	id = params.get("id", "").as<string>();			// id is used by the client
 	db = params.get("db", "pdb").as<string>();
@@ -3061,6 +3065,11 @@ void M6Server::handle_blast_submit_ajax(
 	gapExtend = params.get("gapExtend", gapExtend).as<int>();
 	reportLimit = params.get("reportLimit", reportLimit).as<int>();
 	filter = params.get("filter", true).as<bool>();
+
+	// logging
+	const string client = get_client(request);
+	if(!query.empty() && !db.empty())
+		LOG(INFO,"Recieved ajax blast submission from %s, with query length %d and databank %s", client.c_str(), query.size(), db.c_str());
 	
 	// validate and unalias the databank
 	bool found = false;

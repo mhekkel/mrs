@@ -123,33 +123,6 @@ bool M6AuthInfo::Validate(const string& inMethod, const string& inURI,
 
 // --------------------------------------------------------------------
 
-string get_client(const zh::request& req)
-{
-	string client;
-
-	foreach (const zh::header& h, req.headers)
-	{
-		if (h.name == "X-Forwarded-For" )
-		{
-			client = h.value;
-			string::size_type comma = client.rfind(',');
-			if (comma != string::npos)
-			{
-				if (comma < client.length() - 1 and client[comma + 1] == ' ')
-					++comma;
-				client = client.substr(comma + 1, string::npos);
-			}
-		}
-	}
-
-	if(client.empty())
-		 client = req.remote_address;
-
-	return client;
-}
-
-// --------------------------------------------------------------------
-
 struct M6Redirect
 {
 	string	db;
@@ -245,8 +218,6 @@ M6Server::M6Server(const zx::element* inConfig)
 		
 		mount(location, [this, d] (const zh::request& request, const el::scope& scope, zh::reply& reply)
 		{
-			const string client = get_client(request);
-
 			try
 			{
 				zx::document doc;
@@ -254,27 +225,6 @@ M6Server::M6Server(const zx::element* inConfig)
 				zeep::envelope env(doc);
 			
 				zx::element* request = env.request();
-
-				if (request->name()=="Blast") {
-
-					string query,db;
-					foreach(zx::node* p_arg, request->children<zx::node>())
-					{
-						string id=p_arg->qname();
-						string::size_type colon = id.rfind(':');
-			                        if (colon != string::npos)
-							id=id.substr(colon + 1);
-
-						if(id=="query")
-							query=p_arg->str();
-						else if(id=="db")
-							db=p_arg->str();
-					}
-
-					if (!query.empty() and !db.empty())
-						LOG(INFO, "Recieved Webservice Blast submission from %s, with query length %d and databank %s",client.c_str(),query.size(),db.c_str());
-				}
-
 				reply.set_content(zeep::make_envelope(d->dispatch(request)));
 				log() << request->name();
 			}
@@ -3066,11 +3016,6 @@ void M6Server::handle_blast_submit_ajax(
 	reportLimit = params.get("reportLimit", reportLimit).as<int>();
 	filter = params.get("filter", true).as<bool>();
 
-	// logging
-	const string client = get_client(request);
-	if(!query.empty() && !db.empty())
-		LOG(INFO,"Recieved ajax blast submission from %s, with query length %d and databank %s", client.c_str(), query.size(), db.c_str());
-	
 	// validate and unalias the databank
 	bool found = false;
 	foreach (M6BlastDatabank& bdb, mBlastDatabanks)

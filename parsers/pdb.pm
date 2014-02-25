@@ -39,7 +39,19 @@ sub new
 
 sub parse
 {
-	my ($self, $text) = @_;
+	my ($self, $text, $filename) = @_;
+
+	# *_final.pdb files (from pdb_redo) don't have the id in the header
+	if( (lc $filename) =~ m/(.+\/)?([a-z0-9]{4})_final\.pdb/ )
+	{
+		my $id = $2;
+
+		$self->set_attribute('id', $id);
+		$self->index_unique_string('id', $id);
+		$self->add_link('dssp', $id);
+		$self->add_link('hssp', $id);
+		$self->add_link('pdbfinder2', $id);
+	}
 
 	my ($header, $title, $compound, $model_count, %ligands);
 
@@ -52,14 +64,17 @@ sub parse
 		if ($fld eq 'HEADER')
 		{
 			$header = $text;
-			
+		
+			# xxxx is used in the pdb_redo files	
 			my $id = substr($line, 62, 4);
-			$self->set_attribute('id', $id);
-			$self->index_unique_string('id', $id);
-			$self->add_link('dssp', $id);
-			$self->add_link('hssp', $id);
-			$self->add_link('pdbfinder2', $id);
-			
+			if ( (lc $id) ne 'xxxx' )
+			{
+				$self->set_attribute('id', $id);
+				$self->index_unique_string('id', $id);
+				$self->add_link('dssp', $id);
+				$self->add_link('hssp', $id);
+				$self->add_link('pdbfinder2', $id);
+			}
 			$self->index_text('text', $text);
 		}
 		elsif ($fld eq 'MODEL')
@@ -142,11 +157,14 @@ sub parse
 
 	$self->index_number('models', $model_count) if defined $model_count;
 
-	$header = "$title ($header)" if (length($title) > 0);
-	$header .= "; $compound" if (defined $compound and length($compound) > 0);
-	$header = substr($header, 0, 255) if (length($header) > 255);
-	$header =~ s/ {2,}/ /g;
-	$self->set_attribute('title', $header);
+	if (defined $header)
+	{
+		$header = "$title ($header)" if (defined $title and length($title) > 0);
+		$header .= "; $compound" if (defined $compound and length($compound) > 0);
+		$header = substr($header, 0, 255) if (length($header) > 255);
+		$header =~ s/ {2,}/ /g;
+		$self->set_attribute('title', $header);
+	}
 
 	foreach my $ligand (keys %ligands)
 	{

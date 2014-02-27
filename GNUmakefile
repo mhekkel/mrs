@@ -39,7 +39,7 @@ CFLAGS				+= -Wno-deprecated -Wno-multichar
 CFLAGS				+= $(shell $(PERL) -MExtUtils::Embed -e perl_inc)
 CFLAGS				+= $(DEFINES:%=-D%)
 
-LDFLAGS				+= $(LIBRARY_DIR:%=-L %) $(BOOST_LIBS:%=-l%) $(LIBS:%=-l%) -g 
+LDFLAGS				+= $(LIBRARY_DIR:%=-L %) $(LIBS:%=-l%) $(BOOST_LIBS:%=-l%) -g
 LDFLAGS				+= $(shell $(PERL) -MExtUtils::Embed -e ldopts)
 
 OBJDIR				= obj

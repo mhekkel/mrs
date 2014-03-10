@@ -102,25 +102,35 @@ M6BlastCache::M6BlastCache()
 		{
 			fs::ifstream file(iter->path());
 			if (not file.is_open())
+			{
+				LOG(WARN,"unable to open: %s",iter->path().extension().string().c_str());
 				continue;
-	
-			CacheEntry e;
+			}
 
-			e.id = iter->path().filename().stem().string();
-			e.hitCount = 0;
-			e.bestScore = -1;
+			try // Must verify that the file's contents are OK, otherwise MRS will crash on startup
+			{
+				CacheEntry e;
+
+				e.id = iter->path().filename().stem().string();
+				e.hitCount = 0;
+				e.bestScore = -1;
 			
-			zeep::xml::document doc(file);
-			doc.deserialize("blastjob", e.job);
+				zeep::xml::document doc(file);
+				doc.deserialize("blastjob", e.job);
 			
-			if (fs::exists(mCacheDir / (e.id + ".err")))
-				e.status = bj_Error;
-			else if (fs::exists(mCacheDir / (e.id + ".xml.bz2")))
-				e.status = bj_Finished;
-			else
-				e.status = bj_Queued;
-			
-			mResultCache.push_back(e);
+				if (fs::exists(mCacheDir / (e.id + ".err")))
+					e.status = bj_Error;
+				else if (fs::exists(mCacheDir / (e.id + ".xml.bz2")))
+					e.status = bj_Finished;
+				else
+					e.status = bj_Queued;
+		
+				mResultCache.push_back(e);
+			}
+			catch (exception& ex)
+			{
+				LOG(WARN,"Cannot parse job file %s: %s",iter->path().string().c_str(),ex.what());
+			}
 		}
 	}
 

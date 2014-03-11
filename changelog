@@ -1,3 +1,12 @@
+Changes in MRS version 6.0.6
+
+- Added a version option to the command line
+- Fixed a bug that caused MRS to crash on empty blast job files
+- Changed the rsync fetcher so that it downloads less unwanted files
+- Adjusted the pdb parser so that pdb_redo files don't get xxxx as id
+- Added some more warnings to the server start and server stop commands, about permission problems and mismatching pid files.
+- libzeep is now linked before boost. This prevents compatibility issues.
+
 Changes in MRS version 6.0.5
 
 - Changed e-mail address of maintainer.

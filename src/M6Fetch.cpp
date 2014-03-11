@@ -11,6 +11,7 @@
 
 #include <time.h>
 #include <iostream>
+#include <set>
 
 #if defined(_MSC_VER)
 #include <WinSock.h>
@@ -691,6 +692,18 @@ M6RSyncFetcherImpl::M6RSyncFetcherImpl(const zx::element* inConfig)
 {
 }
 
+bool buildDirectoryPath(const fs::path p)
+{
+	if(p.has_parent_path())
+		if(!buildDirectoryPath(p.parent_path()))
+			return false;
+
+	if(fs::is_directory(p))
+		return true;
+	else
+		return fs::create_directory(p);
+}
+
 void M6RSyncFetcherImpl::Mirror(bool inDryRun, ostream& out)
 {
 	string databank = mConfig->get_attribute("id");
@@ -701,7 +714,6 @@ void M6RSyncFetcherImpl::Mirror(bool inDryRun, ostream& out)
 	zx::element* source = mConfig->find_first("source");
 	string srcdir = source->content();
 
-	string fetch = source->get_attribute("fetch");
 	
 	string rsync = M6Config::GetTool("rsync");
 	if (not fs::exists(rsync))
@@ -721,8 +733,8 @@ void M6RSyncFetcherImpl::Mirror(bool inDryRun, ostream& out)
 	}
 	if (inDryRun)
 		args.push_back("--dry-run");
-	args.push_back(fetch.c_str());
-	
+
+	set<string> includes;
 	bool stripped = false;
 	if (not ba::ends_with(srcdir, "/"))
 	{
@@ -732,10 +744,35 @@ void M6RSyncFetcherImpl::Mirror(bool inDryRun, ostream& out)
 		
 		while (boost::regex_search(srcdir, m, rx))
 		{
+			if(stripped) // means the match is a parent directory
+				includes.insert("*/");
+			else
+			{ // the match is a filename pattern, convert is to an rsync include pattern:
+
+				string matched (m[0].first,m[0].second);
+				matched=matched.substr(1); // remove the starting slash
+				matched=boost::regex_replace(matched, boost::regex("\\{[^\\}]*\\}"), "*");
+				includes.insert(boost::regex_replace(matched, boost::regex("[\\*\\?]+"), "*"));
+			}
+
 			stripped = true;
 			srcdir = m.prefix();
 		}
 	}
+
+	list<string> includestrings_memstore; // keeps the pointers occupied
+	if(includes.size()>0)
+	{
+		foreach( string include, includes)
+		{
+			includestrings_memstore.push_back( str( boost::format("--include=%s") % include.c_str() ) );
+			args.push_back( includestrings_memstore.back().c_str() );
+		}
+		args.push_back("--exclude=*");
+	}
+
+	string fetch = source->get_attribute("fetch");
+	args.push_back(fetch.c_str());
 	
 	if (stripped)
 	{
@@ -751,12 +788,19 @@ void M6RSyncFetcherImpl::Mirror(bool inDryRun, ostream& out)
 	if (ba::contains(srcdir, "/../"))
 		THROW(("invalid destination path for rsync"));
 
+	// Make any parent directories that rsync might not make on its own:
+	fs::path srcdir_path (srcdir);
+	if ( not ba::ends_with(srcdir, "/") )
+		srcdir_path = srcdir_path.parent_path();
+	if (!buildDirectoryPath( srcdir_path ))
+		THROW( ("unable to create directory: %s", srcdir.c_str()) );
+
 	args.push_back(srcdir.c_str());
 	args.push_back(nullptr);
 	
 	for_each(args.begin(), args.end(), [](const char* arg) { if (arg != nullptr) cout << arg << ' '; });
 	cout << endl;
-	
+
 	stringstream in;
 	int r = ForkExec(args, 0, in, cout, cerr);
 	

@@ -3015,7 +3015,7 @@ void M6Server::handle_blast_submit_ajax(
 	gapExtend = params.get("gapExtend", gapExtend).as<int>();
 	reportLimit = params.get("reportLimit", reportLimit).as<int>();
 	filter = params.get("filter", true).as<bool>();
-	
+
 	// validate and unalias the databank
 	bool found = false;
 	foreach (M6BlastDatabank& bdb, mBlastDatabanks)
@@ -3497,6 +3497,19 @@ void RunMainLoop(uint32 inNrOfThreads, bool redirectOutputToLog)
 		catcher.UnblockSignals();
 		
 		int sig = catcher.WaitForSignal();
+
+		// signal logging
+		string sigstr;
+		switch(sig)
+		{
+		case SIGINT : sigstr = "SIGINT";  break;
+		case SIGHUP : sigstr = "SIGHUP";  break;
+		case SIGSEGV: sigstr = "SIGSEGV"; break;
+		case SIGQUIT: sigstr = "SIGQUIT"; break;
+		case SIGTERM: sigstr = "SIGTERM"; break;
+		default: sigstr = boost::lexical_cast<string>(sig); break;
+		}
+		cerr << local_date_time(second_clock::local_time(), time_zone_ptr()) << " RunMainLoop recieved signal: " << sigstr << endl;
 		
 		server.stop();
 #ifdef BOOST_CHRONO_EXTENSIONS
@@ -3543,7 +3556,11 @@ int M6Server::Start(const string& inRunAs, const string& inPidFile, bool inForeg
 	
 	// check to see if we're running already
 	if (not inForeground and IsPIDFileForExecutable(pidfile))
+	{
+		cout << "Server is already running.\n";
+
 		result = 1;
+	}
 	else
 	{
 		// make sure we can listen to the port before forking off as daemon
@@ -3618,6 +3635,9 @@ int M6Server::Stop(const string& inPidFile)
 				fs::remove(pidfile);
 		}
 		catch (...) {}
+
+	} else {
+		THROW(("Not my pid file: %s", pidfile.c_str()));
 	}
 	
 	return result;

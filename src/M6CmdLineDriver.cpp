@@ -97,6 +97,17 @@ vector<M6CmdLineDriver::DriverInfo> M6CmdLineDriver::sDrivers;
 // --------------------------------------------------------------------
 // implementations
 
+class M6VersionDriver : public M6CmdLineDriver
+{
+  public:
+					M6VersionDriver() {};
+
+	virtual void    AddOptions(po::options_description& desc,
+						unique_ptr<po::positional_options_description>& p);
+	virtual bool    Validate(po::variables_map& vm);
+	virtual int		Exec(const string& inCommand, po::variables_map& vm);
+};
+
 class M6BlastDriver : public M6CmdLineDriver
 {
   public:
@@ -378,6 +389,25 @@ BOOL WINAPI M6CmdLineDriver::ConsoleHandler(DWORD CEvent)
 }
 
 #endif
+
+// --------------------------------------------------------------------
+//	version
+
+void M6VersionDriver::AddOptions(po::options_description& desc,
+	unique_ptr<po::positional_options_description>& p)
+{
+	// no options
+}
+
+bool M6VersionDriver::Validate(po::variables_map& vm)
+{
+	return true;
+}
+
+int M6VersionDriver::Exec(const string& inCommand, po::variables_map& vm)
+{
+	cout << MRS_CURRENT_VERSION << endl ;
+}
 
 // --------------------------------------------------------------------
 //	blast
@@ -990,6 +1020,7 @@ int main(int argc, char* argv[])
 		signal(SIGINT, &M6CmdLineDriver::SigHandler);
 #endif
 
+		M6CmdLineDriver::Register<M6VersionDriver>	("version",	"Get MRS version");
 		M6CmdLineDriver::Register<M6BlastDriver>	("blast",	"Do a blast search");
 		M6CmdLineDriver::Register<M6BuildDriver>	("build",	"(Re-)build a databank");
 		M6CmdLineDriver::Register<M6DumpDriver>		("dump",	"Dump index data");

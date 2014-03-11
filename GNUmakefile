@@ -5,7 +5,7 @@
 #    (See accompanying file LICENSE_1_0.txt or copy at
 #          http://www.boost.org/LICENSE_1_0.txt)
 
-VERSION				= 6.0.5
+VERSION				= 6.0.6
 
 include make.config
 
@@ -25,7 +25,8 @@ MRS_USER			?= $(shell whoami)
 PERL				?= $(which perl)
 
 DEFINES				+= MRS_ETC_DIR='"$(MRS_ETC_DIR)"' \
-					   MRS_USER='"$(MRS_USER)"' 
+					   MRS_USER='"$(MRS_USER)"' \
+						MRS_CURRENT_VERSION='"$(VERSION)"'
 
 BOOST_LIBS			= system thread filesystem regex math_c99 math_c99f program_options date_time iostreams timer random chrono
 BOOST_LIBS			:= $(BOOST_LIBS:%=boost_%$(BOOST_LIB_SUFFIX))
@@ -39,7 +40,7 @@ CFLAGS				+= -Wno-deprecated -Wno-multichar
 CFLAGS				+= $(shell $(PERL) -MExtUtils::Embed -e perl_inc)
 CFLAGS				+= $(DEFINES:%=-D%)
 
-LDFLAGS				+= $(LIBRARY_DIR:%=-L %) $(BOOST_LIBS:%=-l%) $(LIBS:%=-l%) -g 
+LDFLAGS				+= $(LIBRARY_DIR:%=-L %) $(LIBS:%=-l%) $(BOOST_LIBS:%=-l%) -g
 LDFLAGS				+= $(shell $(PERL) -MExtUtils::Embed -e ldopts)
 
 OBJDIR				= obj

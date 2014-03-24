@@ -93,6 +93,9 @@ OBJECTS = \
 
 all: mrs config/mrs-config.xml mrs.1 init.d/mrs
 
+checkcache: $(OBJDIR)/checkcache.o
+	$(CXX) -o $@ -I. $< $(LDFLAGS)
+
 mrs: $(OBJECTS)
 	@ echo "$(CXX) -o $@ -I. $^ $(LDFLAGS)"
 	@ $(CXX) -o $@ -I. $^ $(LDFLAGS)

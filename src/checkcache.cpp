@@ -58,40 +58,53 @@ int main(int argc, char* argv[])
 
 		in.push(file);
 
+		stringstream stack;
 		try
 		{
-
-		if ( ba::ends_with( filename, ".xml.bz2" ) )
-		{
-			zeep::xml::document doc(in);
-
-			M6BlastResultPtr result(new M6Blast::Result);
-
-			doc.deserialize("blast-result", const_cast<M6Blast::Result&>(*result));
-		}
-		else if ( ba::ends_with( filename, ".job" ) )
-		{
-			zeep::xml::document doc(in);
-
-			M6BlastJob job;
-		
-			doc.deserialize("blastjob", job);
-		}
-		else if ( ba::ends_with( filename, ".err" ) )
-		{
-			string line;
-			stringstream ss;
-			while(!in.eof())
+			if ( ba::ends_with( filename, ".xml.bz2" ) )
 			{
-				getline(in, line);
-				ss << line << endl;
-			}
-		}
+				stack << "parsing xml\n";
 
+				zeep::xml::document doc(in);
+
+				stack << "converting to blast result\n";
+
+				M6BlastResultPtr result(new M6Blast::Result);
+
+				doc.deserialize("blast-result", const_cast<M6Blast::Result&>(*result));
+			}
+			else if ( ba::ends_with( filename, ".job" ) )
+			{
+				stack << "parsing xml\n";
+
+				zeep::xml::document doc(in);
+
+				stack << "converting to blast job\n";
+
+				M6BlastJob job;
+		
+				doc.deserialize("blastjob", job);
+			}
+			else if ( ba::ends_with( filename, ".err" ) )
+			{
+				stack << "reading file\n";
+
+				string line;
+				stringstream ss;
+				while(!in.eof())
+				{
+					getline(in, line);
+					ss << line << endl;
+				}
+			}
+
+			stack << "done with this file\n";
 		}
 		catch(exception& e)
 		{
-			cout << filename << e.what() ; 
+			cout << stack.str();
+
+			cout << path.string() <<" - error: "<< e.what() << endl ; 
 		}
 	}
 	return 0;

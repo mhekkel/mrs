@@ -29,7 +29,8 @@ struct M6OBitStreamFileImpl : public M6OBitStreamImpl
 	virtual size_t	Size() const								{ return mFile.Size() + (mBufferPtr - mBuffer); }
 	virtual void	Write(const uint8* inData, size_t inSize);
 	virtual void	Truncate()									{ mFile.Truncate(0); mBufferPtr = mBuffer; }
-					
+	virtual void	Sync();
+				
   private:
 	M6File&			mFile;
 	char			mBuffer[kFileBufferSize];
@@ -38,8 +39,7 @@ struct M6OBitStreamFileImpl : public M6OBitStreamImpl
 
 M6OBitStreamFileImpl::~M6OBitStreamFileImpl()
 {
-	if (mBufferPtr > mBuffer)
-		mFile.Write(mBuffer, mBufferPtr - mBuffer);
+	Sync();
 }
 
 void M6OBitStreamFileImpl::Write(const uint8* inData, size_t inSize)
@@ -82,6 +82,13 @@ void M6OBitStreamFileImpl::Write(const uint8* inData, size_t inSize)
 	}
 }
 
+void M6OBitStreamFileImpl::Sync()
+{
+	if (mBufferPtr > mBuffer)
+		mFile.Write(mBuffer, mBufferPtr - mBuffer);
+	mBufferPtr = mBuffer;
+}
+
 struct M6OBitStreamMemImpl : public M6OBitStreamImpl
 {
 					M6OBitStreamMemImpl();
@@ -90,6 +97,7 @@ struct M6OBitStreamMemImpl : public M6OBitStreamImpl
 	virtual size_t	Size() const								{ return mBufferPtr - mBuffer; }
 	virtual void	Write(const uint8* inData, size_t inSize);
 	virtual void	Truncate()									{ mBufferPtr = mBuffer; }
+	virtual void	Sync()									{}
 
 	uint8*			mBuffer;
 	uint8*			mBufferPtr;
@@ -248,7 +256,10 @@ void M6OBitStream::Sync()
 		(*this) << 1;
 	
 	if (mImpl != nullptr)
+	{
 		Overflow();
+		mImpl->Sync();
+	}
 }
 
 void M6OBitStream::Clear()

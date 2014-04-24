@@ -1,3 +1,7 @@
+Changes in MRS version 6.0.7
+
+- Fixed a bug in M6BitStream, that could cause MRS to miss a single index
+
 Changes in MRS version 6.0.6
 
 - Added a version option to the command line

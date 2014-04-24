@@ -130,6 +130,7 @@ M6BlastCache::M6BlastCache()
 			catch (exception& ex)
 			{
 				LOG(WARN,"Cannot parse job file %s: %s",iter->path().string().c_str(),ex.what());
+				fs::remove(iter->path());
 			}
 		}
 	}

@@ -32,6 +32,7 @@ struct M6OBitStreamImpl
 	virtual size_t	Size() const = 0;
 	virtual void	Write(const uint8* inData, size_t inSize) = 0;
 	virtual void	Truncate() = 0;
+	virtual void	Sync() = 0;
 
   protected:
 	uint32			mRefCount;

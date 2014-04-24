@@ -5,7 +5,7 @@
 #    (See accompanying file LICENSE_1_0.txt or copy at
 #          http://www.boost.org/LICENSE_1_0.txt)
 
-VERSION				= 6.0.6
+VERSION				= 6.0.7
 
 include make.config
 
@@ -92,6 +92,9 @@ OBJECTS = \
 	$(OBJDIR)/M6WSSearch.o \
 
 all: mrs config/mrs-config.xml mrs.1 init.d/mrs
+
+checkcache: $(OBJDIR)/checkcache.o
+	$(CXX) -o $@ -I. $< $(LDFLAGS)
 
 mrs: $(OBJECTS)
 	@ echo "$(CXX) -o $@ -I. $^ $(LDFLAGS)"

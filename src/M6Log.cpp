@@ -7,6 +7,8 @@
 
 #include <boost/filesystem/fstream.hpp>
 
+#define LOG4CPP_FIX_ERROR_COLLISION 1
+
 #include <log4cpp/Appender.hh>
 #include <log4cpp/FileAppender.hh>
 #include "log4cpp/PatternLayout.hh"

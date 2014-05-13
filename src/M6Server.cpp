@@ -1393,7 +1393,7 @@ void M6Server::handle_search(const zh::request& request,
 		}
 
 		sub.put("first", el::object(resultoffset + 1));
-		sub.put("last", el::object(resultoffset + hits.size()));
+		sub.put("last", el::object(static_cast<int>(resultoffset + hits.size())));
 		sub.put("hitCount", el::object(hitCount));
 		sub.put("lastPage", el::object(((hitCount - 1) / hits_per_page) + 1));
 		sub.put("ranked", ranked);
@@ -2177,7 +2177,7 @@ void M6Server::handle_admin(const zh::request& request,
 		foreach (const zx::element* l, e->find("link"))
 		{
 			el::object link;
-			link["nr"] = el::object(links.size() + 1);
+			link["nr"] = el::object(static_cast<uint64>(links.size() + 1));
 			link["rx"] = l->get_attribute("rx");
 			link["db"] = l->get_attribute("db");
 			link["id"] = l->get_attribute("id");
@@ -2838,7 +2838,7 @@ void M6Server::handle_blast_results_ajax(const zeep::http::request& request, con
 	            sl1 = ql2 - sl2;
 
 			el::object h;
-			h["nr"] = jhsps.size() + 1;
+			h["nr"] = static_cast<uint64>(jhsps.size() + 1);
 			h["score"] = hsp.mScore;
 			h["bitScore"] = hsp.mBitScore;
 			h["expect"] = hsp.mExpect;
@@ -2898,14 +2898,14 @@ void M6Server::handle_blast_results_ajax(const zeep::http::request& request, con
 			coverageLength = uint32(best.mQueryAlignment.length() * kGraphicWidth / queryLength);
 			
 			el::object h;
-			h["nr"] = jhits.size() + 1;
+			h["nr"] = static_cast<uint64>(jhits.size() + 1);
 			h["db"] = hit.mDb;
 			h["doc"] = hit.mID;
 			h["seq"] = hit.mChain;
 			h["desc"] = hit.mTitle;
 			h["bitScore"] = best.mBitScore;
 			h["expect"] = best.mExpect;
-			h["hsps"] = hsps.size();
+			h["hsps"] = static_cast<uint64>(hsps.size());
 			
 			el::object coverage;
 			coverage["start"] = coverageStart;

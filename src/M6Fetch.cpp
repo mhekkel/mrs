@@ -442,7 +442,7 @@ int64 M6FTPFetcherImpl::CollectFiles(fs::path inLocalDir, fs::path inRemoteDir, 
 
 			if (fs::exists(file))
 			{
-				existing.erase(find(existing.begin(), existing.end(), file), existing.end());
+				existing.erase(find(existing.begin(), existing.end(), file));
 
 				if (fs::last_write_time(file) >= inTime and fs::file_size(file) == inSize)
 				{
@@ -461,7 +461,7 @@ int64 M6FTPFetcherImpl::CollectFiles(fs::path inLocalDir, fs::path inRemoteDir, 
 
 			inProgress.Consumed(1);
 		});
-		
+
 		// but only delete files if the name was a pattern
 		if (isPattern)
 		{

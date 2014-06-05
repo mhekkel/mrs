@@ -1,3 +1,7 @@
+Changes in MRS version 6.0.8
+
+- Fixed a bug in the ftp fetcher, causing it to keep old databank files that should actually be deleted. This was causing problems in refseq.
+
 Changes in MRS version 6.0.7
 
 - Fixed a bug in M6BitStream, that could cause MRS to miss a single index

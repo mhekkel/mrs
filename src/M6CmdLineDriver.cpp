@@ -344,21 +344,15 @@ M6CmdLineDriver::GetDatabank(const string& inDatabank)
 void M6CmdLineDriver::Terminated()
 {
 	M6Status::Instance().SetError(sDatabank, M6Exception::last_what());
-	cerr << "Terminated" << endl
-		 << M6Exception::last_what() << endl;
+	cerr << "Terminated" << endl << M6Exception::last_what() << endl;
 	abort();
 }
 
 void M6CmdLineDriver::SigHandler(int inSignal)
 {
-	char msg[256];
-	sprintf(msg, "terminated on signal %d", inSignal);
-	
-	cerr << "Terminated" << endl
-		 << msg << endl;
-
+	std::string msg = "terminated on signal " + inSignal;
+	cerr << "Terminated" << endl << msg << endl;
 	M6Status::Instance().SetError(sDatabank, msg);
-//	exit(1);
 	abort();
 }
 
@@ -366,26 +360,25 @@ void M6CmdLineDriver::SigHandler(int inSignal)
 
 BOOL WINAPI M6CmdLineDriver::ConsoleHandler(DWORD CEvent)
 {
-    char msg[128];
+  string msg;
 
-    switch(CEvent)
-    {
-	    case CTRL_C_EVENT:			sprintf(msg, "terminated on CTRL-C"); break;
-	    case CTRL_BREAK_EVENT:		sprintf(msg, "terminated on CTRL-BREAK"); break;
-	    case CTRL_CLOSE_EVENT:		sprintf(msg, "terminated on close event"); break;
-	    case CTRL_LOGOFF_EVENT:		sprintf(msg, "terminated on logging off"); break;
-	    case CTRL_SHUTDOWN_EVENT:	sprintf(msg, "terminated on shutdown"); break;
-	    default:					sprintf(msg, "terminated on unknown event"); break;
-    }
+  switch(CEvent)
+  {
+    case CTRL_C_EVENT:        msg = "terminated on CTRL-C"; break;
+    case CTRL_BREAK_EVENT:    msg = "terminated on CTRL-BREAK"; break;
+    case CTRL_CLOSE_EVENT:    msg = "terminated on close event"; break;
+    case CTRL_LOGOFF_EVENT:   msg = "terminated on logging off"; break;
+    case CTRL_SHUTDOWN_EVENT: msg = "terminated on shutdown"; break;
+    default:                  msg = "terminated on unknown event"; break;
+  }
 
-	M6Status::Instance().SetError(sDatabank, msg);
+  M6Status::Instance().SetError(sDatabank, msg);
 
-	cerr << "Terminated" << endl
-		 << msg << endl;
+  cerr << "Terminated" << endl << msg << endl;
 
-	abort();
+  abort();
 
-    return TRUE;
+  return TRUE;
 }
 
 #endif

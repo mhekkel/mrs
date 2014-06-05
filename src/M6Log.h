@@ -7,6 +7,8 @@
 
 #define LOG(level, msg,...) M6Logger::GetLogger().Log(level, msg, ##__VA_ARGS__)
 
+#define LOG4CPP_FIX_ERROR_COLLISION 1
+
 #include <log4cpp/Category.hh>
 
 /// Logging levels used by mrs. Follows the same as for syslog, taken from

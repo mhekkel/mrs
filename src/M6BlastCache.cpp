@@ -316,8 +316,8 @@ string M6BlastCache::Submit(const string& inDatabank, const string& inQuery,
 	if (inReportLimit > 1000)
 		THROW(("Report limit exceeds maximum of 1000 hits"));
 
-	vector<fs::path> files;
-	FastaFilesForDatabank(inDatabank, files);
+	vector<fs::path> fastaFiles;
+	FastaFilesForDatabank(inDatabank, fastaFiles);
 
 	string result;
 	boost::mutex::scoped_lock lock(mCacheMutex);
@@ -331,7 +331,7 @@ string M6BlastCache::Submit(const string& inDatabank, const string& inQuery,
 
 		result = e.id;
 
-		if ((e.status == bj_Finished or e.status == bj_Error) and not e.job.IsStillValid(files))
+		if ((e.status == bj_Finished or e.status == bj_Error) and not e.job.IsStillValid(fastaFiles))
 		{
 			e.status = bj_Queued;
 			StoreJob(e.id, e.job);	// need to store the job again, since the timestamps changed
@@ -344,6 +344,14 @@ string M6BlastCache::Submit(const string& inDatabank, const string& inQuery,
 			
 			if (fs::exists(mCacheDir / (e.id + ".err")))
 				fs::remove(mCacheDir / (e.id + ".err"));
+
+      // reset the timestamps
+      e.job.files.clear();
+      foreach (fs::path& fastaFile, fastaFiles)
+      {
+        M6BlastDbInfo info = { fastaFile.string(), boost::posix_time::from_time_t(fs::last_write_time(fastaFile)) };
+        e.job.files.push_back(info);
+      }
 		}
 
 		LOG(DEBUG,"Returning existing blast job id: %s",result.c_str());
@@ -372,9 +380,9 @@ string M6BlastCache::Submit(const string& inDatabank, const string& inQuery,
 		e.job.gapExtend = inGapExtend;
 		e.job.reportLimit = inReportLimit;
 		
-		foreach (fs::path& file, files)
+		foreach (fs::path& fastaFile, fastaFiles)
 		{
-			M6BlastDbInfo info = { file.string(), boost::posix_time::from_time_t(fs::last_write_time(file)) };
+			M6BlastDbInfo info = { fastaFile.string(), boost::posix_time::from_time_t(fs::last_write_time(fastaFile)) };
 			e.job.files.push_back(info);
 		}
 	

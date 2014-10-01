@@ -4,6 +4,7 @@
 //           http://www.boost.org/LICENSE_1_0.txt)
 
 #include "M6Lib.h"
+#include "M6Log.h"
 
 #if ! defined(_MSC_VER)
 #include <signal.h>
@@ -805,6 +806,14 @@ void M6Server::init_scope(el::scope& scope)
 		databank["id"] = db.mID;
 		databank["name"] = db.mName;
 		databanks.push_back(databank);
+
+		foreach (string alias, db.mAliases) {
+
+			el::object databank;
+			databank["id"] = alias;
+			databank["name"] = alias;
+			databanks.push_back(databank);
+		}
 	}
 	scope.put("databanks", el::object(databanks));
 
@@ -1265,7 +1274,7 @@ void M6Server::handle_search(const zh::request& request,
 	const el::scope& scope, zh::reply& reply)
 {
 	string q, db, id, firstDb;
-	uint32 page, hitCount = 0, firstDocNr = 0;
+	uint32 page, hitCount = 0, firstDocNr = 0, nDBsSearched = 0;
 	
 	zh::parameter_map params;
 	get_parameters(scope, params);
@@ -1284,9 +1293,15 @@ void M6Server::handle_search(const zh::request& request,
 	sub.put("db", el::object(db));
 	sub.put("q", el::object(q));
 
+	std::vector<M6LoadedDatabank>::iterator nameMatchingDBs=
+		std::find_if(mLoadedDatabanks.begin(),mLoadedDatabanks.end(),
+		[&db](M6LoadedDatabank&d) -> bool { return d.mID == db; } );
+
 	if (db.empty() or q.empty() or (db == "all" and q == "*"))
+
 		handle_welcome(request, scope, reply);
-	else if (db == "all")
+
+	else if (nameMatchingDBs == mLoadedDatabanks.end()) // db id not found, try aliases
 	{
 		uint32 hits_per_page = params.get("count", 3).as<uint32>();
 		if (hits_per_page > 5)
@@ -1303,8 +1318,19 @@ void M6Server::handle_search(const zh::request& request,
 		boost::mutex m;
 		vector<el::object> databanks;
 		string error;
-		
-		foreach (M6LoadedDatabank& db, mLoadedDatabanks)
+	
+		std::vector<M6LoadedDatabank> searchDatabanks;
+		if (db == "all")
+			searchDatabanks.assign(mLoadedDatabanks.begin(),mLoadedDatabanks.end());
+		else {
+			foreach (M6LoadedDatabank& d, mLoadedDatabanks) {
+
+				if (d.mAliases.count( db ) > 0)
+					searchDatabanks.push_back( d );
+			}
+		}
+	
+		foreach (M6LoadedDatabank& db, searchDatabanks)
 		{
 			thr.create_thread([&]() {
 				try
@@ -1313,8 +1339,9 @@ void M6Server::handle_search(const zh::request& request,
 					uint32 c;
 					bool r;
 					string dbError;
-					
+
 					Find(db.mID, q, true, 0, 5, false, hits, c, r, dbError);
+					nDBsSearched ++;
 					
 					boost::mutex::scoped_lock lock(m);
 					
@@ -1381,6 +1408,7 @@ void M6Server::handle_search(const zh::request& request,
 			sub.put("relaxed", el::object(true));
 			Find(db, q, false, resultoffset, maxresultcount, true, hits, hitCount, ranked, error);
 		}
+		nDBsSearched ++;
 		
 		if (not hits.empty())
 		{
@@ -1467,7 +1495,7 @@ void M6Server::handle_search(const zh::request& request,
 	if (hitCount == 1)
 		create_redirect(firstDb, firstDocNr, q, true, request, reply);
 	else
-		create_reply_from_template(db == "all" ? "results-for-all.html" : "results.html",
+		create_reply_from_template( (nDBsSearched>1)? "results-for-all.html" : "results.html",
 			sub, reply);
 }
 

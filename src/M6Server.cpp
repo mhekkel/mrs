@@ -812,7 +812,16 @@ void M6Server::init_scope(el::scope& scope)
 			el::object databank;
 			databank["id"] = alias;
 			databank["name"] = alias;
-			databanks.push_back(databank);
+
+			bool contains = false;
+			foreach( el::object dbo , databanks) {
+				if ( dbo["id"] == databank["id"] ) {
+					contains = true;
+					break;
+				}
+			}
+			if ( !contains )
+				databanks.push_back(databank);
 		}
 	}
 	scope.put("databanks", el::object(databanks));
@@ -1297,11 +1306,13 @@ void M6Server::handle_search(const zh::request& request,
 		std::find_if(mLoadedDatabanks.begin(),mLoadedDatabanks.end(),
 		[&db](M6LoadedDatabank&d) -> bool { return d.mID == db; } );
 
+	bool dbIDMatched = nameMatchingDBs != mLoadedDatabanks.end() ;
+
 	if (db.empty() or q.empty() or (db == "all" and q == "*"))
 
 		handle_welcome(request, scope, reply);
 
-	else if (nameMatchingDBs == mLoadedDatabanks.end()) // db id not found, try aliases
+	else if ( !dbIDMatched ) // db id not found, try aliases
 	{
 		uint32 hits_per_page = params.get("count", 3).as<uint32>();
 		if (hits_per_page > 5)
@@ -1495,7 +1506,7 @@ void M6Server::handle_search(const zh::request& request,
 	if (hitCount == 1)
 		create_redirect(firstDb, firstDocNr, q, true, request, reply);
 	else
-		create_reply_from_template( (nDBsSearched>1)? "results-for-all.html" : "results.html",
+		create_reply_from_template( dbIDMatched? "results.html" : "results-for-all.html",
 			sub, reply);
 }
 

@@ -155,6 +155,24 @@ M6BlastCache::~M6BlastCache()
 	}
 }
 
+string statusToString(M6BlastJobStatus status) {
+
+	switch(status) {
+	case bj_Unknown:
+		return "unknown";
+	case bj_Queued:
+		return "queued";
+	case bj_Running:
+		return "running";
+	case bj_Finished:
+		return "finished";
+	case bj_Error:
+		return "error";
+	default:
+		return ""; 
+	}
+}
+
 tr1::tuple<M6BlastJobStatus,string,uint32,double> M6BlastCache::JobStatus(const string& inJobID)
 {
 	boost::mutex::scoped_lock lock(mCacheMutex);
@@ -163,11 +181,15 @@ tr1::tuple<M6BlastJobStatus,string,uint32,double> M6BlastCache::JobStatus(const 
 
 	get<0>(result) = bj_Unknown;
 
+	LOG(DEBUG,"M6BlastCache::JobStatus: looking up job %s in cache",inJobID.c_str());
+
 	auto i = find_if(mResultCache.begin(), mResultCache.end(), [&inJobID](CacheEntry& e) -> bool
 				{ return e.id == inJobID; });
 	
 	if (i != mResultCache.end()) // is requested job id in list ?
 	{
+		LOG(DEBUG,"M6BlastCache::JobStatus: matched job %s with status %s",inJobID.c_str(),statusToString(i->status).c_str());
+
 		get<0>(result) = i->status;
 		
 		try
@@ -214,6 +236,8 @@ tr1::tuple<M6BlastJobStatus,string,uint32,double> M6BlastCache::JobStatus(const 
 			mResultCache.splice(mResultCache.begin(), mResultCache, i, j);
 	}
 	
+	LOG(DEBUG,"M6BlastCache::JobStatus: returning status %s for job %s",statusToString(i->status).c_str(),inJobID.c_str());
+
 	return result;
 }
 

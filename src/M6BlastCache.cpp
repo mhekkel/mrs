@@ -86,6 +86,8 @@ M6BlastCache& M6BlastCache::Instance()
 
 M6BlastCache::M6BlastCache()
 {
+	LOG(DEBUG,"Creating M6BlastCache");
+
 	string s = M6Config::GetDirectory("blast");
 	if (s.empty())
 		THROW(("Missing blastdir configuration"));
@@ -138,6 +140,8 @@ M6BlastCache::M6BlastCache()
 	// finally start the worker thread
 	mStopWorkingFlag = false;
 	mWorkerThread = boost::thread([this](){ this->Work(); });
+
+	LOG(DEBUG,"M6BlastCache has been created");
 }
 
 M6BlastCache::~M6BlastCache()
@@ -313,6 +317,8 @@ string M6BlastCache::Submit(const string& inDatabank, const string& inQuery,
 	bool inGapped, int32 inGapOpen, int32 inGapExtend,
 	uint32 inReportLimit)
 {
+	LOG(DEBUG,"M6BlastCache::Submit call with query length %d and databank %s",inQuery.size(),inDatabank.c_str());
+
 	if (inReportLimit > 1000)
 		THROW(("Report limit exceeds maximum of 1000 hits"));
 
@@ -354,7 +360,7 @@ string M6BlastCache::Submit(const string& inDatabank, const string& inQuery,
       }
 		}
 
-		LOG(DEBUG,"Returning existing blast job id: %s",result.c_str());
+		LOG(DEBUG,"M6BlastCache::Submit: returning existing blast job id: %s",result.c_str());
 
 		break;
 	}
@@ -394,7 +400,7 @@ string M6BlastCache::Submit(const string& inDatabank, const string& inQuery,
 
 		result = e.id;
 
-		LOG(DEBUG,"Returning newly created blast job id: %s",result.c_str());
+		LOG(DEBUG,"M6BlastCache::Submit: returning newly created blast job id: %s",result.c_str());
 	}
 
 	return result;
@@ -487,6 +493,8 @@ void M6BlastCache::ExecuteJob(const string& inJobID)
 	}
 	catch (exception& e)
 	{
+		LOG(DEBUG,"M6BlastCache::ExecuteJob: exception thrown for job %s: %s",inJobID.c_str(),e.what());
+
 		SetJobStatus(inJobID, bj_Error);
 
 		fs::ofstream file(mCacheDir / (inJobID + ".err"));

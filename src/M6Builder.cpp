@@ -48,6 +48,7 @@
 #include "M6Exec.h"
 #include "M6Parser.h"
 #include "M6Utilities.h"
+#include "M6Log.h"
 
 using namespace std;
 using namespace std::tr1;
@@ -651,6 +652,8 @@ int64 M6Builder::Glob(boost::filesystem::path inRawDir,
 void M6Builder::Build(uint32 inNrOfThreads)
 {
 	string dbID = mConfig->get_attribute("id");
+
+	LOG(DEBUG,"building %s in %d threads",dbID.c_str(),inNrOfThreads);
 	
 //	boost::timer::auto_cpu_timer t;
 
@@ -792,6 +795,8 @@ void M6Scheduler::Schedule(const string& inDatabank, const char* inAction)
 	if (find_if(mScheduled.begin(), mScheduled.end(), [inDatabank](tr1::tuple<string,string>& s) -> bool
 			{ return tr1::get<0>(s) == inDatabank; }) == mScheduled.end())
 	{
+		LOG(DEBUG,"scheduling update for %s",inDatabank.c_str());
+
 		mScheduled.push_back(tr1::make_tuple(inDatabank, inAction));
 	}
 }
@@ -924,7 +929,9 @@ void M6Scheduler::Run()
 				args.push_back(nullptr);
 				
 				*mLogFile << "About to " << action << ' ' << databank << endl;
-				
+
+				LOG(DEBUG,"fork executing %s %s %s",exe.c_str(),action.c_str(),databank.c_str());
+	
 				stringstream in;
 				int r = ForkExec(args, 0, in, *mLogFile, *mLogFile);
 				

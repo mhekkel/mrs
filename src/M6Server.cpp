@@ -834,6 +834,8 @@ void M6Server::init_scope(el::scope& scope)
 
 void M6Server::handle_request(const zh::request& req, zh::reply& rep)
 {
+	LOG(DEBUG,"M6Server: recieved %s request with uri %s",req.method.c_str(),req.uri.c_str());
+
 	try
 	{
 		zh::webapp::handle_request(req, rep);
@@ -3525,6 +3527,8 @@ void RunMainLoop(uint32 inNrOfThreads, bool redirectOutputToLog)
 			port = "80";
 		
 		M6Server server(config);
+
+		LOG(DEBUG,"RunMainLoop: binding server to %s:%s",addr.c_str(),port.c_str());
 	
 		server.bind(addr, boost::lexical_cast<uint16>(port));
 		boost::thread thread(boost::bind(&zeep::http::server::run, boost::ref(server), inNrOfThreads));
@@ -3534,6 +3538,8 @@ void RunMainLoop(uint32 inNrOfThreads, bool redirectOutputToLog)
 			 << " listening at " << addr << ':' << port << endl;
 		
 		catcher.UnblockSignals();
+
+		LOG(DEBUG,"RunMainLoop: waiting for signals..");
 		
 		int sig = catcher.WaitForSignal();
 
@@ -3548,6 +3554,9 @@ void RunMainLoop(uint32 inNrOfThreads, bool redirectOutputToLog)
 		case SIGTERM: sigstr = "SIGTERM"; break;
 		default: sigstr = boost::lexical_cast<string>(sig); break;
 		}
+
+		LOG(WARN,"RunMainLoop: recieved signal: %s",sigstr.c_str());
+
 		cerr << local_date_time(second_clock::local_time(), time_zone_ptr()) << " RunMainLoop recieved signal: " << sigstr << endl;
 		
 		server.stop();
@@ -3621,14 +3630,19 @@ int M6Server::Start(const string& inRunAs, const string& inPidFile, bool inForeg
 			acceptor.set_option(boost::asio::ip::tcp::acceptor::reuse_address(true));
 			acceptor.bind(endpoint);
 			acceptor.listen();
+
+			LOG(DEBUG,"M6Server::Start: listening at %s:%s",addr.c_str(),port.c_str());
 		}
 		catch (exception& e)
 		{
 			THROW(("Is mrs running already? %s", e.what()));
 		}
 
-		if (not inForeground)
+		if (not inForeground) {
+
+			LOG(DEBUG,"M6Server::Start: deamonizing");
 			Daemonize(runas, pidfile);
+		}
 
 		(void)M6Scheduler::Instance();
 		
@@ -3642,6 +3656,8 @@ int M6Server::Start(const string& inRunAs, const string& inPidFile, bool inForeg
 			try { fs::remove(pidfile); } catch (...) {}
 		}
 	}
+
+	LOG(DEBUG,"M6Server::Start: returning result %d",result);
 	
 	return result;
 }

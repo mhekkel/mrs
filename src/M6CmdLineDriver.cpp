@@ -713,6 +713,9 @@ int M6InfoDriver::Exec(const string& inCommand, po::variables_map& vm)
 	
 	cout << "Statistics for databank " << path << endl
 		 << endl
+		 << "Version : " << info.mVersion << endl
+		 << "Last Update : " << info.mLastUpdate << endl
+		 << endl
 		 << "Number of documents : " << formatNr(info.mDocCount, 18) << endl
 		 << "Raw text in bytes   : " << formatNr(info.mRawTextSize, 18) << endl
 		 << "Data store size     : " << formatNr(info.mDataStoreSize, 18) << endl

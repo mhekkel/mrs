@@ -598,7 +598,7 @@ void M6Server::Find(const string& inDatabank, const string& inQuery, bool inAllT
 		outHitCount = 0;
 	else
 	{
-		outHitCount = rset->GetCount();
+		outHitCount = rset->GetCount(); // can be wrong !
 		outRanked = rset->IsRanked();
 	
 		uint32 docNr, nr = 1;
@@ -629,9 +629,10 @@ void M6Server::Find(const string& inDatabank, const string& inQuery, bool inAllT
 			outHits.push_back(hit);
 			++nr;
 		}
-		
-		if (inMaxResultCount == 0)
-			outHitCount = nr - 1;
+	
+		// count the number of hits in rset
+		outHitCount = nr - 1;
+		while (rset->Next(docNr, score)) outHitCount++;
 	}		
 }
 
@@ -667,8 +668,11 @@ uint32 M6Server::Count(const string& inDatabank, const string& inQuery)
 				else
 					rset.reset(db->Find(queryTerms, filter, not isBooleanQuery, 1));
 	
-				if (rset)
-					result += rset->GetCount();
+				if (rset) {
+
+					uint32 docNr; float score;
+					while (rset->Next(docNr, score)) result++;
+				}
 			}
 		}
 	}
@@ -877,6 +881,8 @@ void M6Server::handle_welcome(const zh::request& request, const el::scope& scope
 {
 	el::scope sub(scope);
 
+	LOG(DEBUG,"handle welcome");
+
 	if (not mWebServices.empty())
 	{
 		el::object wsdl;
@@ -891,6 +897,8 @@ void M6Server::handle_welcome(const zh::request& request, const el::scope& scope
 		}
 		sub.put("wsdl", wsdl);
 	}
+
+	LOG(DEBUG,"reply in index.html");
 
 	create_reply_from_template("index.html", sub, reply);
 }
@@ -1310,10 +1318,13 @@ void M6Server::handle_search(const zh::request& request,
 
 	bool dbIDMatched = nameMatchingDBs != mLoadedDatabanks.end() ;
 
-	if (db.empty() or q.empty() or (db == "all" and q == "*"))
+	LOG(DEBUG,"handle_search db=\'%s\' q=\'%s\'",db.c_str(),q.c_str());
+
+	if (db.empty() or q.empty() or (db == "all" and q == "*")) {
 
 		handle_welcome(request, scope, reply);
 
+	}
 	else if ( !dbIDMatched ) // db id not found, try aliases
 	{
 		uint32 hits_per_page = params.get("count", 3).as<uint32>();

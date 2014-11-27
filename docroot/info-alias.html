@@ -1,0 +1,100 @@
+<html xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:mrs="http://mrs.cmbi.ru.nl/mrs-web/ml"
+	xml:lang="en" lang="en">
+<head>
+    <title>M6</title>
+
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="author" content="Maarten L. Hekkelman" />
+    <meta name="generator" content="Japi" />
+	<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+
+	<link rel="stylesheet" type="text/css" href="css/mrs-style.css" />
+
+	<script src="scripts/jquery/jquery.js" type="text/javascript">
+	</script>
+
+	<script src="scripts/mrs.js" type="text/javascript">
+	</script>
+</head>
+<body>
+	<mrs:include file="header.html" />
+
+	<div id="main">
+
+	<h2>Note: ${alias} is alias for ${aliased}</h2>
+
+	<mrs:iterate collection="info-databanks" var="databank">
+
+		<mrs:if test="${empty databank.id}">
+			<p>No such databank</p>
+		</mrs:if>
+
+		<mrs:if test="${databank}">
+
+		<table class="list" cellspacing="0" cellpadding="0">
+			<caption>Statistics for ${databank.id}</caption>
+			<tr><th>Name</th><th>Value</th></tr>
+			<tr>
+				<td>Name</td>
+				<td style="text-align:right;">${databank.name}</td>
+			</tr>
+			<tr>
+				<td>Source</td>
+				<td style="text-align:right;"><a href="${databank.info}">${databank.info}</a></td>
+			</tr>
+			<tr>
+				<td>Parser</td>
+				<td style="text-align:right;">
+					<a href="script?script=${databank.parser}">${databank.parser}</a>
+				</td>
+			</tr>
+			<tr>
+				<td>Number of records</td>
+				<td style="text-align:right;"><mrs:number n="${databank.count}"/></td>
+			</tr>
+			<tr>
+				<td>Location</td>
+				<td style="text-align:right;">${databank.path}</td>
+			</tr>
+			<tr>
+				<td>Last Update</td>
+				<td style="text-align:right;">${databank.buildDate}</td>
+			</tr>
+			<tr>
+				<td>On Disk Size</td>
+				<td style="text-align:right"><mrs:number f='#,##0B' n='${databank.onDiskSize}'/></td>
+			</tr>
+			<tr>
+				<td>Raw Data Size</td>
+				<td style="text-align:right"><mrs:number f='#,##0B' n='${databank.rawDataSize}'/></td>
+			</tr>
+		</table>
+		
+		<br/>
+		
+		<mrs:if test="${databank.indices}">
+			<table class="list" cellspacing="0" cellpadding="0">
+				<caption>Indices for ${databank.id}</caption>
+				<tr><th>id</th><th>kind</th><th>count</th><th>file size</th><th>description</th></tr>
+				<mrs:iterate var="i" collection="${databank.indices}">
+					<tr>
+						<td><a href="browse?db=${databank.id}&amp;ix=${i.id}">${i.id}</a></td>
+						<td>${i.type}</td>
+						<td style="text-align:right"><mrs:number n="${i.count}"/></td>
+						<td style="text-align:right;"><mrs:number f='#,##0B' n="${i.size}"/></td>
+						<td>${i.desc}</td>
+					</tr>
+				</mrs:iterate>
+			</table>
+
+			<br/>
+
+		</mrs:if>
+		
+		</mrs:if>
+	</mrs:iterate>
+
+	</div>
+</body>
+</html>

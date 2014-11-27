@@ -3332,10 +3332,17 @@ void M6Server::handle_info(const zh::request& request, const el::scope& scope, z
 
 	el::scope sub(scope);
 
-	string db = params.get("db", "").as<string>();
-	if (db.empty())
+	string dbAlias = params.get("db", "").as<string>();
+	if (dbAlias.empty())
 		THROW(("No databank specified"));
-	
+
+	vector<string> aliased = UnAlias(dbAlias);
+	bool bAlias = aliased.size()>1 || aliased[0] != dbAlias ;
+
+	vector<el::object> databanks;
+	foreach(string db, aliased)
+	{
+
 	foreach (M6LoadedDatabank& ldb, mLoadedDatabanks)
 	{
 		if (ldb.mID != db)
@@ -3387,11 +3394,32 @@ void M6Server::handle_info(const zh::request& request, const el::scope& scope, z
 		
 		databank["indices"] = el::object(indices);
 		
-		sub.put("databank", databank);
+		databanks.push_back(databank);
+		if (!bAlias)
+			sub.put("databank", databank);
 		break;
 	}
+	}
+	
 
-	create_reply_from_template("info.html", sub, reply);
+	if(bAlias) {
+
+		string dbList = "";
+		foreach(string db, aliased) {
+			if(! dbList.empty() )
+				dbList += " + ";
+			dbList += db ;
+		}
+
+		sub.put("info-databanks", el::object(databanks));
+		sub.put("alias",dbAlias);
+		sub.put("aliased",dbList);
+
+		create_reply_from_template("info-alias.html", sub, reply);
+	}
+	else {
+		create_reply_from_template("info.html", sub, reply);
+	}
 }
 
 void M6Server::handle_browse(const zh::request& request, const el::scope& scope, zh::reply& reply)

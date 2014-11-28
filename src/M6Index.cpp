@@ -386,9 +386,10 @@ static M6MatchResult M6Match(const char* inPattern, const char* inName, uint32 i
 				const char* n = inName;
 				while (inLength > 0)
 				{
-					if (M6Match(inPattern + 1, n, --inLength) == eM6Match)
+					if (M6Match(inPattern + 1, n, inLength) == eM6Match)
 						return eM6Match;
-					++n;
+
+					++n; inLength--;
 				}
 				return eM6NoMatchAndEqual;
 			}
@@ -2806,10 +2807,10 @@ void M6IndexImplT<M6DataType>::FindPattern(const string& inPattern, vector<bool>
 	Visit([&](const char* inKey, uint32 inKeyLen, const M6DataType& inData) -> bool
 	{
 		M6MatchResult r = M6Match(inPattern.c_str(), inKey, inKeyLen);
-		
+
 		if (r == eM6Match)
 			outCount += this->AddHits(inData, outBitmap);
-		
+
 		return r != eM6NoMatchAndGreater;
 	}, page, key);
 }

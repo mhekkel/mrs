@@ -1253,6 +1253,29 @@ void M6BatchIndexProcessor::Finish(uint32 inDocCount)
 
 // --------------------------------------------------------------------
 
+string determineDatabankVersion(fs::path dbDirectory)
+{
+	string version="";
+
+	// read version info, if it exists...
+	if (fs::exists(dbDirectory / "version.txt"))
+	{
+		fs::ifstream versionFile(dbDirectory / "version.txt");
+		getline(versionFile, version);
+	}
+
+	if (version.empty())
+	{
+		using namespace boost::gregorian;
+		using namespace boost::posix_time;
+
+		ptime t = from_time_t(fs::last_write_time(dbDirectory));
+		version = to_iso_extended_string(t.date());
+	}
+
+	return version;
+}
+
 M6DatabankImpl::M6DatabankImpl(M6Databank& inDatabank, const fs::path& inPath, MOpenMode inMode)
 	: mDatabank(inDatabank)
 	, mDbDirectory(inPath)
@@ -1343,21 +1366,8 @@ M6DatabankImpl::M6DatabankImpl(M6Databank& inDatabank, const fs::path& inPath, M
 		getline(file, mUUID);
 	}
 
-	// read version info, if it exists...
-	if (fs::exists(mDbDirectory / "version.txt"))
-	{
-		fs::ifstream versionFile(mDbDirectory / "version.txt");
-		getline(versionFile, mVersion);
-	}
-	
-	if (mVersion.empty())
-	{
-		using namespace boost::gregorian;
-		using namespace boost::posix_time;
-		
-		ptime t = from_time_t(fs::last_write_time(mDbDirectory));
-		mVersion = to_iso_extended_string(t.date());
-	}
+	// determine version
+	mVersion = determineDatabankVersion(mDbDirectory);
 }
 
 M6DatabankImpl::M6DatabankImpl(M6Databank& inDatabank, const string& inDatabankID,

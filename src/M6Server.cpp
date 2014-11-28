@@ -4,6 +4,7 @@
 //           http://www.boost.org/LICENSE_1_0.txt)
 
 #include "M6Lib.h"
+#include "M6Log.h"
 
 #if ! defined(_MSC_VER)
 #include <signal.h>
@@ -597,7 +598,7 @@ void M6Server::Find(const string& inDatabank, const string& inQuery, bool inAllT
 		outHitCount = 0;
 	else
 	{
-		outHitCount = rset->GetCount();
+		outHitCount = rset->GetCount(); // can be wrong !
 		outRanked = rset->IsRanked();
 	
 		uint32 docNr, nr = 1;
@@ -628,9 +629,10 @@ void M6Server::Find(const string& inDatabank, const string& inQuery, bool inAllT
 			outHits.push_back(hit);
 			++nr;
 		}
-		
-		if (inMaxResultCount == 0)
-			outHitCount = nr - 1;
+	
+		// count the number of hits in rset
+		outHitCount = nr - 1;
+		while (rset->Next(docNr, score)) outHitCount++;
 	}		
 }
 
@@ -666,8 +668,11 @@ uint32 M6Server::Count(const string& inDatabank, const string& inQuery)
 				else
 					rset.reset(db->Find(queryTerms, filter, not isBooleanQuery, 1));
 	
-				if (rset)
-					result += rset->GetCount();
+				if (rset) {
+
+					uint32 docNr; float score;
+					while (rset->Next(docNr, score)) result++;
+				}
 			}
 		}
 	}
@@ -805,6 +810,23 @@ void M6Server::init_scope(el::scope& scope)
 		databank["id"] = db.mID;
 		databank["name"] = db.mName;
 		databanks.push_back(databank);
+
+		foreach (string alias, db.mAliases) {
+
+			el::object databank;
+			databank["id"] = alias;
+			databank["name"] = alias;
+
+			bool contains = false;
+			foreach( el::object dbo , databanks) {
+				if ( dbo["id"] == databank["id"] ) {
+					contains = true;
+					break;
+				}
+			}
+			if ( !contains )
+				databanks.push_back(databank);
+		}
 	}
 	scope.put("databanks", el::object(databanks));
 
@@ -816,6 +838,8 @@ void M6Server::init_scope(el::scope& scope)
 
 void M6Server::handle_request(const zh::request& req, zh::reply& rep)
 {
+	LOG(DEBUG,"M6Server: recieved %s request with uri %s",req.method.c_str(),req.uri.c_str());
+
 	try
 	{
 		zh::webapp::handle_request(req, rep);
@@ -857,6 +881,8 @@ void M6Server::handle_welcome(const zh::request& request, const el::scope& scope
 {
 	el::scope sub(scope);
 
+	LOG(DEBUG,"handle welcome");
+
 	if (not mWebServices.empty())
 	{
 		el::object wsdl;
@@ -871,6 +897,8 @@ void M6Server::handle_welcome(const zh::request& request, const el::scope& scope
 		}
 		sub.put("wsdl", wsdl);
 	}
+
+	LOG(DEBUG,"reply in index.html");
 
 	create_reply_from_template("index.html", sub, reply);
 }
@@ -1265,7 +1293,7 @@ void M6Server::handle_search(const zh::request& request,
 	const el::scope& scope, zh::reply& reply)
 {
 	string q, db, id, firstDb;
-	uint32 page, hitCount = 0, firstDocNr = 0;
+	uint32 page, hitCount = 0, firstDocNr = 0, nDBsSearched = 0;
 	
 	zh::parameter_map params;
 	get_parameters(scope, params);
@@ -1284,9 +1312,20 @@ void M6Server::handle_search(const zh::request& request,
 	sub.put("db", el::object(db));
 	sub.put("q", el::object(q));
 
-	if (db.empty() or q.empty() or (db == "all" and q == "*"))
+	std::vector<M6LoadedDatabank>::iterator nameMatchingDBs=
+		std::find_if(mLoadedDatabanks.begin(),mLoadedDatabanks.end(),
+		[&db](M6LoadedDatabank&d) -> bool { return d.mID == db; } );
+
+	bool dbIDMatched = nameMatchingDBs != mLoadedDatabanks.end() ;
+
+	LOG(DEBUG,"handle_search db=\'%s\' q=\'%s\'",db.c_str(),q.c_str());
+
+	if (db.empty() or q.empty() or (db == "all" and q == "*")) {
+
 		handle_welcome(request, scope, reply);
-	else if (db == "all")
+
+	}
+	else if ( !dbIDMatched ) // db id not found, try aliases
 	{
 		uint32 hits_per_page = params.get("count", 3).as<uint32>();
 		if (hits_per_page > 5)
@@ -1303,8 +1342,19 @@ void M6Server::handle_search(const zh::request& request,
 		boost::mutex m;
 		vector<el::object> databanks;
 		string error;
-		
-		foreach (M6LoadedDatabank& db, mLoadedDatabanks)
+	
+		std::vector<M6LoadedDatabank> searchDatabanks;
+		if (db == "all")
+			searchDatabanks.assign(mLoadedDatabanks.begin(),mLoadedDatabanks.end());
+		else {
+			foreach (M6LoadedDatabank& d, mLoadedDatabanks) {
+
+				if (d.mAliases.count( db ) > 0)
+					searchDatabanks.push_back( d );
+			}
+		}
+	
+		foreach (M6LoadedDatabank& db, searchDatabanks)
 		{
 			thr.create_thread([&]() {
 				try
@@ -1313,8 +1363,9 @@ void M6Server::handle_search(const zh::request& request,
 					uint32 c;
 					bool r;
 					string dbError;
-					
+
 					Find(db.mID, q, true, 0, 5, false, hits, c, r, dbError);
+					nDBsSearched ++;
 					
 					boost::mutex::scoped_lock lock(m);
 					
@@ -1381,6 +1432,7 @@ void M6Server::handle_search(const zh::request& request,
 			sub.put("relaxed", el::object(true));
 			Find(db, q, false, resultoffset, maxresultcount, true, hits, hitCount, ranked, error);
 		}
+		nDBsSearched ++;
 		
 		if (not hits.empty())
 		{
@@ -1467,7 +1519,7 @@ void M6Server::handle_search(const zh::request& request,
 	if (hitCount == 1)
 		create_redirect(firstDb, firstDocNr, q, true, request, reply);
 	else
-		create_reply_from_template(db == "all" ? "results-for-all.html" : "results.html",
+		create_reply_from_template( dbIDMatched? "results.html" : "results-for-all.html",
 			sub, reply);
 }
 
@@ -3280,10 +3332,17 @@ void M6Server::handle_info(const zh::request& request, const el::scope& scope, z
 
 	el::scope sub(scope);
 
-	string db = params.get("db", "").as<string>();
-	if (db.empty())
+	string dbAlias = params.get("db", "").as<string>();
+	if (dbAlias.empty())
 		THROW(("No databank specified"));
-	
+
+	vector<string> aliased = UnAlias(dbAlias);
+	bool bAlias = aliased.size()>1 || aliased[0] != dbAlias ;
+
+	vector<el::object> databanks;
+	foreach(string db, aliased)
+	{
+
 	foreach (M6LoadedDatabank& ldb, mLoadedDatabanks)
 	{
 		if (ldb.mID != db)
@@ -3335,11 +3394,32 @@ void M6Server::handle_info(const zh::request& request, const el::scope& scope, z
 		
 		databank["indices"] = el::object(indices);
 		
-		sub.put("databank", databank);
+		databanks.push_back(databank);
+		if (!bAlias)
+			sub.put("databank", databank);
 		break;
 	}
+	}
+	
 
-	create_reply_from_template("info.html", sub, reply);
+	if(bAlias) {
+
+		string dbList = "";
+		foreach(string db, aliased) {
+			if(! dbList.empty() )
+				dbList += " + ";
+			dbList += db ;
+		}
+
+		sub.put("info-databanks", el::object(databanks));
+		sub.put("alias",dbAlias);
+		sub.put("aliased",dbList);
+
+		create_reply_from_template("info-alias.html", sub, reply);
+	}
+	else {
+		create_reply_from_template("info.html", sub, reply);
+	}
 }
 
 void M6Server::handle_browse(const zh::request& request, const el::scope& scope, zh::reply& reply)
@@ -3486,6 +3566,8 @@ void RunMainLoop(uint32 inNrOfThreads, bool redirectOutputToLog)
 			port = "80";
 		
 		M6Server server(config);
+
+		LOG(DEBUG,"RunMainLoop: binding server to %s:%s",addr.c_str(),port.c_str());
 	
 		server.bind(addr, boost::lexical_cast<uint16>(port));
 		boost::thread thread(boost::bind(&zeep::http::server::run, boost::ref(server), inNrOfThreads));
@@ -3495,6 +3577,8 @@ void RunMainLoop(uint32 inNrOfThreads, bool redirectOutputToLog)
 			 << " listening at " << addr << ':' << port << endl;
 		
 		catcher.UnblockSignals();
+
+		LOG(DEBUG,"RunMainLoop: waiting for signals..");
 		
 		int sig = catcher.WaitForSignal();
 
@@ -3509,6 +3593,9 @@ void RunMainLoop(uint32 inNrOfThreads, bool redirectOutputToLog)
 		case SIGTERM: sigstr = "SIGTERM"; break;
 		default: sigstr = boost::lexical_cast<string>(sig); break;
 		}
+
+		LOG(WARN,"RunMainLoop: recieved signal: %s",sigstr.c_str());
+
 		cerr << local_date_time(second_clock::local_time(), time_zone_ptr()) << " RunMainLoop recieved signal: " << sigstr << endl;
 		
 		server.stop();
@@ -3582,14 +3669,19 @@ int M6Server::Start(const string& inRunAs, const string& inPidFile, bool inForeg
 			acceptor.set_option(boost::asio::ip::tcp::acceptor::reuse_address(true));
 			acceptor.bind(endpoint);
 			acceptor.listen();
+
+			LOG(DEBUG,"M6Server::Start: listening at %s:%s",addr.c_str(),port.c_str());
 		}
 		catch (exception& e)
 		{
 			THROW(("Is mrs running already? %s", e.what()));
 		}
 
-		if (not inForeground)
+		if (not inForeground) {
+
+			LOG(DEBUG,"M6Server::Start: deamonizing");
 			Daemonize(runas, pidfile);
+		}
 
 		(void)M6Scheduler::Instance();
 		
@@ -3603,6 +3695,8 @@ int M6Server::Start(const string& inRunAs, const string& inPidFile, bool inForeg
 			try { fs::remove(pidfile); } catch (...) {}
 		}
 	}
+
+	LOG(DEBUG,"M6Server::Start: returning result %d",result);
 	
 	return result;
 }

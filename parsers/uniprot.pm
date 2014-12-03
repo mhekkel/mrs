@@ -177,7 +177,7 @@ sub to_fasta
 
 	die("no sequence") unless
 		$doc =~ /SEQUENCE\s+(\d+) AA;\s+\d+ MW;\s+[0-9A-F]{16} CRC64;\n((\s+.+\n)+)\/\//m ;
-	
+
 	my $len = $1;
 	my $seq = $2;
 	
@@ -189,7 +189,29 @@ sub to_fasta
 	
 	$seq =~ s/.{72}/$&\n/g;
 
-	return ">gnl|$db|$id $title\n$seq\n";
+	my @acs=();
+	while ($doc =~ m/^AC\s+([A-Z0-9\-\s;]+)+\n/gm)
+	{
+		my $value=$1 ;
+		foreach my $ac (split(m/;\s*/, $value))
+		{
+			push(@acs,$ac) ;
+		}
+	}
+
+	if (scalar @acs)
+	{
+		my $result = '';
+		foreach my $ac (@acs)
+		{
+			$result .= ">gnl|$db|$id|$ac $title\n$seq\n";
+		}
+		return $result;
+	}
+	else
+	{
+		return ">gnl|$db|$id $title\n$seq\n";
+	}
 }
 
 sub version

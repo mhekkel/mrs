@@ -237,6 +237,7 @@ bool M6IntersectionIterator::Next(uint32& outDoc, float& outRank)
 		sort(mIterators.begin(), mIterators.end());
 
 		outDoc = mIterators.back().mDoc;
+		result = true;
 
 		foreach (M6IteratorPart& part, mIterators)
 		{
@@ -248,11 +249,11 @@ bool M6IntersectionIterator::Next(uint32& outDoc, float& outRank)
 					break;
 				}
 			}
+			result = result and part.mDoc == outDoc;
 		}
 
-		if (mIterators.front().mDoc == outDoc)
+		if (result)
 		{
-			result = true;
 			foreach (M6IteratorPart& part, mIterators)
 				done = done or part.mIter->Next(part.mDoc, r) == false;
 			break;

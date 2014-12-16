@@ -3538,11 +3538,15 @@ void RunMainLoop(uint32 inNrOfThreads, bool redirectOutputToLog)
 	{
 		if (redirectOutputToLog)
 		{
+			LOG(DEBUG,"RunMainLoop: redirecting output to log");
+
 			// (re-)open the log files.
 			fs::path logfile = fs::path(M6Config::GetDirectory("log")) / "access.log";
 			fs::path errfile = fs::path(M6Config::GetDirectory("log")) / "error.log";
 			OpenLogFile(logfile.string(), errfile.string());
 		}
+
+		LOG(DEBUG,"RunMainLoop: importing namespaces");
 
 		using namespace boost::local_time;
 		using namespace boost::posix_time;
@@ -3551,9 +3555,13 @@ void RunMainLoop(uint32 inNrOfThreads, bool redirectOutputToLog)
 		cerr.imbue(std::locale(std::cout.getloc(), lf));
 		cerr << local_date_time(second_clock::local_time(), time_zone_ptr())
 			 << " Restarting services...";
-		
+
+		LOG(DEBUG,"RunMainLoop: blocking signals");
+
 		M6SignalCatcher catcher;
 		catcher.BlockSignals();
+
+		LOG(DEBUG,"RunMainLoop: get config");
 	
 		const zx::element* config = M6Config::GetServer();
 		if (config == nullptr)
@@ -3565,6 +3573,8 @@ void RunMainLoop(uint32 inNrOfThreads, bool redirectOutputToLog)
 		if (port.empty())
 			port = "80";
 		
+		LOG(DEBUG,"RunMainLoop: configuring server");
+
 		M6Server server(config);
 
 		LOG(DEBUG,"RunMainLoop: binding server to %s:%s",addr.c_str(),port.c_str());
@@ -3576,6 +3586,8 @@ void RunMainLoop(uint32 inNrOfThreads, bool redirectOutputToLog)
 			 << local_date_time(second_clock::local_time(), time_zone_ptr())
 			 << " listening at " << addr << ':' << port << endl;
 		
+		LOG(DEBUG,"RunMainLoop: unblocking signals");
+
 		catcher.UnblockSignals();
 
 		LOG(DEBUG,"RunMainLoop: waiting for signals..");
@@ -3599,6 +3611,9 @@ void RunMainLoop(uint32 inNrOfThreads, bool redirectOutputToLog)
 		cerr << local_date_time(second_clock::local_time(), time_zone_ptr()) << " RunMainLoop recieved signal: " << sigstr << endl;
 		
 		server.stop();
+
+		LOG(DEBUG,"RunMainLoop: stopped server");
+
 #ifdef BOOST_CHRONO_EXTENSIONS
 		if (not thread.try_join_for(boost::chrono::seconds(5)))
 #else
@@ -3608,6 +3623,8 @@ void RunMainLoop(uint32 inNrOfThreads, bool redirectOutputToLog)
 			thread.interrupt();
 			thread.detach();
 		}
+
+		LOG(DEBUG,"RunMainLoop: ending iteration");
 	
 		if (sig == SIGHUP)
 			continue;

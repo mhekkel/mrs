@@ -140,11 +140,20 @@ M6Server::M6Server(const zx::element* inConfig)
 	, mAlignEnabled(false)
 	, mConfigCopy(nullptr)
 {
+	LOG(DEBUG,"M6Server: load databanks");
+
 	LoadAllDatabanks();
 
+	LOG(DEBUG,"M6Server: set docroot");
+
 	set_docroot(M6Config::GetDirectory("docroot"));
+
+	LOG(DEBUG,"M6Server: set log forwarded");
+
 	log_forwarded(mConfig->get_attribute("log-forwarded") == "true");
 	
+	LOG(DEBUG,"M6Server: mounting pages");
+
 	mount("",				boost::bind(&M6Server::handle_welcome, this, _1, _2, _3));
 	mount("download",		boost::bind(&M6Server::handle_download, this, _1, _2, _3));
 	mount("entry",			boost::bind(&M6Server::handle_entry, this, _1, _2, _3));
@@ -182,6 +191,8 @@ M6Server::M6Server(const zx::element* inConfig)
 	mount("ajax/blast/queue",	boost::bind(&M6Server::handle_admin_blast_queue_ajax, this, _1, _2, _3));
 	mount("ajax/blast/delete",	boost::bind(&M6Server::handle_admin_blast_delete_ajax, this, _1, _2, _3));
 
+	LOG(DEBUG,"M6Server: add processors");
+
 	add_processor("link",	boost::bind(&M6Server::process_mrs_link, this, _1, _2, _3));
 	add_processor("enable",	boost::bind(&M6Server::process_mrs_enable, this, _1, _2, _3));
 
@@ -196,10 +207,14 @@ M6Server::M6Server(const zx::element* inConfig)
 			mBaseURL += '/';
 	}
 
+	LOG(DEBUG,"M6Server: getting clustal");
+
 	fs::path clustalo(M6Config::GetTool("clustalo"));
 	if (fs::exists(clustalo))
 		mAlignEnabled = true;
 		
+	LOG(DEBUG,"M6Server: mounting web services");
+
 	// web services:
 	foreach (zx::element* ws, mConfig->find("web-service"))
 	{
@@ -256,9 +271,13 @@ M6Server::M6Server(const zx::element* inConfig)
 			reply.set_content(d->make_wsdl(location));
 		});
 	}
+
+	LOG(DEBUG,"M6Server: setting instance");
 	
 	if (sInstance == nullptr)
 		sInstance = this;
+
+	LOG(DEBUG,"M6Server: done");
 }
 
 M6Server::~M6Server()
@@ -592,7 +611,8 @@ void M6Server::Find(const string& inDatabank, const string& inQuery, bool inAllT
 	if (queryTerms.empty())
 		rset.reset(filter);
 	else
-		rset.reset(databank->Find(queryTerms, filter, inAllTermsRequired, inResultOffset + inMaxResultCount));
+		rset.reset(databank->Find(queryTerms, filter, inAllTermsRequired, numeric_limits<uint32>::max()));//inResultOffset + inMaxResultCount));
+		// We want to report the total number of hits, thus no report limit here!
 
 	if (not rset or rset->GetCount() == 0)
 		outHitCount = 0;

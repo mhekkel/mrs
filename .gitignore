@@ -37,3 +37,4 @@ mrs
 checkcache
 mrs.1
 obj/
+obj.dbg/

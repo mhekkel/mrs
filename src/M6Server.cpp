@@ -951,7 +951,17 @@ void M6Server::handle_download(const zh::request& request, const el::scope& scop
 		if (p.first == "id")
 		{
 			id = p.second.as<string>();
-			ss << GetEntry(db, id, format);
+
+			string m_db = db;
+                        size_t pos;
+                        if ((pos = id.find ("/")) != string::npos)
+                        {
+				// databank name included in id
+                                m_db = id.substr (0, pos);
+				id = id.substr (pos + 1);
+                        }
+
+                        ss << GetEntry (m_db, id, format);
 			++n;
 		}
 		else if (p.first == "nr")

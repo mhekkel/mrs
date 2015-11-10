@@ -6,8 +6,6 @@
 
 #include <boost/filesystem.hpp>
 #include <zeep/xml/document.hpp>
-#include <boost/foreach.hpp>
-#define foreach BOOST_FOREACH
 #include <boost/algorithm/string.hpp>
 #include <boost/format.hpp>
 
@@ -58,11 +56,11 @@ BOOST_AUTO_TEST_CASE(test_tok_1)
 {
 	cout << "testing tokenizer 1" << endl;
 	
-	foreach (M6TokenTest& test, kTestTokens)
+	for (M6TokenTest& test : kTestTokens)
 	{
 		M6Tokenizer tok(test.text, strlen(test.text));
 		uint32 i = 0;
-		foreach (M6Token testToken, test.tokens)
+		for (M6Token testToken : test.tokens)
 		{
 			M6Token token = tok.GetNextWord();
 			BOOST_CHECK_EQUAL(token, testToken);
@@ -196,7 +194,7 @@ BOOST_AUTO_TEST_CASE(test_lex_1)
 		}
 	}
 
-	foreach (const string& word, words)
+	for (const string& word : words)
 		BOOST_CHECK_EQUAL(wordmap[lexicon.Lookup(word)], word);
 
 	for (uint32 t = 1; t < lexicon.Count(); ++t)

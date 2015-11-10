@@ -7,8 +7,6 @@
 
 #include <boost/filesystem.hpp>
 #include <zeep/xml/document.hpp>
-#include <boost/foreach.hpp>
-#define foreach BOOST_FOREACH
 #include <boost/algorithm/string.hpp>
 #include <boost/format.hpp>
 
@@ -94,13 +92,13 @@ const char filename[] = "test.index";
 //	
 //	M6SimpleIndex indx(filename, eReadWrite);
 //	
-//	foreach (const char* key, strings)
+//	for (const char* key : strings)
 //		indx.insert(key, nr++);
 //
 //	indx.Validate();
 //
 //	nr = 1;
-//	foreach (const char* key, strings)
+//	for (const char* key : strings)
 //	{
 //		int64 v;
 //		BOOST_CHECK(indx.find(key, v));
@@ -121,7 +119,7 @@ const char filename[] = "test.index";
 //	M6SimpleIndex indx(filename, eReadOnly);
 //
 //	int64 nr = 1;
-//	foreach (const char* key, strings)
+//	for (const char* key : strings)
 //	{
 //		int64 v = nr;
 //		BOOST_CHECK_EQUAL(indx.find(key, v), not (*key == 'c' or *key == 'd' or *key == 'm'));
@@ -170,7 +168,7 @@ const char filename[] = "test.index";
 //	cout << "Created tree with " << indx.size()
 //		<< " keys and a depth of " << indx.depth() << endl;
 //
-//	foreach (auto t, testix)
+//	for (auto t : testix)
 //	{
 //		int64 v;
 //		BOOST_CHECK(indx.find(t.first, v));
@@ -178,7 +176,7 @@ const char filename[] = "test.index";
 //	}
 //	
 //	nr = 0;
-//	foreach (const M6Tuple& i, indx)
+//	for (const M6Tuple& i : indx)
 //	{
 //		BOOST_CHECK_EQUAL(testix[i.key], i.value);
 //		++nr;
@@ -190,7 +188,7 @@ const char filename[] = "test.index";
 //
 //	indx.Validate();
 //
-//	foreach (auto t, testix)
+//	for (auto t : testix)
 //	{
 //		int64 v;
 //		BOOST_CHECK(indx.find(t.first, v));
@@ -198,7 +196,7 @@ const char filename[] = "test.index";
 //	}
 //	
 //	nr = 0;
-//	foreach (auto i, indx)
+//	for (auto i : indx)
 //	{
 //		BOOST_CHECK_EQUAL(testix[i.key], i.value);
 //		++nr;
@@ -210,7 +208,7 @@ const char filename[] = "test.index";
 //	// remove tests
 //
 //	vector<string> keys;
-//	foreach (auto k, testix)
+//	for (auto k : testix)
 //		keys.push_back(k.first);
 //	random_shuffle(keys.begin(), keys.end());
 //
@@ -280,7 +278,7 @@ const char filename[] = "test.index";
 //	M6SimpleIndex indx(filename, data);
 //	indx.Validate();
 //
-//	foreach (auto t, testix)
+//	for (auto t : testix)
 //	{
 //		int64 v;
 //		BOOST_CHECK(indx.find(t.first, v));
@@ -299,7 +297,7 @@ const char filename[] = "test.index";
 //	indx.Vacuum();
 //	indx.Validate();
 //
-//	foreach (auto t, testix)
+//	for (auto t : testix)
 //	{
 //		int64 v;
 //		BOOST_CHECK(indx.find(t.first, v));
@@ -318,7 +316,7 @@ const char filename[] = "test.index";
 //	// remove tests
 //
 //	vector<string> keys;
-//	foreach (auto k, testix)
+//	for (auto k : testix)
 //		keys.push_back(k.first);
 //	random_shuffle(keys.begin(), keys.end());
 //
@@ -506,7 +504,7 @@ BOOST_AUTO_TEST_CASE(file_ix_5b)
 	M6SimpleIndex indx(filename, eReadWrite);
 	indx.Validate();
 
-	foreach (auto t, testix)
+	for (auto t : testix)
 	{
 		uint32 v;
 		BOOST_CHECK(indx.Find(t.first, v));
@@ -514,7 +512,7 @@ BOOST_AUTO_TEST_CASE(file_ix_5b)
 	}
 	
 	nr = 0;
-	//foreach (auto i, indx)
+	//for (auto i : indx)
 	//{
 	//	BOOST_CHECK_EQUAL(testix[i.key], i.value);
 	//	++nr;
@@ -549,7 +547,7 @@ BOOST_AUTO_TEST_CASE(file_ix_5c)
 	M6SimpleIndex indx(filename, eReadWrite);
 	indx.Validate();
 
-	foreach (auto t, testix)
+	for (auto t : testix)
 	{
 		indx.Erase(t.first);
 		//indx.Validate();
@@ -602,7 +600,7 @@ BOOST_AUTO_TEST_CASE(file_ix_5c)
 //		indx.dump();
 //		indx.Validate();
 //
-//		foreach (auto i, indx)
+//		for (auto i : indx)
 //		{
 //			int64 v;
 //			BOOST_CHECK(indx.find(i.key, v));

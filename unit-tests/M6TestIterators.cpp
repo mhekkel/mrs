@@ -1,7 +1,5 @@
 ﻿#include <iostream>
 
-#include <boost/foreach.hpp>
-#define foreach BOOST_FOREACH
 
 #include "M6Lib.h"
 #include "M6Iterator.h"

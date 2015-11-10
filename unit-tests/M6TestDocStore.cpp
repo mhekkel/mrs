@@ -6,8 +6,6 @@
 
 #include <boost/filesystem.hpp>
 #include <zeep/xml/document.hpp>
-#include <boost/foreach.hpp>
-#define foreach BOOST_FOREACH
 #include <boost/algorithm/string.hpp>
 #include <boost/format.hpp>
 //#include <boost/timer/timer.hpp>
@@ -75,7 +73,7 @@ BOOST_AUTO_TEST_CASE(test_store_1)
 
 	M6DocStore store("test/pdbfind2.docs", eReadWrite);
 
-	foreach (const string& doc, testdocs)
+	for (const string& doc : testdocs)
 		store.StoreDocument(doc.c_str(), doc.length());
 	store.Commit();
 
@@ -159,7 +157,7 @@ BOOST_AUTO_TEST_CASE(test_store_4)
 	M6Lexicon lexicon;
 	db.StartBatchImport(lexicon);
 
-	foreach (const string& text, testdocs)
+	for (const string& text : testdocs)
 	{
 		M6InputDocument* doc = new M6InputDocument(db, text);
 		

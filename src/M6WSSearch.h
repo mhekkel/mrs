@@ -18,7 +18,8 @@ enum IndexType
 	Unique,
 	FullText,
 	Number,
-	Date
+	Date,
+	Float
 };
 
 struct Index

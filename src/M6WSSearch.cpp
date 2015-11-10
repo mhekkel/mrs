@@ -6,13 +6,10 @@
 #include "M6Lib.h"
 
 #include <iostream>
+#include <cmath>
 
 #include <zeep/dispatcher.hpp>
 
-#include <boost/bind.hpp>
-#include <boost/tr1/cmath.hpp>
-#include <boost/foreach.hpp>
-#define foreach BOOST_FOREACH
 #include <boost/filesystem/fstream.hpp>
 #include <boost/algorithm/string.hpp>
 #include <boost/date_time/posix_time/posix_time_types.hpp>
@@ -68,7 +65,8 @@ M6WSSearch::M6WSSearch(M6Server& inServer, const M6DbList& inLoadedDatabanks,
 	SOAP_XML_ADD_ENUM(IndexType, FullText);
 	SOAP_XML_ADD_ENUM(IndexType, Number);
 	SOAP_XML_ADD_ENUM(IndexType, Date);
-	
+	SOAP_XML_ADD_ENUM(IndexType, Float);
+
 	SOAP_XML_ADD_ENUM(BooleanQueryOperation, CONTAINS);
 	SOAP_XML_ADD_ENUM(BooleanQueryOperation, LT);
 	SOAP_XML_ADD_ENUM(BooleanQueryOperation, LE);
@@ -154,7 +152,7 @@ void M6WSSearch::GetDatabankInfo(const string& databank,
 {
 	vector<string> unaliased(mServer.UnAlias(databank));
 	
-	foreach (const M6LoadedDatabank& db, mLoadedDatabanks)
+	for (const M6LoadedDatabank& db : mLoadedDatabanks)
 	{
 		if (databank != "all" and db.mID != databank and find(unaliased.begin(), unaliased.end(), db.mID) == unaliased.end())
 			continue;
@@ -190,7 +188,7 @@ void M6WSSearch::GetDatabankInfo(const string& databank,
 			dbInfo.fileSize = dbi.mTotalSize;
 			dbInfo.rawDataSize = dbi.mRawTextSize;
 			
-			foreach (M6IndexInfo& ii, dbi.mIndexInfo)
+			for (M6IndexInfo& ii : dbi.mIndexInfo)
 			{
 				WSSearchNS::Index ix = { ii.mName, ii.mDesc, ii.mCount };
 
@@ -198,9 +196,11 @@ void M6WSSearch::GetDatabankInfo(const string& databank,
 				{
 					case eM6CharIndex:			ix.type = WSSearchNS::Unique; break;
 					case eM6NumberIndex:		ix.type = WSSearchNS::Number; break;
+					case eM6FloatIndex:			ix.type = WSSearchNS::Float; break;
 					//case eM6DateIndex:			ix.type = WSSearchNS::Date; break;
 					case eM6CharMultiIndex:		ix.type = WSSearchNS::Unique; break;
 					case eM6NumberMultiIndex:	ix.type = WSSearchNS::Number; break;
+					case eM6FloatMultiIndex:	ix.type = WSSearchNS::Float; break;
 					//case eM6DateMultiIndex:		ix.type = WSSearchNS::Date; break;
 					case eM6CharMultiIDLIndex:	ix.type = WSSearchNS::Unique; break;
 					case eM6CharWeightedIndex:	ix.type = WSSearchNS::FullText; break;
@@ -275,7 +275,7 @@ void M6WSSearch::GetMetaData(const string& inDatabank, const string& inID, const
 	M6Databank* db;
 	uint32 docNr;
 	
-	tr1::tie(db, docNr) = mServer.GetEntryDatabankAndNr(inDatabank, inID);
+	tie(db, docNr) = mServer.GetEntryDatabankAndNr(inDatabank, inID);
 	
 	unique_ptr<M6Document> doc(db->Fetch(docNr));
 	if (not doc)
@@ -294,7 +294,7 @@ void M6WSSearch::Find(const string& db, const vector<string>& queryterms,
 		if (maxresultcount <= 0)
 			maxresultcount = 5;
 
-		foreach (const M6LoadedDatabank& ldb, mLoadedDatabanks)
+		for (const M6LoadedDatabank& ldb : mLoadedDatabanks)
 		{
 			Find(ldb.mID, queryterms, alltermsrequired, booleanfilter,
 				resultoffset, maxresultcount, response);
@@ -354,7 +354,7 @@ void M6WSSearch::Find(const string& db, const vector<string>& queryterms,
 		if (not maxresultcount)
 			maxresultcount = 5;
 
-		foreach (const string& adb, mServer.UnAlias(db))
+		for (const string& adb : mServer.UnAlias(db))
 		{
 			Find(adb, queryterms, alltermsrequired, booleanfilter,
 				resultoffset, maxresultcount, response);
@@ -418,7 +418,7 @@ M6Iterator* ParseQuery(M6Databank* inDatabank, const WSSearchNS::BooleanQuery& i
 					THROW(("Please supply at least one subquery for a UNION"));
 				
 				unique_ptr<M6UnionIterator> iter(new M6UnionIterator());
-				foreach (auto leaf, inQuery.leafs)
+				for (auto leaf : inQuery.leafs)
 					iter->AddIterator(ParseQuery(inDatabank, leaf));
 				result = iter.release();
 				break;
@@ -430,7 +430,7 @@ M6Iterator* ParseQuery(M6Databank* inDatabank, const WSSearchNS::BooleanQuery& i
 					THROW(("Please supply at least one subquery for an INTERSECTION"));
 				
 				unique_ptr<M6IntersectionIterator> iter(new M6IntersectionIterator());
-				foreach (auto leaf, inQuery.leafs)
+				for (auto leaf : inQuery.leafs)
 					iter->AddIterator(ParseQuery(inDatabank, leaf));
 				result = iter.release();
 				break;
@@ -465,7 +465,7 @@ void M6WSSearch::FindBoolean(const string& inDatabank, const WSSearchNS::Boolean
 		if (not maxresultcount or (maxresultcount.get() > 5 or maxresultcount.get() <= 0))
 			maxresultcount = 3;
 
-		foreach (const M6LoadedDatabank& ldb, mLoadedDatabanks)
+		for (const M6LoadedDatabank& ldb : mLoadedDatabanks)
 			FindBoolean(ldb.mID, inQuery, resultoffset, maxresultcount, response);
 	}
 	else if (M6Databank* databank = mServer.Load(inDatabank))
@@ -509,7 +509,7 @@ void M6WSSearch::FindBoolean(const string& inDatabank, const WSSearchNS::Boolean
 		if (not maxresultcount)
 			maxresultcount = 5;
 
-		foreach (const string& db, mServer.UnAlias(inDatabank))
+		for (const string& db : mServer.UnAlias(inDatabank))
 			FindBoolean(db, inQuery, resultoffset, maxresultcount, response);
 	}
 }
@@ -522,7 +522,7 @@ void M6WSSearch::GetLinked(const string& db, const string& id, const string& lin
 	M6Databank* ddb;
 	uint32 docNr;
 	
-	tr1::tie(sdb, docNr) = mServer.GetEntryDatabankAndNr(db, id);
+	tie(sdb, docNr) = mServer.GetEntryDatabankAndNr(db, id);
 	if (sdb == nullptr)
 		THROW(("entry %s not found in %s", id.c_str(), db.c_str()));
 	
@@ -569,12 +569,12 @@ void M6WSSearch::GetLinked(const string& db, const string& id, const string& lin
 void M6WSSearch::GetLinkedEx(const string& db, const string& linkedDb,
 	const vector<string>& ids, vector<WSSearchNS::GetLinkedExResult>& response)
 {
-	foreach (string id, ids)
+	for (string id : ids)
 	{
 		uint32 docNr;
 		
 		M6Databank* sdb;
-		tr1::tie(sdb, docNr) = mServer.GetEntryDatabankAndNr(db, id);
+		tie(sdb, docNr) = mServer.GetEntryDatabankAndNr(db, id);
 		if (sdb == nullptr)
 			THROW(("entry %s not found in %s", id.c_str(), db.c_str()));
 		

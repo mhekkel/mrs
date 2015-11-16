@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project DefaultTargets="Build" ToolsVersion="12.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|x64">
       <Configuration>Debug</Configuration>
@@ -20,10 +20,12 @@
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <CharacterSet>Unicode</CharacterSet>
     <WholeProgramOptimization>true</WholeProgramOptimization>
+    <PlatformToolset>v120</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <CharacterSet>Unicode</CharacterSet>
+    <PlatformToolset>v120</PlatformToolset>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -46,7 +48,7 @@
     </BuildLog>
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>C:\Boost\include\boost-1_48;$(SolutionDir)..\..\libzeep;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Boost\include\boost-1_55;$(SolutionDir)..\..\libzeep;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
@@ -64,7 +66,7 @@
     <ClCompile>
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>C:\Boost\include\boost-1_48;$(SolutionDir)..\..\libzeep;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Boost\include\boost-1_55;$(SolutionDir)..\..\libzeep;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
@@ -81,12 +83,13 @@
     <ClCompile Include="..\..\..\libzeep\src\document.cpp" />
     <ClCompile Include="..\..\..\libzeep\src\exception.cpp" />
     <ClCompile Include="..\..\..\libzeep\src\http-server.cpp" />
+    <ClCompile Include="..\..\..\libzeep\src\md5.cpp" />
+    <ClCompile Include="..\..\..\libzeep\src\message_parser.cpp" />
     <ClCompile Include="..\..\..\libzeep\src\node.cpp" />
     <ClCompile Include="..\..\..\libzeep\src\parser.cpp" />
     <ClCompile Include="..\..\..\libzeep\src\preforked-http-server.cpp" />
     <ClCompile Include="..\..\..\libzeep\src\reply.cpp" />
     <ClCompile Include="..\..\..\libzeep\src\request.cpp" />
-    <ClCompile Include="..\..\..\libzeep\src\request_parser.cpp" />
     <ClCompile Include="..\..\..\libzeep\src\soap-envelope.cpp" />
     <ClCompile Include="..\..\..\libzeep\src\soap-server.cpp" />
     <ClCompile Include="..\..\..\libzeep\src\unicode_support.cpp" />

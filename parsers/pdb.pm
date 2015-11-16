@@ -60,6 +60,8 @@ sub parse
 	while (my $line = <$h>)
 	{
 		my ($fld, $text) = ($1, $2) if $line =~ m/^(\S+)\s+(?:\d+\s+)?(.+)\n$/;
+
+		next unless defined $fld ;
 		
 		if ($fld eq 'HEADER')
 		{

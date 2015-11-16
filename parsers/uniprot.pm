@@ -199,19 +199,19 @@ sub to_fasta
 		}
 	}
 
-	if (scalar @acs)
-	{
-		my $result = '';
-		foreach my $ac (@acs)
-		{
-			$result .= ">gnl|$db|$id|$ac $title\n$seq\n";
-		}
-		return $result;
-	}
-	else
-	{
-		return ">gnl|$db|$id $title\n$seq\n";
-	}
+#	if (scalar @acs)
+#	{
+#		my $result = '';
+#		foreach my $ac (@acs)
+#		{
+#			$result .= ">gnl|$db|$id|$ac $title\n$seq\n";
+#		}
+#		return $result;
+#	}
+#	else
+#	{
+	return ">gnl|$db|$id $title\n$seq\n";
+#	}
 }
 
 sub version

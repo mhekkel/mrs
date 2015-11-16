@@ -1,7 +1,7 @@
 //   Copyright Maarten L. Hekkelman, Radboud University 2012.
 //  Distributed under the Boost Software License, Version 1.0.
-//     (See accompanying file LICENSE_1_0.txt or copy at
-//           http://www.boost.org/LICENSE_1_0.txt)
+//	 (See accompanying file LICENSE_1_0.txt or copy at
+//		   http://www.boost.org/LICENSE_1_0.txt)
 
 #include "M6Lib.h"
 
@@ -20,8 +20,6 @@
 #include <boost/iostreams/filtering_streambuf.hpp>
 #include <boost/iostreams/copy.hpp>
 #include <boost/format.hpp>
-#include <boost/foreach.hpp>
-#define foreach BOOST_FOREACH
 #include <boost/algorithm/string.hpp>
 #include <boost/regex.hpp>
 //#include <boost/timer/timer.hpp>
@@ -51,7 +49,6 @@
 #include "M6Log.h"
 
 using namespace std;
-using namespace std::tr1;
 namespace zx = zeep::xml;
 namespace fs = boost::filesystem;
 namespace ba = boost::algorithm;
@@ -63,9 +60,9 @@ class M6Processor
 {
   public:
 	typedef M6Queue<fs::path>					M6FileQueue;
-	typedef M6Queue<tr1::tuple<string,string>>	M6DocQueue;
+	typedef M6Queue<tuple<string,string>>	M6DocQueue;
 
-	static const tr1::tuple<string,string> kSentinel;
+	static const tuple<string,string> kSentinel;
 
 					M6Processor(M6Databank& inDatabank, M6Lexicon& inLexicon,
 						const zx::element* inTemplate);
@@ -95,7 +92,7 @@ class M6Processor
 							rethrow_exception(mException);
 						
 						if (mUseDocQueue)
-							mDocQueue.Put(tr1::make_tuple(inDoc, *mFileName));
+							mDocQueue.Put(make_tuple(inDoc, *mFileName));
 						else
 							ProcessDocument(inDoc);
 					}
@@ -129,7 +126,7 @@ class M6Processor
 	exception_ptr			mException;
 };
 
-const tr1::tuple<string,string> M6Processor::kSentinel;
+const tuple<string,string> M6Processor::kSentinel;
 
 // --------------------------------------------------------------------
 
@@ -151,7 +148,7 @@ M6Processor::M6Processor(M6Databank& inDatabank, M6Lexicon& inLexicon,
 		if (mChunkXPath.empty())
 			THROW(("Missing chunk XPath attribute in XML parser"));
 		
-		foreach (zx::element* ix, p->find("index"))
+		for (zx::element* ix : p->find("index"))
 		{
 			string tt = ix->get_attribute("type");
 			M6DataType type = eM6TextData;
@@ -159,6 +156,8 @@ M6Processor::M6Processor(M6Databank& inDatabank, M6Lexicon& inLexicon,
 				type = eM6StringData;
 			else if (tt == "number")
 				type = eM6NumberData;
+			else if (tt == "float")
+				type = eM6FloatData;
 			
 			XMLIndex info = {
 				ix->get_attribute("name"),
@@ -253,7 +252,7 @@ void M6Processor::ParseNode(M6InputDocument& inDoc, zx::node* inNode,
 	}
 	else
 	{
-		foreach (zx::node* node, el->nodes())
+		for (zx::node* node : el->nodes())
 			ParseNode(inDoc, node, inIndex, inDataType, isUnique);
 	}
 }
@@ -261,6 +260,9 @@ void M6Processor::ParseNode(M6InputDocument& inDoc, zx::node* inNode,
 void M6Processor::ParseXML(const string& inFileName, istream& inFileStream)
 {
 	// simple case first, just parse the entire document
+
+    if (inFileStream.peek() != '<') // not xml
+        return;
 
 	zx::process_document_elements(inFileStream, mChunkXPath, [&] (zx::node* root, zx::element* xml) -> bool
 	{
@@ -270,9 +272,9 @@ void M6Processor::ParseXML(const string& inFileName, istream& inFileStream)
 		
 		unique_ptr<M6InputDocument> doc(new M6InputDocument(mDatabank, text.str()));
 		
-		foreach (XMLIndex& ix, mXMLIndexInfo)
+		for (XMLIndex& ix : mXMLIndexInfo)
 		{
-			foreach (zx::node* n, ix.xpath.evaluate<zx::node>(*xml))
+			for (zx::node* n : ix.xpath.evaluate<zx::node>(*xml))
 			{
 				if (ix.attr)
 				{
@@ -453,7 +455,7 @@ void M6Processor::ProcessDocument()
 		for (;;)
 		{
 			string text, filename;
-			tr1::tie(text, filename) = mDocQueue.Get();
+			tie(text, filename) = mDocQueue.Get();
 			
 			if (text.empty() or docs.size() == 100)
 			{
@@ -487,7 +489,7 @@ void M6Processor::ProcessDocument()
 					}
 				}
 				
-				foreach (M6InputDocument* doc, docs)
+				for (M6InputDocument* doc : docs)
 				{
 					doc->RemapTokens(&remapped[0]);
 					mDatabank.Store(doc);
@@ -553,7 +555,7 @@ void M6Processor::Process(vector<fs::path>& inFiles, M6Progress& inProgress,
 		for (uint32 i = 0; i < inNrOfThreads; ++i)
 			mFileThreads.create_thread([&inProgress, this]() { this->ProcessFile(inProgress); });
 
-		foreach (fs::path& file, inFiles)
+		for (fs::path& file : inFiles)
 		{
 			if (not (mException == std::exception_ptr()))
 				rethrow_exception(mException);
@@ -610,7 +612,7 @@ int64 M6Builder::Glob(boost::filesystem::path inRawDir,
 	vector<string> paths;
 	ba::split(paths, source, ba::is_any_of(";"));
 	
-	foreach (string& source, paths)
+	for (string& source : paths)
 	{
 		fs::path dir = fs::path(source).parent_path();
 		if (not dir.has_root_path())
@@ -664,7 +666,7 @@ void M6Builder::Build(uint32 inNrOfThreads)
 		boost::uuids::random_generator gen;
 		boost::uuids::uuid u = gen();
 		
-		path = path.string() + "-" + boost::lexical_cast<string>(u);
+		path = path.string() + "-" + to_string(u);
 	}
 
 	zx::element* source = mConfig->find_first("source");
@@ -725,9 +727,9 @@ void M6Builder::IndexDocument(const std::string& inDatabankID, M6Databank* inDat
 	M6Processor processor(*inDatabank, lexicon, config);
 	unique_ptr<M6InputDocument> doc(processor.IndexDocument(inText, inFileName));
 	
-	foreach (auto& list, doc->GetIndexTokens())
+	for (auto& list : doc->GetIndexTokens())
 	{
-		foreach (auto& token, list.mTokens)
+		for (auto& token : list.mTokens)
 		{
 			if (token != 0)
 				outTerms.push_back(lexicon.GetString(token));
@@ -749,7 +751,7 @@ bool M6Builder::NeedsUpdate()
 		vector<fs::path> files;
 		Glob(M6Config::GetDirectory("raw"), mConfig->find_first("source"), files);
 		
-		foreach (fs::path& file, files)
+		for (fs::path& file : files)
 		{
 			if (fs::last_write_time(file) > dbTime)
 			{
@@ -769,7 +771,7 @@ bool M6Builder::NeedsUpdate()
 // --------------------------------------------------------------------
 
 M6Scheduler::M6Scheduler()
-	: mThread(boost::bind(&M6Scheduler::Run, this))
+	: mThread(bind(&M6Scheduler::Run, this))
 {
 }
 
@@ -792,12 +794,12 @@ void M6Scheduler::Schedule(const string& inDatabank, const char* inAction)
 {
 	boost::mutex::scoped_lock lock(mLock);
 	
-	if (find_if(mScheduled.begin(), mScheduled.end(), [inDatabank](tr1::tuple<string,string>& s) -> bool
-			{ return tr1::get<0>(s) == inDatabank; }) == mScheduled.end())
+	if (find_if(mScheduled.begin(), mScheduled.end(), [inDatabank](tuple<string,string>& s) -> bool
+			{ return get<0>(s) == inDatabank; }) == mScheduled.end())
 	{
 		LOG(DEBUG,"scheduling update for %s",inDatabank.c_str());
 
-		mScheduled.push_back(tr1::make_tuple(inDatabank, inAction));
+		mScheduled.push_back(make_tuple(inDatabank, inAction));
 	}
 }
 
@@ -807,8 +809,8 @@ void M6Scheduler::GetScheduledDatabanks(vector<string>& outDatabanks)
 	
 	boost::mutex::scoped_lock lock(mLock);
 	
-	for_each(mScheduled.begin(), mScheduled.end(), [&outDatabanks](tr1::tuple<string,string>& s) {
-		outDatabanks.push_back(tr1::get<0>(s));
+	for_each(mScheduled.begin(), mScheduled.end(), [&outDatabanks](tuple<string,string>& s) {
+		outDatabanks.push_back(get<0>(s));
 	});
 }
 
@@ -834,8 +836,8 @@ void M6Scheduler::OpenBuildLog()
 void M6Scheduler::Run()
 {
 	using namespace boost::gregorian;
-    using namespace boost::local_time;
-    using namespace boost::posix_time;
+	using namespace boost::local_time;
+	using namespace boost::posix_time;
 
 	bool enabled;
 	ptime updateTime;
@@ -847,8 +849,8 @@ void M6Scheduler::Run()
 
 	ptime now = second_clock::local_time();
 	ptime start = updateTime;
-    if (start < now)
-    	start += hours(24);
+	if (start < now)
+		start += hours(24);
 	time_iterator update(start, hours(24));		// daily 
 	bool writeNextUpdateTime = true, reload = false;
 
@@ -886,7 +888,7 @@ void M6Scheduler::Run()
 				
 				OpenBuildLog();
 				
-				foreach (zx::element* db, M6Config::GetDatabanks())
+				for (zx::element* db : M6Config::GetDatabanks())
 				{
 					if (db->get_attribute("enabled") != "true")
 						continue;
@@ -911,7 +913,7 @@ void M6Scheduler::Run()
 				mLock.lock();
 				if (not mScheduled.empty())
 				{
-					tr1::tie(databank, action) = mScheduled.front();
+					tie(databank, action) = mScheduled.front();
 					mScheduled.pop_front();
 				}
 				mLock.unlock();

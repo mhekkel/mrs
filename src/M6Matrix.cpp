@@ -7,11 +7,10 @@
 
 #include <sstream>
 #include <iostream>
+#include <cmath>
 
 #include <boost/iostreams/device/array.hpp>
 #include <boost/iostreams/stream.hpp>
-#include <boost/foreach.hpp>
-#define foreach BOOST_FOREACH
 #include <boost/bind.hpp>
 
 #include "M6Matrix.h"

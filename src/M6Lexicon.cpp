@@ -1,7 +1,7 @@
 //   Copyright Maarten L. Hekkelman, Radboud University 2012.
 //  Distributed under the Boost Software License, Version 1.0.
-//     (See accompanying file LICENSE_1_0.txt or copy at
-//           http://www.boost.org/LICENSE_1_0.txt)
+//	 (See accompanying file LICENSE_1_0.txt or copy at
+//		   http://www.boost.org/LICENSE_1_0.txt)
 
 #include "M6Lib.h"
 
@@ -65,9 +65,21 @@ struct M6LexPage
 					assert(static_cast<int32>(inEntry) < N);
 					assert(e[inEntry + 1] < e[inEntry]);
 					assert(e[inEntry] <= kLexDataSize);
-					
-					static const M6BasicComparator comp = M6BasicComparator();
-					return comp(inWord, inWordLength, s + e[inEntry + 1], e[inEntry] - e[inEntry + 1]);
+
+					size_t l = e[inEntry] - e[inEntry + 1];
+					if (l > inWordLength)
+						l = inWordLength;
+
+					int d = memcmp(inWord, s + e[inEntry + 1], l);
+					if (d == 0)
+					{
+						if (inWordLength > l)
+							d = 1;
+						else if (e[inEntry] - e[inEntry + 1] > l)
+							d = -1;
+					}
+
+					return d;	
 				}
 
 	int			Compare(const M6LexPage* inPage, uint32 inPEntry, uint32 inEntry) const

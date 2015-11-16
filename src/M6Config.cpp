@@ -6,11 +6,11 @@
 #include "M6Lib.h"
 
 #include <sstream>
+#include <functional>
 
 #include "boost/date_time/local_time/local_time.hpp"
 #include <boost/filesystem/fstream.hpp>
 #include <boost/filesystem/operations.hpp>
-#include <boost/bind.hpp>
 #include <boost/regex.hpp>
 
 #include <zeep/xml/writer.hpp>
@@ -19,6 +19,7 @@
 #include "M6Error.h"
 
 using namespace std;
+using namespace placeholders;
 namespace zx = zeep::xml;
 namespace fs = boost::filesystem;
 
@@ -46,7 +47,7 @@ File::File()
 
 	
 	fs::ifstream configFileStream(sConfigFile, ios::binary);
-	mConfig.external_entity_ref_handler = boost::bind(&File::LoadDTD, this, _1, _2, _3);
+	mConfig.external_entity_ref_handler = bind(&File::LoadDTD, this, _1, _2, _3);
 	mConfig.set_validating(true);
 	configFileStream >> mConfig;
 }
@@ -94,7 +95,7 @@ void File::Validate()
 	mConfig.write(w);
 	
 	zx::document doc;
-	doc.external_entity_ref_handler = boost::bind(&File::LoadDTD, this, _1, _2, _3);
+	doc.external_entity_ref_handler = bind(&File::LoadDTD, this, _1, _2, _3);
 	doc.set_validating(true);
 	xml >> doc;
 }	

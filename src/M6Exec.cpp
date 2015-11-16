@@ -2,6 +2,7 @@
 //  Distributed under the Boost Software License, Version 1.0.
 //     (See accompanying file LICENSE_1_0.txt or copy at
 //           http://www.boost.org/LICENSE_1_0.txt)
+
 #include "M6Lib.h"
 
 #include <iostream>
@@ -18,8 +19,6 @@
 #endif
 
 #include <boost/filesystem/operations.hpp>
-#include <boost/foreach.hpp>
-#define foreach BOOST_FOREACH
 #include <boost/thread.hpp>
 #include <boost/thread/condition.hpp>
 #include <boost/program_options/parsers.hpp>
@@ -651,7 +650,7 @@ streamsize M6ProcessImpl::read(char* s, streamsize n)
 			{
 				vector<string> argss = po::split_unix(this->mCommand);
 				vector<const char*> args;
-				foreach (string& arg, argss)
+				for (string& arg : argss)
 					args.push_back(arg.c_str());
 				
 				if (args.empty() or args.front() == nullptr)

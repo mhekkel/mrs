@@ -9,6 +9,10 @@
 #include <limits>
 #include <cstring>
 
+#if DEBUG
+#include <iostream>
+#endif
+
 #include "M6BitStream.h"
 #include "M6File.h"
 #include "M6Error.h"
@@ -30,7 +34,7 @@ struct M6OBitStreamFileImpl : public M6OBitStreamImpl
 	virtual void	Write(const uint8* inData, size_t inSize);
 	virtual void	Truncate()									{ mFile.Truncate(0); mBufferPtr = mBuffer; }
 	virtual void	Sync();
-				
+					
   private:
 	M6File&			mFile;
 	char			mBuffer[kFileBufferSize];
@@ -86,6 +90,7 @@ void M6OBitStreamFileImpl::Sync()
 {
 	if (mBufferPtr > mBuffer)
 		mFile.Write(mBuffer, mBufferPtr - mBuffer);
+
 	mBufferPtr = mBuffer;
 }
 
@@ -97,7 +102,7 @@ struct M6OBitStreamMemImpl : public M6OBitStreamImpl
 	virtual size_t	Size() const								{ return mBufferPtr - mBuffer; }
 	virtual void	Write(const uint8* inData, size_t inSize);
 	virtual void	Truncate()									{ mBufferPtr = mBuffer; }
-	virtual void	Sync()									{}
+	virtual void	Sync()										{}
 
 	uint8*			mBuffer;
 	uint8*			mBufferPtr;
@@ -433,21 +438,21 @@ M6IBitStream::M6IBitStream(M6IBitStreamImpl* inImpl)
 	: mImpl(inImpl)
 	, mBitOffset(7)
 {
-	mImpl->Get(mByte);
+	mByte = mImpl->Get();
 }
 
 M6IBitStream::M6IBitStream(M6File& inData, int64 inOffset, uint32 inBitBufferSize)
 	: mImpl(new (inBitBufferSize) M6IBitStreamFileImpl(inData, inOffset, inBitBufferSize))
 	, mBitOffset(7)
 {
-	mImpl->Get(mByte);
+	mByte = mImpl->Get();
 }
 
 M6IBitStream::M6IBitStream(const M6OBitStream& inData)
 	: mImpl(new M6IBitStreamOBitImpl(inData))
 	, mBitOffset(7)
 {
-	mImpl->Get(mByte);
+	mByte = mImpl->Get();
 }
 
 M6IBitStream::M6IBitStream(const M6IBitStream& inStream)
@@ -521,14 +526,14 @@ void M6IBitStream::Skip(uint32 inBits)
 	if (inBits >= static_cast<uint32>(mBitOffset + 1))
 	{
 		inBits -= mBitOffset + 1;
-		mImpl->Get(mByte);
+		mByte = mImpl->Get();
 		mBitOffset = 7;
 	}
 	
 	while (inBits >= 8)
 	{
 		inBits -= 8;
-		mImpl->Get(mByte);
+		mByte = mImpl->Get();
 	}
 	
 	mBitOffset -= inBits;
@@ -537,7 +542,7 @@ void M6IBitStream::Skip(uint32 inBits)
 void M6IBitStream::NextByte(uint8& outByte)
 {
 	outByte = mByte << (7 - mBitOffset);
-	mImpl->Get(mByte);
+	mByte = mImpl->Get();
 	outByte |= mByte >> (mBitOffset + 1);
 }
 
@@ -883,7 +888,7 @@ void ReadArray(M6IBitStream& inBits, vector<uint32>& outArray)
 	uint32 width = kStartWidth;
 	uint32 span = 0;
 	uint32 current = 0;
-
+	
 	while (size-- > 0)
 	{
 		if (span == 0)
@@ -902,10 +907,10 @@ void ReadArray(M6IBitStream& inBits, vector<uint32>& outArray)
 		{
 			uint32 delta;
 			ReadBinary(inBits, width, delta);
-			current += delta;
+			current += delta + 1;
 		}
-
-		current += 1;
+		else
+			current += 1;
 
 		outArray.push_back(current);
 

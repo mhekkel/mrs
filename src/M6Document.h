@@ -69,6 +69,7 @@ class M6InputDocument : public M6Document
 		M6DataType		mDataType;
 		std::string		mIndexName;
 		std::string		mIndexValue;
+		double			mIndexFloatValue;
 		bool			mUnique;
 	};
 	
@@ -93,6 +94,7 @@ class M6InputDocument : public M6Document
 	virtual void		Index(const std::string& inIndex,
 							M6DataType inDataType, bool isUnique,
 							const char* inText, size_t inSize);
+	void				Index(const std::string& inIndex, bool isUnique, double inValue);
 
 	virtual void		Index(const std::string& inIndex,
 							const std::vector<std::pair<const char*,size_t>>& inWords);
@@ -106,7 +108,7 @@ class M6InputDocument : public M6Document
 	virtual void		RemapTokens(const uint32 inTokenMap[]);
 
 	void				Compress();
-	uint32				Store();
+	void				Store();
 	
 	uint32				GetDocNr() const					{ return mDocNr; }
 	

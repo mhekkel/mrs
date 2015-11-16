@@ -10,10 +10,9 @@
 #include <vector>
 #include <iterator>
 #include <algorithm>
+#include <ostream>
+#include <tuple>
 
-#include <boost/tr1/tuple.hpp>
-#include <boost/foreach.hpp>
-#define foreach BOOST_FOREACH
 
 #include "M6Tokenizer.h"
 //#include "M6Unicode.h"
@@ -21,7 +20,6 @@
 #include "M6Error.h"
 
 using namespace std;
-//using namespace tr1;
 
 // --------------------------------------------------------------------
 
@@ -63,7 +61,7 @@ ostream& operator<<(ostream& os, M6Token inToken)
 
 template<class InputIterator>
 inline
-tr1::tuple<InputIterator, uint32> ReadUTF8(InputIterator inIterator)
+tuple<InputIterator, uint32> ReadUTF8(InputIterator inIterator)
 {
 	uint32 uc;
 	
@@ -93,7 +91,7 @@ tr1::tuple<InputIterator, uint32> ReadUTF8(InputIterator inIterator)
 		}
 	}
 
-	return tr1::make_tuple(inIterator, uc);
+	return make_tuple(inIterator, uc);
 }
 
 template<class OutputIterator>
@@ -218,7 +216,7 @@ bool contains_han(const string& s)
 	while (si != s.end())
 	{
 		uint32 uc;
-		tr1::tie(si, uc) = ReadUTF8(si);
+		tie(si, uc) = ReadUTF8(si);
 		
 		if (is_han(uc))
 		{
@@ -687,8 +685,16 @@ M6Token M6Tokenizer::GetNextQueryToken()
 	uint32* t = token;
 	bool hasCombiningMarks = false, isPattern = false;
 	uint32 quote = 0;	// keep compiler silent
-		
+	
 	int state = 10;
+
+	auto Restart = [&t,&token,&state,this](int s)
+	{
+		while (t > token)
+			this->Retract(*--t);
+		state = s;
+	};
+		
 	while (result == eM6TokenNone)
 	{
 		// this tokens exceeds the max token length... to not overflow the buffer and return
@@ -726,6 +732,8 @@ M6Token M6Tokenizer::GetNextQueryToken()
 					case '|':	result = eM6TokenOR; break;
 					case '&':	result = eM6TokenAND; break;
 					case '#':	state = 50; break;
+					case '-':	state = 201; break;
+					case '+':	state = 202; break;
 					default:
 						if (fast::isspace(c))
 						{
@@ -734,9 +742,9 @@ M6Token M6Tokenizer::GetNextQueryToken()
 						}
 						else if (fast::is_han(c))		// chinese
 							result = eM6TokenWord;
-						else if (fast::isdigit(c))		// first try a number
-							state = 20;
-						else if (fast::isalnum(c))
+						else if (fast::isdigit(c))
+							state = 203;
+						else if (fast::isalnum(c) or c == '.')
 							state = 30;
 						else if (fast::ispunct(c) or c == '-' or c == '+')
 							result = eM6TokenPunctuation;
@@ -766,8 +774,69 @@ M6Token M6Tokenizer::GetNextQueryToken()
 				}
 				break;
 		
+			// test for numbers since we found '-' or '+'
+			case 201:	// '-' seen
+				if (c >= '0' and c <= '9')
+					state = 203;
+				else
+				{
+					Retract(*--t);
+					result = eM6TokenPunctuation;
+				}
+				break;
+			
+			case 202:
+				if (c >= '0' and c <= '9')
+					state = 203;
+				else
+				{
+					Retract(*--t);
+					result = eM6TokenPunctuation;
+				}
+				break;
+			
+			case 203:
+				if (c == '.')
+					state = 204;
+				else if (c == 'e' or c == 'E')
+					state = 205;
+				else
+					Restart(20);
+				break;
+			
+			case 204:
+				if (c == 'e' or c == 'E')
+					state = 205;
+				else if (c < '0' or c > '9')
+				{
+					Retract(*--t);
+					result = eM6TokenFloat;	
+				}
+				break;
+		
+			case 205:
+				if (c == '+' or c == '-')
+					state = 206;
+
+				// otherwise fall through
+
+			case 206:
+				if (c >= '0' and c <= '9')
+					state = 207;
+				else
+					Restart(20);
+				break;
+			
+			case 207:
+				if (c < '0' or c > '9')
+				{
+					Retract(*--t);
+					result = eM6TokenFloat;
+				}
+				break;
+		
 			// matched a digit, allow only cardinals or an identifier starting with a digit
-			case 20:				
+			case 20:
 				if (fast::isalpha(c))	
 					state = 30;
 				else if (c == '?' or c == '*')
@@ -788,7 +857,7 @@ M6Token M6Tokenizer::GetNextQueryToken()
 					hasCombiningMarks = true;
 				else if (c == '?' or c == '*')
 					isPattern = true;
-				else if (fast::is_han(c) or not fast::isalnum(c))
+				else if (fast::is_han(c) or not (fast::isalnum(c) or c == '.'))
 				{
 					Retract(*--t);
 					result = isPattern ? eM6TokenPattern : eM6TokenWord;
@@ -865,6 +934,8 @@ M6Token M6Tokenizer::GetNextQueryToken()
 			result = eM6TokenAND;
 		else if (mTokenLength == 3 and strncmp(reinterpret_cast<const char*>(b), "NOT", 3) == 0)
 			result = eM6TokenNOT;
+		else if (mTokenLength == 7 and strncmp(reinterpret_cast<const char*>(b), "BETWEEN", 7) == 0)
+			result = eM6TokenBETWEEN;
 	}
 
 	return result;
@@ -882,7 +953,7 @@ void M6Tokenizer::CaseFold(string& ioString)
 	while (ptr < end)
 	{
 		uint32 ch = 0;
-		tr1::tie(ptr, ch) = ReadUTF8(ptr);
+		tie(ptr, ch) = ReadUTF8(ptr);
 		if (::ToLower(ch, s))
 			hasCombiningMarks = true;
 		if (s.size() > 1 or (s.size() == 1 and s[0] != ch))
@@ -895,7 +966,7 @@ void M6Tokenizer::CaseFold(string& ioString)
 	if (hasCombiningMarks or hasUpperCase)
 	{
 		ioString.clear();
-		foreach (uint32 ch, s)
+		for (uint32 ch : s)
 			::WriteUTF8(ch, back_inserter(ioString));
 	}
 }
@@ -912,7 +983,7 @@ void M6Tokenizer::Normalize(string& ioString)
 	while (ptr < end)
 	{
 		uint32 ch = 0;
-		tr1::tie(ptr, ch) = ReadUTF8(ptr);
+		tie(ptr, ch) = ReadUTF8(ptr);
 		if (::Decompose(ch, s))
 			hasCombiningMarks = true;
 	}
@@ -922,7 +993,7 @@ void M6Tokenizer::Normalize(string& ioString)
 		Reorder(&s[0], s.size());
 		
 		ioString.clear();
-		foreach (uint32 ch, s)
+		for (uint32 ch : s)
 			::WriteUTF8(ch, back_inserter(ioString));
 	}
 }

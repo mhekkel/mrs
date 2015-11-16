@@ -8,7 +8,7 @@
 #include <vector>
 #include <map>
 #include <set>
-#include <boost/tr1/tuple.hpp>
+#include <tuple>
 
 #include "M6File.h"
 
@@ -18,6 +18,9 @@ class M6DatabankImpl;
 class M6DocStore;
 class M6Lexicon;
 class M6Iterator;
+class M6BasicIndex;
+
+typedef boost::shared_ptr<M6BasicIndex> M6BasicIndexPtr;
 
 // A link mesh contains a mapping from db ID's and aliases to
 // actual databank objects.
@@ -83,14 +86,20 @@ class M6Databank
 	// high-level interface
 	M6Iterator*		Find(const std::string& inQuery, bool inAllTermsRequired,
 						uint32 inReportLimit);
+	M6Iterator*		FindBoolean(const std::string& inQuery, uint32 inReportLimit);
 	
 	// low-level interface
 	M6Iterator*		Find(const std::vector<std::string>& inQueryTerms,
 						M6Iterator* inFilter, bool inAllTermsRequired, uint32 inReportLimit);
 	M6Iterator*		Find(const std::string& inIndex, const std::string& inTerm,
 						M6QueryOperator inOperator = eM6Equals);
+	M6Iterator*		Find(const std::string& inIndex, const std::string& inLowerBound,
+						const std::string& inUpperBound);
 	M6Iterator*		FindPattern(const std::string& inIndex, const std::string& inPattern);
 	M6Iterator*		FindString(const std::string& inIndex, const std::string& inString);
+	
+	// Very low level...
+	M6BasicIndexPtr	GetIndex(const std::string& inIndex) const;
 
 	// retrieve links for a certain record
 	void			InitLinkMap(const M6LinkMap& inLinkMap);
@@ -101,7 +110,7 @@ class M6Databank
 	M6Iterator*		GetLinkedDocuments(const std::string& inDb, const std::string& inId);
 
 	// Exist returns <documents exist,docnr for a unique match>
-	std::tr1::tuple<bool,uint32>
+	std::tuple<bool,uint32>
 					Exists(const std::string& inIndex, const std::string& inValue);
 
 	// DocNrForID returns a doc number for an ID if the document exists
@@ -119,6 +128,8 @@ class M6Databank
 						const std::string& inFirst, const std::string& inLast,
 						uint32 inRequestedBrowseSections,
 						std::vector<std::pair<std::string,std::string>>& outBrowseSections);
+	void			ListIndexEntries(const std::string& inIndex,
+						std::vector<std::string>& outEntries);
 	void			ListIndexEntries(const std::string& inIndex,
 						const std::string& inFirst, const std::string& inLast,
 						std::vector<std::string>& outEntries);

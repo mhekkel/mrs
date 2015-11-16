@@ -8,15 +8,12 @@
 #include <signal.h>
 
 #include <iostream>
+#include <tuple>
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/fstream.hpp>
 #include <boost/format.hpp>
-#include <boost/foreach.hpp>
-#define foreach BOOST_FOREACH
-//#include <boost/timer/timer.hpp>
-#include <boost/tr1/tuple.hpp>
 #include <boost/algorithm/string.hpp>
 
 #include "M6Builder.h"
@@ -51,45 +48,45 @@ int VERBOSE;
 class M6CmdLineDriver
 {
   public:
-	virtual			~M6CmdLineDriver() {}
+   virtual         ~M6CmdLineDriver() {}
 
-	static int		Exec(int argc, char* const argv[]);
+   static int      Exec(int argc, char* const argv[]);
 
-	static void		Terminated();
-	static void		SigHandler(int inSignal);
+   static void     Terminated();
+   static void     SigHandler(int inSignal);
 #if defined _MSC_VER
-	static BOOL WINAPI
-					ConsoleHandler(DWORD inCEvent);
+   static BOOL WINAPI
+                   ConsoleHandler(DWORD inCEvent);
 #endif
 
-	struct DriverInfo
-	{
-		string								name;
-		string								description;
-		boost::function<M6CmdLineDriver*()>	factory;
-	};
-	
-	template<class D>
-	static void		Register(const char* name, const char* description)
-	{
-		DriverInfo d = { name, description, [](){ return new D; } };
-		sDrivers.push_back(d);
-	}
+   struct DriverInfo
+   {
+       string                              name;
+       string                              description;
+       boost::function<M6CmdLineDriver*()> factory;
+   };
+
+   template<class D>
+   static void     Register(const char* name, const char* description)
+   {
+       DriverInfo d = { name, description, [](){ return new D; } };
+       sDrivers.push_back(d);
+   }
 
   protected:
-					M6CmdLineDriver();
+                   M6CmdLineDriver();
 
-	virtual void	AddOptions(po::options_description& desc,
-						unique_ptr<po::positional_options_description>& p);
-	virtual bool	Validate(po::variables_map& vm);
-	virtual int		Exec(const string& inCommand, po::variables_map& vm) = 0;
-	void			LoadConfig(po::variables_map& vm);
+   virtual void    AddOptions(po::options_description& desc,
+                       unique_ptr<po::positional_options_description>& p);
+   virtual bool    Validate(po::variables_map& vm);
+   virtual int     Exec(const string& inCommand, po::variables_map& vm) = 0;
+   void            LoadConfig(po::variables_map& vm);
 
-	tr1::tuple<const zx::element*,fs::path>
-					GetDatabank(const string& inDatabank);
+   tuple<const zx::element*,fs::path>
+                   GetDatabank(const string& inDatabank);
 
-	static string				sDatabank;
-	static vector<DriverInfo>	sDrivers;
+   static string               sDatabank;
+   static vector<DriverInfo>   sDrivers;
 };
 
 vector<M6CmdLineDriver::DriverInfo> M6CmdLineDriver::sDrivers;
@@ -99,119 +96,119 @@ vector<M6CmdLineDriver::DriverInfo> M6CmdLineDriver::sDrivers;
 
 class M6VersionDriver : public M6CmdLineDriver
 {
-  public:
-					M6VersionDriver() {};
-
-	virtual void    AddOptions(po::options_description& desc,
-						unique_ptr<po::positional_options_description>& p);
-	virtual bool    Validate(po::variables_map& vm);
-	virtual int		Exec(const string& inCommand, po::variables_map& vm);
+   public:
+                                        M6VersionDriver() {};
+ 
+        virtual void    AddOptions(po::options_description& desc,
+                                                unique_ptr<po::positional_options_description>& p);
+        virtual bool    Validate(po::variables_map& vm);
+        virtual int             Exec(const string& inCommand, po::variables_map& vm);
 };
 
 class M6BlastDriver : public M6CmdLineDriver
 {
   public:
-					M6BlastDriver() {};
+                   M6BlastDriver() {};
 
-	virtual void	AddOptions(po::options_description& desc,
-						unique_ptr<po::positional_options_description>& p);
-	virtual bool	Validate(po::variables_map& vm);
-	virtual int		Exec(const string& inCommand, po::variables_map& vm);
+   virtual void    AddOptions(po::options_description& desc,
+                       unique_ptr<po::positional_options_description>& p);
+   virtual bool    Validate(po::variables_map& vm);
+   virtual int     Exec(const string& inCommand, po::variables_map& vm);
 };
 
 class M6BuildDriver : public M6CmdLineDriver
 {
   public:
-					M6BuildDriver() {};
+                   M6BuildDriver() {};
 
-	virtual int		Exec(const string& inCommand, po::variables_map& vm);
+   virtual int     Exec(const string& inCommand, po::variables_map& vm);
 };
 
 class M6QueryDriver : public M6CmdLineDriver
 {
   public:
-					M6QueryDriver() {};
+                   M6QueryDriver() {};
 
-	virtual void	AddOptions(po::options_description& desc,
-						unique_ptr<po::positional_options_description>& p);
-	virtual bool	Validate(po::variables_map& vm);
-	virtual int		Exec(const string& inCommand, po::variables_map& vm);
+   virtual void    AddOptions(po::options_description& desc,
+                       unique_ptr<po::positional_options_description>& p);
+   virtual bool    Validate(po::variables_map& vm);
+   virtual int     Exec(const string& inCommand, po::variables_map& vm);
 };
 
 class M6InfoDriver : public M6CmdLineDriver
 {
   public:
-					M6InfoDriver() {};
+                   M6InfoDriver() {};
 
-	virtual int		Exec(const string& inCommand, po::variables_map& vm);
+   virtual int     Exec(const string& inCommand, po::variables_map& vm);
 };
 
 class M6EntryDriver : public M6CmdLineDriver
 {
   public:
-					M6EntryDriver() {};
+                   M6EntryDriver() {};
 
-	virtual void	AddOptions(po::options_description& desc,
-						unique_ptr<po::positional_options_description>& p);
-	virtual bool	Validate(po::variables_map& vm);
-	virtual int		Exec(const string& inCommand, po::variables_map& vm);
+   virtual void    AddOptions(po::options_description& desc,
+                       unique_ptr<po::positional_options_description>& p);
+   virtual bool    Validate(po::variables_map& vm);
+   virtual int     Exec(const string& inCommand, po::variables_map& vm);
 };
 
 class M6DumpDriver : public M6CmdLineDriver
 {
   public:
-					M6DumpDriver() {};
+                   M6DumpDriver() {};
 
-	virtual void	AddOptions(po::options_description& desc,
-						unique_ptr<po::positional_options_description>& p);
-	virtual bool	Validate(po::variables_map& vm);
-	virtual int		Exec(const string& inCommand, po::variables_map& vm);
+   virtual void    AddOptions(po::options_description& desc,
+                       unique_ptr<po::positional_options_description>& p);
+   virtual bool    Validate(po::variables_map& vm);
+   virtual int     Exec(const string& inCommand, po::variables_map& vm);
 };
 
 class M6FetchDriver : public M6CmdLineDriver
 {
   public:
-					M6FetchDriver() {};
+                   M6FetchDriver() {};
 
-	virtual int		Exec(const string& inCommand, po::variables_map& vm);
+   virtual int     Exec(const string& inCommand, po::variables_map& vm);
 };
 
 class M6VacuumDriver : public M6CmdLineDriver
 {
   public:
-					M6VacuumDriver() {};
+                   M6VacuumDriver() {};
 
-	virtual int		Exec(const string& inCommand, po::variables_map& vm);
+   virtual int     Exec(const string& inCommand, po::variables_map& vm);
 };
 
 class M6ValidateDriver : public M6CmdLineDriver
 {
   public:
-					M6ValidateDriver() {};
+                   M6ValidateDriver() {};
 
-	virtual int		Exec(const string& inCommand, po::variables_map& vm);
+   virtual int     Exec(const string& inCommand, po::variables_map& vm);
 };
 
 class M6PasswordDriver : public M6CmdLineDriver
 {
   public:
-					M6PasswordDriver() {};
+                   M6PasswordDriver() {};
 
-	virtual void	AddOptions(po::options_description& desc,
-						unique_ptr<po::positional_options_description>& p);
-	virtual bool	Validate(po::variables_map& vm);
-	virtual int		Exec(const string& inCommand, po::variables_map& vm);
+   virtual void    AddOptions(po::options_description& desc,
+                       unique_ptr<po::positional_options_description>& p);
+   virtual bool    Validate(po::variables_map& vm);
+   virtual int     Exec(const string& inCommand, po::variables_map& vm);
 };
 
 class M6ServerDriver : public M6CmdLineDriver
 {
   public:
-					M6ServerDriver() {};
+                   M6ServerDriver() {};
 
-	virtual void	AddOptions(po::options_description& desc,
-						unique_ptr<po::positional_options_description>& p);
-	virtual bool	Validate(po::variables_map& vm);
-	virtual int		Exec(const string& inCommand, po::variables_map& vm);
+   virtual void    AddOptions(po::options_description& desc,
+                       unique_ptr<po::positional_options_description>& p);
+   virtual bool    Validate(po::variables_map& vm);
+   virtual int     Exec(const string& inCommand, po::variables_map& vm);
 };
 
 // --------------------------------------------------------------------
@@ -225,11 +222,11 @@ M6CmdLineDriver::M6CmdLineDriver()
 
 int M6CmdLineDriver::Exec(int argc, char* const argv[])
 {
-	unique_ptr<M6CmdLineDriver> driver;
+   unique_ptr<M6CmdLineDriver> driver;
 
-	if (argc > 1)
-	{
-		foreach (DriverInfo& di, sDrivers)
+   if (argc > 1)
+   {
+        for (DriverInfo& di : sDrivers)
 		{
 			if (di.name == argv[1])
 			{
@@ -252,7 +249,7 @@ int M6CmdLineDriver::Exec(int argc, char* const argv[])
 			 << "  Command can be one of:" << endl
 			 << endl;
 		
-		foreach (DriverInfo& di, sDrivers)
+		for (DriverInfo& di : sDrivers)
 			cout << "    " << di.name << string(12 - di.name.length(), ' ') << di.description << endl;
 		
 		cout << endl
@@ -331,21 +328,22 @@ void M6CmdLineDriver::LoadConfig(po::variables_map& vm)
 	}
 }
 
-tr1::tuple<const zx::element*,fs::path>
+tuple<const zx::element*,fs::path>
 M6CmdLineDriver::GetDatabank(const string& inDatabank)
 {
 	const zx::element* config = M6Config::GetEnabledDatabank(inDatabank);
 
 	fs::path path = M6Config::GetDbDirectory(inDatabank);
 	
-	return tr1::make_tuple(config, path);
+	return make_tuple(config, path);
 }
 
 void M6CmdLineDriver::Terminated()
 {
 	M6Status::Instance().SetError(sDatabank, M6Exception::last_what());
 	cerr << "Terminated" << endl << M6Exception::last_what() << endl;
-	abort();
+	_exit (1);
+    //abort();
 }
 
 void M6CmdLineDriver::SigHandler(int inSignal)
@@ -353,7 +351,8 @@ void M6CmdLineDriver::SigHandler(int inSignal)
 	std::string msg = "terminated on signal " + inSignal;
 	cerr << "Terminated" << endl << msg << endl;
 	M6Status::Instance().SetError(sDatabank, msg);
-	abort();
+	_exit (1);
+    //abort();
 }
 
 #if defined _MSC_VER
@@ -468,7 +467,7 @@ int M6BlastDriver::Exec(const string& inCommand, po::variables_map& vm)
 
 	vector<fs::path> databanks;
 	string db = vm["databank"].as<string>();
-	foreach (const zx::element* dbc, M6Config::GetDatabanks(db))
+	for (const zx::element* dbc : M6Config::GetDatabanks(db))
 	{
 		fs::path dbdir = M6Config::GetDbDirectory(dbc->get_attribute("id"));
 
@@ -538,7 +537,7 @@ int M6BuildDriver::Exec(const string& inCommand, po::variables_map& vm)
 	vector<string> databanks;
 	if (sDatabank == "all" or sDatabank == "daily" or sDatabank == "weekly" or sDatabank == "monthly")
 	{
-		foreach (zx::element* db, M6Config::GetDatabanks())
+		for (zx::element* db : M6Config::GetDatabanks())
 		{
 			if (db->get_attribute("enabled") != "true")
 				continue;
@@ -552,7 +551,7 @@ int M6BuildDriver::Exec(const string& inCommand, po::variables_map& vm)
 	
 	int result = 0;
 
-	foreach (string databank, databanks)
+	for (string databank : databanks)
 	{
 		try
 		{
@@ -606,6 +605,8 @@ void M6QueryDriver::AddOptions(po::options_description& desc,
 	M6CmdLineDriver::AddOptions(desc, p);
 	desc.add_options()
 		("query,q", po::value<string>(),		"Query term")
+        ("boolean,b",                           "Perform a boolean query (not ranked)")
+        ("all",                                  "Print all results")
 		("count", po::value<uint32>(),			"Result count (default = 10)")
 		("offset", po::value<uint32>(),			"Result offset (default = 0)")
 		;
@@ -622,7 +623,7 @@ int M6QueryDriver::Exec(const string& inCommand, po::variables_map& vm)
 {
 	const zx::element* config;
 	fs::path path;
-	tr1::tie(config, path) = GetDatabank(vm["databank"].as<string>());
+	tie(config, path) = GetDatabank(vm["databank"].as<string>());
 
 	M6Databank db(path.string());
 
@@ -633,7 +634,13 @@ int M6QueryDriver::Exec(const string& inCommand, po::variables_map& vm)
 	if (vm.count("offset"))
 		offset = vm["offset"].as<uint32>();
 
-	unique_ptr<M6Iterator> rset(db.Find(vm["query"].as<string>(), true, offset + count));
+    bool boolean = vm.count("boolean");
+    bool all = vm.count("all");
+
+    unique_ptr<M6Iterator> rset(
+        boolean ?
+            db.FindBoolean(vm["query"].as<string>(), offset + count) :
+            db.Find(vm["query"].as<string>(), true, offset + count));
 	
 	if (rset)
 	{
@@ -644,13 +651,14 @@ int M6QueryDriver::Exec(const string& inCommand, po::variables_map& vm)
 		while (offset-- > 0 and rset->Next(docNr, rank))
 			;
 		
-		while (count-- > 0 and rset->Next(docNr, rank))
+        while ((all or count-- > 0) and rset->Next(docNr, rank))
 		{
 			unique_ptr<M6Document> doc(db.Fetch(docNr));
 			
-			cout << doc->GetAttribute("id") << "\t"
-				 << boost::format("%1.2f") % (100.0 * rank) << "\t"
-				 << doc->GetAttribute("title") << endl;
+            cout << doc->GetAttribute("id") << "\t";
+            if (boolean)
+                cout << boost::format("%1.2f") % (100.0 * rank) << "\t";
+            cout << doc->GetAttribute("title") << endl;
 		}
 	}
 	
@@ -664,7 +672,7 @@ int M6InfoDriver::Exec(const string& inCommand, po::variables_map& vm)
 {
 	const zx::element* config;
 	fs::path path;
-	tr1::tie(config, path) = GetDatabank(vm["databank"].as<string>());
+	tie(config, path) = GetDatabank(vm["databank"].as<string>());
 
 	M6Databank db(path.string());
 	
@@ -702,8 +710,10 @@ int M6InfoDriver::Exec(const string& inCommand, po::variables_map& vm)
 		{
 			case eM6CharIndex:			desc = "unique string     "; break;
 			case eM6NumberIndex:		desc = "unique number     "; break;
+            case eM6FloatIndex:         desc = "unique fp number  "; break;
 			case eM6CharMultiIndex:		desc = "string            "; break;
 			case eM6NumberMultiIndex:	desc = "number            "; break;
+            case eM6FloatMultiIndex:    desc = "floating point nr "; break;
 			case eM6CharMultiIDLIndex:	desc = "word with position"; break;
 			case eM6CharWeightedIndex:	desc = "weighted word     "; break;
 			case eM6LinkIndex:			desc = "link              "; break;
@@ -723,11 +733,15 @@ int M6InfoDriver::Exec(const string& inCommand, po::variables_map& vm)
 		 << "Index Name           |                    | Nr of keys   | File size" << endl
 		 << "-------------------------------------------------------------------------" << endl;
 	
-	foreach (M6IndexInfo& ix, info.mIndexInfo)
-		cout << ix.mName << string(20 - ix.mName.length(), ' ') << " | "
+	for (M6IndexInfo& ix : info.mIndexInfo)
+    {
+        string name = ix.mName.length() > 20 ? ix.mName.substr(0, 17) + "..." : ix.mName.substr(0, 20);
+
+		cout << name << string(20 - name.length(), ' ') << " | "
 			 << descIxType(ix.mType) << " | "
 			 << formatNr(ix.mCount, 12) << " | "
 			 << formatNr(ix.mFileSize, 14) << endl;
+    }
 
 	return 0;
 }
@@ -756,7 +770,7 @@ int M6DumpDriver::Exec(const string& inCommand, po::variables_map& vm)
 {
 	const zx::element* config;
 	fs::path path;
-	tr1::tie(config, path) = GetDatabank(vm["databank"].as<string>());
+	tie(config, path) = GetDatabank(vm["databank"].as<string>());
 
 	M6Databank db(path.string());
 	
@@ -789,7 +803,7 @@ int M6EntryDriver::Exec(const string& inCommand, po::variables_map& vm)
 {
 	const zx::element* config;
 	fs::path path;
-	tr1::tie(config, path) = GetDatabank(vm["databank"].as<string>());
+	tie(config, path) = GetDatabank(vm["databank"].as<string>());
 
 	M6Databank db(path.string());
 	
@@ -826,7 +840,7 @@ int M6VacuumDriver::Exec(const string& inCommand, po::variables_map& vm)
 {
 	const zx::element* config;
 	fs::path path;
-	tr1::tie(config, path) = GetDatabank(vm["databank"].as<string>());
+	tie(config, path) = GetDatabank(vm["databank"].as<string>());
 
 	M6Databank db(path.string(), eReadWrite);
 
@@ -842,7 +856,7 @@ int M6ValidateDriver::Exec(const string& inCommand, po::variables_map& vm)
 {
 	const zx::element* config;
 	fs::path path;
-	tr1::tie(config, path) = GetDatabank(vm["databank"].as<string>());
+	tie(config, path) = GetDatabank(vm["databank"].as<string>());
 
 	M6Databank db(path.string());
 

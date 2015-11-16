@@ -15,7 +15,7 @@ our $VERSION = '6.0';
 
 #use strict;
 #use warnings;
-use Data::Dumper;
+#use Data::Dumper;
 
 my %scripts;
 my %INDICES;

@@ -1,7 +1,7 @@
 //   Copyright Maarten L. Hekkelman, Radboud University 2012.
 //  Distributed under the Boost Software License, Version 1.0.
-//     (See accompanying file LICENSE_1_0.txt or copy at
-//           http://www.boost.org/LICENSE_1_0.txt)
+//	    (See accompanying file LICENSE_1_0.txt or copy at
+//		       http://www.boost.org/LICENSE_1_0.txt)
 
 #pragma once
 
@@ -98,28 +98,38 @@ namespace std {
 
 struct M6IBitStreamImpl
 {
-					M6IBitStreamImpl()
-						: mBufferPtr(nullptr), mBufferSize(0)
-					{
-					}
-					
-					M6IBitStreamImpl(const M6IBitStreamImpl& inImpl)
-						: mBufferPtr(inImpl.mBufferPtr), mBufferSize(inImpl.mBufferSize)
-					{
-					}
+	M6IBitStreamImpl()
+		: mBufferPtr(nullptr), mBufferSize(0)
+	{
+	}
 
-	virtual			~M6IBitStreamImpl() {}
+	M6IBitStreamImpl(const M6IBitStreamImpl& inImpl)
+		: mBufferPtr(inImpl.mBufferPtr), mBufferSize(inImpl.mBufferSize)
+	{
+	}
+
+	virtual ~M6IBitStreamImpl()
+	{
+	}
 
 	// using Clone, we can make ibitstreams copy constructable.
 	virtual M6IBitStreamImpl* Clone() = 0;
 
-	void			Get(uint8& outByte);
-	
-  protected:
-	virtual void	Read() = 0;
+	inline uint8 Get()
+	{
+		if (mBufferSize <= 0)
+			Read();
 
-	uint8*			mBufferPtr;
-	int64			mBufferSize;
+		return --mBufferSize < 0 ? 0 : *mBufferPtr++;
+	}
+
+	friend void ReadArray(M6IBitStream& inBits, std::vector<uint32>& outArray);
+
+  protected:
+	virtual void Read() = 0;
+
+	uint8*  mBufferPtr;
+	int64   mBufferSize;
 };
 
 class M6IBitStream
@@ -136,15 +146,55 @@ class M6IBitStream
 						~M6IBitStream();
 	
 	// 
-	
-	int					operator()();
+
+	inline int operator()()
+	{
+		int result = (mByte & (1 << mBitOffset)) != 0;
+
+		if (--mBitOffset < 0)
+		{
+			mByte = mImpl->Get();
+			mBitOffset = 7;
+		}
+
+		return result;
+	}
+
+	template<typename T>
+	inline void ReadBinary(int32 inBitCount, T& outValue)
+	{
+		outValue = 0;
+		while (inBitCount > 0)
+		{
+			static const uint8 kM[] = { 0x00, 0x01, 0x03, 0x07, 0x0F, 0x1F, 0x3F, 0x7F, 0xFF };
+
+			int bw = mBitOffset + 1;
+			if (bw > inBitCount)
+				bw = inBitCount;
+
+			outValue = outValue << bw | (kM[bw] & (mByte >> (mBitOffset + 1 - bw)));
+
+			mBitOffset -= bw;
+			if (mBitOffset < 0)
+			{
+				mByte = mImpl->Get();
+				mBitOffset = 7;
+			}
+
+			inBitCount -= bw;
+		}
+	}
+
+	//int					operator()();
 	void				Sync();
-	void				Underflow();
+	//void				Underflow();
 	void				Skip(uint32 inBits);
 	
 	friend void ReadBits(M6IBitStream& inBits, M6OBitStream& outValue);
 	friend void WriteBits(M6OBitStream& inBits, const M6OBitStream& inValue);
 	friend void CopyBits(M6OBitStream& inBits, const M6OBitStream& inValue);
+
+	friend void ReadArray(M6IBitStream& inBits, std::vector<uint32>& outArray);
 
 	friend struct M6IBitStreamFileImpl;
 	friend struct M6IBitStreamOBitImpl;
@@ -164,19 +214,12 @@ class M6IBitStream
 //	Binary mode writes a fixed bitcount number of bits for a value
 //
 template<class T>
-void ReadBinary(M6IBitStream& inBits, int32 inBitCount, T& outValue)
+inline void ReadBinary(M6IBitStream& inBits, int32 inBitCount, T& outValue)
 {
 	assert(inBitCount <= sizeof(T) * 8);
 	assert(inBitCount > 0);
-	outValue = 0;
 
-	uint64 b = 1ULL << (inBitCount - 1);
-	while (b)
-	{
-		if (inBits())
-			outValue |= b;
-		b >>= 1;
-	}
+	inBits.ReadBinary(inBitCount, outValue);
 }
 
 inline void WriteBinary(M6OBitStream& inBits, int inBitCount, uint64 inValue)
@@ -367,7 +410,7 @@ inline M6OBitStream& M6OBitStream::operator<<(bool inBit)
 }
 
 // --------------------------------------------------------------------
-
+/*
 inline void M6IBitStreamImpl::Get(uint8& outByte)
 {
 	if (mBufferSize <= 0)
@@ -398,7 +441,7 @@ inline int M6IBitStream::operator()()
 	
 	return result;
 }
-
+*/
 //// --------------------------------------------------------------------
 //
 //inline M6CompressedArray::const_iterator::const_iterator()

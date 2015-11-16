@@ -27,6 +27,9 @@
 #pragma warning (disable : 4800)	// BOOL conversion
 
 #pragma comment ( lib, "libzeep" )
+#if not defined(BUILDING_M6_EXE)
+#pragma comment ( lib, "libm6" )
+#endif
 
 #if defined(_DEBUG)
 #	define DEBUG	1
@@ -56,16 +59,19 @@ enum M6DataType
 	eM6TextData			= 1,
 	eM6StringData,
 	eM6NumberData,
-	eM6DateData
+	eM6DateData,
+    eM6FloatData,
 };
 
 enum M6IndexType : uint32
 {
 	eM6CharIndex			= 'M6cu',
 	eM6NumberIndex			= 'M6nu',
+    eM6FloatIndex           = 'M6db',
 //	eM6DateIndex			= 'M6du',
 	eM6CharMultiIndex		= 'M6cm',
 	eM6NumberMultiIndex		= 'M6nm',
+    eM6FloatMultiIndex      = 'M6dm',
 //	eM6DateMultiIndex		= 'M6dm',
 	eM6CharMultiIDLIndex	= 'M6ci',
 	eM6CharWeightedIndex	= 'M6cw',
@@ -84,7 +90,10 @@ enum M6QueryOperator
 	eM6GreaterThan
 };
 
-extern const uint32
-	kM6MaxWeight, kM6WeightBitCount;
+enum : uint32
+{
+    kM6WeightBitCount = 5,
+    kM6MaxWeight = (1 << kM6WeightBitCount) - 1,
+};
 
 extern int VERBOSE;

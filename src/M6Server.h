@@ -1,7 +1,7 @@
 //   Copyright Maarten L. Hekkelman, Radboud University 2012.
 //  Distributed under the Boost Software License, Version 1.0.
-//     (See accompanying file LICENSE_1_0.txt or copy at
-//           http://www.boost.org/LICENSE_1_0.txt)
+//	 (See accompanying file LICENSE_1_0.txt or copy at
+//		   http://www.boost.org/LICENSE_1_0.txt)
 
 #pragma once
 
@@ -9,7 +9,7 @@
 #include <map>
 #include <set>
 
-#include <boost/tr1/tuple.hpp>
+#include <tuple>
 
 #include <zeep/http/webapp.hpp>
 #include <zeep/http/webapp/el.hpp>
@@ -29,9 +29,6 @@ class M6WSBlast;
 
 typedef std::map<std::string,std::set<M6Databank*>> M6LinkMap;
 
-struct M6AuthInfo;
-typedef std::vector<M6AuthInfo*> M6AuthInfoList;
-
 class M6Server : public zh::webapp
 {
   public:
@@ -48,7 +45,6 @@ class M6Server : public zh::webapp
 	static int		Reload(const std::string& inPidFile);
 
 	virtual void	handle_request(const zh::request& req, zh::reply& rep);
-	virtual void	create_unauth_reply(bool stale, const std::string& realm, zh::reply& rep);
 
 	void			LoadAllDatabanks();
 	M6Databank*		Load(const std::string& inDatabank);
@@ -70,7 +66,7 @@ class M6Server : public zh::webapp
 	};
 	typedef std::vector<M6BlastDatabank> M6BlastDbList;
 
-	std::tr1::tuple<M6Databank*,uint32>
+	std::tuple<M6Databank*,uint32>
 					GetEntryDatabankAndNr(const std::string& inDatabank, const std::string& inID);
 	std::string		GetEntry(M6Databank* inDatabank, const std::string& inFormat, uint32 inDocNr);
 	std::string		GetEntry(M6Databank* inDatabank, const std::string& inFormat,
@@ -101,7 +97,8 @@ class M6Server : public zh::webapp
 	  
 	virtual void	init_scope(el::scope& scope);
 
-	void			ValidateAuthentication(const zh::request& request, const std::string& inRealm);
+	virtual std::string
+					get_hashed_password(const std::string& username, const std::string& realm);
 	void			ProcessNewConfig(const std::string& inPage, zh::parameter_map& inParams);
 
 	void			handle_download(const zh::request& request, const el::scope& scope, zh::reply& reply);
@@ -162,9 +159,7 @@ class M6Server : public zh::webapp
 	M6BlastDbList	mBlastDatabanks;
 	M6LinkMap		mLinkMap;
 
-	M6AuthInfoList	mAuthInfo;
 	boost::mutex	mAuthMutex;
-	std::string		mAdminRealm;
 	std::string		mBaseURL;
 	bool			mAlignEnabled;
 

@@ -12,8 +12,6 @@
 #include <boost/static_assert.hpp>
 #include <boost/algorithm/string.hpp>
 #include <boost/filesystem/operations.hpp>
-#include <boost/foreach.hpp>
-#define foreach BOOST_FOREACH
 #include <boost/bind.hpp>
 
 #include "M6Dictionary.h"
@@ -681,7 +679,7 @@ void M6Dictionary::SuggestSearchTerms(const string& inWord, vector<string>& outS
 	sort_heap(suggestions.begin(), suggestions.end());
 	
 	set<string> words;
-	foreach (suggestion& s, suggestions)
+	for (suggestion& s : suggestions)
 	{
 		if (words.count(s.word))
 			continue;

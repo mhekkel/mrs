@@ -12,9 +12,10 @@
 #include <cassert>
 #include <vector>
 #include <iostream>
+#include <atomic>
 
 #include <boost/iostreams/categories.hpp>
-#include <boost/thread/mutex.hpp>
+#include <boost/thread.hpp>
 
 #include "M6DocStore.h"
 #include "M6Error.h"
@@ -250,11 +251,13 @@ class M6DocStoreImpl
 					~M6DocStoreImpl();
 
 	uint32			Size() const					{ return mHeader.mDocCount; }
-	uint32			NextDocumentNumber() const		{ return mHeader.mNextDocNumber; }
+	uint32			NextDocumentNumber()			{ return mNextDocNumber++; }
+	uint32			MaxDocumentNumber() const		{ return mNextDocNumber; }
+
 	int64			GetRawSize() const				{ return mHeader.mRawTextSize; }
 	int64			GetFileSize() const				{ return mFile.Size(); }
 
-	uint32			StoreDocument(const char* inData, size_t inSize, size_t inRawSize);
+	void			StoreDocument(uint32 inDocNr, const char* inData, size_t inSize, size_t inRawSize);
 	void			EraseDocument(uint32 inDocNr);
 	bool			FetchDocument(uint32 inDocNr, uint32& outPageNr, uint32& outDocSize);
 	void			OpenDataStream(uint32 inDocNr, uint32 inPageNr, uint32 inDocSize,
@@ -280,9 +283,9 @@ class M6DocStoreImpl
 	void			Dump();
 
 	friend struct Lock;
-	struct Lock : public boost::mutex::scoped_lock
+	struct Lock : public boost::unique_lock<boost::mutex>
 	{
-					Lock(M6DocStoreImpl* inImpl) : boost::mutex::scoped_lock(inImpl->mMutex) {} 
+		Lock(M6DocStoreImpl* inImpl) : boost::unique_lock<boost::mutex>(inImpl->mMutex) {}
 	};
 
   private:
@@ -303,6 +306,7 @@ class M6DocStoreImpl
 	MOpenMode				mMode;
 	boost::mutex			mMutex;
 	M6DocStoreHdr			mHeader;
+	atomic<uint32>			mNextDocNumber;
 	M6DocStoreIndexPagePtr	mRoot;
 	bool					mDirty;
 	bool					mAutoCommit;
@@ -839,6 +843,7 @@ streamsize M6DocSource::read(char* s, streamsize n)
 M6DocStoreImpl::M6DocStoreImpl(const fs::path& inPath, MOpenMode inMode)
 	: mFile(inPath, inMode)
 	, mMode(inMode)
+	, mNextDocNumber(1)
 	, mDirty(false)
 	, mAutoCommit(true)
 {
@@ -858,6 +863,8 @@ M6DocStoreImpl::M6DocStoreImpl(const fs::path& inPath, MOpenMode inMode)
 	{
 		mFile.PRead(mHeader, 0);
 		mRoot = Load<M6DocStoreIndexPage>(mHeader.mIndexRoot);
+		
+		mNextDocNumber = mHeader.mNextDocNumber;
 	}
 
 	assert(mHeader.mSignature == kM6DocStoreSignature);
@@ -867,7 +874,10 @@ M6DocStoreImpl::M6DocStoreImpl(const fs::path& inPath, MOpenMode inMode)
 M6DocStoreImpl::~M6DocStoreImpl()
 {
 	if (mDirty)
+	{
+		mHeader.mNextDocNumber = mNextDocNumber;
 		mFile.PWrite(mHeader, 0);
+	}
 	
 	mRoot = M6DocStoreIndexPagePtr();
 
@@ -938,13 +948,16 @@ string M6DocStoreImpl::GetAttributeName(uint8 inAttrNr) const
 	return result;
 }
 
-uint32 M6DocStoreImpl::StoreDocument(const char* inData, size_t inSize, size_t inRawSize)
+void M6DocStoreImpl::StoreDocument(uint32 inDocNr, const char* inData, size_t inSize, size_t inRawSize)
 {
 	if (inSize == 0 or inData == nullptr)
 		THROW(("Empty document"));
 	
 	if (inSize > numeric_limits<uint32>::max())
 		THROW(("Document too large"));
+
+	if (inDocNr == 0 or inDocNr > mNextDocNumber)
+		THROW(("Invalid document number"));
 
 //cout << "store doc" << endl;
 
@@ -963,11 +976,11 @@ uint32 M6DocStoreImpl::StoreDocument(const char* inData, size_t inSize, size_t i
 	else
 		dataPage = Load<M6DocStoreDataPage>(pageNr);
 
-	uint32 docNr = mHeader.mNextDocNumber, docPageNr = pageNr, docSize = size;
+	uint32 docPageNr = pageNr, docSize = size;
 	
 	while (size > 0)
 	{
-		uint32 k = dataPage->Store(docNr, ptr, size);
+		uint32 k = dataPage->Store(inDocNr, ptr, size);
 		
 		ptr += k;
 		size -= k;
@@ -998,29 +1011,21 @@ uint32 M6DocStoreImpl::StoreDocument(const char* inData, size_t inSize, size_t i
 			mRoot = Load<M6DocStoreIndexPage>(mHeader.mIndexRoot);
 	}
 	
-	uint32 result = docNr;
-	
-	if (mRoot->Insert(docNr, docPageNr, docSize))
+	if (mRoot->Insert(inDocNr, docPageNr, docSize))
 	{
 		M6DocStoreIndexPagePtr newRoot(Allocate<M6DocStoreIndexPage>());
 		newRoot->SetPageType(eM6DocStoreIndexBranchPage);
 		newRoot->SetLink(mHeader.mIndexRoot);
-		newRoot->InsertValues(docNr, docPageNr, 0, 0);
+		newRoot->InsertValues(inDocNr, docPageNr, 0, 0);
 		mHeader.mIndexRoot = newRoot->GetPageNr();
 		
 		mRoot = newRoot;
 	}
 	
-	++mHeader.mNextDocNumber;
 	++mHeader.mDocCount;
 	mHeader.mRawTextSize += inRawSize;
 
 	mDirty = true;
-	
-//	if (mAutoCommit)
-//		Commit();
-
-	return result;
 }
 
 void M6DocStoreImpl::EraseDocument(uint32 inDocNr)
@@ -1334,10 +1339,10 @@ string M6DocStore::GetAttributeName(uint8 inAttrNr) const
 	return mImpl->GetAttributeName(inAttrNr);
 }
 
-uint32 M6DocStore::StoreDocument(const char* inData, size_t inSize, size_t inRawSize)
+void M6DocStore::StoreDocument(uint32 inDocNr, const char* inData, size_t inSize, size_t inRawSize)
 {
 	M6DocStoreImpl::Lock lock(mImpl);
-	return mImpl->StoreDocument(inData, inSize, inRawSize);
+	mImpl->StoreDocument(inDocNr, inData, inSize, inRawSize);
 }
 
 void M6DocStore::EraseDocument(uint32 inDocNr)
@@ -1372,10 +1377,14 @@ void M6DocStore::Commit()
 	mImpl->Commit();
 }
 
-uint32 M6DocStore::NextDocumentNumber() const
+uint32 M6DocStore::GetNextDocumentNumber()
 {
-	M6DocStoreImpl::Lock lock(mImpl);
 	return mImpl->NextDocumentNumber();
+}
+
+uint32 M6DocStore::GetMaxDocNr()
+{
+	return mImpl->MaxDocumentNumber();
 }
 
 void M6DocStore::Validate()

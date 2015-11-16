@@ -13,8 +13,6 @@
 #include <boost/iostreams/device/array.hpp>
 #include <boost/iostreams/stream.hpp>
 #include <boost/iostreams/copy.hpp>
-#include <boost/foreach.hpp>
-#define foreach BOOST_FOREACH
 #include <boost/algorithm/string.hpp>
 //#include <boost/locale.hpp>
 #include <boost/range/sub_range.hpp>
@@ -26,6 +24,8 @@
 //#include "M6FastLZ.h"
 #include "M6Databank.h"
 #include "M6Index.h"
+
+#include "M6Log.h"
 
 using namespace std;
 namespace io = boost::iostreams;
@@ -54,14 +54,14 @@ M6Document::~M6Document()
 
 M6InputDocument::M6InputDocument(M6Databank& inDatabank)
 	: M6Document(inDatabank)
-	, mDocNr(0)
+	, mDocNr(inDatabank.GetDocStore().GetNextDocumentNumber())
 {
 }
 
 M6InputDocument::M6InputDocument(M6Databank& inDatabank, const string& inText)
 	: M6Document(inDatabank)
 	, mText(inText)
-	, mDocNr(0)
+	, mDocNr(inDatabank.GetDocStore().GetNextDocumentNumber())
 {
 }
 
@@ -115,7 +115,7 @@ void M6InputDocument::Compress()
 	out.push(z_stream);
 	out.push(io::back_inserter(mBuffer));
 
-	foreach (auto attr, mAttributes)
+	for (auto attr : mAttributes)
 	{
 		uint8 attrNr = store.RegisterAttribute(attr.first);
 		out.write(reinterpret_cast<char*>(&attrNr), 1);
@@ -136,10 +136,10 @@ void M6InputDocument::Compress()
 		out << "[[" << endl;
 		stringstream ls;
 
-		foreach (auto& l, mLinks)
+		for (auto& l : mLinks)
 		{
 			out << l.first << '\t';
-			foreach (auto id, l.second)
+			for (auto id : l.second)
 				out << id << ';';
 			out << endl;
 		}
@@ -150,12 +150,10 @@ void M6InputDocument::Compress()
 	out.write(mText.c_str(), mText.length());
 }
 
-uint32 M6InputDocument::Store()
+void M6InputDocument::Store()
 {
-	M6DocStore& store(mDatabank.GetDocStore());
 	assert(not mBuffer.empty());
-	mDocNr = store.StoreDocument(&mBuffer[0], mBuffer.size(), mText.length());
-	return mDocNr;
+	mDatabank.GetDocStore().StoreDocument(mDocNr, &mBuffer[0], mBuffer.size(), mText.length());
 }
 
 M6InputDocument::M6IndexTokenList::iterator M6InputDocument::GetIndexTokens(
@@ -190,8 +188,9 @@ void M6InputDocument::Index(const string& inIndex, M6DataType inDataType,
 	if (inDataType != eM6TextData)
 	{
 		tokenize = inDataType == eM6StringData;
-		M6IndexValue v = { inDataType, inIndex, string(inText, inSize), isUnique };
-		M6Tokenizer::CaseFold(v.mIndexValue);
+		M6IndexValue v = { inDataType, inIndex, string(inText, inSize), 0, isUnique };
+		if (inDataType == eM6StringData)
+			M6Tokenizer::CaseFold(v.mIndexValue);
 		mValues.push_back(v);
 	}
 	
@@ -237,12 +236,18 @@ void M6InputDocument::Index(const string& inIndex, M6DataType inDataType,
 	}
 }
 
+void M6InputDocument::Index(const std::string& inIndex, bool isUnique, double inValue)
+{
+	M6IndexValue v = { eM6FloatData, inIndex, "", inValue, isUnique };
+	mValues.push_back(v);
+}
+
 void M6InputDocument::Index(const string& inIndex,
 		const vector<pair<const char*,size_t>>& inWords)
 {
 	auto ix = GetIndexTokens(inIndex, eM6StringData);
 
-	foreach (auto word, inWords)
+	for (auto word : inWords)
 	{
 		uint32 t = mDocLexicon.Store(word.first, word.second);
 		ix->mTokens.push_back(t);
@@ -320,9 +325,9 @@ void M6InputDocument::Tokenize(M6Lexicon& inLexicon, uint32 inLastStopWord)
 
 void M6InputDocument::RemapTokens(const uint32 inTokenMap[])
 {
-	foreach (M6IndexTokens& tm, mTokens)
+	for (M6IndexTokens& tm : mTokens)
 	{
-		foreach (uint32& t, tm.mTokens)
+		for (uint32& t : tm.mTokens)
 			t = inTokenMap[t];
 	}
 }
@@ -379,7 +384,7 @@ string M6OutputDocument::GetText()
 
 	io::filtering_ostream out(io::back_inserter(text));
 	io::copy(is, out);
-	
+
 	return text;
 }
 
@@ -391,7 +396,7 @@ string M6OutputDocument::GetAttribute(const string& inName)
 	
 	uint8 attrNr = store.RegisterAttribute(inName);
 	if (attrNr == 0 and inName == "id")
-		result = boost::lexical_cast<string>(mDocNr);
+		result = to_string(mDocNr);
 	else
 	{
 		// set-up the decompression machine

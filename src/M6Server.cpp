@@ -1,7 +1,7 @@
 //   Copyright Maarten L. Hekkelman, Radboud University 2012.
 //  Distributed under the Boost Software License, Version 1.0.
-//     (See accompanying file LICENSE_1_0.txt or copy at
-//           http://www.boost.org/LICENSE_1_0.txt)
+//	 (See accompanying file LICENSE_1_0.txt or copy at
+//		   http://www.boost.org/LICENSE_1_0.txt)
 
 #include "M6Lib.h"
 #include "M6Log.h"
@@ -13,11 +13,9 @@
 
 #include <iostream>
 #include <numeric>
+#include <cmath>
 
 #include <boost/bind.hpp>
-#include <boost/tr1/cmath.hpp>
-#include <boost/foreach.hpp>
-#define foreach BOOST_FOREACH
 #include <boost/filesystem/fstream.hpp>
 #include <boost/algorithm/string.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
@@ -46,7 +44,6 @@
 #include "M6Progress.h"
 #include "M6WSSearch.h"
 #include "M6WSBlast.h"
-#include "M6Log.h"
 
 using namespace std;
 namespace fs = boost::filesystem;
@@ -55,72 +52,6 @@ namespace pt = boost::posix_time;
 namespace po = boost::program_options;
 
 const string kM6ServerNS = "http://mrs.cmbi.ru.nl/mrs-web/ml";
-
-// --------------------------------------------------------------------
-
-struct M6AuthInfo
-{
-						M6AuthInfo(const string& inRealm);
-	
-	bool				Validate(const string& inMethod, const string& inURI,
-							const string& inHA1, map<string,string>& inInfo);
-	string				GetChallenge() const;
-	bool				Stale() const;
-	
-	string				mNonce, mRealm;
-	uint32				mLastNC;
-	pt::ptime			mCreated;
-};
-
-M6AuthInfo::M6AuthInfo(const string& inRealm)
-	: mRealm(inRealm)
-	, mLastNC(0)
-{
-	using namespace boost::gregorian;
-
-	boost::random::random_device rng;
-	uint32 data[4] = { rng(), rng(), rng(), rng() };
-
-	mNonce = M6MD5(data, sizeof(data)).Finalise();
-	mCreated = pt::second_clock::local_time();
-}
-
-string M6AuthInfo::GetChallenge() const
-{
-	string challenge = "Digest ";
-	challenge += "realm=\"" + mRealm + "\", qop=\"auth\", nonce=\"" + mNonce + '"';
-	return challenge;
-}
-
-bool M6AuthInfo::Stale() const
-{
-	pt::time_duration age = pt::second_clock::local_time() - mCreated;
-	return age.total_seconds() > 1800;
-}
-
-bool M6AuthInfo::Validate(const string& inMethod, const string& inURI,
-	const string& inHA1, map<string,string>& inInfo)
-{
-	bool valid = false;
-	
-	uint32 nc = strtol(inInfo["nc"].c_str(), nullptr, 16);
-	if (nc > mLastNC)
-	{
-		string ha2 = M6MD5(inMethod + ':' + inInfo["uri"]).Finalise();
-		
-		string response = M6MD5(
-			inHA1 + ':' +
-			inInfo["nonce"] + ':' +
-			inInfo["nc"] + ':' +
-			inInfo["cnonce"] + ':' +
-			inInfo["qop"] + ':' +
-			ha2).Finalise();
-		
-		valid = inInfo["response"] == response;
-		mLastNC = nc;
-	}
-	return valid;
-}
 
 // --------------------------------------------------------------------
 
@@ -187,19 +118,25 @@ M6Server::M6Server(const zx::element* inConfig)
 	mount("info",			boost::bind(&M6Server::handle_info, this, _1, _2, _3));
 	mount("browse",			boost::bind(&M6Server::handle_browse, this, _1, _2, _3));
 
-	mount("admin",				boost::bind(&M6Server::handle_admin, this, _1, _2, _3));
-	mount("ajax/blast/queue",	boost::bind(&M6Server::handle_admin_blast_queue_ajax, this, _1, _2, _3));
-	mount("ajax/blast/delete",	boost::bind(&M6Server::handle_admin_blast_delete_ajax, this, _1, _2, _3));
+	zx::node* realm = mConfig->find_first_node("admin/@realm");
+	if (realm == nullptr)
+	{
+		mount("admin", boost::bind(&M6Server::handle_admin, this, _1, _2, _3));
+		mount("ajax/blast/queue", boost::bind(&M6Server::handle_admin_blast_queue_ajax, this, _1, _2, _3));
+		mount("ajax/blast/delete", boost::bind(&M6Server::handle_admin_blast_delete_ajax, this, _1, _2, _3));
+	}
+	else
+	{
+		mount("admin", realm->str(), boost::bind(&M6Server::handle_admin, this, _1, _2, _3));
+		mount("ajax/blast/queue", realm->str(), boost::bind(&M6Server::handle_admin_blast_queue_ajax, this, _1, _2, _3));
+		mount("ajax/blast/delete", realm->str(), boost::bind(&M6Server::handle_admin_blast_delete_ajax, this, _1, _2, _3));
+	}
 
 	LOG(DEBUG,"M6Server: add processors");
 
 	add_processor("link",	boost::bind(&M6Server::process_mrs_link, this, _1, _2, _3));
 	add_processor("enable",	boost::bind(&M6Server::process_mrs_enable, this, _1, _2, _3));
 
-	zx::node* realm = mConfig->find_first_node("admin/@realm");
-	if (realm != nullptr)
-		mAdminRealm = realm->str();
-	
 	if (zx::element* e = mConfig->find_first("base-url"))
 	{
 		mBaseURL = e->content();
@@ -216,7 +153,7 @@ M6Server::M6Server(const zx::element* inConfig)
 	LOG(DEBUG,"M6Server: mounting web services");
 
 	// web services:
-	foreach (zx::element* ws, mConfig->find("web-service"))
+	for (zx::element* ws : mConfig->find("web-service"))
 	{
 		string service = ws->get_attribute("service");
 		string ns = ws->get_attribute("ns");
@@ -274,27 +211,28 @@ M6Server::M6Server(const zx::element* inConfig)
 
 	LOG(DEBUG,"M6Server: setting instance");
 	
-	if (sInstance == nullptr)
-		sInstance = this;
+	if (sInstance && sInstance != this)
+		delete sInstance;
+	sInstance = this;
 
 	LOG(DEBUG,"M6Server: done");
 }
 
 M6Server::~M6Server()
 {
-	if (sInstance == this)
-		sInstance = nullptr;
-	
-	foreach (M6LoadedDatabank& db, mLoadedDatabanks)
+	for (M6LoadedDatabank& db : mLoadedDatabanks)
 	{
 		delete db.mDatabank;
 		delete db.mParser;
 	}
 	
-	foreach (zeep::dispatcher* ws, mWebServices)
+	for (zeep::dispatcher* ws : mWebServices)
 		delete ws;
 
 	delete mConfigCopy;
+
+	if (sInstance == this)
+		sInstance = nullptr;
 }
 
 void M6Server::LoadAllDatabanks()
@@ -304,7 +242,7 @@ void M6Server::LoadAllDatabanks()
 	map<string,set<string>> blastAliases;
 	map<string,string> names;
 	
-	foreach (zx::element* config, M6Config::GetDatabanks())
+	for (zx::element* config : M6Config::GetDatabanks())
 	{
 		try
 		{
@@ -338,7 +276,7 @@ void M6Server::LoadAllDatabanks()
 				parser = new M6Parser(config->get_attribute("parser"));
 
 			set<string> aliases;
-			foreach (zx::element* alias, config->find("aliases/alias"))
+			for (zx::element* alias : config->find("aliases/alias"))
 			{
 				string s(alias->content());
 				M6Tokenizer::CaseFold(s);
@@ -362,7 +300,7 @@ void M6Server::LoadAllDatabanks()
 			mLoadedDatabanks.push_back(ldb);
 			
 			mLinkMap[databank].insert(ldb.mDatabank);
-			foreach (const string& alias, aliases)
+			for (const string& alias : aliases)
 				mLinkMap[alias].insert(ldb.mDatabank);
 		}
 		catch (exception& e)
@@ -372,18 +310,18 @@ void M6Server::LoadAllDatabanks()
 		}
 	}
 	
-	foreach (M6LoadedDatabank& db, mLoadedDatabanks)
+	for (M6LoadedDatabank& db : mLoadedDatabanks)
 		db.mDatabank->InitLinkMap(mLinkMap);
 
 	// setup the mBlastDatabanks list
-	foreach (auto& blastAlias, blastAliases)
+	for (auto& blastAlias : blastAliases)
 	{
 		M6BlastDatabank bdb = { blastAlias.first, names[blastAlias.first] };
 		
 		if (bdb.mName.empty())	// refuse empty names
 			continue;
 		
-		foreach (const string& f, blastAlias.second)
+		for (const string& f : blastAlias.second)
 			bdb.mIDs.insert(f);
 		mBlastDatabanks.push_back(bdb);
 	}
@@ -396,7 +334,7 @@ M6Databank* M6Server::Load(const string& inDatabank)
 	string databank(inDatabank);
 	M6Tokenizer::CaseFold(databank);
 
-	foreach (M6LoadedDatabank& db, mLoadedDatabanks)
+	for (M6LoadedDatabank& db : mLoadedDatabanks)
 	{
 		if (db.mID == databank)
 		{
@@ -408,7 +346,7 @@ M6Databank* M6Server::Load(const string& inDatabank)
 	return result;
 }
 
-tr1::tuple<M6Databank*,uint32> M6Server::GetEntryDatabankAndNr(const string& inDatabank, const string& inID)
+tuple<M6Databank*,uint32> M6Server::GetEntryDatabankAndNr(const string& inDatabank, const string& inID)
 {
 	string db = inDatabank;
 
@@ -420,13 +358,13 @@ tr1::tuple<M6Databank*,uint32> M6Server::GetEntryDatabankAndNr(const string& inD
 
 	if (mdb == nullptr and not id.empty())
 	{
-		foreach (string adb, UnAlias(db))
+		for (string adb : UnAlias(db))
 		{
 			mdb = Load(adb);
 			if (mdb != nullptr)
 			{
 				bool exists;
-				tr1::tie(exists, docNr) = mdb->Exists("id", id);
+				tie(exists, docNr) = mdb->Exists("id", id);
 				if (exists)
 				{
 					db = adb;
@@ -442,14 +380,14 @@ tr1::tuple<M6Databank*,uint32> M6Server::GetEntryDatabankAndNr(const string& inD
 	if (docNr == 0)
 	{
 		bool exists;
-		tr1::tie(exists, docNr) = mdb->Exists("id", id);
+		tie(exists, docNr) = mdb->Exists("id", id);
 		if (not exists)
 			THROW(("Entry %s does not exist in databank %s", id.c_str(), db.c_str()));
 		if (docNr == 0)
 			THROW(("Multiple entries with ID %s in databank %s", id.c_str(), db.c_str()));
 	}
 	
-	return tr1::make_tuple(mdb, docNr);
+	return make_tuple(mdb, docNr);
 }
 
 string M6Server::GetEntry(M6Databank* inDatabank, const string& inFormat, uint32 inDocNr)
@@ -459,24 +397,23 @@ string M6Server::GetEntry(M6Databank* inDatabank, const string& inFormat, uint32
 		THROW(("Unable to fetch document"));
 	
 	string result;
-	
+
 	if (inFormat == "title")
 		result = doc->GetAttribute("title");
 	else
 	{
 		result = doc->GetText();
-	
+
 		if (inFormat == "fasta")
 		{
-			foreach (M6LoadedDatabank& db, mLoadedDatabanks)
+			for (M6LoadedDatabank& db : mLoadedDatabanks)
 			{
 				if (db.mDatabank != inDatabank or db.mParser == nullptr)
 					continue;
-				
+
 				string fasta;
 				db.mParser->ToFasta(result, db.mID, doc->GetAttribute("id"), 
 					doc->GetAttribute("title"), fasta);
-
 
 				result = fasta;
 				break;
@@ -514,7 +451,7 @@ string M6Server::GetEntry(const string& inDB, const string& inID, const string& 
 		chain = inID.substr(s + 1);
 	}
 
-	tr1::tie(db, docNr) = GetEntryDatabankAndNr(inDB, id);
+	tie(db, docNr) = GetEntryDatabankAndNr(inDB, id);
 
 	string result = GetEntry(db, inFormat, docNr);
 	
@@ -662,12 +599,12 @@ uint32 M6Server::Count(const string& inDatabank, const string& inQuery)
 	
 	if (inDatabank == "all")		// same as count for all databanks
 	{
-		foreach (M6LoadedDatabank& db, mLoadedDatabanks)
+		for (M6LoadedDatabank& db : mLoadedDatabanks)
 			result += Count(db.mID, inQuery);
 	}
 	else
 	{
-		foreach (const string& databank, UnAlias(inDatabank))
+		for (const string& databank : UnAlias(inDatabank))
 		{
 			unique_ptr<M6Iterator> rset;
 			M6Iterator* filter;
@@ -706,7 +643,7 @@ vector<string> M6Server::UnAlias(const string& inDatabank)
 {
 	vector<string> result;
 	
-	foreach (auto& db, mLoadedDatabanks)
+	for (auto& db : mLoadedDatabanks)
 	{
 		if (db.mID == inDatabank or db.mAliases.count(inDatabank))
 			result.push_back(db.mID);
@@ -724,7 +661,7 @@ vector<string> M6Server::GetAliases(const string& inDatabank)
 	
 	result.push_back(inDatabank);
 	
-	foreach (auto& db, mLoadedDatabanks)
+	for (auto& db : mLoadedDatabanks)
 	{
 		if (db.mID == inDatabank)
 		{
@@ -753,11 +690,11 @@ void M6Server::GetLinkedDbs(const string& inDb, const string& inId,
 		unique_ptr<M6Document> doc(databank->Fetch(id));
 		if (doc)
 		{
-			foreach (const auto& l, doc->GetLinks())
+			for (const auto& l : doc->GetLinks())
 			{
 				vector<string> aliases(UnAlias(l.first));
 				
-				foreach (const string& alias, aliases)
+				for (const string& alias : aliases)
 				{
 					if (dbs.count(alias))
 						continue;
@@ -766,11 +703,11 @@ void M6Server::GetLinkedDbs(const string& inDb, const string& inId,
 					if (db == nullptr)
 						continue;
 
-					foreach (const string& id, l.second)
+					for (const string& id : l.second)
 					{
 						bool exists;
 						uint32 docNr;
-						tr1::tie(exists, docNr) = db->Exists("id", id);
+						tie(exists, docNr) = db->Exists("id", id);
 						if (exists)
 						{
 							dbs.insert(alias);
@@ -784,12 +721,12 @@ void M6Server::GetLinkedDbs(const string& inDb, const string& inId,
 
 	vector<string> aliases(GetAliases(inDb));
 
-	foreach (auto& db, mLoadedDatabanks)
+	for (auto& db : mLoadedDatabanks)
 	{
 		if (dbs.count(db.mID))
 			continue;
 		
-		foreach (auto& alias, aliases)
+		for (auto& alias : aliases)
 		{
 			if (db.mDatabank->IsLinked(alias, inId))
 			{
@@ -810,7 +747,7 @@ void M6Server::AddLinks(const string& inDB, const string& inID, el::object& inHi
 	if (not linkedDbs.empty())
 	{
 		vector<el::object> linked;
-		foreach (string& db, linkedDbs)
+		for (string& db : linkedDbs)
 			linked.push_back(el::object(db));
 		inHit["links"] = el::object(linked);
 	}
@@ -824,21 +761,21 @@ void M6Server::init_scope(el::scope& scope)
 		scope.put("baseUrl", el::object(mBaseURL));
 
 	vector<el::object> databanks;
-	foreach (M6LoadedDatabank& db, mLoadedDatabanks)
+	for (M6LoadedDatabank& db : mLoadedDatabanks)
 	{
 		el::object databank;
 		databank["id"] = db.mID;
 		databank["name"] = db.mName;
 		databanks.push_back(databank);
 
-		foreach (string alias, db.mAliases) {
+		for (string alias : db.mAliases) {
 
 			el::object databank;
 			databank["id"] = alias;
 			databank["name"] = alias;
 
 			bool contains = false;
-			foreach( el::object dbo , databanks) {
+			for (el::object dbo : databanks) {
 				if ( dbo["id"] == databank["id"] ) {
 					contains = true;
 					break;
@@ -863,6 +800,8 @@ void M6Server::handle_request(const zh::request& req, zh::reply& rep)
 	try
 	{
 		zh::webapp::handle_request(req, rep);
+
+        LOG(DEBUG,"M6Server: completed %s request handling for %s", req.method.c_str(), req.uri.c_str());
 	}
 	catch (zh::status_type& s)
 	{
@@ -870,6 +809,8 @@ void M6Server::handle_request(const zh::request& req, zh::reply& rep)
 	}
 	catch (std::exception& e)
 	{
+        LOG (ERROR, "M6Server: %s threw an error: %s", req.uri.c_str(), e.what());
+
 		cerr << e.what() << endl;
 		
 		el::scope scope(req);
@@ -879,22 +820,6 @@ void M6Server::handle_request(const zh::request& req, zh::reply& rep)
 
 		create_reply_from_template("error.html", scope, rep);
 	}
-}
-
-void M6Server::create_unauth_reply(bool stale, const string& realm, zh::reply& rep)
-{
-	boost::mutex::scoped_lock lock(mAuthMutex);
-	
-	rep = zh::reply::stock_reply(zh::unauthorized);
-	
-	M6AuthInfo* authInfo = new M6AuthInfo(realm);
-	mAuthInfo.push_back(authInfo);
-
-	string challenge = authInfo->GetChallenge();
-	if (stale)
-		challenge += ", stale=\"true\"";
-
-	rep.set_header("WWW-Authenticate", challenge); 
 }
 
 void M6Server::handle_welcome(const zh::request& request, const el::scope& scope, zh::reply& reply)
@@ -910,7 +835,7 @@ void M6Server::handle_welcome(const zh::request& request, const el::scope& scope
 		const char* wss[] = { "mrsws_search", "mrsws_blast", "mrsws_align" };
 		el::object wsc;
 
-		foreach (const char* ws, wss)
+		for (const char* ws : wss)
 		{
 			if (zx::node* n = mConfig->find_first_node((boost::format("web-service[@service='%1%']/@location") % ws).str().c_str()))
 				wsdl[ws] = mBaseURL + n->str() + "/wsdl";
@@ -945,23 +870,32 @@ void M6Server::handle_download(const zh::request& request, const el::scope& scop
 	string id;
 	stringstream ss;
 	uint32 n = 0;
-	
-	foreach (auto& p, params)
+
+    LOG (DEBUG, "download request recieved, format=%s, db=%s",
+                format.c_str (),
+                db.c_str ());
+
+	for (auto& p : params)
 	{
 		if (p.first == "id")
 		{
 			id = p.second.as<string>();
 
 			string m_db = db;
-                        size_t pos;
-                        if ((pos = id.find ("/")) != string::npos)
-                        {
+			size_t pos, pos2;
+			if ((pos = id.find ("/")) != string::npos)
+			{
 				// databank name included in id
-                                m_db = id.substr (0, pos);
-				id = id.substr (pos + 1);
-                        }
+				m_db = id.substr (0, pos);
 
-                        ss << GetEntry (m_db, id, format);
+                if ((pos2 = id.find ("/", pos + 1)) != string::npos)
+
+                    id = id.substr (pos + 1, pos2 - (pos + 1));
+                else
+				    id = id.substr (pos + 1);
+			}
+
+			ss << GetEntry (m_db, id, format);
 			++n;
 		}
 		else if (p.first == "nr")
@@ -970,6 +904,7 @@ void M6Server::handle_download(const zh::request& request, const el::scope& scop
 			if (databank == nullptr)
 				THROW(("Databank %s not loaded", db.c_str()));
 			
+
 			ss << GetEntry(databank, format, boost::lexical_cast<uint32>(p.second.as<string>()));
 			++n;
 		}
@@ -999,6 +934,9 @@ void M6Server::handle_entry(const zh::request& request, const el::scope& scope, 
 	rq = params.get("rq", "").as<string>();
 	format = params.get("format", "entry").as<string>();
 	
+    LOG (DEBUG, "request entry format=%s db=%s id=%s nr=%s",
+                format.c_str (), db.c_str (), id.c_str (), nr.c_str ());
+
 	if (id.empty() and db.empty())
 	{
 		fs::path path(scope["baseuri"].as<string>());
@@ -1027,17 +965,17 @@ void M6Server::handle_entry(const zh::request& request, const el::scope& scope, 
 
 	if (mdb == nullptr and not id.empty())
 	{
-		foreach (string adb, UnAlias(db))
+		for (string adb : UnAlias(db))
 		{
 			mdb = Load(adb);
 			if (mdb != nullptr)
 			{
 				bool exists;
-				tr1::tie(exists, docNr) = mdb->Exists("id", id);
+				tie(exists, docNr) = mdb->Exists("id", id);
 				if (exists)
 				{
 					db = adb;
-					nr = boost::lexical_cast<string>(docNr);
+					nr = to_string(docNr);
 					break;
 				}
 			}
@@ -1050,7 +988,7 @@ void M6Server::handle_entry(const zh::request& request, const el::scope& scope, 
 	if (nr.empty())
 	{
 		bool exists;
-		tr1::tie(exists, docNr) = mdb->Exists("id", id);
+		tie(exists, docNr) = mdb->Exists("id", id);
 		if (not exists)
 			THROW(("Entry %s does not exist in databank %s", id.c_str(), db.c_str()));
 		if (docNr == 0)
@@ -1064,7 +1002,7 @@ void M6Server::handle_entry(const zh::request& request, const el::scope& scope, 
 		if (doc)
 			id = doc->GetAttribute("id");
 	}
-	
+
 	unique_ptr<M6Document> document(mdb->Fetch(docNr));
 	
 	el::scope sub(scope);
@@ -1080,7 +1018,7 @@ void M6Server::handle_entry(const zh::request& request, const el::scope& scope, 
 	if (not linkedDbs.empty())
 	{
 		vector<el::object> linked;
-		foreach (string& db, linkedDbs)
+		for (string& db : linkedDbs)
 			linked.push_back(el::object(db));
 		sub.put("links", el::object(linked));
 	}
@@ -1134,7 +1072,7 @@ void M6Server::handle_entry(const zh::request& request, const el::scope& scope, 
 		if (format != nullptr)
 		{
 			zx::element_set links(format->find("link"));
-			foreach (zx::element* link, links)
+			for (zx::element* link : links)
 			{
 				try
 				{
@@ -1185,7 +1123,7 @@ void M6Server::handle_entry(const zh::request& request, const el::scope& scope, 
 
 void M6Server::highlight_query_terms(zx::element* node, boost::regex& expr)
 {
-	foreach (zx::element* e, *node)
+	for (zx::element* e : *node)
 	{
 		// do not highlight script, style or head blocks
 		if (e->name() == "script" or e->name() == "head" or e->name() == "style")
@@ -1194,7 +1132,7 @@ void M6Server::highlight_query_terms(zx::element* node, boost::regex& expr)
 		highlight_query_terms(e, expr);
 	}
 
-	foreach (zx::node* n, node->nodes())
+	for (zx::node* n : node->nodes())
 	{
 		zx::text* text = dynamic_cast<zx::text*>(n);
 		
@@ -1230,10 +1168,10 @@ void M6Server::highlight_query_terms(zx::element* node, boost::regex& expr)
 void M6Server::create_link_tags(zx::element* node, boost::regex& expr,
 	const string& inDatabank, const string& inIndex, const string& inID, const string& inAnchor)
 {
-	foreach (zx::element* e, *node)
+	for (zx::element* e : *node)
 		create_link_tags(e, expr, inDatabank, inIndex, inID, inAnchor);
 
-	foreach (zx::node* n, node->nodes())
+	for (zx::node* n : node->nodes())
 	{
 		zx::text* text = dynamic_cast<zx::text*>(n);
 		
@@ -1275,7 +1213,7 @@ void M6Server::create_link_tags(zx::element* node, boost::regex& expr,
 				{
 					M6Tokenizer::CaseFold(id);
 					
-					tr1::tie(exists, docNr) = mdb->Exists(ix, id);
+					tie(exists, docNr) = mdb->Exists(ix, id);
 					
 					unique_ptr<zx::element> a(new zeep::xml::element("a"));
 					
@@ -1323,7 +1261,8 @@ void M6Server::handle_search(const zh::request& request,
 	const el::scope& scope, zh::reply& reply)
 {
 	string q, db, id, firstDb;
-	uint32 page, hitCount = 0, firstDocNr = 0, nDBsSearched = 0;
+	uint32 page, hitCount = 0, firstDocNr = 0,
+           nDBsSearched = 0;
 	
 	zh::parameter_map params;
 	get_parameters(scope, params);
@@ -1350,10 +1289,9 @@ void M6Server::handle_search(const zh::request& request,
 
 	LOG(DEBUG,"handle_search db=\'%s\' q=\'%s\'",db.c_str(),q.c_str());
 
-	if (db.empty() or q.empty() or (db == "all" and q == "*")) {
-
+	if (db.empty() or q.empty() or (db == "all" and q == "*"))
+	{
 		handle_welcome(request, scope, reply);
-
 	}
 	else if ( !dbIDMatched ) // db id not found, try aliases
 	{
@@ -1377,14 +1315,14 @@ void M6Server::handle_search(const zh::request& request,
 		if (db == "all")
 			searchDatabanks.assign(mLoadedDatabanks.begin(),mLoadedDatabanks.end());
 		else {
-			foreach (M6LoadedDatabank& d, mLoadedDatabanks) {
+			for (M6LoadedDatabank& d : mLoadedDatabanks) {
 
 				if (d.mAliases.count( db ) > 0)
 					searchDatabanks.push_back( d );
 			}
 		}
 	
-		foreach (M6LoadedDatabank& db, searchDatabanks)
+		for (M6LoadedDatabank& db : searchDatabanks)
 		{
 			thr.create_thread([&]() {
 				try
@@ -1435,7 +1373,7 @@ void M6Server::handle_search(const zh::request& request,
 			sub.put("hit-databanks", el::object(databanks));
 		}
 	}
-	else
+	else // given id matches 1 database
 	{
 		uint32 hits_per_page = params.get("show", 15).as<uint32>();
 		if (hits_per_page > 100)
@@ -1475,7 +1413,7 @@ void M6Server::handle_search(const zh::request& request,
 		}
 
 		sub.put("first", el::object(resultoffset + 1));
-		sub.put("last", el::object(static_cast<int>(resultoffset + hits.size())));
+		sub.put("last", el::object((uint64)(resultoffset + hits.size())));
 		sub.put("hitCount", el::object(hitCount));
 		sub.put("lastPage", el::object(((hitCount - 1) / hits_per_page) + 1));
 		sub.put("ranked", ranked);
@@ -1493,7 +1431,7 @@ void M6Server::handle_search(const zh::request& request,
 		terms.erase(unique(terms.begin(), terms.end()), terms.end());
 		
 		vector<el::object> suggestions;
-		foreach (string& term, terms)
+		for (string& term : terms)
 		{
 			try
 			{
@@ -1511,7 +1449,7 @@ void M6Server::handle_search(const zh::request& request,
 					s.erase(s.begin() + 10, s.end());
 				
 				vector<el::object> alternatives;
-				foreach (auto c, s)
+				for (auto c : s)
 				{
 					el::object alt;
 					alt["term"] = c.first;
@@ -1547,10 +1485,14 @@ void M6Server::handle_search(const zh::request& request,
 
 	// OK, now if we only have one hit, we might as well show it directly of course...
 	if (hitCount == 1)
+
 		create_redirect(firstDb, firstDocNr, q, true, request, reply);
-	else
-		create_reply_from_template( dbIDMatched? "results.html" : "results-for-all.html",
-			sub, reply);
+
+    else if (dbIDMatched)
+
+        create_reply_from_template ("results.html", sub, reply);
+    else
+        create_reply_from_template ("results-for-all.html", sub, reply);
 }
 
 void M6Server::handle_link(const zh::request& request, const el::scope& scope, zh::reply& reply)
@@ -1730,7 +1672,7 @@ void M6Server::handle_similar(const zh::request& request, const el::scope& scope
 			hit["docNr"] = docNr;
 			hit["id"] = doc->GetAttribute("id");
 			hit["title"] = doc->GetAttribute("title");;
-			hit["score"] = tr1::trunc(score);
+			hit["score"] = trunc(score);
 			
 			AddLinks(db, doc->GetAttribute("id"), hit);
 			
@@ -1797,7 +1739,7 @@ void M6Server::ProcessNewConfig(const string& inPage, zeep::http::parameter_map&
 	if (inPage == "global")
 	{
 		const char* dirs[] = { "mrs", "raw", "parser", "docroot", "blast" };
-		foreach (const char* dir, dirs)
+		for (const char* dir : dirs)
 		{
 			fs::path p = inParams.get(dir, "").as<string>();
 			if (not fs::is_directory(p))
@@ -1806,7 +1748,7 @@ void M6Server::ProcessNewConfig(const string& inPage, zeep::http::parameter_map&
 		}
 
 		const char* tools[] = { "clustalo", "rsync" };
-		foreach (const char* tool, tools)
+		for (const char* tool : tools)
 		{
 			fs::path p = inParams.get(tool, "").as<string>();
 			if (not p.empty() and not fs::exists(p))
@@ -1840,7 +1782,7 @@ void M6Server::ProcessNewConfig(const string& inPage, zeep::http::parameter_map&
 		}
 		
 		const char* wss[] = { "mrsws_search", "mrsws_blast", "mrsws_align" };
-		foreach (const char* ws, wss)
+		for (const char* ws : wss)
 		{
 			e = server->find_first((boost::format("web-service[@service='%1%']") % ws).str());
 			s = inParams.get(ws, "").as<string>();
@@ -2049,7 +1991,7 @@ void M6Server::ProcessNewConfig(const string& inPage, zeep::http::parameter_map&
 			}
 
 			const char* fields[] = { "name", "info", "filter", "source" };
-			foreach (const char* field, fields)
+			for (const char* field : fields)
 			{
 				string s = inParams.get(field, "").as<string>();
 				zx::element* e = db->find_first(field);
@@ -2141,8 +2083,6 @@ void M6Server::ProcessNewConfig(const string& inPage, zeep::http::parameter_map&
 void M6Server::handle_admin(const zh::request& request,
 	const el::scope& scope, zh::reply& reply)
 {
-	ValidateAuthentication(request, mAdminRealm);
-
 	if (mConfigCopy == nullptr)
 		mConfigCopy = new M6Config::File();
 
@@ -2212,7 +2152,7 @@ void M6Server::handle_admin(const zh::request& request,
 		const char* wss[] = { "mrsws_search", "mrsws_blast", "mrsws_align" };
 		el::object wsc;
 
-		foreach (const char* ws, wss)
+		for (const char* ws : wss)
 		{
 			if ((n = serverConfig->find_first_node((boost::format("web-service[@service='%1%']/@location") % ws).str().c_str())) != nullptr)
 				wsc[ws] = n->str();
@@ -2237,7 +2177,7 @@ void M6Server::handle_admin(const zh::request& request,
 		parsers.push_back(parser);
 	}
 
-	foreach (const zx::element* e, mConfigCopy->GetParsers())
+	for (const zx::element* e : mConfigCopy->GetParsers())
 	{
 		el::object parser;
 		parser["id"] = e->get_attribute("id");
@@ -2249,17 +2189,17 @@ void M6Server::handle_admin(const zh::request& request,
 	
 	// add formats
 	vector<el::object> formats;
-	foreach (const zx::element* e, mConfigCopy->GetFormats())
+	for (const zx::element* e : mConfigCopy->GetFormats())
 	{
 		el::object format;
 		format["id"] = e->get_attribute("id");
 		format["script"] = e->get_attribute("script");
 		
 		vector<el::object> links;
-		foreach (const zx::element* l, e->find("link"))
+		for (const zx::element* l : e->find("link"))
 		{
 			el::object link;
-			link["nr"] = el::object(static_cast<uint64>(links.size() + 1));
+			link["nr"] = el::object((uint64)links.size() + 1);
 			link["rx"] = l->get_attribute("rx");
 			link["db"] = l->get_attribute("db");
 			link["id"] = l->get_attribute("id");
@@ -2298,7 +2238,7 @@ void M6Server::handle_admin(const zh::request& request,
 	set<string> aliases;
 	map<string,string> aliasnames;
 
-	foreach (const zx::element* db, mConfigCopy->GetDatabanks())
+	for (const zx::element* db : mConfigCopy->GetDatabanks())
 	{
 		zx::element* e;
 		
@@ -2340,7 +2280,7 @@ void M6Server::handle_admin(const zh::request& request,
 		aliasnames[id] = name;
 
 		vector<el::object> dbaliases;
-		foreach (const zx::element* a, db->find("aliases/alias"))
+		for (const zx::element* a : db->find("aliases/alias"))
 		{
 			el::object alias;
 			alias["name"] = alias["id"] = a->content();
@@ -2361,7 +2301,7 @@ void M6Server::handle_admin(const zh::request& request,
 	sub.put("config-databanks", el::object(databanks));
 	
 	vector<el::object> aliasobjects;
-	foreach (const string& alias, aliases)
+	for (const string& alias : aliases)
 	{
 		el::object aliasobject;
 		aliasobject["id"] = alias;
@@ -2384,14 +2324,12 @@ void M6Server::handle_admin(const zh::request& request,
 void M6Server::handle_admin_blast_queue_ajax(const zh::request& request,
 	const el::scope& scope, zh::reply& reply)
 {
-	ValidateAuthentication(request, mAdminRealm);
-	
 	zeep::http::parameter_map params;
 	get_parameters(scope, params);
 
 	vector<el::object> jobs;
 
-	foreach (const M6BlastJobDesc& jobDesc, M6BlastCache::Instance().GetJobList())
+	for (const M6BlastJobDesc& jobDesc : M6BlastCache::Instance().GetJobList())
 	{
 		el::object job;
 		job["id"] = jobDesc.id;
@@ -2407,8 +2345,6 @@ void M6Server::handle_admin_blast_queue_ajax(const zh::request& request,
 void M6Server::handle_admin_blast_delete_ajax(const zh::request& request,
 	const el::scope& scope, zh::reply& reply)
 {
-	ValidateAuthentication(request, mAdminRealm);
-	
 	zeep::http::parameter_map params;
 	get_parameters(scope, params);
 
@@ -2466,6 +2402,9 @@ void M6Server::handle_rest_entry(const zh::request& request, const el::scope& sc
 	if (db.empty())
 		THROW(("No db specified"));
 
+    LOG (DEBUG, "handle_rest_entry with db=%s id=%s format=%s",
+                db.c_str (), id.c_str (), format.c_str ());
+
 	reply.set_content(GetEntry(db, id, format), "text/plain");
 }
 
@@ -2513,7 +2452,7 @@ void M6Server::handle_rest_find(const zh::request& request, const el::scope& sco
 		ostringstream s;
 		
 		s << hitCount << " hits found, displaying " << hits.size() << " hits starting from " << resultoffset << endl;
-		foreach (el::object& hit, hits)
+		for (el::object& hit : hits)
 		{
 			s << hit["nr"] << '\t'
 			  << hit["id"] << '\t'
@@ -2553,7 +2492,7 @@ void M6Server::process_mrs_link(zx::element* node, const el::scope& scope, fs::p
 				{
 					exists = true;
 					if (not rset->Next(docNr2, rank))
-						nr = boost::lexical_cast<string>(docNr);
+						nr = to_string(docNr);
 				}
 			}
 		}
@@ -2592,7 +2531,7 @@ void M6Server::process_mrs_link(zx::element* node, const el::scope& scope, fs::p
 	assert(parent);
 	parent->insert(node, a);
 	
-	foreach (zx::node* c, node->nodes())
+	for (zx::node* c : node->nodes())
 	{
 		zx::node* clone = c->clone();
 		a->push_back(clone);
@@ -2605,7 +2544,7 @@ void M6Server::process_mrs_enable(zx::element* node, const el::scope& scope, fs:
 	string test = node->get_attribute("test");
 	bool enabled = evaluate_el(scope, test);
 	
-	foreach (zx::node* c, node->nodes())
+	for (zx::node* c : node->nodes())
 	{
 		zx::node* clone = c->clone();
 		zx::element* e = dynamic_cast<zx::element*>(clone);
@@ -2632,7 +2571,7 @@ void M6Server::create_redirect(const string& databank, const string& inIndex, co
 	const string& q, bool redirectForQuery, const zh::request& request, zh::reply& reply)
 {
 	string host = request.local_address;
-	foreach (const zh::header& h, request.headers)
+	for (const zh::header& h : request.headers)
 	{
 		if (ba::iequals(h.name, "Host"))
 		{
@@ -2645,7 +2584,7 @@ void M6Server::create_redirect(const string& databank, const string& inIndex, co
 	if (request.local_port != 80 and request.local_port != 0 and host.find(':') == string::npos)
 	{
 		host += ':';
-		host += boost::lexical_cast<string>(request.local_port);
+		host += to_string(request.local_port);
 	}
 
 	bool exists = false;
@@ -2654,7 +2593,7 @@ void M6Server::create_redirect(const string& databank, const string& inIndex, co
 	if (mdb != nullptr)
 	{
 		uint32 docNr;
-		tr1::tie(exists, docNr) = mdb->Exists(inIndex, inValue);
+		tie(exists, docNr) = mdb->Exists(inIndex, inValue);
 		if (exists)
 		{
 			string location;
@@ -2698,7 +2637,7 @@ void M6Server::create_redirect(const string& databank, uint32 inDocNr,
 	const string& q, bool redirectForQuery, const zh::request& request, zh::reply& reply)
 {
 	string host = request.local_address;
-	foreach (const zh::header& h, request.headers)
+	for (const zh::header& h : request.headers)
 	{
 		if (ba::iequals(h.name, "Host"))
 		{
@@ -2711,7 +2650,7 @@ void M6Server::create_redirect(const string& databank, uint32 inDocNr,
 	if (request.local_port != 80 and request.local_port != 0 and host.find(':') == string::npos)
 	{
 		host += ':';
-		host += boost::lexical_cast<string>(request.local_port);
+		host += to_string(request.local_port);
 	}
 
 	M6Databank* mdb = Load(databank);
@@ -2747,7 +2686,7 @@ void M6Server::SpellCheck(const string& inDatabank, const string& inTerm,
 	{
 		vector<pair<string,uint16>> corrections;
 
-		foreach (M6LoadedDatabank& db, mLoadedDatabanks)
+		for (M6LoadedDatabank& db : mLoadedDatabanks)
 		{
 			vector<pair<string,uint16>> s;
 			SpellCheck(db.mID, inTerm, s);
@@ -2759,7 +2698,7 @@ void M6Server::SpellCheck(const string& inDatabank, const string& inTerm,
 			[](const pair<string,uint16>& a, const pair<string,uint16>& b) -> bool { return a.second > b.second; });
 		
 		set<string> words;
-		foreach (auto c, corrections)
+		for (auto c : corrections)
 		{
 			if (words.count(c.first))
 				continue;
@@ -2791,7 +2730,7 @@ void M6Server::handle_blast(const zeep::http::request& request, const el::scope&
 	el::scope sub(scope);
 
 	vector<el::object> blastdatabanks;
-	foreach (M6BlastDatabank& ldb, mBlastDatabanks)
+	for (M6BlastDatabank& ldb : mBlastDatabanks)
 	{
 		el::object databank;
 		databank["id"] = ldb.mID;
@@ -2868,59 +2807,59 @@ void M6Server::handle_blast_results_ajax(const zeep::http::request& request, con
 		
 		vector<el::object> jhsps;
 		
-		foreach (const M6Blast::Hsp& hsp, hsps)
+		for (const M6Blast::Hsp& hsp : hsps)
 		{
 			string queryAlignment = hsp.mQueryAlignment;
 			
 			// calculate the offsets for the graphical representation of this hsp
-	        uint32 qf = hsp.mQueryStart;
-	        uint32 qt = hsp.mQueryEnd;
-	        uint32 ql = job->mQueryLength;
+			uint32 qf = hsp.mQueryStart;
+			uint32 qt = hsp.mQueryEnd;
+			uint32 ql = job->mQueryLength;
 	
-	        uint32 sf = hsp.mTargetStart;
-	        uint32 st = hsp.mTargetEnd;
-	        uint32 sl = hsp.mTargetLength;
+			uint32 sf = hsp.mTargetStart;
+			uint32 st = hsp.mTargetEnd;
+			uint32 sl = hsp.mTargetLength;
 	
-	        uint32 length = static_cast<uint32>(queryAlignment.length());
-	        uint32 before = qf;
-	        if (before < sf)
-	            before = sf;
+			uint32 length = static_cast<uint32>(queryAlignment.length());
+			uint32 before = qf;
+			if (before < sf)
+				before = sf;
 	
-	        uint32 after = ql - qt;
-	        if (after < sl - st)
-	            after = sl - st;
+			uint32 after = ql - qt;
+			if (after < sl - st)
+				after = sl - st;
 	
-	        length += before + after;
+			length += before + after;
 	
-	        float factor = 150;
-	        factor /= length;
+			float factor = 150;
+			factor /= length;
 	
 			uint32 ql1, ql2, ql3, ql4, sl1, sl2, sl3, sl4;
 	
-	        if (qf < before)
-	            ql1 = uint32(factor * (before - qf));
-	        else
-	            ql1 = 0;
-	        ql2 = uint32(factor * qf);
-	        ql3 = uint32(factor * queryAlignment.length());
-	        ql4 = uint32(factor * (ql - qt));
+			if (qf < before)
+				ql1 = uint32(factor * (before - qf));
+			else
+				ql1 = 0;
+			ql2 = uint32(factor * qf);
+			ql3 = uint32(factor * queryAlignment.length());
+			ql4 = uint32(factor * (ql - qt));
 	
-	        if (sf < before)
-	            sl1 = uint32(factor * (before - sf));
-	        else
-	            sl1 = 0;
-	        sl2 = uint32(factor * sf);
-	        sl3 = uint32(factor * queryAlignment.length());
-	        sl4 = uint32(factor * (sl - st));
+			if (sf < before)
+				sl1 = uint32(factor * (before - sf));
+			else
+				sl1 = 0;
+			sl2 = uint32(factor * sf);
+			sl3 = uint32(factor * queryAlignment.length());
+			sl4 = uint32(factor * (sl - st));
 	
-	        if (ql1 > 0 and ql1 + ql2 < sl2)
-	            ql1 = sl2 - ql2;
+			if (ql1 > 0 and ql1 + ql2 < sl2)
+				ql1 = sl2 - ql2;
 	
-	        if (sl1 > 0 and sl1 + sl2 < ql2)
-	            sl1 = ql2 - sl2;
+			if (sl1 > 0 and sl1 + sl2 < ql2)
+				sl1 = ql2 - sl2;
 
 			el::object h;
-			h["nr"] = static_cast<uint64>(jhsps.size() + 1);
+			h["nr"] = (uint64)jhsps.size() + 1;
 			h["score"] = hsp.mScore;
 			h["bitScore"] = hsp.mBitScore;
 			h["expect"] = hsp.mExpect;
@@ -2952,7 +2891,7 @@ void M6Server::handle_blast_results_ajax(const zeep::http::request& request, con
 		
 		vector<el::object> jhits;
 		
-		foreach (const M6Blast::Hit& hit, hits)
+		for (const M6Blast::Hit& hit : hits)
 		{
 			const list<M6Blast::Hsp>& hsps(hit.mHsps);
 			if (hsps.empty())
@@ -2980,14 +2919,14 @@ void M6Server::handle_blast_results_ajax(const zeep::http::request& request, con
 			coverageLength = uint32(best.mQueryAlignment.length() * kGraphicWidth / queryLength);
 			
 			el::object h;
-			h["nr"] = static_cast<uint64>(jhits.size() + 1);
+			h["nr"] = (uint64)jhits.size() + 1;
 			h["db"] = hit.mDb;
 			h["doc"] = hit.mID;
 			h["seq"] = hit.mChain;
 			h["desc"] = hit.mTitle;
 			h["bitScore"] = best.mBitScore;
 			h["expect"] = best.mExpect;
-			h["hsps"] = static_cast<uint64>(hsps.size());
+			h["hsps"] = (uint64)hsps.size();
 			
 			el::object coverage;
 			coverage["start"] = coverageStart;
@@ -3006,16 +2945,14 @@ void M6Server::handle_blast_results_ajax(const zeep::http::request& request, con
 
 ostream& operator<<(ostream& os, M6BlastJobStatus status)
 {
-	switch (status)
-	{
-		case bj_Unknown:	os << "unknown"; break;
-		case bj_Queued:		os << "queued"; break;
-		case bj_Running:	os << "running"; break;
-		case bj_Finished:	os << "finished"; break;
-		case bj_Error:		os << "error"; break;
-	}
-	
-	return os;
+    switch (status)
+    {
+        case bj_Unknown:    os << "unknown"; break;
+        case bj_Queued:     os << "queued"; break;
+        case bj_Running:    os << "running"; break;
+        case bj_Finished:   os << "finished"; break;
+        case bj_Error:      os << "error"; break;
+    }
 }
 
 void M6Server::handle_blast_status_ajax(const zeep::http::request& request, const el::scope& scope, zeep::http::reply& reply)
@@ -3031,7 +2968,7 @@ void M6Server::handle_blast_status_ajax(const zeep::http::request& request, cons
 
 	vector<el::object> jjobs;
 	
-	foreach (const string& id, jobs)
+	for (const string& id : jobs)
 	{
 		try
 		{
@@ -3040,11 +2977,11 @@ void M6Server::handle_blast_status_ajax(const zeep::http::request& request, cons
 			uint32 hitCount;
 			double bestScore;
 			
-			tr1::tie(status, error, hitCount, bestScore) = M6BlastCache::Instance().JobStatus(id);
+			tie(status, error, hitCount, bestScore) = M6BlastCache::Instance().JobStatus(id);
 			
 			el::object jjob;
 			jjob["id"] = id;
-			jjob["status"] = boost::lexical_cast<string>(status);
+			jjob["status"] = boost::lexical_cast<string> (status);
 			
 			switch (status)
 			{
@@ -3100,7 +3037,7 @@ void M6Server::handle_blast_submit_ajax(
 
 	// validate and unalias the databank
 	bool found = false;
-	foreach (M6BlastDatabank& bdb, mBlastDatabanks)
+	for (M6BlastDatabank& bdb : mBlastDatabanks)
 	{
 		if (bdb.mID == db)
 		{
@@ -3168,11 +3105,11 @@ void M6Server::handle_blast_submit_ajax(
 		// and answer with the created job ID
 		result["id"] = jobId;
 		result["qid"] = qid;
-		result["status"] = boost::lexical_cast<string>(bj_Queued);
+		result["status"] = boost::lexical_cast<string> (bj_Queued);
 	}
 	catch (exception& e)
 	{
-		result["status"] = boost::lexical_cast<string>(bj_Error);
+		result["status"] = boost::lexical_cast<string> (bj_Error);
 		result["error"] = e.what();
 	}
 	
@@ -3199,7 +3136,7 @@ void M6Server::handle_align(const zh::request& request, const el::scope& scope, 
 		ba::split(seqs, seqstr, ba::is_any_of(";"));
 		string fasta;
 		
-		foreach (string& ts, seqs)
+		for (string& ts : seqs)
 		{
 			string::size_type s = ts.find('/');
 			if (s == string::npos)
@@ -3275,9 +3212,9 @@ void M6Server::handle_status(const zh::request& request, const el::scope& scope,
 	el::scope sub(scope);
 
 	vector<el::object> databanks;
-//	foreach (M6LoadedDatabank& db, mLoadedDatabanks)
+//	for (M6LoadedDatabank& db : mLoadedDatabanks)
 
-	foreach (zx::element* db, M6Config::GetDatabanks())
+	for (zx::element* db : M6Config::GetDatabanks())
 	{
 		if (db->get_attribute("enabled") == "false")
 			continue;
@@ -3315,7 +3252,7 @@ void M6Server::handle_status_ajax(const zh::request& request, const el::scope& s
 	vector<string> scheduled;
 	M6Scheduler::Instance().GetScheduledDatabanks(scheduled);
 
-	foreach (zx::element* db, M6Config::GetDatabanks())
+	for (zx::element* db : M6Config::GetDatabanks())
 	{
 		if (db->get_attribute("enabled") == "false")
 			continue;
@@ -3370,10 +3307,10 @@ void M6Server::handle_info(const zh::request& request, const el::scope& scope, z
 	bool bAlias = aliased.size()>1 || aliased[0] != dbAlias ;
 
 	vector<el::object> databanks;
-	foreach(string db, aliased)
+	for (string db : aliased)
 	{
 
-	foreach (M6LoadedDatabank& ldb, mLoadedDatabanks)
+	for (M6LoadedDatabank& ldb : mLoadedDatabanks)
 	{
 		if (ldb.mID != db)
 			continue;
@@ -3397,7 +3334,7 @@ void M6Server::handle_info(const zh::request& request, const el::scope& scope, z
 			databank["info"] = info->content();
 
 		vector<el::object> indices;
-		foreach (M6IndexInfo& iinfo, info.mIndexInfo)
+		for (M6IndexInfo& iinfo : info.mIndexInfo)
 		{
 			el::object index;
 			
@@ -3408,9 +3345,11 @@ void M6Server::handle_info(const zh::request& request, const el::scope& scope, z
 			{
 				case eM6CharIndex:			index["type"] = "unique string"; break;
 				case eM6NumberIndex:		index["type"] = "unique number"; break;
+                case eM6FloatIndex:         index["type"] = "unique fp number"; break;
 //				case eM6DateIndex:			index["type"] = "date"; break;
 				case eM6CharMultiIndex:		index["type"] = "string"; break;
 				case eM6NumberMultiIndex:	index["type"] = "number"; break;
+                case eM6FloatMultiIndex:    index["type"] = "floating point number"; break;
 //				case eM6DateMultiIndex:		index["type"] = "date"; break;
 				case eM6CharMultiIDLIndex:	index["type"] = "string"; break;
 				case eM6CharWeightedIndex:	index["type"] = "full text"; break;
@@ -3435,7 +3374,7 @@ void M6Server::handle_info(const zh::request& request, const el::scope& scope, z
 	if(bAlias) {
 
 		string dbList = "";
-		foreach(string db, aliased) {
+		for (string db : aliased) {
 			if(! dbList.empty() )
 				dbList += " + ";
 			dbList += db ;
@@ -3484,7 +3423,7 @@ void M6Server::handle_browse(const zh::request& request, const el::scope& scope,
 	{
 		vector<el::object> elSections;
 		
-		foreach (auto& section, sections)
+		for (auto& section : sections)
 		{
 			el::object elSection;
 			elSection["first"] = section.first;
@@ -3498,6 +3437,10 @@ void M6Server::handle_browse(const zh::request& request, const el::scope& scope,
 	{
 		vector<string> keys;
 		mdb->ListIndexEntries(ix, iFirst, iLast, keys);
+
+        for (auto& key : keys)
+            LOG (DEBUG, "key for %s - %s: %s", iFirst.c_str (), iLast.c_str (), key.c_str ());
+
 		sub.put("keys", keys.begin(), keys.end());
 	}
 
@@ -3506,58 +3449,17 @@ void M6Server::handle_browse(const zh::request& request, const el::scope& scope,
 
 // --------------------------------------------------------------------
 
-void M6Server::ValidateAuthentication(const zh::request& request,
-	const string& inRealm)
+string M6Server::get_hashed_password(const string& username, const string& realm)
 {
-	string authorization;
-	foreach (const zeep::http::header& h, request.headers)
+    string result;
+
+    boost::format f("/mrs-config/users/user[@name='%1%' and @realm='%2%']");
+    if (zx::element* user = mConfig->find_first((f % username % realm).str()))
 	{
-		if (ba::iequals(h.name, "Authorization"))
-			authorization = h.value;
+        result = user->get_attribute("password");
 	}
 
-	if (authorization.empty())
-		throw zh::unauthorized_exception(false, inRealm);
-
-	// That was easy, now check the response
-	
-	map<string,string> info;
-	
-	boost::regex re("(\\w+)=(?|\"([^\"]*)\"|'([^']*)'|(\\w+))(?:,\\s*)?");
-	const char* b = authorization.c_str();
-	const char* e = b + authorization.length();
-	boost::match_results<const char*> m;
-	while (b < e and boost::regex_search(b, e, m, re))
-	{
-		info[string(m[1].first, m[1].second)] = string(m[2].first, m[2].second);
-		b = m[0].second;
-	}
-
-	bool authorized = false, stale = false;
-
-	boost::format f("/mrs-config/users/user[@name='%1%' and @realm='%2%']");
-	if (zx::element* user = mConfig->find_first((f % info["username"] % info["realm"]).str()))
-	{
-		string ha1 = user->get_attribute("password");
-
-		boost::mutex::scoped_lock lock(mAuthMutex);
-	
-		foreach (M6AuthInfo* auth, mAuthInfo)
-		{
-			if (auth->mRealm == info["realm"] and auth->mNonce == info["nonce"]
-				and auth->Validate(request.method, request.uri, ha1, info))
-			{
-				authorized = true;
-				stale = auth->Stale();
-				if (stale)
-					mAuthInfo.erase(find(mAuthInfo.begin(), mAuthInfo.end(), auth));
-				break;
-			}
-		}
-	}
-	
-	if (stale or not authorized)
-		throw zh::unauthorized_exception(stale, inRealm);
+    return result;
 }
 
 // --------------------------------------------------------------------
@@ -3605,12 +3507,12 @@ void RunMainLoop(uint32 inNrOfThreads, bool redirectOutputToLog)
 		
 		LOG(DEBUG,"RunMainLoop: configuring server");
 
-		M6Server server(config);
+		shared_ptr<M6Server> server(new M6Server(config));
 
 		LOG(DEBUG,"RunMainLoop: binding server to %s:%s",addr.c_str(),port.c_str());
 	
-		server.bind(addr, boost::lexical_cast<uint16>(port));
-		boost::thread thread(boost::bind(&zeep::http::server::run, boost::ref(server), inNrOfThreads));
+		server->bind(addr, boost::lexical_cast<uint16>(port));
+		boost::thread thread(boost::bind(&zeep::http::server::run, boost::ref(*server), inNrOfThreads));
 	
 		cerr << " done" << endl
 			 << local_date_time(second_clock::local_time(), time_zone_ptr())
@@ -3622,25 +3524,30 @@ void RunMainLoop(uint32 inNrOfThreads, bool redirectOutputToLog)
 
 		LOG(DEBUG,"RunMainLoop: waiting for signals..");
 		
-		int sig = catcher.WaitForSignal();
-
-		// signal logging
-		string sigstr;
-		switch(sig)
+		int sig;
+		do
 		{
-		case SIGINT : sigstr = "SIGINT";  break;
-		case SIGHUP : sigstr = "SIGHUP";  break;
-		case SIGSEGV: sigstr = "SIGSEGV"; break;
-		case SIGQUIT: sigstr = "SIGQUIT"; break;
-		case SIGTERM: sigstr = "SIGTERM"; break;
-		default: sigstr = boost::lexical_cast<string>(sig); break;
+			sig = catcher.WaitForSignal();
+
+			// signal logging
+			string sigstr;
+			switch(sig)
+			{
+			case SIGINT : sigstr = "SIGINT";  break;
+			case SIGHUP : sigstr = "SIGHUP";  break;
+			case SIGSEGV: sigstr = "SIGSEGV"; break;
+			case SIGQUIT: sigstr = "SIGQUIT"; break;
+			case SIGTERM: sigstr = "SIGTERM"; break;
+			default: sigstr = to_string(sig); break;
+			}
+
+			LOG(WARN,"RunMainLoop: recieved signal: %s",sigstr.c_str());
+
+			//cerr << local_date_time(second_clock::local_time(), time_zone_ptr()) << " RunMainLoop recieved signal: " << sigstr << endl;
 		}
+		while (sig == SIGCHLD); // we don't care about these in MRS server
 
-		LOG(WARN,"RunMainLoop: recieved signal: %s",sigstr.c_str());
-
-		cerr << local_date_time(second_clock::local_time(), time_zone_ptr()) << " RunMainLoop recieved signal: " << sigstr << endl;
-		
-		server.stop();
+		server->stop();
 
 		LOG(DEBUG,"RunMainLoop: stopped server");
 
@@ -3724,8 +3631,8 @@ int M6Server::Start(const string& inRunAs, const string& inPidFile, bool inForeg
 			THROW(("Is mrs running already? %s", e.what()));
 		}
 
-		if (not inForeground) {
-
+		if (not inForeground)
+        {
 			LOG(DEBUG,"M6Server::Start: deamonizing");
 			Daemonize(runas, pidfile);
 		}

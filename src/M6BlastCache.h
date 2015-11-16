@@ -6,11 +6,11 @@
 #pragma once
 
 #include <queue>
+#include <tuple>
 
 #include <boost/thread.hpp>
 #include <boost/thread/condition.hpp>
 #include <boost/filesystem/path.hpp>
-#include <boost/tr1/tuple.hpp>
 
 #include "M6Blast.h"
 
@@ -106,7 +106,7 @@ class M6BlastCache
   public:
 	static M6BlastCache&		Instance();
 
-	std::tr1::tuple<M6BlastJobStatus,std::string,uint32,double>
+	std::tuple<M6BlastJobStatus,std::string,uint32,double>
 								JobStatus(const std::string& inJobID);
 
 	M6BlastResultPtr			JobResult(const std::string& inJobID);

@@ -11,6 +11,8 @@
 
 #if defined(__linux__)
 #include <unistd.h>
+#else
+//#define DISABLE_IPC_FOR_NOW 1
 #endif
 
 #include <boost/version.hpp>
@@ -18,17 +20,16 @@
 #include <boost/format.hpp>
 #include <boost/date_time/posix_time/posix_time_types.hpp>
 #include <boost/lexical_cast.hpp>
+#if not DISABLE_IPC_FOR_NOW
 #include <boost/interprocess/managed_shared_memory.hpp>
+#endif
 #include <boost/interprocess/containers/vector.hpp>
 #include <boost/interprocess/allocators/allocator.hpp>
-#include <boost/foreach.hpp>
-#define foreach BOOST_FOREACH
 #include <boost/timer/timer.hpp>
 
 #include "M6Utilities.h"
-#include "M6Server.h"
 
-#if defined(__linux__) || defined(__INTEL_COMPILER_BUILD_DATE) || defined(__APPLE__)
+#if defined(__linux__) || defined(__INTEL_COMPILER_BUILD_DATE) || defined(__APPLE__) || defined(__FreeBSD__)
 #include <atomic>
 
 typedef std::atomic<int64>	M6Counter;
@@ -60,7 +61,6 @@ inline int64 setCounter(M6Counter& ioCounter, int64 inValue)
 	return inValue;
 }
 
-
 #endif
 
 #include "M6Progress.h"
@@ -79,9 +79,10 @@ struct M6StatusImpl
 		char		stage[220];
 	};
 	
+#if not DISABLE_IPC_FOR_NOW
 	typedef ip::allocator<M6DbStatusInfo, ip::managed_shared_memory::segment_manager> M6ShmemAllocator;
 	typedef ip::vector<M6DbStatusInfo, M6ShmemAllocator> M6DbSet;
-
+#endif
 				M6StatusImpl();
 				~M6StatusImpl();
 
@@ -90,16 +91,21 @@ struct M6StatusImpl
 	void		SetError(const string& inDatabank, const string& inErrorMessage);
 	void		Cleanup(const string& inDatabank);
 
+#if not DISABLE_IPC_FOR_NOW
 	ip::managed_shared_memory*	mSegment;
 	M6ShmemAllocator*			mAllocator;
 	M6DbSet*					mDbStatus;
+#endif
 };
 
 BOOST_STATIC_ASSERT(sizeof(M6StatusImpl::M6DbStatusInfo) == 256);
 
 M6StatusImpl::M6StatusImpl()
+#if not DISABLE_IPC_FOR_NOW
 	: mSegment(nullptr), mAllocator(nullptr), mDbStatus(nullptr)
+#endif
 {
+#if not DISABLE_IPC_FOR_NOW
 	try
 	{
 		mSegment = new ip::managed_shared_memory(ip::open_or_create, "M6SharedMemory", 65536);
@@ -117,21 +123,25 @@ M6StatusImpl::M6StatusImpl()
 		delete mSegment;
 		mSegment = nullptr;
 	}
+#endif
 }
 
 M6StatusImpl::~M6StatusImpl()
 {
+#if not DISABLE_IPC_FOR_NOW
 	delete mAllocator;
 	delete mSegment;
+#endif
 }
 
 bool M6StatusImpl::GetUpdateStatus(const string& inDatabank, string& outStage, float& outProgress)
 {
 	bool result = false;
 	
+#if not DISABLE_IPC_FOR_NOW
 	if (mDbStatus != nullptr)
 	{
-		foreach (const M6DbStatusInfo& info, *mDbStatus)
+		for (const M6DbStatusInfo& info : *mDbStatus)
 		{
 			if (inDatabank != info.databank)
 				continue;
@@ -142,6 +152,7 @@ bool M6StatusImpl::GetUpdateStatus(const string& inDatabank, string& outStage, f
 			break;
 		}
 	}
+#endif
 	
 	return result;
 }
@@ -151,6 +162,7 @@ void M6StatusImpl::SetUpdateStatus(const string& inDatabank, const string& inSta
 	// Believe it or not, but if you compile this code with -O3 using gcc
 	// the copy of a float does not work...
 	
+#if not DISABLE_IPC_FOR_NOW
 	if (mDbStatus != nullptr)
 	{
 		M6DbSet::iterator i = mDbStatus->begin();
@@ -173,6 +185,7 @@ void M6StatusImpl::SetUpdateStatus(const string& inDatabank, const string& inSta
 			memcpy(&i->progress, &inProgress, sizeof(float));
 		}
 	}
+#endif
 }
 
 void M6StatusImpl::SetError(const string& inDatabank, const string& inErrorMessage)
@@ -182,6 +195,7 @@ void M6StatusImpl::SetError(const string& inDatabank, const string& inErrorMessa
 
 void M6StatusImpl::Cleanup(const string& inDatabank)
 {
+#if not DISABLE_IPC_FOR_NOW
 	if (mDbStatus != nullptr)
 	{
 		M6DbSet::iterator i = mDbStatus->begin();
@@ -191,6 +205,7 @@ void M6StatusImpl::Cleanup(const string& inDatabank)
 		if (i != mDbStatus->end())
 			mDbStatus->erase(i);
 	}
+#endif
 }
 
 M6Status& M6Status::Instance()
@@ -243,7 +258,7 @@ struct M6ProgressImpl
 						: mDatabank(inDatabank)
 						, mMax(inMax), mLast(0), mConsumed(0)
 						, mAction(inAction), mMessage(inAction), mSpinner(0)
-						, mThread(boost::bind(&M6ProgressImpl::Run, this)) {}
+						, mThread(bind(&M6ProgressImpl::Run, this)) {}
 					~M6ProgressImpl();
 
 	void			Run();
@@ -275,7 +290,7 @@ void M6ProgressImpl::Run()
 		{
 			boost::this_thread::sleep(boost::posix_time::seconds(1));
 			
-			boost::mutex::scoped_lock lock(mMutex);
+			boost::unique_lock<boost::mutex> lock(mMutex);
 			
 			if (mConsumed == mMax)
 				break;
@@ -333,7 +348,7 @@ void M6ProgressImpl::PrintProgress()
 			msg += ' ';
 		if (perc < 10)
 			msg += ' ';
-		msg += boost::lexical_cast<string>(perc);
+		msg += to_string(perc);
 		msg += '%';
 	}
 	
@@ -356,7 +371,7 @@ void M6ProgressImpl::PrintDone()
 	
 	if (IsaTTY())
 		cout << '\r' << msg << endl;
-	else if (M6Server::Instance() == nullptr)
+	else //if (M6Server::Instance() == nullptr)
 		cout << msg << endl;
 
 	M6Status::Instance().SetUpdateStatus(mDatabank, mAction, 1.0f);
@@ -409,7 +424,7 @@ void M6Progress::Progress(int64 inProgress)
 
 void M6Progress::Message(const std::string& inMessage)
 {
-	boost::mutex::scoped_lock lock(mImpl->mMutex);
+	boost::unique_lock<boost::mutex> lock(mImpl->mMutex);
 	mImpl->mMessage = inMessage;
 }
 

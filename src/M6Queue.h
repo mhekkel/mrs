@@ -7,7 +7,7 @@
 
 #include <deque>
 #include <boost/thread.hpp>
-#include <boost/thread/condition.hpp>
+#include <boost/thread/condition_variable.hpp>
 
 template<class T, uint32 N = 100>
 class M6Queue
@@ -30,14 +30,14 @@ class M6Queue
 
 	std::deque<T>		mQueue;
 	boost::mutex		mMutex;
-	std::unique_ptr<boost::condition>
+	std::unique_ptr<boost::condition_variable>
 						mEmptyCondition, mFullCondition;
 	bool				mWasFull, mWasEmpty;
 };
 
 template<class T, uint32 N>
 M6Queue<T,N>::M6Queue()
-	: mEmptyCondition(new boost::condition), mFullCondition(new boost::condition)
+	: mEmptyCondition(new boost::condition_variable), mFullCondition(new boost::condition_variable)
 	, mWasFull(false), mWasEmpty(true)
 {
 }
@@ -50,7 +50,7 @@ M6Queue<T,N>::~M6Queue()
 template<class T, uint32 N>
 void M6Queue<T,N>::Put(T inValue)
 {
-	boost::mutex::scoped_lock lock(mMutex);
+	boost::unique_lock<boost::mutex> lock(mMutex);
 
 	mWasFull = false;
 	while (mQueue.size() >= N)
@@ -84,7 +84,7 @@ void M6Queue<T,N>::Put(T inValue)
 template<class T, uint32 N>
 T M6Queue<T,N>::Get()
 {
-	boost::mutex::scoped_lock lock(mMutex);
+	boost::unique_lock<boost::mutex> lock(mMutex);
 
 	mWasEmpty = false;
 	while (mQueue.empty())

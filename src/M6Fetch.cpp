@@ -32,8 +32,6 @@ typedef socklen_t M6SockLen;
 #include <boost/regex.hpp>
 #include <boost/format.hpp>
 #include <boost/algorithm/string.hpp>
-#include <boost/foreach.hpp>
-#define foreach BOOST_FOREACH
 #include <boost/format.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/function.hpp>
@@ -246,12 +244,12 @@ void M6FTPFetcherImpl::Mirror(bool inDryRun, ostream& out)
 	
 	if (inDryRun)
 	{
-		foreach (auto file, mFilesToFetch)
+		for (auto file : mFilesToFetch)
 			out << "fetching " << file.remote << " => " << file.local << endl;
 		
 		if (source->get_attribute("delete") == "true")
 		{
-			foreach (auto del, mFilesToDelete)
+			for (auto del : mFilesToDelete)
 				out << "Deleting " << del << endl;
 		}
 	}
@@ -261,7 +259,7 @@ void M6FTPFetcherImpl::Mirror(bool inDryRun, ostream& out)
 		{
 			M6Progress progress(mDatabank, bytesToFetch, "Fetching");
 			
-			foreach (auto file, mFilesToFetch)
+			for (auto file : mFilesToFetch)
 			{
 				progress.Message(string("Fetching ") + file.remote.filename().string());
 	
@@ -274,7 +272,7 @@ void M6FTPFetcherImpl::Mirror(bool inDryRun, ostream& out)
 		
 		if (source->get_attribute("delete") == "true")
 		{
-			foreach (auto del, mFilesToDelete)
+			for (auto del : mFilesToDelete)
 			{
 				if (VERBOSE)
 					cerr << "Deleting " << del << endl;
@@ -372,7 +370,7 @@ int64 M6FTPFetcherImpl::CollectFiles()
 {
 	int64 result = 0;
 	
-	foreach (fs::path dir, mSrcPath)
+	for (fs::path dir : mSrcPath)
 	{
 		uint32 status = SendAndWaitForReply("cwd", dir.string());
 		if (status != 250)
@@ -384,7 +382,7 @@ int64 M6FTPFetcherImpl::CollectFiles()
 	
 	M6Progress progress(mDatabank, "listing files");
 	
-	foreach (const string& source, sources)
+	for (const string& source : sources)
 	{
 		fs::path p(source);
 		fs::path::iterator pb = p.begin();
@@ -442,7 +440,7 @@ int64 M6FTPFetcherImpl::CollectFiles(fs::path inLocalDir, fs::path inRemoteDir, 
 
 			if (fs::exists(file))
 			{
-				existing.erase(find(existing.begin(), existing.end(), file));
+                existing.erase(find(existing.begin(), existing.end(), file), existing.end());
 
 				if (fs::last_write_time(file) >= inTime and fs::file_size(file) == inSize)
 				{
@@ -465,7 +463,7 @@ int64 M6FTPFetcherImpl::CollectFiles(fs::path inLocalDir, fs::path inRemoteDir, 
 		// but only delete files if the name was a pattern
 		if (isPattern)
 		{
-			foreach (fs::path file, existing)
+			for (fs::path file : existing)
 				mFilesToDelete.push_back(file);
 		}
 	}
@@ -480,7 +478,7 @@ int64 M6FTPFetcherImpl::CollectFiles(fs::path inLocalDir, fs::path inRemoteDir, 
 	else
 		dirs.push_back(s);
 
-	foreach (const string& dir, dirs)
+	for (const string& dir : dirs)
 	{
 		uint32 status = SendAndWaitForReply("cwd", dir);
 		if (status != 250)
@@ -714,7 +712,6 @@ void M6RSyncFetcherImpl::Mirror(bool inDryRun, ostream& out)
 	zx::element* source = mConfig->find_first("source");
 	string srcdir = source->content();
 
-	
 	string rsync = M6Config::GetTool("rsync");
 	if (not fs::exists(rsync))
 		THROW(("rsync not found"));
@@ -734,7 +731,7 @@ void M6RSyncFetcherImpl::Mirror(bool inDryRun, ostream& out)
 	if (inDryRun)
 		args.push_back("--dry-run");
 
-	set<string> includes;
+	std::set<string> includes;
 	bool stripped = false;
 	if (not ba::ends_with(srcdir, "/"))
 	{
@@ -763,7 +760,7 @@ void M6RSyncFetcherImpl::Mirror(bool inDryRun, ostream& out)
 	list<string> includestrings_memstore; // keeps the pointers occupied
 	if(includes.size()>0)
 	{
-		foreach( string include, includes)
+		for( string include : includes)
 		{
 			includestrings_memstore.push_back( str( boost::format("--include=%s") % include.c_str() ) );
 			args.push_back( includestrings_memstore.back().c_str() );

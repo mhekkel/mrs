@@ -1,14 +1,12 @@
 //   Copyright Maarten L. Hekkelman, Radboud University 2012.
 //  Distributed under the Boost Software License, Version 1.0.
-//     (See accompanying file LICENSE_1_0.txt or copy at
-//           http://www.boost.org/LICENSE_1_0.txt)
+//	 (See accompanying file LICENSE_1_0.txt or copy at
+//		   http://www.boost.org/LICENSE_1_0.txt)
 
 #include "M6Lib.h"
 
 #include <cassert>
 
-#include <boost/foreach.hpp>
-#define foreach BOOST_FOREACH
 
 #include "M6Iterator.h"
 
@@ -89,9 +87,15 @@ M6UnionIterator::M6UnionIterator(M6Iterator* inA, M6Iterator* inB)
 	AddIterator(inB);
 }
 
+M6UnionIterator::M6UnionIterator(list<M6Iterator*> inIters)
+{
+	for (M6Iterator* iter: inIters)
+		AddIterator (iter);
+}
+
 M6UnionIterator::~M6UnionIterator()
 {
-	foreach (M6IteratorPart& part, mIterators)
+	for (M6IteratorPart& part : mIterators)
 		delete part.mIter;
 	mIterators.clear();
 }
@@ -197,7 +201,7 @@ M6IntersectionIterator::M6IntersectionIterator(M6Iterator* inA, M6Iterator* inB)
 
 M6IntersectionIterator::~M6IntersectionIterator()
 {
-	foreach (M6IteratorPart& part, mIterators)
+	for (M6IteratorPart& part : mIterators)
 		delete part.mIter;
 	mIterators.clear();
 }
@@ -206,7 +210,7 @@ void M6IntersectionIterator::AddIterator(M6Iterator* inIter)
 {
 	if (inIter == nullptr)
 	{
-		foreach (M6IteratorPart& part, mIterators)
+		for (M6IteratorPart& part : mIterators)
 			delete part.mIter;
 		mIterators.clear();
 	}
@@ -239,7 +243,7 @@ bool M6IntersectionIterator::Next(uint32& outDoc, float& outRank)
 		outDoc = mIterators.back().mDoc;
 		result = true;
 
-		foreach (M6IteratorPart& part, mIterators)
+		for (M6IteratorPart& part : mIterators)
 		{
 			while (part.mDoc < outDoc)
 			{
@@ -254,7 +258,7 @@ bool M6IntersectionIterator::Next(uint32& outDoc, float& outRank)
 
 		if (result)
 		{
-			foreach (M6IteratorPart& part, mIterators)
+			for (M6IteratorPart& part : mIterators)
 				done = done or part.mIter->Next(part.mDoc, r) == false;
 			break;
 		}
@@ -265,7 +269,7 @@ bool M6IntersectionIterator::Next(uint32& outDoc, float& outRank)
 
 	if (done)
 	{
-		foreach (M6IteratorPart& part, mIterators)
+		for (M6IteratorPart& part : mIterators)
 			delete part.mIter;
 		mIterators.clear();
 	}
@@ -325,14 +329,14 @@ void M6PhraseIterator::M6PhraseIteratorPart::ReadArray()
 }
 
 M6PhraseIterator::M6PhraseIterator(fs::path& inIDLFile,
-	vector<std::tr1::tuple<M6Iterator*,int64,uint32>>& inIterators)
+	vector<std::tuple<M6Iterator*,int64,uint32>>& inIterators)
 	: mIDLFile(inIDLFile, eReadOnly)
 {
 	bool ok = true;
 	
-	foreach (auto i, inIterators)
+	for (auto i : inIterators)
 	{
-		M6PhraseIteratorPart p(tr1::get<0>(i), M6IBitStream(mIDLFile, tr1::get<1>(i)), tr1::get<2>(i));
+		M6PhraseIteratorPart p(get<0>(i), M6IBitStream(mIDLFile, get<1>(i)), get<2>(i));
 	
 		float r;
 		if (not p.mIter->Next(p.mDoc, r))
@@ -350,15 +354,15 @@ M6PhraseIterator::M6PhraseIterator(fs::path& inIDLFile,
 	
 	if (not ok)
 	{
-		foreach (auto& iter, inIterators)
-			delete tr1::get<0>(iter);
+		for (auto& iter : inIterators)
+			delete get<0>(iter);
 		mIterators.clear();
 	}
 }
 
 M6PhraseIterator::~M6PhraseIterator()
 {
-	foreach (auto& part, mIterators)
+	for (auto& part : mIterators)
 		delete part.mIter;
 	mIterators.clear();
 }
@@ -377,7 +381,7 @@ bool M6PhraseIterator::Next(uint32& outDoc, float& outRank)
 
 		outDoc = mIterators.back().mDoc;
 
-		foreach (M6PhraseIteratorPart& part, mIterators)
+		for (M6PhraseIteratorPart& part : mIterators)
 		{
 			while (part.mDoc < outDoc)
 			{
@@ -415,7 +419,7 @@ bool M6PhraseIterator::Next(uint32& outDoc, float& outRank)
 				swap(mIDLCache1, mIDLCache2);
 			}
 
-			foreach (M6PhraseIteratorPart& part, mIterators)
+			for (M6PhraseIteratorPart& part : mIterators)
 			{
 				if (part.mIter->Next(part.mDoc, r))
 					part.ReadArray();
@@ -434,7 +438,7 @@ bool M6PhraseIterator::Next(uint32& outDoc, float& outRank)
 
 	if (done)
 	{
-		foreach (M6PhraseIteratorPart& part, mIterators)
+		for (M6PhraseIteratorPart& part : mIterators)
 			delete part.mIter;
 		mIterators.clear();
 	}

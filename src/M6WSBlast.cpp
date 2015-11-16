@@ -2,13 +2,12 @@
 //  Distributed under the Boost Software License, Version 1.0.
 //     (See accompanying file LICENSE_1_0.txt or copy at
 //           http://www.boost.org/LICENSE_1_0.txt)
+
 #include "M6Lib.h"
 
 #include <set>
 #include <boost/regex.hpp>
 #include <boost/bind.hpp>
-#include <boost/foreach.hpp>
-#define foreach BOOST_FOREACH
 #include <boost/algorithm/string.hpp>
 
 #include "M6Config.h"
@@ -121,7 +120,7 @@ void M6WSBlast::Blast(const string& query, const string& program, const string& 
 	if (dbs.empty())
 		THROW(("Databank '%s' not configured", db.c_str()));
 
-	foreach (string adb, dbs)
+	for (string adb : dbs)
 	{
 		M6Databank* mdb = mServer.Load(adb);
 		if (mdb == nullptr)
@@ -154,7 +153,7 @@ void M6WSBlast::BlastJobStatus(string job_id, M6WSBlastNS::JobStatus& response)
 	uint32 hitCount;
 	double bestScore;
 	
-	tr1::tie(status, error, hitCount, bestScore) = M6BlastCache::Instance().JobStatus(job_id);
+	tie(status, error, hitCount, bestScore) = M6BlastCache::Instance().JobStatus(job_id);
 	
 	switch (status)
 	{
@@ -174,7 +173,7 @@ void M6WSBlast::BlastJobResult(string job_id, M6WSBlastNS::BlastResult& response
 	uint32 hitCount;
 	double bestScore;
 	
-	tr1::tie(status, error, hitCount, bestScore) = M6BlastCache::Instance().JobStatus(job_id);
+	tie(status, error, hitCount, bestScore) = M6BlastCache::Instance().JobStatus(job_id);
 	if (status != bj_Finished)
 		THROW(("Job %s not finished yet", job_id.c_str()));
 	
@@ -189,7 +188,7 @@ void M6WSBlast::BlastJobResult(string job_id, M6WSBlastNS::BlastResult& response
 
 	const list<M6Blast::Hit>& hits(result->mHits);
 	
-	foreach (const M6Blast::Hit& hit, hits)
+	for (const M6Blast::Hit& hit : hits)
 	{
 		const list<M6Blast::Hsp>& hsps(hit.mHsps);
 		if (hsps.empty())
@@ -202,7 +201,7 @@ void M6WSBlast::BlastJobResult(string job_id, M6WSBlastNS::BlastResult& response
 		if (not hit.mChain.empty())
 			h.sequenceId.reset(hit.mChain);
 		
-		foreach (const M6Blast::Hsp& hsp, hsps)
+		for (const M6Blast::Hsp& hsp : hsps)
 		{
 			M6WSBlastNS::Hsp hs;
 			
@@ -232,5 +231,5 @@ void M6WSBlast::BlastJobError(string job_id, string& response)
 	uint32 hitCount;
 	double bestScore;
 	
-	tr1::tie(status, response, hitCount, bestScore) = M6BlastCache::Instance().JobStatus(job_id);
+	tie(status, response, hitCount, bestScore) = M6BlastCache::Instance().JobStatus(job_id);
 }

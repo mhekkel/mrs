@@ -1,7 +1,7 @@
 //   Copyright Maarten L. Hekkelman, Radboud University 2012.
 //  Distributed under the Boost Software License, Version 1.0.
-//     (See accompanying file LICENSE_1_0.txt or copy at
-//           http://www.boost.org/LICENSE_1_0.txt)
+//	 (See accompanying file LICENSE_1_0.txt or copy at
+//		   http://www.boost.org/LICENSE_1_0.txt)
 
 // Utility routines, most are OS specific
 
@@ -14,6 +14,7 @@
 #include <boost/filesystem/fstream.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <boost/algorithm/string.hpp>
+#include <boost/thread/condition_variable.hpp>
 
 #include "M6Utilities.h"
 #include "M6Error.h"
@@ -33,16 +34,16 @@ namespace ba = boost::algorithm;
 
 void SetStdinEcho(bool inEnable)
 {
-    HANDLE hStdin = ::GetStdHandle(STD_INPUT_HANDLE); 
-    DWORD mode;
-    ::GetConsoleMode(hStdin, &mode);
+	HANDLE hStdin = ::GetStdHandle(STD_INPUT_HANDLE); 
+	DWORD mode;
+	::GetConsoleMode(hStdin, &mode);
 
-    if(not inEnable)
-        mode &= ~ENABLE_ECHO_INPUT;
-    else
-        mode |= ENABLE_ECHO_INPUT;
+	if(not inEnable)
+		mode &= ~ENABLE_ECHO_INPUT;
+	else
+		mode |= ENABLE_ECHO_INPUT;
 
-    ::SetConsoleMode(hStdin, mode);
+	::SetConsoleMode(hStdin, mode);
 }
 
 fs::path GetExecutablePath()
@@ -118,17 +119,18 @@ void OpenLogFile(const string& inLogFile, const string& inErrFile)
 
 struct M6SignalCatcherImpl
 {
-	static BOOL				CtrlHandler(DWORD inCntrlType);
+	static BOOL __stdcall   CtrlHandler(DWORD inCntrlType);
 
 	static void				Signal(int inSignal);
 
 	static int				sSignal;
-	static boost::condition	sCondition;
+	static boost::condition_variable
+							sCondition;
 	static boost::mutex		sMutex;
 };
 
 int M6SignalCatcherImpl::sSignal;
-boost::condition M6SignalCatcherImpl::sCondition;
+boost::condition_variable M6SignalCatcherImpl::sCondition;
 boost::mutex M6SignalCatcherImpl::sMutex;
 
 BOOL M6SignalCatcherImpl::CtrlHandler(DWORD inCntrlType)
@@ -170,8 +172,8 @@ BOOL M6SignalCatcherImpl::CtrlHandler(DWORD inCntrlType)
 M6SignalCatcher::M6SignalCatcher()
 	: mImpl(nullptr)
 {
-    if (not ::SetConsoleCtrlHandler(&M6SignalCatcherImpl::CtrlHandler, true))
-    	THROW(("Could not install control handler"));
+	if (not ::SetConsoleCtrlHandler(&M6SignalCatcherImpl::CtrlHandler, true))
+		THROW(("Could not install control handler"));
 }
 
 M6SignalCatcher::~M6SignalCatcher()
@@ -188,7 +190,7 @@ void M6SignalCatcher::UnblockSignals()
 
 int M6SignalCatcher::WaitForSignal()
 {
-	boost::mutex::scoped_lock lock(M6SignalCatcherImpl::sMutex);
+	boost::unique_lock<boost::mutex> lock(M6SignalCatcherImpl::sMutex);
 	M6SignalCatcherImpl::sCondition.wait(lock);
 	return M6SignalCatcherImpl::sSignal;
 }
@@ -198,7 +200,7 @@ void M6SignalCatcher::Signal(int inSignal)
 	M6SignalCatcherImpl::CtrlHandler(CTRL_BREAK_EVENT);
 }
 
-#elif defined(linux) || defined(__linux) || defined (__linux__) || defined(__APPLE__)
+#elif defined(linux) || defined(__linux) || defined (__linux__) || defined(__APPLE__) || defined(__FreeBSD__)
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -212,7 +214,7 @@ void M6SignalCatcher::Signal(int inSignal)
 #include <getopt.h>
 #include <cerrno>
 #include <pwd.h>
-#if defined(__APPLE__)
+#if defined(__APPLE__) || defined(__FreeBSD__)
 #include <termios.h>
 #include <limits.h>
 #else
@@ -230,14 +232,14 @@ string gExePath;
 
 void SetStdinEcho(bool inEnable)
 {
-    struct termios tty;
-    ::tcgetattr(STDIN_FILENO, &tty);
-    if(not inEnable)
-        tty.c_lflag &= ~ECHO;
-    else
-        tty.c_lflag |= ECHO;
+	struct termios tty;
+	::tcgetattr(STDIN_FILENO, &tty);
+	if(not inEnable)
+		tty.c_lflag &= ~ECHO;
+	else
+		tty.c_lflag |= ECHO;
 
-    (void)::tcsetattr(STDIN_FILENO, TCSANOW, &tty);
+	(void)::tcsetattr(STDIN_FILENO, TCSANOW, &tty);
 }
 
 fs::path GetExecutablePath()
@@ -427,7 +429,7 @@ struct M6SignalCatcherImpl
 M6SignalCatcher::M6SignalCatcher()
 	: mImpl(new M6SignalCatcherImpl)
 {
-    sigfillset(&mImpl->new_mask);
+	sigfillset(&mImpl->new_mask);
 }
 
 M6SignalCatcher::~M6SignalCatcher()
@@ -437,12 +439,12 @@ M6SignalCatcher::~M6SignalCatcher()
 
 void M6SignalCatcher::BlockSignals()
 {
-    pthread_sigmask(SIG_BLOCK, &mImpl->new_mask, &mImpl->old_mask);
+	pthread_sigmask(SIG_BLOCK, &mImpl->new_mask, &mImpl->old_mask);
 }
 
 void M6SignalCatcher::UnblockSignals()
 {
-    pthread_sigmask(SIG_SETMASK, &mImpl->old_mask, nullptr);
+	pthread_sigmask(SIG_SETMASK, &mImpl->old_mask, nullptr);
 }
 
 int M6SignalCatcher::WaitForSignal()
@@ -452,6 +454,7 @@ int M6SignalCatcher::WaitForSignal()
 	sigemptyset(&wait_mask);
 	sigaddset(&wait_mask, SIGINT);
 	sigaddset(&wait_mask, SIGHUP);
+	sigaddset(&wait_mask, SIGCHLD);
 	sigaddset(&wait_mask, SIGQUIT);
 	sigaddset(&wait_mask, SIGTERM);
 	pthread_sigmask(SIG_BLOCK, &wait_mask, 0);

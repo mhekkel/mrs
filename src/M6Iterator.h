@@ -7,8 +7,9 @@
 
 #include <vector>
 #include <algorithm>
+#include <tuple>
+
 #include <boost/filesystem/path.hpp>
-#include <boost/tr1/tuple.hpp>
 
 #include "M6BitStream.h"
 #include "M6File.h"
@@ -147,6 +148,7 @@ class M6UnionIterator : public M6Iterator
 					M6UnionIterator();
 					~M6UnionIterator();
 					M6UnionIterator(M6Iterator* inA, M6Iterator* inB);
+					M6UnionIterator(std::list<M6Iterator*> inIters);
 
 	void			AddIterator(M6Iterator* inIter);
 
@@ -183,7 +185,7 @@ class M6PhraseIterator : public M6Iterator
   public:
 
 					M6PhraseIterator(boost::filesystem::path& inIDLFile,
-						std::vector<std::tr1::tuple<M6Iterator*,int64,uint32>>& inIterators);
+						std::vector<std::tuple<M6Iterator*,int64,uint32>>& inIterators);
 					~M6PhraseIterator();
 	
 	virtual bool	Next(uint32& outDoc, float& outRank);

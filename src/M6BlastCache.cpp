@@ -14,11 +14,7 @@
 #include <boost/current_function.hpp>
 #include <boost/date_time/posix_time/posix_time_types.hpp>
 #include <boost/filesystem/operations.hpp>
-#include <boost/lexical_cast.hpp>
 #include <boost/thread.hpp>
-#include <boost/foreach.hpp>
-#define foreach BOOST_FOREACH
-#define reverse_foreach BOOST_REVERSE_FOREACH
 #include <boost/format.hpp>
 #include <boost/filesystem/fstream.hpp>
 #include <boost/iostreams/filtering_streambuf.hpp>
@@ -67,7 +63,7 @@ bool M6BlastJob::IsStillValid(const vector<fs::path>& inFiles) const
 {
 	vector<M6BlastDbInfo> fileInfo;
 	
-	foreach (const fs::path& file, inFiles)
+	for (const fs::path& file : inFiles)
 	{
 		M6BlastDbInfo info = { file.string(), boost::posix_time::from_time_t(fs::last_write_time(file)) };
 		fileInfo.push_back(info);
@@ -173,11 +169,11 @@ string statusToString(M6BlastJobStatus status) {
 	}
 }
 
-tr1::tuple<M6BlastJobStatus,string,uint32,double> M6BlastCache::JobStatus(const string& inJobID)
+tuple<M6BlastJobStatus,string,uint32,double> M6BlastCache::JobStatus(const string& inJobID)
 {
 	boost::mutex::scoped_lock lock(mCacheMutex);
 
-	tr1::tuple<M6BlastJobStatus,string,uint32,double> result;
+	tuple<M6BlastJobStatus,string,uint32,double> result;
 
 	get<0>(result) = bj_Unknown;
 
@@ -304,7 +300,7 @@ void M6BlastCache::CacheResult(const string& inJobID, M6BlastResultPtr inResult)
 	// do some housekeeping, jobs at the back are first to be removed.
 	while (mResultCache.size() > kMaxCachedEntryResults)
 	{
-		foreach (const char* ext, kBlastFileExtensions)
+		for (const char* ext : kBlastFileExtensions)
 		{
 			boost::system::error_code ec;
 			fs::remove(mCacheDir / (mResultCache.back().id + ext), ec);
@@ -321,7 +317,7 @@ void M6BlastCache::FastaFilesForDatabank(const string& inDatabank, vector<fs::pa
 	
 	sort(dbs.begin(), dbs.end());
 	
-	foreach (string& db, dbs)
+	for (string& db : dbs)
 	{
 		fs::path dbdir = M6Config::GetDbDirectory(db);
 		
@@ -353,7 +349,7 @@ string M6BlastCache::Submit(const string& inDatabank, const string& inQuery,
 	boost::mutex::scoped_lock lock(mCacheMutex);
 	
 	// see if the job has already been submitted before
-	foreach (CacheEntry& e, mResultCache)
+	for (CacheEntry& e : mResultCache)
 	{
 		if (not e.job.IsJobFor(inDatabank, inQuery, inProgram, inMatrix, inWordSize, inExpect,
 				inLowComplexityFilter, inGapped, inGapOpen, inGapExtend, inReportLimit))
@@ -375,13 +371,13 @@ string M6BlastCache::Submit(const string& inDatabank, const string& inQuery,
 			if (fs::exists(mCacheDir / (e.id + ".err")))
 				fs::remove(mCacheDir / (e.id + ".err"));
 
-      // reset the timestamps
-      e.job.files.clear();
-      foreach (fs::path& fastaFile, fastaFiles)
-      {
-        M6BlastDbInfo info = { fastaFile.string(), boost::posix_time::from_time_t(fs::last_write_time(fastaFile)) };
-        e.job.files.push_back(info);
-      }
+            // reset the timestamps
+            e.job.files.clear();
+            for (fs::path& fastaFile : fastaFiles)
+            {
+                M6BlastDbInfo info = { fastaFile.string(), boost::posix_time::from_time_t(fs::last_write_time(fastaFile)) };
+                e.job.files.push_back(info);
+            }
 		}
 
 		LOG(DEBUG,"M6BlastCache::Submit: returning existing blast job id: %s",result.c_str());
@@ -410,7 +406,7 @@ string M6BlastCache::Submit(const string& inDatabank, const string& inQuery,
 		e.job.gapExtend = inGapExtend;
 		e.job.reportLimit = inReportLimit;
 		
-		foreach (fs::path& fastaFile, fastaFiles)
+		for (fs::path& fastaFile : fastaFiles)
 		{
 			M6BlastDbInfo info = { fastaFile.string(), boost::posix_time::from_time_t(fs::last_write_time(fastaFile)) };
 			e.job.files.push_back(info);
@@ -453,9 +449,9 @@ void M6BlastCache::Work()
 			string next;
 			
 			{
-				// Pick the frontmost queued entry. An alternative would be to use 'reverse_foreach'.
+				// Pick the frontmost queued entry. An alternative would be to use reversed looping.
 				boost::mutex::scoped_lock lock2(mCacheMutex);
-				foreach (CacheEntry& e, mResultCache)
+				for (CacheEntry& e : mResultCache)
 				{
 					if (e.status != bj_Queued)
 						continue;
@@ -533,7 +529,7 @@ void M6BlastCache::SetJobStatus(const string inJobId, M6BlastJobStatus inStatus)
 {
 	boost::mutex::scoped_lock lock(mCacheMutex);
 	
-	foreach (CacheEntry& e, mResultCache)
+	for (CacheEntry& e : mResultCache)
 	{
 		if (e.id != inJobId)
 			continue;
@@ -557,7 +553,7 @@ M6BlastJobDescList M6BlastCache::GetJobList()
 
 	M6BlastJobDescList result;
 	
-	foreach (CacheEntry& e, mResultCache)
+	for (CacheEntry& e : mResultCache)
 	{
 		M6BlastJobDesc desc;
 		
@@ -602,7 +598,7 @@ void M6BlastCache::DeleteJob(const string& inJobID)
 	if (mWorkerThread.joinable())
 		mWorkerThread.interrupt();
 	
-	foreach (const char* ext, kBlastFileExtensions) // remove job files from the cache directory
+	for (const char* ext : kBlastFileExtensions) // remove job files from the cache directory
 	{
 		boost::system::error_code ec;
 		fs::remove(mCacheDir / (inJobID + ext), ec);

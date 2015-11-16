@@ -11,8 +11,6 @@
 #include <boost/thread.hpp>
 #include <boost/algorithm/string/split.hpp>
 #include <boost/algorithm/string/classification.hpp>
-#include <boost/foreach.hpp>
-#define foreach BOOST_FOREACH
 #include <boost/regex.hpp>
 
 #include "M6File.h"
@@ -108,12 +106,6 @@ M6Handle open(const std::string& inFile, MOpenMode inMode)
 	return result;
 }
 
-M6Handle open_tempfile(const std::string& inFileNameTemplate)
-{
-	THROW(("Unimplemented"));
-	return M6Handle(-1);
-}
- 
 void close(M6Handle inHandle)
 {
 	::CloseHandle(reinterpret_cast<HANDLE>(inHandle));
@@ -236,23 +228,6 @@ M6Handle open(const std::string& inFile, MOpenMode inMode)
 	return fd;
 }
 
-M6Handle open_tempfile(const std::string& inFileNameTemplate)
-{
-//	char path[PATH_MAX] = {};
-//
-//	outPath = inDirectory / (inBaseName + ".XXXXXX");
-//	strcpy(path, outPath.string().c_str());
-//	
-//	int fd = ::mkstemp(path);
-//	if (fd < 0)
-//		THROW(("Error creating temporary file: %s", strerror(errno)));
-//
-//	outPath = path;
-//	
-//	return fd;
-	return -1;
-}
- 
 void close(M6Handle inHandle)
 {
 	::close(inHandle);
@@ -359,6 +334,13 @@ M6File& M6File::operator=(const M6File& inFile)
 	}
 	
 	return *this;
+}
+
+void M6File::Close()
+{
+	if (mImpl->mHandle >= 0)
+		M6IO::close(mImpl->mHandle);
+	mImpl->mHandle = -1;
 }
 
 void M6File::Read(void* inBuffer, int64 inSize)
@@ -474,7 +456,7 @@ void expand_group(const string& inPattern, vector<string>& outExpanded)
 		string group = m[1].str();
 		ba::split(options, group, ba::is_any_of(","));
 		
-		foreach (string& option, options)
+		for (string& option : options)
 		{
 			vector<string> expanded;
 			expand_group(m.prefix() + option + m.suffix(), expanded);
@@ -502,7 +484,7 @@ bool M6FilePathNameMatches(const fs::path& inPath, const string inGlobPattern)
 			expand_group(pattern, expandedpatterns);
 		});
 		
-		foreach (string& pat, expandedpatterns)
+		for (string& pat : expandedpatterns)
 		{
 			if (Match(pat.c_str(), inPath.string().c_str()))
 			{

@@ -7,17 +7,14 @@
 
 #include <limits>
 #include <numeric>
+#include <atomic>
 
 #include <boost/regex.hpp>
 #include <boost/algorithm/string.hpp>
 #include <boost/format.hpp>
-#include <boost/foreach.hpp>
-#define foreach BOOST_FOREACH
 #include <boost/iostreams/device/mapped_file.hpp>
-#include <boost/detail/atomic_count.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <boost/thread.hpp>
-#include <boost/lexical_cast.hpp>
 
 #include <zeep/xml/writer.hpp>
 
@@ -1091,7 +1088,7 @@ void HitData::AddHsp(const HspData& inHsp)
 {
 	bool found = false;
 
-	foreach (auto& hsp, mHsps)
+	for (auto& hsp : mHsps)
 	{
 		if (inHsp.Overlaps(hsp))
 		{
@@ -1230,7 +1227,7 @@ void BlastQuery<WORDSIZE>::Search(const vector<fs::path>& inDatabanks, M6Progres
 {
 	exception_ptr ex;
 	
-	foreach (const fs::path& p, inDatabanks)
+	for (const fs::path& p : inDatabanks)
 	{
 		io::mapped_file file(p.string().c_str(), io::mapped_file::readonly);
 		if (not file.is_open())
@@ -1306,7 +1303,8 @@ void BlastQuery<WORDSIZE>::Search(const vector<fs::path>& inDatabanks, M6Progres
 	if (not mHits.empty())
 	{
 		boost::thread_group t;
-		boost::detail::atomic_count ix(-1);
+		atomic<int> ix(-1);
+		//boost::detail::atomic_count ix(-1);
 		
 		for (uint32 i = 0; i < inNrOfThreads; ++i)
 		{
@@ -1318,15 +1316,15 @@ void BlastQuery<WORDSIZE>::Search(const vector<fs::path>& inDatabanks, M6Progres
 					for (;;)
 					{
 						uint32 next = ++ix;
-						if (next >= mHits.size())
+						if (next >= this->mHits.size())
 							break;
 						
-						HitPtr hit = mHits[next];
+						HitPtr hit = this->mHits[next];
 						
-						foreach (HspData& hsp, hit->mHsps)
+						for (HspData& hsp : hit->mHsps)
 							hsp.mScore = this->AlignGappedSecond(hit->mTarget, hsp);
 						
-						hit->Cleanup(mSearchSpace, lambda, logK, mExpect);
+						hit->Cleanup(this->mSearchSpace, lambda, logK, this->mExpect);
 					}
 				}
 				catch (...)
@@ -1377,7 +1375,7 @@ void BlastQuery<WORDSIZE>::Report(Result& outResult)
 	boost::regex
 		kDefLineParser("^>gnl\\|([^| ]*)\\|([^| ]*)(?:\\|([^| ]*))?(?: (.+))\n?");
 
-	foreach (HitPtr hit, mHits)
+	for (HitPtr hit : mHits)
 	{
 		boost::smatch m;
 		if (not boost::regex_match(hit->mDefLine, m, kDefLineParser, boost::match_not_dot_newline))
@@ -1396,7 +1394,7 @@ void BlastQuery<WORDSIZE>::Report(Result& outResult)
 		h.mChain = m[3];
 		h.mTitle = m[4];
 
-		foreach (HspData& hsp, hit->mHsps)
+		for (HspData& hsp : hit->mHsps)
 		{
 			Hsp p = { static_cast<uint32>(h.mHsps.size() + 1), hsp.mQueryStart + 1, hsp.mQueryEnd,
 				hsp.mTargetStart + 1, hsp.mTargetEnd, hsp.mTargetLength,
@@ -1447,10 +1445,10 @@ void BlastQuery<WORDSIZE>::Report(Result& outResult)
 template<int WORDSIZE>
 void BlastQuery<WORDSIZE>::WriteAsFasta(ostream& inStream)
 {
-	foreach (HitPtr hit, mHits)
+	for (HitPtr hit : mHits)
 	{
 		string seq;
-		foreach (uint8 r, hit->mTarget)
+		for (uint8 r : hit->mTarget)
 		{
 			if (seq.length() % 73 == 72)
 				seq += '\n';
@@ -1940,7 +1938,7 @@ Result* Search(const vector<fs::path>& inDatabanks,
 	if (inProgram != "blastp")
 		throw M6Exception("Unsupported program %s", inProgram.c_str());
 
-	foreach (const fs::path& db, inDatabanks)
+	for (const fs::path& db : inDatabanks)
 	{
 		if (not fs::exists(db))
 			throw M6Exception("Databank not found (%s)", db.string().c_str());
@@ -2001,7 +1999,7 @@ Result* Search(const vector<fs::path>& inDatabanks,
 	unique_ptr<Result> result(new Result);
 
 	result->mParams.mProgram = inProgram;
-	foreach (const fs::path& db, inDatabanks)
+	for (const fs::path& db : inDatabanks)
 	{
 		if (not result->mDb.empty())
 			result->mDb += ',';
@@ -2058,17 +2056,17 @@ Result* Search(const vector<fs::path>& inDatabanks,
 void operator&(xml::writer& w, const Hsp& inHsp)
 {
 	w.start_element("Hsp");
-	w.element("Hsp_num", boost::lexical_cast<string>(inHsp.mHspNr));
-	w.element("Hsp_bit-score", boost::lexical_cast<string>(inHsp.mBitScore));
-	w.element("Hsp_score", boost::lexical_cast<string>(inHsp.mScore));
-	w.element("Hsp_evalue", boost::lexical_cast<string>(inHsp.mExpect));
-	w.element("Hsp_query-from", boost::lexical_cast<string>(inHsp.mQueryStart));
-	w.element("Hsp_query-to", boost::lexical_cast<string>(inHsp.mQueryEnd));
-	w.element("Hsp_hit-from", boost::lexical_cast<string>(inHsp.mTargetStart));
-	w.element("Hsp_hit-to", boost::lexical_cast<string>(inHsp.mTargetEnd));
-	w.element("Hsp_identity", boost::lexical_cast<string>(inHsp.mIdentity));
-	w.element("Hsp_positive", boost::lexical_cast<string>(inHsp.mPositive));
-	w.element("Hsp_align-len", boost::lexical_cast<string>(inHsp.mQueryAlignment.length()));
+	w.element("Hsp_num", to_string(inHsp.mHspNr));
+	w.element("Hsp_bit-score", to_string(inHsp.mBitScore));
+	w.element("Hsp_score", to_string(inHsp.mScore));
+	w.element("Hsp_evalue", to_string(inHsp.mExpect));
+	w.element("Hsp_query-from", to_string(inHsp.mQueryStart));
+	w.element("Hsp_query-to", to_string(inHsp.mQueryEnd));
+	w.element("Hsp_hit-from", to_string(inHsp.mTargetStart));
+	w.element("Hsp_hit-to", to_string(inHsp.mTargetEnd));
+	w.element("Hsp_identity", to_string(inHsp.mIdentity));
+	w.element("Hsp_positive", to_string(inHsp.mPositive));
+	w.element("Hsp_align-len", to_string(inHsp.mQueryAlignment.length()));
 	w.element("Hsp_qseq", inHsp.mQueryAlignment);
 	w.element("Hsp_hseq", inHsp.mTargetAlignment);
 	w.element("Hsp_midline", inHsp.mMidLine);
@@ -2078,7 +2076,7 @@ void operator&(xml::writer& w, const Hsp& inHsp)
 void operator&(xml::writer& w, const Hit& inHit)
 {
 	w.start_element("Hit");
-	w.element("Hit_num", boost::lexical_cast<string>(inHit.mHitNr));
+	w.element("Hit_num", to_string(inHit.mHitNr));
 	if (inHit.mChain.empty())
 		w.element("Hit_id", inHit.mID);
 	else
@@ -2087,7 +2085,7 @@ void operator&(xml::writer& w, const Hit& inHit)
 		w.element("Hit_def", inHit.mDefLine);
 	//if (not inHit.mAccession.empty())
 	//	w.element("Hit_accession", inHit.mAccession);
-	w.element("Hit_len", boost::lexical_cast<string>(inHit.mSequence.length()));
+	w.element("Hit_len", to_string(inHit.mSequence.length()));
 	w.start_element("Hit_hsps");
 	for_each(inHit.mHsps.begin(), inHit.mHsps.end(), [&](const Hsp& hsp) {
 		w & hsp;
@@ -2105,16 +2103,16 @@ void Result::WriteAsNCBIBlastXML(ostream& os)
 	w.element("BlastOutput_db", mDb);
 	w.element("BlastOutput_query-ID", mQueryID);
 	w.element("BlastOutput_query-def", mQueryDef);
-	w.element("BlastOutput_query-len", boost::lexical_cast<string>(mQueryLength));
+	w.element("BlastOutput_query-len", to_string(mQueryLength));
 	
 	w.start_element("BlastOutput_param");
 	w.start_element("Parameters");
 	w.element("Parameters_matrix", mParams.mMatrix);
-	w.element("Parameters_expect", boost::lexical_cast<string>(mParams.mExpect));
+	w.element("Parameters_expect", to_string(mParams.mExpect));
 	if (mParams.mGapped)
 	{
-		w.element("Parameters_gap-open", boost::lexical_cast<string>(mParams.mGapOpen));
-		w.element("Parameters_gap-extend", boost::lexical_cast<string>(mParams.mGapExtend));
+		w.element("Parameters_gap-open", to_string(mParams.mGapOpen));
+		w.element("Parameters_gap-extend", to_string(mParams.mGapExtend));
 	}
 	w.element("Parameters_filter", mParams.mFilter ? "T" : "F");
 	w.end_element();
@@ -2126,7 +2124,7 @@ void Result::WriteAsNCBIBlastXML(ostream& os)
 	w.element("Iteration_query-ID", mQueryID);
 	if (not mQueryDef.empty())
 		w.element("Iteration_query-def", mQueryDef);
-	w.element("Iteration_query-len", boost::lexical_cast<string>(mQueryLength));
+	w.element("Iteration_query-len", to_string(mQueryLength));
 	w.start_element("Iteration_hits");
 	for_each(mHits.begin(), mHits.end(), [&](const Hit& hit) {
 		w & hit;
@@ -2134,12 +2132,12 @@ void Result::WriteAsNCBIBlastXML(ostream& os)
 	w.end_element();	// Iteration_hits
 	w.start_element("Iteration_stat");
 	w.start_element("Statistics");
-	w.element("Statistics_db-num", boost::lexical_cast<string>(mStats.mDbCount));
-	w.element("Statistics_db-len", boost::lexical_cast<string>(mStats.mDbLength));
-	w.element("Statistics_eff-space", boost::lexical_cast<string>(mStats.mEffectiveSpace));
-	w.element("Statistics_kappa", boost::lexical_cast<string>(mStats.mKappa));
-	w.element("Statistics_lambda", boost::lexical_cast<string>(mStats.mLambda));
-	w.element("Statistics_entropy", boost::lexical_cast<string>(mStats.mEntropy));
+	w.element("Statistics_db-num", to_string(mStats.mDbCount));
+	w.element("Statistics_db-len", to_string(mStats.mDbLength));
+	w.element("Statistics_eff-space", to_string(mStats.mEffectiveSpace));
+	w.element("Statistics_kappa", to_string(mStats.mKappa));
+	w.element("Statistics_lambda", to_string(mStats.mLambda));
+	w.element("Statistics_entropy", to_string(mStats.mEntropy));
 	w.end_element();	// Statistics
 	w.end_element();	// Iteration_stat
 	w.end_element();	// Iteration

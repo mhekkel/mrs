@@ -20,7 +20,7 @@ class M6DocStore
 	
 	void			GetInfo(uint32& outDocCount, int64& outFileSize, int64& outRawSize);
 	
-	uint32			StoreDocument(const char* inData, size_t inSize, size_t inRawSize);
+	void			StoreDocument(uint32 inDocNr, const char* inData, size_t inSize, size_t inRawSize);
 	bool			FetchDocument(uint32 inDocNr, uint32& outPageNr, uint32& outDocSize);
 	void			OpenDataStream(uint32 inDocNr, uint32 inPageNr, uint32 inDocSize,
 						boost::iostreams::filtering_stream<boost::iostreams::input>& ioStream);
@@ -30,7 +30,10 @@ class M6DocStore
 	std::string		GetAttributeName(uint8 inAttrNr) const;
 
 	uint32			size() const;
-	uint32			NextDocumentNumber() const;
+
+	// Changed: now returns the next document number AND increases the internal counter
+	uint32			GetNextDocumentNumber();
+	uint32			GetMaxDocNr();
 
 	void			Commit();
 

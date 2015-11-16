@@ -1,7 +1,7 @@
 //   Copyright Maarten L. Hekkelman, Radboud University 2012.
 //  Distributed under the Boost Software License, Version 1.0.
-//     (See accompanying file LICENSE_1_0.txt or copy at
-//           http://www.boost.org/LICENSE_1_0.txt)
+//	 (See accompanying file LICENSE_1_0.txt or copy at
+//		   http://www.boost.org/LICENSE_1_0.txt)
 
 // Code to store a B+ index with variable key length and various values.
 //
@@ -22,13 +22,12 @@
 #include <numeric>
 #include <iostream>
 #include <queue>
+#include <functional>
+#include <tuple>
 
 #include <boost/static_assert.hpp>
-#include <boost/foreach.hpp>
-#define foreach BOOST_FOREACH
 #include <boost/filesystem/operations.hpp>
 #include <boost/thread.hpp>
-#include <boost/function.hpp>
 
 #include "M6Index.h"
 #include "M6Error.h"
@@ -66,6 +65,13 @@ class M6ValidationException : public std::exception
 
 // --------------------------------------------------------------------
 
+M6DuplicateKeyException::M6DuplicateKeyException(const string& inKey)
+{
+	snprintf(mMessage, sizeof(mMessage), "Duplicate key: %s", inKey.c_str());
+}
+
+// --------------------------------------------------------------------
+
 int M6NumericComparator::operator()(const char* inKeyA, size_t inKeyLengthA, const char* inKeyB, size_t inKeyLengthB) const
 {
 	int d = 0;
@@ -99,6 +105,42 @@ int M6NumericComparator::operator()(const char* inKeyA, size_t inKeyLengthA, con
 	}
 
 	return d;
+}
+
+// --------------------------------------------------------------------
+
+int M6FloatComparator::operator()(const char* inKeyA, size_t inKeyLengthA, const char* inKeyB, size_t inKeyLengthB) const
+{
+	int d = 0;
+
+	assert(inKeyLengthA == sizeof(double));
+	assert(inKeyLengthB == sizeof(double));
+
+	double a = *((double*)inKeyA);
+	double b = *((double*)inKeyB);
+
+//  double a = atof(string(inKeyA, inKeyLengthA).c_str());
+//  double b = atof(string(inKeyB, inKeyLengthB).c_str());
+
+	if (a < b)
+		d = -1;
+	else if (a > b)
+		d = 1;
+
+	return d;
+}
+
+string M6FloatComparator::StringToKey(const string& s)
+{
+	double d = atof(s.c_str());
+	return string((char*)&d, sizeof(d));
+}
+
+string M6FloatComparator::KeyToString(const string& s)
+{
+	assert(s.length() == sizeof(double));
+	double d = *(double*)s.c_str();
+	return to_string(d);
 }
 
 // --------------------------------------------------------------------
@@ -456,8 +498,9 @@ class M6PageDataAccess
 
 	string			GetKey(uint32 inIndex) const;
 	M6DataType		GetValue(uint32 inIndex) const;
-	
-	tr1::tuple<const char*, uint32, const M6DataType*>
+
+	template<class DataType = M6DataType>	
+	tuple<const char*, uint32, const DataType*>
 					Peek(uint32 inIndex) const;
 	
 	void			SetValue(uint32 inIndex, const M6DataType& inValue);
@@ -551,8 +594,8 @@ inline typename M6PageDataAccess<M6DataPage>::M6DataType M6PageDataAccess<M6Data
 }
 
 template<class M6DataPage>
-inline
-tr1::tuple<const char*, uint32, const typename M6PageDataAccess<M6DataPage>::M6DataType*>
+template<class DataType>
+tuple<const char*, uint32, const DataType*>
 M6PageDataAccess<M6DataPage>::Peek(uint32 inIndex) const
 {
 	assert(inIndex < mData.mN);
@@ -560,7 +603,7 @@ M6PageDataAccess<M6DataPage>::Peek(uint32 inIndex) const
 	const uint8* key = mData.mKeys + mKeyOffsets[inIndex];
 	const M6DataType* data = &mData.mData[kM6DataCount - inIndex - 1];
 
-	return tr1::make_tuple(reinterpret_cast<const char*>(key) + 1, *key, data);
+	return make_tuple(reinterpret_cast<const char*>(key) + 1, static_cast<uint32>(*key), data);
 }
 
 template<class M6DataPage>
@@ -784,7 +827,12 @@ struct M6IxFileHeader
 	uint32		mFirstBitsPage;
 	uint32		mLastBitsPage;
 	uint32		mFirstLeafPage;
+	uint32	  mMaxWeight;
 };
+
+const uint32
+	kM6IxFileHeaderV1Size = 32,
+	kM6IxFileHeaderV2Size = sizeof(M6IxFileHeader);
 
 union M6IxFileHeaderPage
 {
@@ -856,6 +904,7 @@ struct M6IndexImpl
 	virtual bool	GetNextKey(uint32& ioPage, uint32& ioKeyNr, string& outKey) = 0;
 	virtual uint32	GetCount(uint32 inPage, uint32 inKeyNr) = 0;
 
+	virtual M6Iterator *GetIterator(uint32 inPage, uint32 inKeyNr) = 0;
 	virtual void	Insert(uint32 inKey, const uint32& inValue)						{ THROW(("Incorrect use of index")); }
 	virtual void	Insert(uint32 inKey, const M6MultiData& inValue)				{ THROW(("Incorrect use of index")); }
 	virtual void	Insert(uint32 inKey, const M6MultiIDLData& inValue)				{ THROW(("Incorrect use of index")); }
@@ -870,12 +919,17 @@ struct M6IndexImpl
 
 	virtual M6Iterator*	Find(const string& inKey) = 0;
 	virtual void		Find(const string& inKey, M6QueryOperator inOperator, vector<bool>& outBitmap, uint32& outCount) = 0;
+	virtual void		Find(const string& inLowerBound, const string& inUpperBound, vector<bool>& outBitmap, uint32& outCount) = 0;
 	virtual void		FindPattern(const string& inPattern, vector<bool>& outBitmap, uint32& outCount) = 0;
 	virtual M6Iterator*	FindString(const string& inString) = 0;
 	
 	uint32			Size() const				{ return mHeader.mSize; }
 	uint32			Depth() const				{ return mHeader.mDepth; }
 	M6IndexType		GetIndexType() const		{ return mIndexType; }
+
+	uint32			GetMaxWeight() const		{ return mHeader.mMaxWeight; }
+	void			SetMaxWeight(uint32 inMaxWeight)
+												{ mHeader.mMaxWeight = inMaxWeight; }
 	
 	int				CompareKeys(const char* inKeyA, size_t inKeyLengthA,
 						const char* inKeyB, size_t inKeyLengthB) const
@@ -972,7 +1026,8 @@ class M6IndexImplT : public M6IndexImpl
 
 	virtual void	GetKey(uint32 inPage, uint32 inKeyNr, string& outKey);
 	virtual bool	GetNextKey(uint32& ioPage, uint32& ioKeyNr, string& outKey);
-	M6Iterator*		GetIterator(uint32 inPage, uint32 inKeyNr);
+	virtual M6Iterator*
+					GetIterator(uint32 inPage, uint32 inKeyNr);
 	virtual M6Iterator*
 					GetIterator(const M6DataType& inValue);
 	virtual uint32	AddHits(const M6DataType& inValue, vector<bool>& outBitmap);
@@ -985,6 +1040,7 @@ class M6IndexImplT : public M6IndexImpl
 
 	virtual M6Iterator*	Find(const string& inKey);
 	virtual void		Find(const string& inKey, M6QueryOperator inOperator, vector<bool>& outBitmap, uint32& outCount);
+	virtual void		Find(const string& inLowerBound, const string& inUpperBound, vector<bool>& outBitmap, uint32& outCount);
 	virtual void		FindPattern(const string& inPattern, vector<bool>& outBitmap, uint32& outCount);
 	virtual M6Iterator*	FindString(const string& inString);
 
@@ -1024,7 +1080,7 @@ class M6IndexImplT : public M6IndexImpl
 	virtual M6BasicPage*	CreateLeafPage(M6IndexPageData* inData, uint32 inPageNr);
 	virtual M6BasicPage*	CreateBranchPage(M6IndexPageData* inData, uint32 inPageNr);
 
-	typedef boost::function<bool(const char* inKey, uint32 inKeyLength, const M6DataType& inData)> Visitor;
+	typedef function<bool(const char* inKey, uint32 inKeyLength, const M6DataType& inData)> Visitor;
 	void			Visit(Visitor inVisitor, uint32 inPage = 0, uint32 inKey = 0);
 
 	BOOST_STATIC_ASSERT(sizeof(M6BatchEntry[2]) == (2 * sizeof(M6BatchEntry)));
@@ -1117,7 +1173,7 @@ class M6LeafPage : public M6IndexPage<M6DataType>
 	string				GetKey(uint32 inIndex) const								{ return mAccess.GetKey(inIndex); }
 	M6DataType			GetValue(uint32 inIndex) const								{ return mAccess.GetValue(inIndex); }
 
-	tr1::tuple<const char*, uint32, const M6DataType*>
+	tuple<const char*, uint32, const M6DataType*>
 						Peek(uint32 inIndex) const									{ return mAccess.Peek(inIndex); }
 
 	void				SetValue(uint32 inIndex, const M6DataType& inValue)			{ mAccess.SetValue(inIndex, inValue); this->mDirty = true; }
@@ -1176,7 +1232,7 @@ class M6BranchPage : public M6IndexPage<M6DataType>
 	string				GetKey(uint32 inIndex) const								{ return mAccess.GetKey(inIndex); }
 	uint32				GetValue(uint32 inIndex) const								{ return mAccess.GetValue(inIndex); }
 
-	tr1::tuple<const char*, uint32, const M6DataType*>
+	tuple<const char*, uint32, const M6DataType*>
 						Peek(uint32 inIndex) const									{ return mAccess.Peek(inIndex); }
 
 	void				SetValue(uint32 inIndex, uint32 inValue)					{ mAccess.SetValue(inIndex, inValue); this->mDirty = true; }
@@ -1255,7 +1311,7 @@ bool M6LeafPage<M6DataType>::Insert(string& ioKey, const M6DataType& inValue, ui
 	int32 ix;
 	
 	if (BinarySearch(ioKey, ix))
-		throw M6DuplicateKeyException();
+		throw M6DuplicateKeyException(ioKey);
 //		SetValue(ix, inValue);	// simply update the value (we're a unique index)
 	else if (CanStore(ioKey))
 		InsertKeyValue(ioKey, inValue, ix + 1);
@@ -1476,7 +1532,7 @@ void M6LeafPage<M6DataType>::Dump(int inLevel, BranchPage* inParent)
 //		
 //		os << '[';
 //		bool first = true;
-//		foreach (uint32 doc, docs)
+//		for (uint32 doc : docs)
 //		{
 //			if (not first) os << ", ";
 //			first = false;
@@ -1971,6 +2027,7 @@ M6IndexImpl::M6IndexImpl(M6BasicIndex& inIndex, const fs::path& inPath, M6IndexT
 		M6IxFileHeaderPage page = {};
 		page.mHeader.mSignature = inType;
 		page.mHeader.mHeaderSize = sizeof(M6IxFileHeader);
+		page.mHeader.mMaxWeight = kM6MaxWeight;
 		mFile.PWrite(&page, kM6IndexPageSize, 0);
 
 		mHeader = page.mHeader;
@@ -1983,12 +2040,16 @@ M6IndexImpl::M6IndexImpl(M6BasicIndex& inIndex, const fs::path& inPath, M6IndexT
 		mFile.PRead(mHeader, 0);
 	
 	assert(mHeader.mSignature == mIndexType);
-	assert(mHeader.mHeaderSize == sizeof(M6IxFileHeader));
+
+	if (mHeader.mHeaderSize == kM6IxFileHeaderV1Size)   // backward compatible
+		mHeader.mMaxWeight = kM6MaxWeight;
+	else
+		assert(mHeader.mHeaderSize == kM6IxFileHeaderV2Size);
 }
 
 M6IndexImpl::~M6IndexImpl()
 {
-	boost::mutex::scoped_lock lock(mCacheMutex);
+	boost::unique_lock<boost::mutex> lock(mCacheMutex);
 	
 	FlushCache();
 	delete [] mCache;
@@ -2159,7 +2220,7 @@ M6IndexImpl::M6CachedPagePtr M6IndexImpl::GetCachePage()
 template<class Page>
 Page* M6IndexImpl::Allocate()
 {
-	boost::mutex::scoped_lock lock(mCacheMutex);
+	boost::unique_lock<boost::mutex> lock(mCacheMutex);
 
 	int64 fileSize = mFile.Size();
 	uint32 pageNr = static_cast<uint32>((fileSize - 1) / kM6IndexPageSize + 1);
@@ -2188,7 +2249,7 @@ Page* M6IndexImpl::Load(uint32 inPageNr)
 	if (inPageNr == 0)
 		THROW(("Invalid page number"));
 
-	boost::mutex::scoped_lock lock(mCacheMutex);
+	boost::unique_lock<boost::mutex> lock(mCacheMutex);
 		
 	M6CachedPagePtr cp = mLRUHead;
 
@@ -2229,7 +2290,7 @@ Page* M6IndexImpl::Load(uint32 inPageNr)
 template<class Page>
 void M6IndexImpl::Release(Page*& ioPage)
 {
-	boost::mutex::scoped_lock lock(mCacheMutex);
+	boost::unique_lock<boost::mutex> lock(mCacheMutex);
 
 	assert(ioPage != nullptr);
 	
@@ -2258,7 +2319,7 @@ void M6IndexImpl::Release(Page*& ioPage)
 template<class Page>
 void M6IndexImpl::Reference(Page* inPage)
 {
-	boost::mutex::scoped_lock lock(mCacheMutex);
+	boost::unique_lock<boost::mutex> lock(mCacheMutex);
 
 	assert(inPage != nullptr);
 	
@@ -2674,7 +2735,9 @@ template<class M6DataType>
 M6Iterator* M6IndexImplT<M6DataType>::GetIterator(uint32 inPage, uint32 inKeyNr)
 {
 	LeafPage* page = Load<LeafPage>(inPage);
-	return GetIterator(page->GetValue(inKeyNr));
+	M6Iterator* result = GetIterator(page->GetValue(inKeyNr));
+	Release(page);
+	return result;
 }
 
 template<class M6DataType>
@@ -2717,7 +2780,7 @@ M6Iterator* M6IndexImplT<M6DataType>::Find(const string& inKey)
 	{
 		IndexPage* root(Load<IndexPage>(mHeader.mRoot));
 		M6DataType value;
-		if (root->Find(inKey, value))
+		if (root->Find(this->mIndex.StringToKey(inKey), value))
 			result = GetIterator(value);
 		Release(root);
 	}
@@ -2732,11 +2795,12 @@ void M6IndexImplT<M6DataType>::Find(const string& inQuery, M6QueryOperator inOpe
 		return;
 	
 	uint32 page = 0, key = 0;
+	string query = this->mIndex.StringToKey(inQuery);
 
 	if (inOperator != eM6LessThan and inOperator != eM6LessOrEqual)
 	{
 		IndexPage* root(Load<IndexPage>(mHeader.mRoot));
-		root->LowerBound(inQuery, page, key);
+		root->LowerBound(query, page, key);
 		Release(root);
 	}
 
@@ -2744,10 +2808,15 @@ void M6IndexImplT<M6DataType>::Find(const string& inQuery, M6QueryOperator inOpe
 	{
 		bool result = false;
 		
-		int d = this->mIndex.CompareKeys(inKey, inKeyLen, inQuery.c_str(), inQuery.length());
+		int d = this->mIndex.CompareKeys(inKey, inKeyLen, query.c_str(), query.length());
 		
 		switch (inOperator)
 		{
+			case eM6Equals:
+				if (d == 0)
+					outCount += this->AddHits(inData, outBitmap);
+				break;
+
 			case eM6LessThan:
 				if (d < 0)
 				{
@@ -2779,6 +2848,32 @@ void M6IndexImplT<M6DataType>::Find(const string& inQuery, M6QueryOperator inOpe
 			default:
 				assert(false);
 				break;
+		}
+
+		return result;
+	}, page, key);
+}
+
+template<class M6DataType>
+void M6IndexImplT<M6DataType>::Find(const string& inLowerBound, const string& inUpperBound, vector<bool>& outBitmap, uint32& outCount)
+{
+	if (mHeader.mRoot == 0)
+		return;
+
+	uint32 page = 0, key = 0;
+
+	IndexPage* root(Load<IndexPage>(mHeader.mRoot));
+	root->LowerBound(inLowerBound, page, key);
+	Release(root);
+
+	Visit([&](const char* inKey, uint32 inKeyLen, const M6DataType& inData) -> bool
+	{
+		bool result = false;
+
+		if (this->mIndex.CompareKeys(inKey, inKeyLen, inUpperBound.c_str(), inUpperBound.length()) <= 0)
+		{
+			outCount += this->AddHits(inData, outBitmap);
+			result = true;
 		}
 
 		return result;
@@ -2829,7 +2924,7 @@ M6Iterator* M6IndexImplT<M6MultiIDLData>::FindString(const string& inString)
 	{
 		IndexPage* root(Load<IndexPage>(mHeader.mRoot));
 		M6MultiIDLData data;
-		vector<tr1::tuple<M6Iterator*,int64,uint32>> iterators;
+		vector<tuple<M6Iterator*,int64,uint32>> iterators;
 		bool ok = true;
 		uint32 index = 0;
 		
@@ -2848,7 +2943,7 @@ M6Iterator* M6IndexImplT<M6MultiIDLData>::FindString(const string& inString)
 					break;
 				}
 
-				iterators.push_back(tr1::make_tuple(
+				iterators.push_back(make_tuple(
 					new M6MultiDocIterator(M6IBitStream(new M6IBitVectorImpl(*this, data.mBitVector)),
 							data.mCount), data.mIDLOffset, index));
 				++index;
@@ -2861,8 +2956,8 @@ M6Iterator* M6IndexImplT<M6MultiIDLData>::FindString(const string& inString)
 		
 		if (not ok)
 		{
-			foreach (auto i, iterators)
-				delete tr1::get<0>(i);
+			for (auto i : iterators)
+				delete get<0>(i);
 			iterators.clear();
 		}
 		
@@ -2961,7 +3056,7 @@ void M6IndexImplT<M6DataType>::Vacuum(M6Progress& inProgress)
 			}
 			
 			string key = next->GetKey(0);
-			assert(key.compare(page->GetKey(page->GetN() - 1)) > 0);
+//			assert(key.compare(page->GetKey(page->GetN() - 1)) > 0);
 			if (not page->CanStore(key))
 			{
 				Release(next);
@@ -3213,7 +3308,7 @@ void M6IndexImplT<M6DataType>::Visit(Visitor inVisitor, uint32 inPage, uint32 in
 			continue;
 		}
 		
-		tr1::tie(key, keyLen, data) = page->Peek(keyNr);
+		tie(key, keyLen, data) = page->Peek(keyNr);
 		++keyNr;
 		
 		if (not inVisitor(key, keyLen, *data))
@@ -3309,19 +3404,19 @@ void M6IndexImplT<M6DataType>::GetBrowseSections(const string& inFirst, const st
 	Reference(page);
 	uint32 skip = interval;
 	pair<string,string> section;
-	section.first = page->GetKey(beginKey);
+	section.first = this->mIndex.KeyToString(page->GetKey(beginKey));
 	skip += beginKey;
 
 	while (outSections.size() < inNrOfSections)
 	{
 		if (page->GetN() >= skip)
 		{
-			section.second = page->GetKey(skip - 1);
+			section.second = this->mIndex.KeyToString(page->GetKey(skip - 1));
 			outSections.push_back(section);
 			
 			if (page->GetN() > skip)
 			{
-				section.first = page->GetKey(skip);
+				section.first = this->mIndex.KeyToString(page->GetKey(skip));
 				skip += interval;
 				continue;
 			}
@@ -3330,7 +3425,7 @@ void M6IndexImplT<M6DataType>::GetBrowseSections(const string& inFirst, const st
 		if (page->GetLink() == 0 or page == endPage)
 		{
 			// last page, now if inLast is empty, take the last key of this page
-			outSections.back().second = page->GetKey(page->GetN() - 1);
+			outSections.back().second = this->mIndex.KeyToString(page->GetKey(page->GetN() - 1));
 			Release(page);
 			break;
 		}
@@ -3343,7 +3438,7 @@ void M6IndexImplT<M6DataType>::GetBrowseSections(const string& inFirst, const st
 		
 		if (skip == 0)
 		{
-			section.first = page->GetKey(0);
+			section.first = this->mIndex.KeyToString(page->GetKey(0));
 			skip += interval;
 		}
 	}
@@ -3368,14 +3463,16 @@ void M6IndexImplT<M6DataType>::GetBrowseEntries(
 	
 	IndexPage* root(Load<IndexPage>(mHeader.mRoot));
 	if (not inFirst.empty())
-		root->LowerBound(inFirst, page, key);
+		root->LowerBound(this->mIndex.StringToKey(inFirst), page, key);
 	Release(root);
 	
 	Visit([&](const char* inKey, uint32 inKeyLen, const M6DataType& inData) -> bool
 	{
-		outEntries.push_back(string(inKey, inKey + inKeyLen));
+		string key = this->mIndex.KeyToString(string(inKey, inKey + inKeyLen));
+
+		outEntries.push_back(key);
 		
-		return ++n < 100 and (inLast.empty() or inLast >= inKey);
+		return ++n < 100 and (inLast.empty() or inLast >= key);
 	}, page, key);
 }
 
@@ -3403,7 +3500,7 @@ void M6IndexImplT<M6DataType>::VisitKeys(M6BasicIndex::KeyVisitor inVisitor)
 			continue;
 		}
 		
-		tr1::tie(key, keyLen, data) = page->Peek(keyNr);
+		tie(key, keyLen, data) = page->Peek(keyNr);
 		++keyNr;
 		
 		if (not inVisitor(key, keyLen, M6CountData(*data)))
@@ -3454,7 +3551,10 @@ void M6IndexImplT<M6DataType>::Dump()
 
 M6BasicIndex::iterator M6IndexImpl::Begin()
 {
-	return M6BasicIndex::iterator(this, mHeader.mFirstLeafPage, 0);
+	return
+		mHeader.mSize > 0 ?
+			M6BasicIndex::iterator(this, mHeader.mFirstLeafPage, 0) :
+			M6BasicIndex::iterator(nullptr, 0, 0);
 }
 
 M6BasicIndex::iterator M6IndexImpl::End()
@@ -3489,7 +3589,7 @@ M6BasicIndex::iterator::iterator(M6IndexImpl* inImpl, uint32 inPageNr, uint32 in
 	, mPage(inPageNr)
 	, mKeyNr(inKeyNr)
 {
-	if (mIndex != nullptr)
+	if (mIndex != nullptr and mPage != 0)
 		mIndex->GetKey(inPageNr, inKeyNr, mCurrent);
 }
 
@@ -3517,6 +3617,11 @@ M6BasicIndex::iterator& M6BasicIndex::iterator::operator++()
 	}
 
 	return *this;
+}
+
+M6Iterator* M6BasicIndex::iterator::GetDocuments() const
+{
+	return mIndex->GetIterator(mPage, mKeyNr);
 }
 
 uint32 M6BasicIndex::iterator::GetCount() const
@@ -3553,7 +3658,10 @@ void M6BasicIndex::Vacuum(M6Progress& inProgress)
 
 M6BasicIndex::iterator M6BasicIndex::begin() const
 {
-	return mImpl->Begin();
+	if (size() == 0)
+		return mImpl->End();
+	else
+		return mImpl->Begin();
 }
 
 M6BasicIndex::iterator M6BasicIndex::end() const
@@ -3583,7 +3691,7 @@ void M6BasicIndex::Insert(const string& key, uint32 value)
 	if (key.length() >= kM6MaxKeyLength)
 		THROW(("Invalid key length"));
 
-	mImpl->Insert(key, value);
+	mImpl->Insert(StringToKey(key), value);
 }
 
 void M6BasicIndex::Insert(uint32 key, uint32 value)
@@ -3610,6 +3718,12 @@ void M6BasicIndex::Find(const string& inKey, M6QueryOperator inOperator,
 	vector<bool>& outBitmap, uint32& outCount)
 {
 	mImpl->Find(inKey, inOperator, outBitmap, outCount);
+}
+
+void M6BasicIndex::Find(const string& inLowerBound, const string& inUpperBound,
+	vector<bool>& outBitmap, uint32& outCount)
+{
+	mImpl->Find(inLowerBound, inUpperBound, outBitmap, outCount);
 }
 
 void M6BasicIndex::FindPattern(const string& inPattern, vector<bool>& outBitmap, uint32& outCount)
@@ -3702,7 +3816,7 @@ void M6MultiBasicIndex::Insert(const string& inKey, const vector<uint32>& inDocu
 	CompressSimpleArraySelector(bits, inDocuments);
 	mImpl->StoreBits(bits, data.mBitVector);
 	
-	mImpl->Insert(inKey, data);
+	mImpl->Insert(StringToKey(inKey), data);
 }
 
 void M6MultiBasicIndex::Insert(uint32 inKey, const vector<uint32>& inDocuments)
@@ -3712,8 +3826,26 @@ void M6MultiBasicIndex::Insert(uint32 inKey, const vector<uint32>& inDocuments)
 	M6OBitStream bits;
 	CompressSimpleArraySelector(bits, inDocuments);
 	mImpl->StoreBits(bits, data.mBitVector);
-	
-	mImpl->Insert(inKey, data);
+
+#pragma message("ouch!")
+   if (mImpl->IsInBatchMode())
+	   mImpl->Insert(inKey, data);
+   else
+	   mImpl->Insert(to_string(inKey), data);
+}
+
+#pragma message("double ouch!")
+void M6MultiBasicIndex::Insert(double inKey, const vector<uint32>& inDocuments)
+{
+   M6MultiData data = { static_cast<uint32>(inDocuments.size()) };
+
+   M6OBitStream bits;
+   CompressSimpleArraySelector(bits, inDocuments);
+   mImpl->StoreBits(bits, data.mBitVector);
+
+   string key((char*)&inKey, sizeof(inKey));
+
+   mImpl->Insert(key, data);
 }
 
 //bool M6MultiBasicIndex::Find(const string& inKey, M6CompressedArray& outDocuments)
@@ -3774,7 +3906,7 @@ M6Iterator* M6WeightedBasicIndexImpl::GetIterator(const M6MultiData& inValue)
 	vector<pair<uint32,float>> docs;
 	docs.reserve(inValue.mCount);
 	
-	M6WeightedBasicIndex::M6WeightedIterator iter(*this, inValue.mBitVector, inValue.mCount);
+	M6WeightedBasicIndex::M6WeightedIterator iter(*this, inValue.mBitVector, inValue.mCount, GetMaxWeight());
 	
 	uint32 docNr;
 	uint8 weight;
@@ -3812,9 +3944,12 @@ M6WeightedBasicIndex::M6WeightedBasicIndex(const fs::path& inPath, M6IndexType i
 {
 }
 
-void M6WeightedBasicIndex::Insert(uint32 inKey, vector<pair<uint32,uint8>>& inDocuments)
+void M6WeightedBasicIndex::StoreDocumentBits(std::vector<std::pair<uint32,uint8>>& inDocuments, M6MultiData& data)
+//void M6WeightedBasicIndex::Insert(uint32 inKey, vector<pair<uint32,uint8>>& inDocuments)
 {
-	M6MultiData data = { static_cast<uint32>(inDocuments.size()) };
+//	M6MultiData data = { static_cast<uint32>(inDocuments.size()) };
+	if (mImpl->GetMaxWeight() == 0)
+		THROW(("Max Weight wat not set, yet"));
 
 	M6OBitStream bits;
 
@@ -3828,7 +3963,7 @@ void M6WeightedBasicIndex::Insert(uint32 inKey, vector<pair<uint32,uint8>>& inDo
 	
 	auto v = inDocuments.begin();
 	
-	uint32 lastWeight = kM6MaxWeight + 1;
+	uint32 lastWeight = mImpl->GetMaxWeight() + 1;
 	while (v != inDocuments.end())
 	{
 		uint32 w = v->second;
@@ -3854,6 +3989,24 @@ void M6WeightedBasicIndex::Insert(uint32 inKey, vector<pair<uint32,uint8>>& inDo
 
 	mImpl->StoreBits(bits, data.mBitVector);
 
+//	mImpl->Insert(inKey, data);
+}
+
+void M6WeightedBasicIndex::Insert(uint32 inKey, vector<pair<uint32,uint8>>& inDocuments)
+{
+	M6MultiData data = { static_cast<uint32>(inDocuments.size()) };
+
+	StoreDocumentBits(inDocuments, data);
+
+	mImpl->Insert(inKey, data);
+}
+
+void M6WeightedBasicIndex::Insert(const string& inKey, vector<pair<uint32,uint8>>& inDocuments)
+{
+	M6MultiData data = { static_cast<uint32>(inDocuments.size()) };
+
+	StoreDocumentBits(inDocuments, data);
+
 	mImpl->Insert(inKey, data);
 }
 
@@ -3862,10 +4015,10 @@ M6WeightedBasicIndex::M6WeightedIterator::M6WeightedIterator()
 }
 
 M6WeightedBasicIndex::M6WeightedIterator::M6WeightedIterator(M6IndexImpl& inIndex,
-	const M6BitVector& inBitVector, uint32 inCount)
+	const M6BitVector& inBitVector, uint32 inCount, uint32 inMaxWeight)
 	: mBits(new M6IBitVectorImpl(inIndex, inBitVector))
 	, mCount(inCount)
-	, mWeight(kM6MaxWeight + 1)
+	, mWeight(inMaxWeight + 1)
 {
 }
 
@@ -3946,7 +4099,7 @@ bool M6WeightedBasicIndex::Find(const string& inKey, M6WeightedIterator& outIter
 	M6MultiData data;
 	if (mImpl->Find(inKey, data))
 	{
-		outIterator = M6WeightedIterator(*mImpl, data.mBitVector, data.mCount);
+		outIterator = M6WeightedIterator(*mImpl, data.mBitVector, data.mCount, mImpl->GetMaxWeight());
 		result = true;
 	}
 	return result;
@@ -3974,7 +4127,7 @@ void M6WeightedBasicIndex::CalculateDocumentWeights(uint32 inDocCount,
 			M6MultiData data = leaf->GetValue(i);
 			M6IBitStream bits(new M6IBitVectorImpl(*mImpl, data.mBitVector));
 
-			uint32 weight = kM6MaxWeight + 1;
+			uint32 weight = mImpl->GetMaxWeight() + 1;
 			
 			uint32 count = data.mCount;
 			float idfCorrection = log(1.f + max / count);
@@ -3990,7 +4143,7 @@ void M6WeightedBasicIndex::CalculateDocumentWeights(uint32 inDocCount,
 
 				ReadArray(bits, docs);
 
-				foreach (uint32 doc, docs)
+				for (uint32 doc : docs)
 					outWeights[doc] += docTermWeight;
 
 				count -= static_cast<uint32>(docs.size());
@@ -4014,6 +4167,16 @@ void M6WeightedBasicIndex::CalculateDocumentWeights(uint32 inDocCount,
 		[](float w) -> float { return sqrt(w); });
 }
 
+void M6WeightedBasicIndex::SetMaxWeight(uint32 inMaxWeight)
+{
+	mImpl->SetMaxWeight(inMaxWeight);
+}
+
+uint32 M6WeightedBasicIndex::GetMaxWeight() const
+{
+	return mImpl->GetMaxWeight();
+}
+
 // --------------------------------------------------------------------
 
 M6BasicIndex* M6BasicIndex::Load(const fs::path& inFile)
@@ -4031,9 +4194,11 @@ M6BasicIndex* M6BasicIndex::Load(const fs::path& inFile)
 	{
 		case eM6CharIndex:			index = new M6SimpleIndex(inFile, eReadOnly);		break;
 		case eM6NumberIndex:		index = new M6NumberIndex(inFile, eReadOnly);		break;
+		case eM6FloatIndex:		 index = new M6FloatIndex(inFile, eReadOnly);		break;
 //		case eM6DateIndex:			index = new M6SimpleIndex(inFile, eReadOnly);		break;
 		case eM6CharMultiIndex:		index = new M6SimpleMultiIndex(inFile, eReadOnly);	break;
 		case eM6NumberMultiIndex:	index = new M6NumberMultiIndex(inFile, eReadOnly); 	break;
+		case eM6FloatMultiIndex:	index = new M6FloatMultiIndex(inFile, eReadOnly);   break;
 //		case eM6DateMultiIndex:		index = new M6SimpleMultiIndex(inFile, eReadOnly);	break;
 		case eM6CharMultiIDLIndex:	index = new M6SimpleIDLMultiIndex(inFile, eReadOnly); break;
 		case eM6CharWeightedIndex:	index = new M6SimpleWeightedIndex(inFile, eReadOnly); break;
@@ -4058,14 +4223,14 @@ void M6LeafPage<M6MultiData>::Dump(int inLevel, BranchPage* inParent)
 		vector<uint32> docs;
 		ReadArray(bits, docs);
 
-		assert(docs.size() == data.mCount);
+//		assert(docs.size() == data.mCount);
 		
 		cout << prefix << "  " << GetKey(i) << '(' << data.mCount << ')'
 			 << (i + 1 < mData->mN ? ", " : "") << endl;
 		
 		cout << prefix << "   [";
 		bool first = true;
-		foreach (uint32 doc, docs)
+		for (uint32 doc : docs)
 		{
 			if (not first) cout << ", ";
 			first = false;

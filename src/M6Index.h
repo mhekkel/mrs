@@ -10,7 +10,6 @@
 #pragma once
 
 #include <boost/function.hpp>
-#include <boost/lexical_cast.hpp>
 #include <boost/filesystem/path.hpp>
 
 #include "M6File.h"
@@ -26,8 +25,11 @@ class M6Lexicon;
 class M6DuplicateKeyException : public std::exception
 {
   public:
-						M6DuplicateKeyException() {}
-	virtual const char*	what() const throw()	{ return "duplicate key"; } 
+						M6DuplicateKeyException(const std::string& inKey);
+	virtual const char*	what() const throw()	{ return mMessage; }
+	
+  private:
+	char mMessage[80];
 };
 
 extern const uint32 kM6MaxKeyLength;
@@ -56,6 +58,10 @@ class M6BasicIndex
 	
 	virtual int		CompareKeys(const char* inKeyA, size_t inKeyLengthA,
 						const char* inKeyB, size_t inKeyLengthB) const = 0;
+	virtual std::string
+					StringToKey(const std::string& s) = 0;
+	virtual std::string
+					KeyToString(const std::string& s) = 0;
 
 	// iterator is used to iterate over the keys in an index.
 	// To access the accompanying data, use the M6Iterator producing
@@ -130,6 +136,7 @@ class M6BasicIndex
 
 	M6Iterator*		Find(const std::string& inKey);
 	void			Find(const std::string& inKey, M6QueryOperator inOperator, std::vector<bool>& outBitmap, uint32& outCount);
+	void			Find(const std::string& inLowerBound, const std::string& inUpperBound, std::vector<bool>& outBitmap, uint32& outCount);
 	void			FindPattern(const std::string& inPattern, std::vector<bool>& outBitmap, uint32& outCount);
 	M6Iterator*		FindString(const std::string& inString);
 
@@ -152,18 +159,30 @@ template<class INDEX, class COMPARATOR, M6IndexType TYPE> class M6Index : public
   public:
 	typedef COMPARATOR			M6Comparator;
 
-					M6Index(const boost::filesystem::path& inPath, MOpenMode inMode)
-						: INDEX(inPath, TYPE, inMode) {}
+	M6Index(const boost::filesystem::path& inPath, MOpenMode inMode)
+		: INDEX(inPath, TYPE, inMode) {}
 
-	virtual int		CompareKeys(const char* inKeyA, size_t inKeyLengthA,
-								const char* inKeyB, size_t inKeyLengthB) const
-						{ return mComparator(inKeyA, inKeyLengthA, inKeyB, inKeyLengthB); }
+	virtual int CompareKeys(const char* inKeyA, size_t inKeyLengthA,
+		const char* inKeyB, size_t inKeyLengthB) const
+	{
+		return mComparator(inKeyA, inKeyLengthA, inKeyB, inKeyLengthB);
+	}
 
-  protected:
+	virtual std::string StringToKey(const std::string& s)
+	{
+		return mComparator.StringToKey(s);
+	}
+
+	virtual std::string KeyToString(const std::string& s)
+	{
+		return mComparator.KeyToString(s);
+	}
+
+protected:
 	M6Comparator	mComparator;
 };
 
-// simplistic comparator, based on strncmp
+// simplistic comparator, based on memcmp
 struct M6BasicComparator
 {
 	int operator()(const char* inKeyA, size_t inKeyLengthA, const char* inKeyB, size_t inKeyLengthB) const
@@ -171,20 +190,35 @@ struct M6BasicComparator
 		size_t l = inKeyLengthA;
 		if (l > inKeyLengthB)
 			l = inKeyLengthB;
-		int d = strncmp(inKeyA, inKeyB, l);
+		int d = memcmp(inKeyA, inKeyB, l);
 		if (d == 0)
 			d = static_cast<int>(inKeyLengthA - inKeyLengthB);
 		return d;
 	}
+
+	std::string StringToKey(const std::string& key) { return key; }
+	std::string KeyToString(const std::string& key) { return key; }
 };
 
 struct M6NumericComparator
 {
 	int operator()(const char* inKeyA, size_t inKeyLengthA, const char* inKeyB, size_t inKeyLengthB) const;
+
+	std::string StringToKey(const std::string& key) { return key; }
+	std::string KeyToString(const std::string& key) { return key; }
+};
+
+struct M6FloatComparator
+{
+	int operator()(const char* inKeyA, size_t inKeyLengthA, const char* inKeyB, size_t inKeyLengthB) const;
+
+	std::string StringToKey(const std::string& key);
+	std::string KeyToString(const std::string& key);
 };
 
 typedef M6Index<M6BasicIndex, M6BasicComparator, eM6CharIndex>	M6SimpleIndex;
 typedef M6Index<M6BasicIndex, M6NumericComparator, eM6NumberIndex>	M6NumberIndex;
+typedef M6Index<M6BasicIndex, M6FloatComparator, eM6FloatIndex>	M6FloatIndex;
 
 // --------------------------------------------------------------------
 
@@ -194,6 +228,7 @@ class M6MultiBasicIndex : public M6BasicIndex
 					M6MultiBasicIndex(const boost::filesystem::path& inPath, M6IndexType inIndexType, MOpenMode inMode);
 
 	void			Insert(const std::string& inKey, const std::vector<uint32>& inDocuments);
+	void			Insert(double inKey, const std::vector<uint32>& inDocuments);
 //	bool			Find(const std::string& inKey, M6CompressedArray& outDocuments);
 
 	// for batch mode only:
@@ -202,6 +237,7 @@ class M6MultiBasicIndex : public M6BasicIndex
 
 typedef M6Index<M6MultiBasicIndex, M6BasicComparator, eM6CharMultiIndex> M6SimpleMultiIndex;
 typedef M6Index<M6MultiBasicIndex, M6NumericComparator, eM6NumberMultiIndex> M6NumberMultiIndex;
+typedef M6Index<M6MultiBasicIndex, M6FloatComparator, eM6FloatMultiIndex> M6FloatMultiIndex;
 
 // --------------------------------------------------------------------
 
@@ -221,6 +257,8 @@ typedef M6Index<M6MultiIDLBasicIndex, M6BasicComparator, eM6CharMultiIDLIndex> M
 
 // --------------------------------------------------------------------
 
+struct M6MultiData;
+
 class M6WeightedBasicIndex : public M6BasicIndex
 {
   public:
@@ -230,7 +268,7 @@ class M6WeightedBasicIndex : public M6BasicIndex
 	{
 	  public:
 						M6WeightedIterator();
-						M6WeightedIterator(M6IndexImpl& inIndex, const M6BitVector& inBitVector, uint32 inCount);
+						M6WeightedIterator(M6IndexImpl& inIndex, const M6BitVector& inBitVector, uint32 inCount, uint32 inMaxWeight);
 						M6WeightedIterator(const M6WeightedIterator&);
 						M6WeightedIterator(M6WeightedIterator&&);
 		M6WeightedIterator&
@@ -250,6 +288,9 @@ class M6WeightedBasicIndex : public M6BasicIndex
 		uint8			mWeight;
 	};
 	
+	void			SetMaxWeight(uint32 inMaxWeight);
+	uint32			GetMaxWeight() const;
+	
 	void			Insert(const std::string& inKey, std::vector<std::pair<uint32,uint8>>& inDocuments);
 	bool			Find(const std::string& inKey, M6WeightedIterator& outIterator);
 	void			CalculateDocumentWeights(uint32 inDocCount, std::vector<float>& outWeights,
@@ -257,6 +298,11 @@ class M6WeightedBasicIndex : public M6BasicIndex
 
 	// for batch mode only:
 	void			Insert(uint32 inKey, std::vector<std::pair<uint32,uint8>>& inDocuments);
+	
+  private:
+	void			StoreDocumentBits(std::vector<std::pair<uint32,uint8>>& inDocuments, M6MultiData& data);
+	
+	uint32			mMaxWeight;
 };
 
 typedef M6Index<M6WeightedBasicIndex, M6BasicComparator, eM6CharWeightedIndex>	M6SimpleWeightedIndex;

@@ -1,11 +1,13 @@
 //   Copyright Maarten L. Hekkelman, Radboud University 2012.
 //  Distributed under the Boost Software License, Version 1.0.
-//     (See accompanying file LICENSE_1_0.txt or copy at
-//           http://www.boost.org/LICENSE_1_0.txt)
+//	 (See accompanying file LICENSE_1_0.txt or copy at
+//		   http://www.boost.org/LICENSE_1_0.txt)
 
 #include "M6Lib.h"
 
 #include <iostream>
+#include <cmath>
+#include <atomic>
 
 #include <boost/filesystem/operations.hpp>
 
@@ -26,6 +28,7 @@ namespace fs = boost::filesystem;
 #include "perl.h"
 #include "XSUB.h"
 
+#undef isnan
 #undef INT64_C	// 
 #undef bind
 #undef bool
@@ -62,6 +65,8 @@ struct M6ParserImpl
 							{ mDocument->Index(inIndex, eM6DateData, false, inText, inLength); }
 	void				IndexNumber(const string& inIndex, const char* inText, size_t inLength)
 							{ mDocument->Index(inIndex, eM6NumberData, false, inText, inLength); }
+	void				IndexFloat(const string& inIndex, double inValue)
+							{ mDocument->Index(inIndex, false, inValue); }
 
 	void				AddLink(const string& inDatabank, const string& inValue)
 							{ mDocument->AddLink(inDatabank, inValue); }
@@ -653,9 +658,9 @@ XS(_M6_Script_next_sequence_nr)
 	if (proxy == nullptr)
 		croak("Error, M6::Script object is not specified");
 	
-	static boost::mutex m;
-	boost::mutex::scoped_lock lock(m);
-	static uint32 counter = 1;
+//	static boost::mutex m;
+//	boost::mutex::scoped_lock lock(m);
+	static atomic<uint32> counter(1);
 	ST(0) = newSViv(counter++);
 	
 	XSRETURN(1);
@@ -883,6 +888,51 @@ XS(_M6_Script_index_number)
 	XSRETURN(0);
 }
 
+XS(_M6_Script_index_float)
+{
+	dXSARGS;
+
+	if (items != 3)
+		croak("Usage: M6::Script::index_float(self, indexname, value);");
+
+	M6ParserImpl* proxy = M6ParserImpl::GetObject(ST(0));
+	if (proxy == nullptr)
+		croak("Error, M6::Script object is not specified");
+
+	// fetch the parameters
+
+	string index;
+	const char* ptr;
+	STRLEN len;
+
+	ptr = SvPV(ST(1), len);
+	if (ptr == nullptr or len == 0)
+		croak("Error, indexname is undefined in call to index_float");
+
+	index.assign(ptr, len);
+
+	// cast the value explicitly to a double
+	double value = SvNV(ST(2));
+
+	if (std::isnan(value) or std::isinf(value))
+		warn("Invalid value for index_float");
+	else
+	{
+		try
+		{
+			// Simply store the double as if it were a string of size sizeof(double).
+			// Should work.
+			proxy->IndexFloat(index, value);
+		}
+		catch (exception& e)
+		{
+			croak(e.what());
+		}
+	}
+
+	XSRETURN(0);
+}
+
 XS(_M6_Script_index_date)
 {
 	dXSARGS;
@@ -992,6 +1042,7 @@ void xs_init(pTHX)
 	newXS(const_cast<char*>("M6::Script::index_string"), _M6_Script_index_string, file);
 	newXS(const_cast<char*>("M6::Script::index_unique_string"), _M6_Script_index_unique_string, file);
 	newXS(const_cast<char*>("M6::Script::index_number"), _M6_Script_index_number, file);
+	newXS(const_cast<char*>("M6::Script::index_float"), _M6_Script_index_float, file);
 	newXS(const_cast<char*>("M6::Script::index_date"), _M6_Script_index_date, file);
 	
 	newXS(const_cast<char*>("M6::Script::add_link"), _M6_Script_add_link, file);

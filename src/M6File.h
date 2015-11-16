@@ -25,7 +25,7 @@ typedef int64	M6Handle;
 namespace M6IO
 {
 	M6Handle open(const std::string& inFile, MOpenMode inMode);
-	M6Handle open_tempfile(const std::string& inFileNameTemplate); 
+
 	void close(M6Handle inHandle);
 	void truncate(M6Handle inHandle, int64 inSize);
 	int64 file_size(M6Handle inHandle);
@@ -49,6 +49,8 @@ class M6File
 					M6File(const boost::filesystem::path& inFile, MOpenMode inMode);
 	M6File&			operator=(const M6File& inFile);
 	virtual			~M6File();
+	
+	void			Close();
 
 	void			Read(void* inBuffer, int64 inSize);
 	void			Write(const void* inBuffer, int64 inSize);

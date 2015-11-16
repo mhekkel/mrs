@@ -35,6 +35,7 @@ enum M6Token
 	// tokens returned by GetNextQueryToken:
 
 	eM6TokenString,			// a quoted string
+	eM6TokenFloat,			// a double precision floating point number
 	eM6TokenPattern,		// a glob-like pattern
 	eM6TokenDocNr,			// #1234 an explicit document number
 //	eM6TokenHyphen,
@@ -42,6 +43,7 @@ enum M6Token
 	eM6TokenOR,
 	eM6TokenAND,
 	eM6TokenNOT,
+	eM6TokenBETWEEN,
 	eM6TokenOpenParenthesis,
 	eM6TokenCloseParenthesis,
 	eM6TokenOpenBracket,

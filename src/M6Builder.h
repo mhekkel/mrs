@@ -7,10 +7,10 @@
 
 #include <vector>
 #include <string>
+#include <tuple>
 
 #include <boost/filesystem/path.hpp>
 #include <boost/thread.hpp>
-#include <boost/tr1/tuple.hpp>
 #include <zeep/xml/node.hpp>
 
 #include "M6Lexicon.h"
@@ -73,6 +73,6 @@ class M6Scheduler
 	std::unique_ptr<std::ostream>
 						mLogFile;
 	boost::thread		mThread;
-	std::deque<std::tr1::tuple<std::string,std::string>>
+	std::deque<std::tuple<std::string,std::string>>
 						mScheduled;
 };

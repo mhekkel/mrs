@@ -21,12 +21,13 @@
       <file>document.cpp</file>
       <file>exception.cpp</file>
       <file>http-server.cpp</file>
+      <file>md5.cpp</file>
+      <file>message_parser.cpp</file>
       <file>node.cpp</file>
       <file>parser.cpp</file>
       <file>preforked-http-server.cpp</file>
       <file>reply.cpp</file>
       <file>request.cpp</file>
-      <file>request_parser.cpp</file>
       <file>soap-envelope.cpp</file>
       <file>soap-server.cpp</file>
       <file>unicode_support.cpp</file>
@@ -85,36 +86,35 @@
   </files>
   <targets>
     <target kind="Executable">
-      <name>mrs-ws Debug</name>
+      <name>mrs Debug</name>
       <linkTarget>mrs</linkTarget>
       <compiler>/usr/bin/c++</compiler>
       <defines>
         <define>DEBUG</define>
-        <define>MRS_ETC_DIR=&quot;/etc/mrs&quot;</define>
+        <define>MRS_ETC_DIR=&quot;/usr/local/etc/mrs&quot;</define>
         <define>MRS_USER=&quot;maarten&quot;</define>
       </defines>
       <cflags>
         <cflag>-g</cflag>
-        <cflag>-O0</cflag>
         <cflag>-pthread</cflag>
         <cflag>-std=c++0x</cflag>
+        <cflag>-O0</cflag>
       </cflags>
       <ldflags>
         <ldflag>-pthread</ldflag>
       </ldflags>
       <warnings>
-        <warning>all</warning>
         <warning>no-deprecated</warning>
         <warning>no-multichar</warning>
       </warnings>
     </target>
     <target kind="Executable">
-      <name>mrs-ws Release</name>
-      <linkTarget>mrs-ws</linkTarget>
+      <name>mrs Release</name>
+      <linkTarget>mrs</linkTarget>
       <compiler>/usr/bin/c++</compiler>
       <defines>
         <define>NDEBUG</define>
-        <define>MRS_ETC_DIR=&quot;/etc/mrs&quot;</define>
+        <define>MRS_ETC_DIR=&quot;/usr/local/etc/mrs&quot;</define>
         <define>MRS_USER=&quot;maarten&quot;</define>
       </defines>
       <cflags>
@@ -130,6 +130,7 @@
         <warning>all</warning>
         <warning>no-deprecated</warning>
         <warning>no-multichar</warning>
+        <warning>no-unused-local-typedefs</warning>
       </warnings>
     </target>
   </targets>

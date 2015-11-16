@@ -1,7 +1,7 @@
 //   Copyright Maarten L. Hekkelman, Radboud University 2012.
 //  Distributed under the Boost Software License, Version 1.0.
-//     (See accompanying file LICENSE_1_0.txt or copy at
-//           http://www.boost.org/LICENSE_1_0.txt)
+//	 (See accompanying file LICENSE_1_0.txt or copy at
+//		   http://www.boost.org/LICENSE_1_0.txt)
 
 #include "M6Lib.h"
 
@@ -36,6 +36,7 @@ class M6QueryParser
 	M6Iterator*		ParseQualifiedTest(const string& inIndex);
 	M6Iterator*		ParseTerm(const string& inIndex);
 	M6Iterator*		ParseBooleanTerm(const string& inIndex, M6QueryOperator inOperator);
+	M6Iterator*	    ParseBetween(const string& inIndex);
 	M6Iterator*		ParseString();
 
 	M6Token			GetNextToken();
@@ -204,6 +205,8 @@ M6Iterator* M6QueryParser::ParseTest()
 			
 			if (mLookahead >= eM6TokenColon and mLookahead <= eM6TokenGreaterThan)
 				result.reset(ParseQualifiedTest(s));
+			else if (mLookahead == eM6TokenBETWEEN)
+				result.reset(ParseBetween(s));
 			else if (mLookahead == eM6TokenPunctuation)
 			{
 				mQueryTerms.push_back(s);
@@ -296,6 +299,34 @@ M6Iterator* M6QueryParser::ParseQualifiedTest(const string& inIndex)
 	return result.release();	
 }
 
+M6Iterator* M6QueryParser::ParseBetween(const string& inIndex)
+{
+	mIsBooleanQuery = true;
+
+	Match(eM6TokenBETWEEN);
+
+	string lowerbound = mTokenizer.GetTokenString();
+
+	if (mLookahead == eM6TokenString or mLookahead == eM6TokenWord or mLookahead == eM6TokenFloat)
+		Match(mLookahead);
+	else
+		Match(eM6TokenNumber);
+
+	Match(eM6TokenAND);
+
+	string upperbound = mTokenizer.GetTokenString();
+
+	if (mLookahead == eM6TokenString or mLookahead == eM6TokenWord or mLookahead == eM6TokenFloat)
+		Match(mLookahead);
+	else
+		Match(eM6TokenNumber);
+
+	M6Iterator* result = nullptr;
+	if (mDatabank != nullptr)
+		result = mDatabank->Find(inIndex, lowerbound, upperbound);
+	return result;
+}
+
 M6Iterator* M6QueryParser::ParseLink()
 {
 	unique_ptr<M6UnionIterator> result(new M6UnionIterator);
@@ -362,6 +393,7 @@ M6Iterator* M6QueryParser::ParseTerm(const string& inIndex)
 		
 		case eM6TokenWord:
 		case eM6TokenNumber:
+		case eM6TokenFloat:
 			if (mDatabank != nullptr)
 				result.reset(mDatabank->Find(inIndex, mTokenizer.GetTokenString()));
 			Match(mLookahead);
@@ -403,6 +435,7 @@ M6Iterator* M6QueryParser::ParseBooleanTerm(const string& inIndex, M6QueryOperat
 
 		case eM6TokenWord:
 		case eM6TokenNumber:
+		case eM6TokenFloat:
 			if (mDatabank != nullptr)
 				result.reset(mDatabank->Find(inIndex, mTokenizer.GetTokenString(), inOperator));
 			Match(mLookahead);
@@ -423,7 +456,7 @@ M6Iterator* M6QueryParser::GetLinks(const string& inDB, const string& inDocID)
 
 M6Iterator* M6QueryParser::GetLinks(const string& inDB, uint32 inDocNr)
 {
-	return mDatabank->GetLinkedDocuments(inDB, boost::lexical_cast<string>(inDocNr));
+	return mDatabank->GetLinkedDocuments(inDB, to_string(inDocNr));
 }
 
 // --------------------------------------------------------------------

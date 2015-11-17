@@ -50,110 +50,110 @@ our @ISA = "MRS::Script";
 
 sub new
 {
-	my $invocant = shift;
-	my $self = new MRS::Script(
-		section		=> 'protein',
-		meta		=> [ 'title' ],
-		raw_files	=> qr/protein_ids\.txt/,
-		blast		=> 'mrs',
-		seqtype		=> 'P',
-		@_
-	);
+    my $invocant = shift;
+    my $self = new MRS::Script(
+        section        => 'protein',
+        meta        => [ 'title' ],
+        raw_files    => qr/protein_ids\.txt/,
+        blast        => 'mrs',
+        seqtype        => 'P',
+        @_
+    );
 
-	if ($self->{db} eq 'gpcrdb-new')
-	{
-		$self->{url} => 'http://www.gpcr.org/7tm';
-		$self->{name} = 'gpcrdb-new';
-	}
-	elsif ($self->{db} eq 'nucleardb')
-	{
-		$self->{url} => 'http://www.receptors.org/';
-		$self->{name} = 'nucleardb';
-	}
-	
-	return bless $self, "MRS::Script::gpcrdb";
+    if ($self->{db} eq 'gpcrdb-new')
+    {
+        $self->{url} => 'http://www.gpcr.org/7tm';
+        $self->{name} = 'gpcrdb-new';
+    }
+    elsif ($self->{db} eq 'nucleardb')
+    {
+        $self->{url} => 'http://www.receptors.org/';
+        $self->{name} = 'nucleardb';
+    }
+
+    return bless $self, "MRS::Script::gpcrdb";
 }
 
 sub Parse
 {
-	my $self = shift;
-	
-	my ($doc, $m, $seq);
-	
-	# never mind what's in the getProteinCount file...
-	
-	# Retrieving and processing the WSDL
-	my $ws_url = 'http://cmbi23.cmbi.ru.nl:8080/mcsis-web/webservice/';
-	$ws_url = 'http://cmbi23.cmbi.ru.nl:8080/mcsis-web-nrdb/webservice/'
-		if ($self->{db} eq 'nucleardb');
-	
-	my $wsdl  = XML::LibXML->new->parse_file("$ws_url/?wsdl");
-	my $trans = XML::Compile::Transport::SOAPHTTP->new(address => $ws_url);
-	my $proxy = XML::Compile::WSDL11->new($wsdl); # , transport => $trans);
+    my $self = shift;
 
-	my $getProtein = $proxy->compileClient('getProtein', address => $ws_url);
-	
-	while (my $proteinId = $self->GetLine)
-	{
-		chomp($proteinId);
-		
-		my ($answer, $trace) = $getProtein->(proteinId => $proteinId);
-		die "geen eiwit" unless defined $answer;
-		
-		my $protein = $answer->{parameters}->{protein};
-		
-		$self->Store(XMLout($protein));
-		$self->AddSequence($protein->{sequence});
-		$self->IndexValue('id', $proteinId);
+    my ($doc, $m, $seq);
 
-		$self->IndexValue('ac', $protein->{ac})
-			if defined $protein->{ac} and length($protein->{ac});
-		$self->IndexTextAndNumbers('upi', $protein->{upi})
-			if defined $protein->{upi};
-		$self->IndexTextAndNumbers('crc64', $protein->{crc64})
-			if defined $protein->{crc64};
+    # never mind what's in the getProteinCount file...
 
-		my $title;
-		foreach my $desc (@{$protein->{descriptions}})
-		{
-			if (defined $desc->{description})
-			{
-				$self->IndexTextAndNumbers('description', $desc->{description});
-				$title .= "; " if defined($title);
-				$title .= $desc->{description};
-			}
-		}
+    # Retrieving and processing the WSDL
+    my $ws_url = 'http://cmbi23.cmbi.ru.nl:8080/mcsis-web/webservice/';
+    $ws_url = 'http://cmbi23.cmbi.ru.nl:8080/mcsis-web-nrdb/webservice/'
+        if ($self->{db} eq 'nucleardb');
 
-		$self->StoreMetaData('title', $title) if (length($title));
+    my $wsdl  = XML::LibXML->new->parse_file("$ws_url/?wsdl");
+    my $trans = XML::Compile::Transport::SOAPHTTP->new(address => $ws_url);
+    my $proxy = XML::Compile::WSDL11->new($wsdl); # , transport => $trans);
 
-		foreach my $gene (@{$protein->{genes}})
-		{
-			$self->IndexText('gene', $gene->{gene})
-				if defined $gene->{gene};
-		}
-		
-		$self->IndexNumber('species-id', $protein->{species}->{id})
-			if defined $protein->{species}->{id};
-		$self->IndexTextAndNumbers('species', $protein->{species}->{scientificName})
-			if defined $protein->{species}->{scientificName};
-		
-		$self->FlushDocument();
-	}
+    my $getProtein = $proxy->compileClient('getProtein', address => $ws_url);
+
+    while (my $proteinId = $self->GetLine)
+    {
+        chomp($proteinId);
+
+        my ($answer, $trace) = $getProtein->(proteinId => $proteinId);
+        die "geen eiwit" unless defined $answer;
+
+        my $protein = $answer->{parameters}->{protein};
+
+        $self->Store(XMLout($protein));
+        $self->AddSequence($protein->{sequence});
+        $self->IndexValue('id', $proteinId);
+
+        $self->IndexValue('ac', $protein->{ac})
+            if defined $protein->{ac} and length($protein->{ac});
+        $self->IndexTextAndNumbers('upi', $protein->{upi})
+            if defined $protein->{upi};
+        $self->IndexTextAndNumbers('crc64', $protein->{crc64})
+            if defined $protein->{crc64};
+
+        my $title;
+        foreach my $desc (@{$protein->{descriptions}})
+        {
+            if (defined $desc->{description})
+            {
+                $self->IndexTextAndNumbers('description', $desc->{description});
+                $title .= "; " if defined($title);
+                $title .= $desc->{description};
+            }
+        }
+
+        $self->StoreMetaData('title', $title) if (length($title));
+
+        foreach my $gene (@{$protein->{genes}})
+        {
+            $self->IndexText('gene', $gene->{gene})
+                if defined $gene->{gene};
+        }
+
+        $self->IndexNumber('species-id', $protein->{species}->{id})
+            if defined $protein->{species}->{id};
+        $self->IndexTextAndNumbers('species', $protein->{species}->{scientificName})
+            if defined $protein->{species}->{scientificName};
+
+        $self->FlushDocument();
+    }
 }
 
 sub pp
 {
-	my ($this, $q, $text, $id, $url) = @_;
-	
-	my $xml = XMLin($text);
-	my $id = $xml->{id};
-	
-	my $url = "http://www.gpcr.org/7tm/proteins/$id";
-	$url = "http://www.receptors.org/nucleardb/proteins/$id" if $this->{db} eq 'nucleardb';
-	
-	return sprintf(
-		"<iframe width='100%' height='800px' src='%s'><a href='%s'>%s</a></iframe>",
-		$url, $url, $url);
+    my ($this, $q, $text, $id, $url) = @_;
+
+    my $xml = XMLin($text);
+    my $id = $xml->{id};
+
+    my $url = "http://www.gpcr.org/7tm/proteins/$id";
+    $url = "http://www.receptors.org/nucleardb/proteins/$id" if $this->{db} eq 'nucleardb';
+
+    return sprintf(
+        "<iframe width='100%' height='800px' src='%s'><a href='%s'>%s</a></iframe>",
+        $url, $url, $url);
 }
 
 1;

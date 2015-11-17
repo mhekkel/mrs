@@ -17,18 +17,18 @@ class M6Progress;
 class M6Dictionary
 {
   public:
-			M6Dictionary(boost::filesystem::path inFile);
-			~M6Dictionary();
+            M6Dictionary(boost::filesystem::path inFile);
+            ~M6Dictionary();
 
-	void	SuggestCorrection(const std::string& inWord,
-				std::vector<std::pair<std::string,uint16>>& outCorrections);
+    void    SuggestCorrection(const std::string& inWord,
+                std::vector<std::pair<std::string,uint16>>& outCorrections);
 
-	void	SuggestSearchTerms(const std::string& inWord,
-				std::vector<std::string>& outSearchTerms);
+    void    SuggestSearchTerms(const std::string& inWord,
+                std::vector<std::string>& outSearchTerms);
 
-	static void Create(M6BasicIndex& inIndex, uint32 inDocCount,
-				M6File& inFile, M6Progress& inProgress);
+    static void Create(M6BasicIndex& inIndex, uint32 inDocCount,
+                M6File& inFile, M6Progress& inProgress);
 
   private:
-	M6Automaton*	mAutomaton;
+    M6Automaton*    mAutomaton;
 };

@@ -107,7 +107,7 @@
         <alias>pdbfinder2</alias>
       </aliases>
       <name>PDBFINDER</name>
-      <source fetch="ftp://ftp.cmbi.ru.nl/pub/molbio/data/pdbfinder2/" delete="false">pdbfinder2/PDBFIND2.TXT.gz</source>
+      <source fetch="rsync://rsync.cmbi.ru.nl/pdbfinder2/PDBFIND2.TXT.gz" recursive="false">pdbfinder2/PDBFIND2.TXT.gz</source>
     </databank>
     <!-- omim -->
     <databank id="omim" parser="omim" format="omim" enabled="true" update="never" fasta="false">
@@ -126,7 +126,7 @@
     <databank id="enzyme" parser="enzyme" format="enzyme" enabled="true" update="daily" fasta="false">
       <name>Enzyme</name>
       <info>http://ca.expasy.org/enzyme/</info>
-      <source fetch="ftp://ftp.ebi.ac.uk/pub/databases/enzyme/" delete="false">enzyme/enzyme.dat</source>
+      <source fetch="rsync://ftp.ebi.ac.uk/pub/databases/enzyme/enzyme.dat">enzyme/enzyme.dat</source>
     </databank>
     <databank id="sprot" parser="uniprot" format="uniprot" update="daily" enabled="true" fasta="true">
       <aliases>
@@ -171,7 +171,7 @@
     <databank enabled="true" fasta="true" id="pdb_redo" parser="pdb" update="weekly">
       <name>PDB Redo</name>
       <info>http://www.cmbi.ru.nl/pdb_redo</info>
-      <source delete="true" fetch="ftp://ftp.cmbi.ru.nl/pub/molbio/data/pdb_redo" recursive="true">pdb_redo/??/????/????_final.pdb</source>
+      <source delete="true" fetch="rsync://rsync.cmbi.ru.nl/pdb_redo/" recursive="true">pdb_redo/??/????/????_final.pdb</source>
     </databank>
     <databank id="pdb" parser="pdb" enabled="true" update="daily" fasta="true">
       <name>PDB</name>
@@ -191,7 +191,7 @@
     <databank id="gene" parser="gene" stylesheet="gene.xslt" enabled="true" update="weekly" fasta="false">
       <name>Entrez Gene</name>
       <info>http://www.ncbi.nlm.nih.gov/entrez/query.fcgi?db=gene</info>
-      <source fetch="ftp://ftp.ncbi.nlm.nih.gov/gene/DATA/ASN_BINARY" delete="false">gene/All_Data.ags.gz</source>
+      <source fetch="rsync://rsync.ncbi.nlm.nih.gov/gene/DATA/All_Data.ags.gz" delete="false">gene/All_Data.ags.gz</source>
       <filter>/usr/bin/gene2xml -bT</filter>
     </databank>
     <databank id="go" parser="go" enabled="true" update="weekly" fasta="false">

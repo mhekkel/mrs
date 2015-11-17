@@ -827,6 +827,13 @@ BlastJobs = {
 			}
 		}
 
+		try {
+			localStorage.setItem('mrs-test', 'test');
+			localStorage.removeItem('mrs-test');
+		} catch (exception) {
+			alert('Unable to write to local storage. Do you perhaps have private browsing turned on?');
+		}
+
 		BlastJobs.jobs = new Array();
 
 		var storedJobs = unescape(localStorage.getItem('blast-jobs'));
@@ -868,9 +875,10 @@ BlastJobs = {
 			}
 		}
 		catch (e) {
-			if (e == QUOTA_EXCEEDED_ERR) {
+			if (!(QUOTA_EXCEEDED_ERR === undefined) && e == QUOTA_EXCEEDED_ERR) {
 				alert('Quota exceeded!');
 			}
+			else throw e;
 		}
 	},
 	

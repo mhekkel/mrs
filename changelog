@@ -1,3 +1,27 @@
+Changes in MRS version 6.1.0
+
+- Several bugs in the search algorithm have been fixed.
+- The search algorithm now allows to search by alias. Like uniprot, representing trembl + sprot.
+- The index page has been fixed to show all sections and entries.
+- Tabs in source code have been replaced by whitespace indents
+
+Changes in MRS version 6.0.8
+
+- Fixed a bug in the ftp fetcher, causing it to keep old databank files that should actually be deleted. This was causing problems in refseq.
+
+Changes in MRS version 6.0.7
+
+- Fixed a bug in M6BitStream, that could cause MRS to miss a single index
+
+Changes in MRS version 6.0.6
+
+- Added a version option to the command line
+- Fixed a bug that caused MRS to crash on empty blast job files
+- Changed the rsync fetcher so that it downloads less unwanted files
+- Adjusted the pdb parser so that pdb_redo files don't get xxxx as id
+- Added some more warnings to the server start and server stop commands, about permission problems and mismatching pid files.
+- libzeep is now linked before boost. This prevents compatibility issues.
+
 Changes in MRS version 6.0.5
 
 - Changed e-mail address of maintainer.

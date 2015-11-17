@@ -61,7 +61,8 @@ my @inc_dirs_guess = (
 );
 
 my @libs = (
-	'm'
+	'm',
+	'pthread'
 );
 
 # prefer the IP address here, since the hostname might not be fully qualified...

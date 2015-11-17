@@ -19,22 +19,22 @@
 class M6SignalCatcher
 {
   public:
-				M6SignalCatcher();
-				~M6SignalCatcher();
+                M6SignalCatcher();
+                ~M6SignalCatcher();
 
-	void		BlockSignals();
-	void		UnblockSignals();
-	
-	int			WaitForSignal();
+    void        BlockSignals();
+    void        UnblockSignals();
 
-	static void	Signal(int inSignal);
+    int            WaitForSignal();
+
+    static void    Signal(int inSignal);
 
   private:
-				M6SignalCatcher(const M6SignalCatcher&);
-	M6SignalCatcher&
-				operator=(const M6SignalCatcher&);
+                M6SignalCatcher(const M6SignalCatcher&);
+    M6SignalCatcher&
+                operator=(const M6SignalCatcher&);
 
-	struct M6SignalCatcherImpl*	mImpl;
+    struct M6SignalCatcherImpl*    mImpl;
 };
 
 void SetStdinEcho(bool inEnable);

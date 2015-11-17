@@ -16,22 +16,22 @@
 
 enum MOpenMode
 {
-	eReadOnly,
-	eReadWrite
+    eReadOnly,
+    eReadWrite
 };
 
-typedef int64	M6Handle;
+typedef int64    M6Handle;
 
 namespace M6IO
 {
-	M6Handle open(const std::string& inFile, MOpenMode inMode);
-	M6Handle open_tempfile(const std::string& inFileNameTemplate); 
-	void close(M6Handle inHandle);
-	void truncate(M6Handle inHandle, int64 inSize);
-	int64 file_size(M6Handle inHandle);
-	
-	void pwrite(M6Handle inHandle, const void* inBuffer, int64 inSize, int64 inOffset);
-	void pread(M6Handle inHandle, void* inBuffer, int64 inSize, int64 inOffset);
+    M6Handle open(const std::string& inFile, MOpenMode inMode);
+
+    void close(M6Handle inHandle);
+    void truncate(M6Handle inHandle, int64 inSize);
+    int64 file_size(M6Handle inHandle);
+
+    void pwrite(M6Handle inHandle, const void* inBuffer, int64 inSize, int64 inOffset);
+    void pread(M6Handle inHandle, void* inBuffer, int64 inSize, int64 inOffset);
 }
 
 class M6FileReader;
@@ -43,43 +43,45 @@ bool M6FilePathNameMatches(const boost::filesystem::path& inPath, const std::str
 class M6File
 {
   public:
-					M6File();
-					M6File(const M6File& inFile);
-					M6File(const std::string& inFile, MOpenMode inMode);
-					M6File(const boost::filesystem::path& inFile, MOpenMode inMode);
-	M6File&			operator=(const M6File& inFile);
-	virtual			~M6File();
+                    M6File();
+                    M6File(const M6File& inFile);
+                    M6File(const std::string& inFile, MOpenMode inMode);
+                    M6File(const boost::filesystem::path& inFile, MOpenMode inMode);
+    M6File&            operator=(const M6File& inFile);
+    virtual            ~M6File();
 
-	void			Read(void* inBuffer, int64 inSize);
-	void			Write(const void* inBuffer, int64 inSize);
-	
-	void			PRead(void* inBuffer, int64 inSize, int64 inOffset);
-	void			PWrite(const void* inBuffer, int64 inSize, int64 inOffset);
-	
-	template<class S>
-	void			PRead(S& outStruct, int64 inOffset)
-						{ PRead(&outStruct, sizeof(S), inOffset); }
-	
-	template<class S>
-	void			PWrite(S& outStruct, int64 inOffset)
-						{ PWrite(&outStruct, sizeof(S), inOffset); }
-	
-	virtual void	Truncate(int64 inSize);
-	int64			Size() const						{ return mImpl->mSize; }
-	int64			Seek(int64 inOffset, int inMode);
-	int64			Tell() const						{ return mImpl->mOffset; }
+    void            Close();
 
-	M6Handle		GetHandle() const					{ return mImpl->mHandle; }
+    void            Read(void* inBuffer, int64 inSize);
+    void            Write(const void* inBuffer, int64 inSize);
+
+    void            PRead(void* inBuffer, int64 inSize, int64 inOffset);
+    void            PWrite(const void* inBuffer, int64 inSize, int64 inOffset);
+
+    template<class S>
+    void            PRead(S& outStruct, int64 inOffset)
+                        { PRead(&outStruct, sizeof(S), inOffset); }
+
+    template<class S>
+    void            PWrite(S& outStruct, int64 inOffset)
+                        { PWrite(&outStruct, sizeof(S), inOffset); }
+
+    virtual void    Truncate(int64 inSize);
+    int64            Size() const                        { return mImpl->mSize; }
+    int64            Seek(int64 inOffset, int inMode);
+    int64            Tell() const                        { return mImpl->mOffset; }
+
+    M6Handle        GetHandle() const                    { return mImpl->mHandle; }
 
   protected:
 
-	struct M6FileImpl
-	{
-		M6Handle		mHandle;
-		int64			mSize;
-		int64			mOffset;
-		uint32			mRefCount;
-	};
+    struct M6FileImpl
+    {
+        M6Handle        mHandle;
+        int64            mSize;
+        int64            mOffset;
+        uint32            mRefCount;
+    };
 
-	M6FileImpl*		mImpl;
+    M6FileImpl*        mImpl;
 };

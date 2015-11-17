@@ -34,5 +34,7 @@ init.d/mrs
 logrotate.d/mrs
 make.config
 mrs
+checkcache
 mrs.1
 obj/
+obj.dbg/

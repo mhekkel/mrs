@@ -16,7 +16,7 @@
 	<mrs:if test="${not mobile}">
 	<label>
 		Search
-		<select name="db" onchange="document.getElementById('queryForm').submit();" style="width:150px;">
+		<select name="db" onchange="if ( '${q}' ) document.getElementById('queryForm').submit();" style="width:150px;">
 			<option value="all">All Databanks</option>
 			<mrs:options collection="databanks" value="id" label="name" selected="${db}" />
 		</select>

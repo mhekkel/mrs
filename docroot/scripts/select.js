@@ -270,7 +270,9 @@ GlobalSelection = {
 						if (ch != null) {
 							id = id + '/' + ch;
 						}
-						
+
+						id = db + '/' + id;
+
 						var option = document.createElement("option");
 						option.text = option.value = id;
 						option.selected = true;

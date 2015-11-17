@@ -3442,7 +3442,20 @@ void M6IndexImplT<M6DataType>::GetBrowseSections(const string& inFirst, const st
 			skip += interval;
 		}
 	}
-	
+
+    // hmmmm, somehow sections miss the last key in the index, sometimes
+    if (inLast.empty())
+    {
+        while (page->GetLink() != 0)
+        {
+            LeafPage* next = Load<LeafPage>(page->GetLink());
+            Release(page);
+            page = next;
+        }
+
+        outSections.back().second = this->mIndex.KeyToString(page->GetKey(page->GetN() - 1));
+    }
+
 	if (inLast.empty() == false and outSections.back().second != inLast)
 		outSections.back().second = inLast;
 	
@@ -3472,7 +3485,7 @@ void M6IndexImplT<M6DataType>::GetBrowseEntries(
 
 		outEntries.push_back(key);
 		
-		return ++n < 100 and (inLast.empty() or inLast >= key);
+		return ++n < 100 and (inLast.empty() or CompareKeys(inLast, key) > 0);
 	}, page, key);
 }
 
@@ -3827,14 +3840,15 @@ void M6MultiBasicIndex::Insert(uint32 inKey, const vector<uint32>& inDocuments)
 	CompressSimpleArraySelector(bits, inDocuments);
 	mImpl->StoreBits(bits, data.mBitVector);
 
-#pragma message("ouch!")
+// TODO: ouch! In batch mode keys are inserted in a different format. Not a very clean solution!
+
    if (mImpl->IsInBatchMode())
 	   mImpl->Insert(inKey, data);
    else
 	   mImpl->Insert(to_string(inKey), data);
 }
 
-#pragma message("double ouch!")
+// double ouch!
 void M6MultiBasicIndex::Insert(double inKey, const vector<uint32>& inDocuments)
 {
    M6MultiData data = { static_cast<uint32>(inDocuments.size()) };

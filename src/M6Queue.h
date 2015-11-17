@@ -13,32 +13,32 @@ template<class T, uint32 N = 100>
 class M6Queue
 {
   public:
-						M6Queue();
-						~M6Queue();
+                        M6Queue();
+                        ~M6Queue();
 
-	void				Put(T inValue);
-//	void				Put(T inValue[], uint32 inCount);
-	T					Get();
+    void                Put(T inValue);
+//    void                Put(T inValue[], uint32 inCount);
+    T                    Get();
 
-	// flags to help debug performance issues
-	bool				WasFull() const		{ return mWasFull; }
-	bool				WasEmpty() const	{ return mWasEmpty; }
+    // flags to help debug performance issues
+    bool                WasFull() const        { return mWasFull; }
+    bool                WasEmpty() const    { return mWasEmpty; }
 
   private:
-						M6Queue(const M6Queue&);
-	M6Queue&			operator=(const M6Queue&);
+                        M6Queue(const M6Queue&);
+    M6Queue&            operator=(const M6Queue&);
 
-	std::deque<T>		mQueue;
-	boost::mutex		mMutex;
-	std::unique_ptr<boost::condition_variable>
-						mEmptyCondition, mFullCondition;
-	bool				mWasFull, mWasEmpty;
+    std::deque<T>        mQueue;
+    boost::mutex        mMutex;
+    std::unique_ptr<boost::condition_variable>
+                        mEmptyCondition, mFullCondition;
+    bool                mWasFull, mWasEmpty;
 };
 
 template<class T, uint32 N>
 M6Queue<T,N>::M6Queue()
-	: mEmptyCondition(new boost::condition_variable), mFullCondition(new boost::condition_variable)
-	, mWasFull(false), mWasEmpty(true)
+    : mEmptyCondition(new boost::condition_variable), mFullCondition(new boost::condition_variable)
+    , mWasFull(false), mWasEmpty(true)
 {
 }
 
@@ -50,53 +50,53 @@ M6Queue<T,N>::~M6Queue()
 template<class T, uint32 N>
 void M6Queue<T,N>::Put(T inValue)
 {
-	boost::unique_lock<boost::mutex> lock(mMutex);
+    boost::unique_lock<boost::mutex> lock(mMutex);
 
-	mWasFull = false;
-	while (mQueue.size() >= N)
-	{
-		mFullCondition->wait(lock);
-		mWasFull = true;
-	}
-	
-	mQueue.push_back(inValue);
+    mWasFull = false;
+    while (mQueue.size() >= N)
+    {
+        mFullCondition->wait(lock);
+        mWasFull = true;
+    }
 
-	mEmptyCondition->notify_one();
+    mQueue.push_back(inValue);
+
+    mEmptyCondition->notify_one();
 }
 
 //template<class T, uint32 N>
 //void M6Queue<T,N>::Put(T inValue[], uint32 inCount)
 //{
-//	boost::mutex::scoped_lock lock(mMutex);
+//    boost::mutex::scoped_lock lock(mMutex);
 //
-//	mWasFull = false;
-//	while (mQueue.size() >= N)
-//	{
-//		mFullCondition->wait(lock);
-//		mWasFull = true;
-//	}
-//	
-//	mQueue.append(inValue, inValue + inCount);
+//    mWasFull = false;
+//    while (mQueue.size() >= N)
+//    {
+//        mFullCondition->wait(lock);
+//        mWasFull = true;
+//    }
 //
-//	mEmptyCondition->notify_one();
+//    mQueue.append(inValue, inValue + inCount);
+//
+//    mEmptyCondition->notify_one();
 //}
 
 template<class T, uint32 N>
 T M6Queue<T,N>::Get()
 {
-	boost::unique_lock<boost::mutex> lock(mMutex);
+    boost::unique_lock<boost::mutex> lock(mMutex);
 
-	mWasEmpty = false;
-	while (mQueue.empty())
-	{
-		mEmptyCondition->wait(lock);
-		mWasEmpty = true;
-	}
-	
-	T result = mQueue.front();
-	mQueue.pop_front();
+    mWasEmpty = false;
+    while (mQueue.empty())
+    {
+        mEmptyCondition->wait(lock);
+        mWasEmpty = true;
+    }
 
-	mFullCondition->notify_one();
-	
-	return result;
+    T result = mQueue.front();
+    mQueue.pop_front();
+
+    mFullCondition->notify_one();
+
+    return result;
 }

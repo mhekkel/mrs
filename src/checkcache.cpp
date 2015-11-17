@@ -30,82 +30,82 @@ namespace ba = boost::algorithm;
 
 int main(int argc, char* argv[])
 {
-	if(argc!=2)
-	{
-		cout << "Please give a cache directory path!\n" ;
-		return 0;
-	}
+    if(argc!=2)
+    {
+        cout << "Please give a cache directory path!\n" ;
+        return 0;
+    }
 
-	fs::path cacheDir(argv[1]);
-	fs::directory_iterator end_iter;
-	for( fs::directory_iterator dir_iter(cacheDir) ; dir_iter != end_iter ; ++dir_iter)
-	{
-		fs::path path=dir_iter->path();
-		if(!boost::filesystem::is_regular_file(path))
-			continue;
+    fs::path cacheDir(argv[1]);
+    fs::directory_iterator end_iter;
+    for( fs::directory_iterator dir_iter(cacheDir) ; dir_iter != end_iter ; ++dir_iter)
+    {
+        fs::path path=dir_iter->path();
+        if(!boost::filesystem::is_regular_file(path))
+            continue;
 
-		string filename=path.filename().string();
+        string filename=path.filename().string();
 
-		io::filtering_stream<io::input> in;
-		fs::ifstream file(path, ios::binary);
-		if (not file.is_open()) {
-			cerr << filename << ": file not open\n";
-			return 1;
-		}
+        io::filtering_stream<io::input> in;
+        fs::ifstream file(path, ios::binary);
+        if (not file.is_open()) {
+            cerr << filename << ": file not open\n";
+            return 1;
+        }
 
-		if ( ba::ends_with( filename, ".bz2" ) )
-			in.push(io::bzip2_decompressor());
+        if ( ba::ends_with( filename, ".bz2" ) )
+            in.push(io::bzip2_decompressor());
 
-		in.push(file);
+        in.push(file);
 
-		stringstream stack;
-		try
-		{
-			if ( ba::ends_with( filename, ".xml.bz2" ) )
-			{
-				stack << "parsing xml\n";
+        stringstream stack;
+        try
+        {
+            if ( ba::ends_with( filename, ".xml.bz2" ) )
+            {
+                stack << "parsing xml\n";
 
-				zeep::xml::document doc(in);
+                zeep::xml::document doc(in);
 
-				stack << "converting to blast result\n";
+                stack << "converting to blast result\n";
 
-				M6BlastResultPtr result(new M6Blast::Result);
+                M6BlastResultPtr result(new M6Blast::Result);
 
-				doc.deserialize("blast-result", const_cast<M6Blast::Result&>(*result));
-			}
-			else if ( ba::ends_with( filename, ".job" ) )
-			{
-				stack << "parsing xml\n";
+                doc.deserialize("blast-result", const_cast<M6Blast::Result&>(*result));
+            }
+            else if ( ba::ends_with( filename, ".job" ) )
+            {
+                stack << "parsing xml\n";
 
-				zeep::xml::document doc(in);
+                zeep::xml::document doc(in);
 
-				stack << "converting to blast job\n";
+                stack << "converting to blast job\n";
 
-				M6BlastJob job;
-		
-				doc.deserialize("blastjob", job);
-			}
-			else if ( ba::ends_with( filename, ".err" ) )
-			{
-				stack << "reading file\n";
+                M6BlastJob job;
 
-				string line;
-				stringstream ss;
-				while(!in.eof())
-				{
-					getline(in, line);
-					ss << line << endl;
-				}
-			}
+                doc.deserialize("blastjob", job);
+            }
+            else if ( ba::ends_with( filename, ".err" ) )
+            {
+                stack << "reading file\n";
 
-			stack << "done with this file\n";
-		}
-		catch(exception& e)
-		{
-			cout << stack.str();
+                string line;
+                stringstream ss;
+                while(!in.eof())
+                {
+                    getline(in, line);
+                    ss << line << endl;
+                }
+            }
 
-			cout << path.string() <<" - error: "<< e.what() << endl ; 
-		}
-	}
-	return 0;
+            stack << "done with this file\n";
+        }
+        catch(exception& e)
+        {
+            cout << stack.str();
+
+            cout << path.string() <<" - error: "<< e.what() << endl ;
+        }
+    }
+    return 0;
 }

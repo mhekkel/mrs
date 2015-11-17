@@ -61,13 +61,13 @@ M6Logger::M6Logger() : mLog4cppLogger(log4cpp::Category::getRoot())
 
   mLog4cppLogger.addAppender(pAppender);
 }
- 
+
 M6Logger& M6Logger::GetLogger()
 {
   static M6Logger logger;
   return logger;
 }
- 
+
 void M6Logger::Log(M6LogLevel level, const std::string& format, ... )
 {
   if(!bEnabled)
@@ -90,9 +90,9 @@ void M6Logger::Log(M6LogLevel level, const std::string& format, ... )
     assert(false);  // LCOV_EXCL_LINE
   };
   assert(log4cppLevel != log4cpp::Priority::NOTSET);
- 
+
   // Log message
-  va_list args;                                                           
+  va_list args;
   va_start(args, format);
   mLog4cppLogger.logva(log4cppLevel, format.c_str(), args);
   va_end(args);

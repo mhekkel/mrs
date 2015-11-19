@@ -10,13 +10,16 @@ my %NUMBER = (
     t_water_mols => 1,
     het_groups => 1,
     hssp_n_align => 1,
-    t_frac_helix => 1,
-    t_frac_beta => 1,
     t_nres_prot => 1,
     free_r => 1000,
     n_models => 1,
     t_non_std => 1,
     t_alternates => 1
+);
+
+my %FLOAT = (
+    t_frac_helix => 1,
+    t_frac_beta => 1
 );
 
 sub new
@@ -70,6 +73,10 @@ sub parse
         elsif (defined $NUMBER{$key} and defined $value)
         {
             $self->index_number($key, $value * 1.0 * $NUMBER{$key});
+        }
+        elsif (defined $FLOAT{$key} and defined $value)
+        {
+            $self->index_float($key, $value * 1.0 * $FLOAT{$key});
         }
         else
         {

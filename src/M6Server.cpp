@@ -2956,7 +2956,7 @@ void M6Server::handle_blast_status_ajax(const zeep::http::request& request, cons
     string ids = params.get("jobs", "").as<string>();
     vector<string> jobs;
 
-    LOG (DEBUG, "handle_blast_status_ajax for jobs=\"%s\"", ids.c_str ());
+    LOG (DEBUG, "handle_blast_status_ajax for jobs string of length %d", ids.size ());
 
     if (not ids.empty())
         ba::split(jobs, ids, ba::is_any_of(";"));

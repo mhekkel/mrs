@@ -815,29 +815,25 @@ M6Token M6Tokenizer::GetNextQueryToken()
                 }
                 break;
 
-            case 205: // previous was float pattern: [0-9][Ee]
+            case 205: // previous was float pattern: [0-9][Ee], -/+ is optional
                 if (c == '+' or c == '-')
 
                     state = 206;
-                else
-                    /* Discard the entire pattern, it can't be a [0-9][Ee][-+][0-9] float.
-                       It might be a [0-9] number though.
-                     */
-                    Restart(20);
-                break;
 
-            case 206: // previous was float pattern: [0-9][Ee][-+]
+                // otherwise fall through
+
+            case 206: // previous was float pattern: [0-9][Ee][-+]?
                 if (c >= '0' and c <= '9')
 
                     state = 207;
                 else
-                    /* Discard the entire pattern, it can't be a [0-9][Ee][-+][0-9] float.
+                    /* Discard the entire pattern, it can't be a [0-9][Ee][-+]?[0-9] float.
                        It might be a [0-9] number though.
                      */
                     Restart(20);
                 break;
 
-            case 207: // previous was float pattern: [0-9][Ee][-+][0-9]
+            case 207: // previous was float pattern: [0-9][Ee][-+]?[0-9]
                 if (c < '0' or c > '9')
                 {
                     // No more digits to add to this number

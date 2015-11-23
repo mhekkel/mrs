@@ -2945,14 +2945,7 @@ void M6Server::handle_blast_results_ajax(const zeep::http::request& request, con
 
 ostream& operator<<(ostream& os, M6BlastJobStatus status)
 {
-    switch (status)
-    {
-        case bj_Unknown:    os << "unknown"; break;
-        case bj_Queued:     os << "queued"; break;
-        case bj_Running:    os << "running"; break;
-        case bj_Finished:   os << "finished"; break;
-        case bj_Error:      os << "error"; break;
-    }
+    os << StatusToString (status);
 }
 
 void M6Server::handle_blast_status_ajax(const zeep::http::request& request, const el::scope& scope, zeep::http::reply& reply)
@@ -2962,6 +2955,8 @@ void M6Server::handle_blast_status_ajax(const zeep::http::request& request, cons
 
     string ids = params.get("jobs", "").as<string>();
     vector<string> jobs;
+
+    LOG (DEBUG, "handle_blast_status_ajax for jobs string of length %d", ids.size ());
 
     if (not ids.empty())
         ba::split(jobs, ids, ba::is_any_of(";"));
@@ -2981,7 +2976,7 @@ void M6Server::handle_blast_status_ajax(const zeep::http::request& request, cons
 
             el::object jjob;
             jjob["id"] = id;
-            jjob["status"] = boost::lexical_cast<string> (status);
+            jjob["status"] = StatusToString (status);
 
             switch (status)
             {
@@ -3000,7 +2995,10 @@ void M6Server::handle_blast_status_ajax(const zeep::http::request& request, cons
 
             jjobs.push_back(jjob);
         }
-        catch (...) {}
+        catch (...)
+        {
+            LOG (ERROR, "handle_blast_status_ajax error: \"%s\"", id.c_str ());
+        }
     }
 
     el::object json(jjobs);
@@ -3102,14 +3100,16 @@ void M6Server::handle_blast_submit_ajax(
             boost::lexical_cast<double>(expect), filter,
             gapped, gapOpen, gapExtend, reportLimit);
 
+        LOG (DEBUG, "handle_blast_submit_ajax: created new job with id: %s", jobId.c_str ());
+
         // and answer with the created job ID
         result["id"] = jobId;
         result["qid"] = qid;
-        result["status"] = boost::lexical_cast<string> (bj_Queued);
+        result["status"] = StatusToString (bj_Queued);
     }
     catch (exception& e)
     {
-        result["status"] = boost::lexical_cast<string> (bj_Error);
+        result["status"] = StatusToString (bj_Error);
         result["error"] = e.what();
     }
 

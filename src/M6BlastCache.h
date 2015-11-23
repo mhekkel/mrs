@@ -7,6 +7,7 @@
 
 #include <queue>
 #include <tuple>
+#include <string>
 
 #include <boost/thread.hpp>
 #include <boost/thread/condition.hpp>
@@ -24,6 +25,8 @@ enum M6BlastJobStatus
     bj_Finished,
     bj_Error
 };
+
+std::string StatusToString (M6BlastJobStatus);
 
 // --------------------------------------------------------------------
 

@@ -11,7 +11,7 @@ BEGIN
 
 package M6;
 
-our $VERSION = '6.0';
+our $VERSION = '6.1';
 
 #use strict;
 #use warnings;

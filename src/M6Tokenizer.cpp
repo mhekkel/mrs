@@ -32,6 +32,7 @@ ostream& operator<<(ostream& os, M6Token inToken)
         case eM6TokenUndefined:            os << "undefined token"; break;
         case eM6TokenWord:                os << "word"; break;
         case eM6TokenNumber:            os << "number"; break;
+        case eM6TokenFloat:            os << "float"; break;
         case eM6TokenPunctuation:        os << "punctuation character"; break;
         case eM6TokenString:            os << "quoted string"; break;
         case eM6TokenPattern:            os << "glob-pattern (word with * or ?)"; break;
@@ -775,7 +776,7 @@ M6Token M6Tokenizer::GetNextQueryToken()
                 break;
 
             // test for numbers since we found '-' or '+'
-            case 201:    // '-' seen
+            case 201: // '-' seen
                 if (c >= '0' and c <= '9')
                     state = 203;
                 else
@@ -785,7 +786,7 @@ M6Token M6Tokenizer::GetNextQueryToken()
                 }
                 break;
 
-            case 202:
+            case 202: // '+' seen
                 if (c >= '0' and c <= '9')
                     state = 203;
                 else
@@ -795,7 +796,7 @@ M6Token M6Tokenizer::GetNextQueryToken()
                 }
                 break;
 
-            case 203:
+            case 203: // previous char was digit
                 if (c == '.')
                     state = 204;
                 else if (c == 'e' or c == 'E')
@@ -814,22 +815,28 @@ M6Token M6Tokenizer::GetNextQueryToken()
                 }
                 break;
 
-            case 205:
+            case 205: // previous was float pattern: [0-9][Ee], -/+ is optional
                 if (c == '+' or c == '-')
+
                     state = 206;
 
                 // otherwise fall through
 
-            case 206:
+            case 206: // previous was float pattern: [0-9][Ee][-+]?
                 if (c >= '0' and c <= '9')
+
                     state = 207;
                 else
+                    /* Discard the entire pattern, it can't be a [0-9][Ee][-+]?[0-9] float.
+                       It might be a [0-9] number though.
+                     */
                     Restart(20);
                 break;
 
-            case 207:
+            case 207: // previous was float pattern: [0-9][Ee][-+]?[0-9]
                 if (c < '0' or c > '9')
                 {
+                    // No more digits to add to this number
                     Retract(*--t);
                     result = eM6TokenFloat;
                 }

@@ -32,6 +32,7 @@ ostream& operator<<(ostream& os, M6Token inToken)
         case eM6TokenUndefined:            os << "undefined token"; break;
         case eM6TokenWord:                os << "word"; break;
         case eM6TokenNumber:            os << "number"; break;
+        case eM6TokenFloat:            os << "float"; break;
         case eM6TokenPunctuation:        os << "punctuation character"; break;
         case eM6TokenString:            os << "quoted string"; break;
         case eM6TokenPattern:            os << "glob-pattern (word with * or ?)"; break;

@@ -1,3 +1,7 @@
+Changes in MRS version 6.1.1
+
+- Entering 1E50 as query now yields results again.
+
 Changes in MRS version 6.1.0
 
 - Several bugs in the search algorithm have been fixed.

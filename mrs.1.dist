@@ -1,4 +1,4 @@
-.TH mrs 1 "03-jan-2013" "version 6.0" "USER COMMANDS"
+.TH mrs 1 "03-jan-2013" "version 6.1" "USER COMMANDS"
 .SH NAME
 mrs \- A tool to build and manipulate a MRS 6 server and its data files
 .SH SYNOPSIS

@@ -1,3 +1,7 @@
+Changes in MRS version 6.1.2
+
+- blast jobs with a large amount of work are now placed in a separate thread.
+
 Changes in MRS version 6.1.1
 
 - Entering 1E50 as query now yields results again.

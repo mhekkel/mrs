@@ -123,6 +123,7 @@ class M6BlastCache
 
     void                        Purge(bool inDeleteFiles = false);
 
+    bool                        LoadCacheJob (const std::string& inJobID, M6BlastJob& job);
     M6BlastJobDescList            GetJobList();
     void                        DeleteJob(const std::string& inJobID);
 
@@ -133,7 +134,7 @@ class M6BlastCache
     M6BlastCache&                operator=(const M6BlastCache&);
                                 ~M6BlastCache();
 
-    void                        Work();
+    void                        Work(const bool highload=false);
     void                        ExecuteJob(const std::string& inJobID);
     void                        StoreJob(const std::string& inJobID, const M6BlastJob& inJob);
     void                        SetJobStatus(const std::string inJobId, M6BlastJobStatus inStatus);
@@ -145,8 +146,11 @@ class M6BlastCache
     void                        ExecuteStatement(const std::string& inStatement);
 
     boost::filesystem::path        mCacheDir;
-    boost::thread                mWorkerThread;
-    boost::mutex                mCacheMutex, mWorkMutex;
+    boost::thread                mWorkerThread,
+                                 mHighLoadThread;
+    boost::mutex                mCacheMutex,
+                                mWorkMutex,
+                                mHighLoadMutex;
     boost::condition            mWorkCondition;
     bool                        mStopWorkingFlag;
 

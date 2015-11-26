@@ -36,6 +36,7 @@ using namespace std;
 namespace fs = boost::filesystem;
 namespace io = boost::iostreams;
 namespace ba = boost::algorithm;
+namespace zx = zeep::xml;
 
 const uint32 kMaxCachedEntryResults = 1000;
 const char* kBlastFileExtensions[] = { ".xml.bz2", ".job", ".err" };
@@ -131,6 +132,17 @@ M6BlastCache::M6BlastCache()
                 fs::remove(iter->path());
             }
         }
+    }
+
+    // Determine the number of threads from config:
+    const zx::element *server = M6Config::GetServer(),
+                      *blaster = server->find_first("blaster");
+    mMaxThreads = boost::thread::hardware_concurrency();
+    if (blaster != nullptr)
+    {
+        uint32 n =  boost::lexical_cast<uint32> (blaster->get_attribute ("nthread"));
+        if (n > 0)
+            mMaxThreads = n;
     }
 
     // finally start the worker threads
@@ -485,8 +497,6 @@ void M6BlastCache::Work (const bool highload)
                     if (highload != IsHighLoad (e.job))
                         continue;
 
-                    LOG (DEBUG, "job %s is considered %s", e.id.c_str (), highload? "high load": "normal load");
-
                     next = e.id;
                     break;
                 }
@@ -495,7 +505,7 @@ void M6BlastCache::Work (const bool highload)
             if (next.empty()) // if no new job, wait
                 mWorkCondition.wait(lock);
             else
-                ExecuteJob(next);
+                ExecuteJob (next, highload? 1: mMaxThreads - 1);
         }
         catch (boost::thread_interrupted&)
         {
@@ -529,7 +539,7 @@ bool M6BlastCache::LoadCacheJob (const std::string& inJobID, M6BlastJob& job)
 
     return false;
 }
-void M6BlastCache::ExecuteJob(const string& inJobID)
+void M6BlastCache::ExecuteJob(const string& inJobID, const uint32 n_threads)
 {
     try
     {
@@ -548,7 +558,7 @@ void M6BlastCache::ExecuteJob(const string& inJobID)
 
         M6BlastResultPtr result(M6Blast::Search(files, job.query, job.program,
             job.matrix, job.wordsize, job.expect, job.filter, job.gapped,
-            job.gapOpen, job.gapExtend, job.reportLimit));
+            job.gapOpen, job.gapExtend, job.reportLimit, n_threads));
 
         CacheResult(inJobID, result);
     }

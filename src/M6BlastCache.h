@@ -135,7 +135,7 @@ class M6BlastCache
                                 ~M6BlastCache();
 
     void                        Work(const bool highload=false);
-    void                        ExecuteJob(const std::string& inJobID);
+    void                        ExecuteJob(const std::string& inJobID, const uint32 n_threads);
     void                        StoreJob(const std::string& inJobID, const M6BlastJob& inJob);
     void                        SetJobStatus(const std::string inJobId, M6BlastJobStatus inStatus);
     void                        CacheResult(const std::string& inJobId, M6BlastResultPtr inResult);
@@ -153,6 +153,8 @@ class M6BlastCache
                                 mHighLoadMutex;
     boost::condition            mWorkCondition;
     bool                        mStopWorkingFlag;
+
+    uint32                      mMaxThreads;
 
     struct CacheEntry
     {

@@ -29,6 +29,8 @@
     <base-url>__MRS_BASE_URL__</base-url>
     <web-service service="mrsws_search" ns="http://mrs.cmbi.ru.nl/mrsws/search" location="mrsws/search"/>
     <web-service service="mrsws_blast" ns="http://mrs.cmbi.ru.nl/mrsws/blast" location="mrsws/blast"/>
+    <blaster nthread="4"/>
+    <builder nthread="4"/>
   </server>
   <!-- Formats section, formats are used to add links to entries and
 		 to link a JavaScript pretty printer -->

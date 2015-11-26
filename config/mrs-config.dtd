@@ -24,7 +24,7 @@
 			   realm CDATA #REQUIRED
 			   password CDATA #REQUIRED>
 	
-<!ELEMENT server (admin?,base-url?,web-service*)+>
+<!ELEMENT server (admin?,base-url?,blaster?,builder?,web-service*)+>
 <!ATTLIST server addr NMTOKEN #REQUIRED
 				 port NMTOKEN #REQUIRED
 				 user NMTOKEN #IMPLIED
@@ -33,6 +33,10 @@
 <!ELEMENT admin EMPTY>
 <!ATTLIST admin realm CDATA #REQUIRED>
 <!ELEMENT base-url (#PCDATA)>
+<!ELEMENT blaster EMPTY>
+<!ATTLIST blaster nthread CDATA #REQUIRED>
+<!ELEMENT builder EMPTY>
+<!ATTLIST builder nthread CDATA #REQUIRED>
 <!ELEMENT web-service EMPTY>
 <!ATTLIST web-service service (mrsws_search|mrsws_blast|mrsws_align) #REQUIRED
 					  ns CDATA #REQUIRED

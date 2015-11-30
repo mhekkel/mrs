@@ -42,7 +42,6 @@
 #include "M6Progress.h"
 #include "M6DataSource.h"
 #include "M6Queue.h"
-#include "M6Config.h"
 #include "M6Exec.h"
 #include "M6Parser.h"
 #include "M6Utilities.h"

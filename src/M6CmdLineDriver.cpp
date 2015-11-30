@@ -547,10 +547,10 @@ int M6BuildDriver::Exec(const string& inCommand, po::variables_map& vm)
     {
         // Determine the number of threads from config:
         const zx::element *server = M6Config::GetServer(),
-                          *blaster = server->find_first("builder");
-        if (blaster != nullptr)
+                          *builder = server->find_first("builder");
+        if (builder != nullptr)
         {
-            uint32 n =  boost::lexical_cast<uint32> (blaster->get_attribute ("nthread"));
+            uint32 n =  boost::lexical_cast<uint32> (builder->get_attribute ("nthread"));
             if (n > 0)
                 nrOfThreads = n;
         }

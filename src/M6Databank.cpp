@@ -1767,6 +1767,14 @@ M6DatabankImpl::M6DatabankImpl(M6Databank& inDatabank, const string& inDatabankI
 
 M6DatabankImpl::~M6DatabankImpl()
 {
+    /*
+        When an exception occurs, make the threads stop before
+        deleting the data structures that they are using.
+     */
+    mStoreQueue.Put(nullptr);
+    mStoreThread.join();
+    mIndexThread.join();
+
     boost::unique_lock<boost::mutex> lock(mMutex);
 
     if (not mDocWeights.empty())

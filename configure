@@ -352,27 +352,6 @@ END
 	
 	push @libs, 'z';
 
-	# log4cpp
-
-	$header_check =<<END;
-#include <log4cpp/Category.hh>
-#include <iostream>
-int main() { std::cout << 1 << '\t' << 0; return 0; }
-END
-
-	$lib_check =<<END;
-#include <log4cpp/Category.hh>
-int main() { log4cpp::Category& root = log4cpp::Category::getRoot(); return 0; }
-END
-
-	if (not CheckLib("log4cpp", $header_check, $lib_check))
-	{
-		die "\n\nCannot continue since you don't seem to have log4cpp installed\n",
-			"Please install the log4cpp-dev package and run configure again.\n";
-	}
-
-	push @libs, 'log4cpp';
-
 	# libbz2
 	
 	$header_check =<<END;

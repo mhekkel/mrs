@@ -30,7 +30,7 @@ DEFINES				+= MRS_ETC_DIR='"$(MRS_ETC_DIR)"' \
 
 BOOST_LIBS			= system thread filesystem regex math_c99 math_c99f program_options date_time iostreams timer random chrono
 BOOST_LIBS			:= $(BOOST_LIBS:%=boost_%$(BOOST_LIB_SUFFIX))
-LIBS				= m pthread rt z bz2 zeep log4cpp
+LIBS				= m pthread rt z bz2 zeep
 
 CXX					?= c++
 

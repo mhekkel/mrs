@@ -22,6 +22,7 @@
   <!-- Users section, users can be added or modified using the command "mrs password" -->
   <users>
 <!--    <user name="scott" realm="MRS Administrator" password="b92ff7d60b994c8a0d2941ad9349e841"/>-->
+      <user name="admin" realm="MRS Administrator" password="e75d9285211a1f0db651b45f0385b700"/>
   </users>
   <!-- Server section -->
   <server addr="0.0.0.0" port="__MRS_PORT__" user="__MRS_USER__" pidfile="__MRS_RUN_DIR__/mrs.pid">

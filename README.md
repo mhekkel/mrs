@@ -14,13 +14,12 @@ offering a graphical interface to manipulate this configuration. The update
 process is fully automated and easy to follow.
 
 MRS runs on both Linux and Windows although a recent C++ compiler is required
-to build it. The Linux version comes with an init.d script. For windows, I 
+to build it. The Linux version comes with an init.d script. For windows, I
 still have to implement the code to run MRS as a service.
 
 See the changelog file for an overview of what has changed since version 5.
 
-
-Indexing Databanks
+# Indexing Databanks
 
 As an example, we will index the source code for MRS. First go to the Admin
 pages and click the 'add' button in the Databanks tab page. Select the newly
@@ -32,7 +31,7 @@ relative path, MRS will prepend it with the 'raw files' directory specified
 in the Main tab. If the path is absolute however, it will take this path
 directly. So we enter for Source files:
 
-/home/me/mrs-6.0.0/*.{cpp,h,inl,c}
+    /home/me/mrs-6.0.0/*.{cpp,h,inl,c}
 
 Now if you tick the Recursive checkbox, MRS will include all files that have
 a name that ends with either .cpp, .h, .inl or .c found in any directory
@@ -45,18 +44,43 @@ is a document.
 Now go the Main tab and click the Restart button (to save the configuration
 file) and in a terminal type
 
-mrs build m6src
+    mrs build m6src
 
 Restart the server again to load the newly created databank and you'll see
 the m6src is now searchable.
 
-
-Building MRS
+# Building MRS
 
 You need gcc 4.6, log4cpp >= 5 and boost >= 1.48 to build MRS. Intel compilers are supported
 and Visual Studio 2010 is OK too.
 
-For Linux:
+## Docker
+
+MRS comes with a Dockerfile for building mrs. It can also be used in
+production. To build the docker image, run the following in the root project
+folder:
+
+    docker build -t mrs .
+
+To run the container in development mode, allowing you to change the source on
+the host (your machine) and have the changes picked up in the container, run:
+
+    docker run -v /home/jon/projects/mrs:/app -p 18090:18090 -it mrs
+
+This will run interactively and the MRS web interface is accessible on the host
+at [http://localhost:18090](http://localhost:18090).
+
+Your production environment might differ so take the following with a pinch of
+salt. Instead of mapping the source on the local machine, you probably want to
+map the data so it's not destroyed if the container gets deleted.
+
+    docker run -v /srv/mrs/data:/srv/mrs-data -p 18090:18090 mrs
+
+This maps the data on the host at `/srv/mrs/data` to the mount point
+`/srv/mrs-data` in the container, allowing mrs in the container to write data
+to the host.
+
+## Linux (manually)
 
 You need to have the following to build MRS from source code:
 
@@ -67,9 +91,9 @@ You need to have the following to build MRS from source code:
 
 Then run:
 
-./configure
-make
-make install
+    ./configure
+    make
+    make install
 
 You can set several options using the configure script, see ./configure --help
 to see which options are available.
@@ -98,7 +122,7 @@ command and add a new user/password for the admin account. The password is
 stored encrypted in the configuration file. You then start a server using
 the command:
 
-	mrs server start
+    mrs server start
 
 If this was successful you can now access the MRS website at the address of
 the local machine and the port specified (default: 18090). Use your web
@@ -108,7 +132,7 @@ the page. Then follow the instructions there.
 The default setup will automatically update the enabled databanks. You can
 update databanks manually as well of course using the 'mrs update db' command.
 
-For Windows:
+## Windows
 
 Building MRS on Windows is not trivial, don't try it unless you have
 experience building Windows software using Visual Studio.
@@ -120,15 +144,15 @@ C:\Boost and you're using version 1.48. Also, make sure you build Boost
 with zlib and bz2 support. The way I did it is, download boost, extract it,
 run boostrap and then:
 
-bjam link=static runtime-link=static threading=multi address-model=64 
-	-sBZIP2_SOURCE="C:/Users/maarten/projects/bzip2-1.0.6"
-	-sZLIB_SOURCE="C:/Users/maarten/projects/zlib-1.2.5"
-	-sICU_PATH="C:/Users/maarten/projects/icu" stage install
+    bjam link=static runtime-link=static threading=multi address-model=64
+         -sBZIP2_SOURCE="C:/Users/maarten/projects/bzip2-1.0.6"
+         -sZLIB_SOURCE="C:/Users/maarten/projects/zlib-1.2.5"
+         -sICU_PATH="C:/Users/maarten/projects/icu" stage install
 
 Then you need to build a custom Perl interpreter. Download the source code
 and edit the file perl-5.14.1/win32/Makefile uncomment the line containing:
 
-	CCTYPE		= MSVC100
+    CCTYPE = MSVC100
 
 and build and install perl using nmake. This should install a perl in C:\Perl
 and here you can also file the perl514.dll file which you need to place in the

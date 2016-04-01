@@ -16,7 +16,7 @@ RUN git clone https://github.com/mhekkel/libzeep.git /deps/libzeep ;\
 RUN sed -i '71s/.*/\t\$\(CXX\) \-shared \-o \$@ \-Wl,\-soname=\$\(SO_NAME\) \$\(OBJECTS\) \$\(LDFLAGS\)/' /deps/libzeep/makefile
 WORKDIR /deps/libzeep
 # XXX: Run ldconfig manually to work around a bug in libzeep's makefile
-RUN make ; make install ; ldconfig
+RUN make -j ; make install ; ldconfig
 
 WORKDIR /app
 COPY . /app

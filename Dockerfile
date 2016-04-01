@@ -4,7 +4,7 @@ RUN mkdir -p /app
 WORKDIR /app
 
 RUN apt-get update
-RUN apt-get install -y clustalo
+RUN apt-get install -y clustalo ncbi-tools-bin
 RUN apt-get install -y make rsync wget
 RUN apt-get install -y git g++ libboost-all-dev libbz2-dev doxygen xsltproc docbook docbook-xsl docbook-xml autoconf automake autotools-dev liblog4cpp5-dev libperl-dev
 RUN mkdir -p /deps

@@ -23,8 +23,6 @@ COPY . /app
 RUN ./configure && make && make install
 RUN mkdir -p /srv/files && cp -r /srv/mrs-data/* /srv/files
 
-#VOLUME /srv/mrs-data
-
 EXPOSE 18090
 
 CMD ["bash", "run.sh"]

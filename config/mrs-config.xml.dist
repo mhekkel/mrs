@@ -209,7 +209,7 @@
     <databank id="interpro" parser="interpro" stylesheet="interpro.xslt" enabled="true" update="daily" fasta="false">
       <name>Interpro</name>
       <info>http://www.ebi.ac.uk/interpro/</info>
-      <source fetch="ftp://ftp.ebi.ac.uk/pub/databases/interpro/" delete="false">interpro/interpro.xml.gz</source>
+      <source fetch="ftp://ftp.ebi.ac.uk/pub/databases/interpro/54.0/" delete="false">interpro/interpro.xml.gz</source>
     </databank>
     <databank id="oxford" parser="oxford" enabled="true" update="weekly" fasta="false">
       <name>Oxford Human Mouse grid</name>
@@ -311,7 +311,7 @@
     <databank enabled="true" fasta="true" id="mmcif" parser="mmcif" update="daily">
       <name>mmCIF - macromolecular Crystallographic Information File</name>
       <info>http://mmcif.rcsb.org/</info>
-      <source delete="true" fetch="rsync.wwpdb.org::ftp_data/structures/divided/mmCIF" port="33444" recursive="true">mmCIF/??/????.cif.gz</source>
+      <source delete="true" fetch="rsync.wwpdb.org::ftp_data/structures/divided/mmCIF/" port="33444" recursive="true">mmCIF/??/????.cif.gz</source>
     </databank>
   </databanks>
 </mrs-config>

@@ -192,7 +192,7 @@
     <databank id="gene" parser="gene" stylesheet="gene.xslt" enabled="true" update="weekly" fasta="false">
       <name>Entrez Gene</name>
       <info>http://www.ncbi.nlm.nih.gov/entrez/query.fcgi?db=gene</info>
-      <source fetch="rsync://rsync.ncbi.nlm.nih.gov/gene/DATA/All_Data.ags.gz" delete="false">gene/All_Data.ags.gz</source>
+      <source fetch="ftp://ftp.ncbi.nlm.nih.gov/gene/DATA/ASN_BINARY" delete="false">gene/All_Data.ags.gz</source>
       <filter>/usr/bin/gene2xml -bT</filter>
     </databank>
     <databank id="go" parser="go" enabled="true" update="weekly" fasta="false">

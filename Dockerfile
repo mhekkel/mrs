@@ -20,7 +20,7 @@ RUN make ; make install ; ldconfig
 
 WORKDIR /app
 COPY . /app
-RUN ./configure && make && make install
+RUN ./configure && make -j && make install
 RUN mkdir -p /srv/files && cp -r /srv/mrs-data/* /srv/files
 
 EXPOSE 18090

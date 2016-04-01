@@ -292,7 +292,7 @@
     <databank id="pmc" parser="pmc" stylesheet="ViewNLM-v2.3.xsl" enabled="true" update="weekly" fasta="false">
       <name>PubMed Central</name>
       <info>http://www.pubmedcentral.nih.gov/</info>
-      <source fetch="ftp://ftp.ncbi.nih.gov/pub/pmc" delete="false">pmc/articles*.tar.gz</source>
+      <source fetch="ftp://ftp.ncbi.nih.gov/pub" delete="false">pmc/articles*.tar.gz</source>
     </databank>
     <databank enabled="false" fasta="false" id="hssp3" parser="hssp3" update="daily">
       <name>HSSP3, the original</name>

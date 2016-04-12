@@ -19,7 +19,7 @@ MRS_RUN_DIR			?= /var/run/
 MRS_ETC_DIR			?= /usr/local/etc/mrs/
 
 MRS_PORT			?= 18090
-MRS_BASE_URL		?= http://$(shell hostname -f):$(MRS_PORT)/
+MRS_BASE_URL		?= http://chelonium.cmbi.umcn.nl:$(MRS_PORT)/
 MRS_USER			?= $(shell whoami)
 
 PERL				?= $(which perl)

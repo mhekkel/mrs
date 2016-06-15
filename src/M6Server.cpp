@@ -643,6 +643,8 @@ vector<string> M6Server::UnAlias(const string& inDatabank)
 {
     vector<string> result;
 
+    LOG (DEBUG, "attempting to resolve alias %s", inDatabank.c_str ());
+
     for (auto& db : mLoadedDatabanks)
     {
         if (db.mID == inDatabank or db.mAliases.count(inDatabank))
@@ -651,6 +653,9 @@ vector<string> M6Server::UnAlias(const string& inDatabank)
 
     sort(result.begin(), result.end());
     result.erase(unique(result.begin(), result.end()), result.end());
+
+    LOG (DEBUG, "found %d databanks for alias %s", result.size (),
+                                                   inDatabank.c_str ());
 
     return result;
 }
@@ -3301,14 +3306,20 @@ void M6Server::handle_info(const zh::request& request, const el::scope& scope, z
 
     string dbAlias = params.get("db", "").as<string>();
     if (dbAlias.empty())
+    {
         THROW(("No databank specified"));
+    }
+
+    LOG (DEBUG, "M6Server: info request is for databank %s", dbAlias.c_str ());
 
     vector<string> aliased = UnAlias(dbAlias);
-    bool bAlias = aliased.size()>1 || aliased[0] != dbAlias ;
+    bool bAlias = aliased.size()>1 ||
+                    aliased.size () == 1 && aliased[0] != dbAlias ;
 
     vector<el::object> databanks;
     for (string db : aliased)
     {
+        LOG (DEBUG, "M6Server: Resolved %s to %s", dbAlias.c_str (), db.c_str ());
 
     for (M6LoadedDatabank& ldb : mLoadedDatabanks)
     {
@@ -3370,6 +3381,8 @@ void M6Server::handle_info(const zh::request& request, const el::scope& scope, z
     }
     }
 
+    LOG (DEBUG, "M6Server: creating info reply for %d databanks",
+                aliased.size ());
 
     if(bAlias) {
 
@@ -3389,6 +3402,8 @@ void M6Server::handle_info(const zh::request& request, const el::scope& scope, z
     else {
         create_reply_from_template("info.html", sub, reply);
     }
+
+    LOG (DEBUG, "M6Server: done creating info reply");
 }
 
 void M6Server::handle_browse(const zh::request& request, const el::scope& scope, zh::reply& reply)

@@ -306,6 +306,7 @@ M6TarDataSourceImpl::M6TarDataSourceImpl(const fs::path& inArchive, M6Progress& 
 
 M6TarDataSourceImpl::~M6TarDataSourceImpl()
 {
+    close (mStream);
 }
 
 M6TarDataSourceImpl::M6DataFile* M6TarDataSourceImpl::Next()

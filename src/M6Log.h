@@ -5,11 +5,10 @@
 
 #pragma once
 
+#include <boost/filesystem/fstream.hpp>
+#include <boost/thread.hpp>
+
 #define LOG(level, msg,...) M6Logger::GetLogger().Log(level, msg, ##__VA_ARGS__)
-
-#define LOG4CPP_FIX_ERROR_COLLISION 1
-
-#include <log4cpp/Category.hh>
 
 /// Logging levels used by mrs. Follows the same as for syslog, taken from
 /// RFC 5424. Comments added for ease of reading.
@@ -42,6 +41,8 @@ class M6Logger
     M6Logger& operator=(M6Logger&&) =delete;
 
   private:
-    log4cpp::Category& mLog4cppLogger;
+    boost::filesystem::path mLogFilePath;
+    boost::mutex mutex_log;
     bool bEnabled;
+    M6LogLevel mPriority;
 };

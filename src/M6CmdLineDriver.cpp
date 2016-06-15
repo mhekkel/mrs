@@ -487,6 +487,18 @@ int M6BlastDriver::Exec(const string& inCommand, po::variables_map& vm)
     if (vm.count("ungapped"))        gapped = false;
     if (vm.count("expect"))            expect = vm["expect"].as<double>();
     if (vm.count("threads"))        threads = vm["threads"].as<int32>();
+    else
+    {
+        // Determine the number of threads from config:
+        const zx::element *server = M6Config::GetServer(),
+                          *blaster = server->find_first("blaster");
+        if (blaster != nullptr)
+        {
+            uint32 n =  boost::lexical_cast<uint32> (blaster->get_attribute ("nthread"));
+            if (n > 0)
+                threads = n;
+        }
+    }
 
     //if (vm.count("write-fasta"))
     //{
@@ -531,6 +543,18 @@ int M6BuildDriver::Exec(const string& inCommand, po::variables_map& vm)
         nrOfThreads = 4;
     if (vm.count("threads"))
         nrOfThreads = vm["threads"].as<uint32>();
+    else
+    {
+        // Determine the number of threads from config:
+        const zx::element *server = M6Config::GetServer(),
+                          *builder = server->find_first("builder");
+        if (builder != nullptr)
+        {
+            uint32 n =  boost::lexical_cast<uint32> (builder->get_attribute ("nthread"));
+            if (n > 0)
+                nrOfThreads = n;
+        }
+    }
     if (nrOfThreads < 1)
         nrOfThreads = 1;
 

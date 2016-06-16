@@ -5,7 +5,7 @@
 #    (See accompanying file LICENSE_1_0.txt or copy at
 #          http://www.boost.org/LICENSE_1_0.txt)
 
-VERSION				= 6.1.3
+VERSION				= 6.1.4
 
 include make.config
 

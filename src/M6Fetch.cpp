@@ -718,7 +718,7 @@ void M6RSyncFetcherImpl::Mirror(bool inDryRun, ostream& out)
 
     vector<const char*> args;
     args.push_back(rsync.c_str());
-    args.push_back("-ltpvd");
+    args.push_back("-KLtpvd");
     if (source->get_attribute("recursive") == "true")
         args.push_back("--recursive");
     if (source->get_attribute("delete") == "true")
@@ -765,6 +765,7 @@ void M6RSyncFetcherImpl::Mirror(bool inDryRun, ostream& out)
             includestrings_memstore.push_back( str( boost::format("--include=%s") % include.c_str() ) );
             args.push_back( includestrings_memstore.back().c_str() );
         }
+        args.push_back("--include=*/");
         args.push_back("--exclude=*");
     }
 

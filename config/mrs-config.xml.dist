@@ -16,7 +16,7 @@
     <tool id="rsync">__RSYNC__</tool>
   </tools>
   <!-- Scheduler section -->
-  <scheduler enabled="true" time="20:00" weekday="friday"/>
+  <scheduler enabled="false" time="20:00" weekday="friday"/>
   <!-- Logger section, determines what will be logged -->
   <logger enabled="true" priority="INFO"/>
   <!-- Users section, users can be added or modified using the command "mrs password" -->
@@ -313,7 +313,7 @@
     <databank enabled="true" fasta="true" id="mmcif" parser="mmcif" update="daily">
       <name>mmCIF - macromolecular Crystallographic Information File</name>
       <info>http://mmcif.rcsb.org/</info>
-      <source delete="true" fetch="rsync.wwpdb.org::ftp_data/structures/divided/mmCIF/" port="33444" recursive="true">mmCIF/??/????.cif.gz</source>
+      <source delete="true" fetch="rsync.wwpdb.org::ftp_data/structures/divided/mmCIF/" port="33444" recursive="true">mmCIF/????.cif.gz</source>
     </databank>
   </databanks>
 </mrs-config>

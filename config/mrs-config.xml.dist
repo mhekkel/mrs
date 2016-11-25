@@ -124,7 +124,7 @@
     <databank id="embl" parser="embl" format="embl" enabled="true" update="weekly" fasta="false">
       <name>EMBL</name>
       <info>http://www.ebi.ac.uk/embl/index.html</info>
-      <source delete="true" fetch="rsync://ftp.ebi.ac.uk/pub/databases/embl/release/" recursive="true">embl_release/*.dat.gz</source>
+      <source delete="true" fetch="rsync://ftp.ebi.ac.uk/pub/databases/embl/release/" recursive="true">embl/*.dat.gz</source>
     </databank>
     <databank id="enzyme" parser="enzyme" format="enzyme" enabled="true" update="daily" fasta="false">
       <name>Enzyme</name>

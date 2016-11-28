@@ -71,19 +71,15 @@ M6Server::M6Server(const zx::element* inConfig)
     , mAlignEnabled(false)
     , mConfigCopy(nullptr)
 {
-    LOG(DEBUG,"M6Server: load databanks");
+    LOG(INFO,"M6Server: loading databanks..");
 
     LoadAllDatabanks();
 
-    LOG(DEBUG,"M6Server: set docroot");
+    LOG(INFO,"M6Server: done loading databanks");
 
     set_docroot(M6Config::GetDirectory("docroot"));
 
-    LOG(DEBUG,"M6Server: set log forwarded");
-
     log_forwarded(mConfig->get_attribute("log-forwarded") == "true");
-
-    LOG(DEBUG,"M6Server: mounting pages");
 
     mount("",                boost::bind(&M6Server::handle_welcome, this, _1, _2, _3));
     mount("download",        boost::bind(&M6Server::handle_download, this, _1, _2, _3));
@@ -800,8 +796,6 @@ void M6Server::init_scope(el::scope& scope)
 
 void M6Server::handle_request(const zh::request& req, zh::reply& rep)
 {
-    LOG(DEBUG,"M6Server: recieved %s request with uri %s",req.method.c_str(),req.uri.c_str());
-
     try
     {
         zh::webapp::handle_request(req, rep);
@@ -831,7 +825,7 @@ void M6Server::handle_welcome(const zh::request& request, const el::scope& scope
 {
     el::scope sub(scope);
 
-    LOG(DEBUG,"handle welcome");
+    LOG(INFO,"handling welcome page");
 
     if (not mWebServices.empty())
     {
@@ -848,20 +842,26 @@ void M6Server::handle_welcome(const zh::request& request, const el::scope& scope
         sub.put("wsdl", wsdl);
     }
 
-    LOG(DEBUG,"reply in index.html");
-
     create_reply_from_template("index.html", sub, reply);
+
+    LOG(DEBUG,"done generating welcome page response");
 }
 
 void M6Server::handle_file(const zh::request& request,
     const el::scope& scope, zh::reply& reply)
 {
+    LOG(INFO, "handling file request for %s",
+              scope["baseuri"].as<string>().c_str());
+
     fs::path file = get_docroot() / scope["baseuri"].as<string>();
 
     webapp::handle_file(request, scope, reply);
 
     if (file.extension() == ".html")
         reply.set_content_type("application/xhtml+xml");
+
+    LOG(INFO, "Done generating file reply for %s",
+              scope["baseuri"].as<string>().c_str());
 }
 
 void M6Server::handle_download(const zh::request& request, const el::scope& scope, zh::reply& reply)
@@ -876,9 +876,8 @@ void M6Server::handle_download(const zh::request& request, const el::scope& scop
     stringstream ss;
     uint32 n = 0;
 
-    LOG (DEBUG, "download request recieved, format=%s, db=%s",
-                format.c_str (),
-                db.c_str ());
+    LOG(INFO, "download request recieved, format=%s, db=%s",
+               format.c_str (), db.c_str ());
 
     for (auto& p : params)
     {
@@ -922,6 +921,9 @@ void M6Server::handle_download(const zh::request& request, const el::scope& scop
 
     reply.set_header("Content-disposition",
         (boost::format("attachment; filename=%1%.txt") % id).str());
+
+    LOG(INFO, "done generating download reply format=%s, db=%s",
+              format.c_str (), db.c_str ());
 }
 
 void M6Server::handle_entry(const zh::request& request, const el::scope& scope, zh::reply& reply)
@@ -939,8 +941,8 @@ void M6Server::handle_entry(const zh::request& request, const el::scope& scope, 
     rq = params.get("rq", "").as<string>();
     format = params.get("format", "entry").as<string>();
 
-    LOG (DEBUG, "request entry format=%s db=%s id=%s nr=%s",
-                format.c_str (), db.c_str (), id.c_str (), nr.c_str ());
+    LOG(INFO, "request entry format=%s db=%s id=%s nr=%s",
+              format.c_str (), db.c_str (), id.c_str (), nr.c_str ());
 
     if (id.empty() and db.empty())
     {
@@ -962,6 +964,8 @@ void M6Server::handle_entry(const zh::request& request, const el::scope& scope, 
     if (db.empty() or (nr.empty() and id.empty()))        // shortcut
     {
         reply = zh::reply::redirect(mBaseURL);
+
+        LOG(INFO, "redirecting empty entry request to base url");
         return;
     }
 
@@ -1124,6 +1128,9 @@ void M6Server::handle_entry(const zh::request& request, const el::scope& scope, 
     {
         create_redirect(redirect.db, redirect.nr, "", false, request, reply);
     }
+
+    LOG(INFO, "done generating reply for entry format=%s db=%s id=%s nr=%s",
+              format.c_str (), db.c_str (), id.c_str (), nr.c_str ());
 }
 
 void M6Server::highlight_query_terms(zx::element* node, boost::regex& expr)
@@ -1292,7 +1299,8 @@ void M6Server::handle_search(const zh::request& request,
 
     bool dbIDMatched = nameMatchingDBs != mLoadedDatabanks.end() ;
 
-    LOG(DEBUG,"handle_search db=\'%s\' q=\'%s\'",db.c_str(),q.c_str());
+    LOG(INFO, "handling search request for db=\'%s\' q=\'%s\'",
+              db.c_str(), q.c_str());
 
     if (db.empty() or q.empty() or (db == "all" and q == "*"))
     {
@@ -1498,6 +1506,9 @@ void M6Server::handle_search(const zh::request& request,
         create_reply_from_template ("results.html", sub, reply);
     else
         create_reply_from_template ("results-for-all.html", sub, reply);
+
+    LOG(INFO, "done generating reply for search db=\'%s\' q=\'%s\'",
+              db.c_str(),q.c_str());
 }
 
 void M6Server::handle_link(const zh::request& request, const el::scope& scope, zh::reply& reply)
@@ -1512,10 +1523,16 @@ void M6Server::handle_link(const zh::request& request, const el::scope& scope, z
     ix = params.get("ix", "").as<string>();        if (ix == "full-text") ix = "*";
     q = params.get("q", "").as<string>();
 
+    LOG(INFO, "handling link request for id=%s, db=%s, ix=%s, q=%s",
+              id.c_str(), db.c_str(), ix.c_str(), q.c_str());
+
     M6Tokenizer::CaseFold(db);
     M6Tokenizer::CaseFold(id);
 
     create_redirect(db, ix, id, q, false, request, reply);
+
+    LOG(INFO, "done generating link reply for id=%s, db=%s, ix=%s, q=%s",
+              id.c_str(), db.c_str(), ix.c_str(), q.c_str());
 }
 
 void M6Server::handle_linked(const zh::request& request, const el::scope& scope, zh::reply& reply)
@@ -1530,6 +1547,9 @@ void M6Server::handle_linked(const zh::request& request, const el::scope& scope,
     ddb = params.get("d", "").as<string>();
     nr = params.get("nr", "0").as<uint32>();
     page = params.get("page", 1).as<uint32>();
+
+    LOG(INFO, "handling linked request for s=%s, d=%s, nr=%d, page=%d",
+              sdb.c_str(), ddb.c_str(), nr, page);
 
     if (page < 1)
         page = 1;
@@ -1612,6 +1632,9 @@ void M6Server::handle_linked(const zh::request& request, const el::scope& scope,
 
         create_reply_from_template("results.html", sub, reply);
     }
+
+    LOG(INFO, "done generating linked response for s=%s, d=%s, nr=%d, page=%d",
+              sdb.c_str(), ddb.c_str(), nr, page);
 }
 
 void M6Server::handle_similar(const zh::request& request, const el::scope& scope, zh::reply& reply)
@@ -1625,6 +1648,9 @@ void M6Server::handle_similar(const zh::request& request, const el::scope& scope
     db = params.get("db", "").as<string>();
     nr = params.get("nr", "").as<string>();
     page = params.get("page", 1).as<uint32>();
+
+    LOG(INFO, "handling similar request for db=%s, nr=%s, page=%d",
+              db.c_str(), nr.c_str(), page);
 
     int32 maxresultcount = hits_per_page, resultoffset = 0;
 
@@ -1697,6 +1723,9 @@ void M6Server::handle_similar(const zh::request& request, const el::scope& scope
     }
 
     create_reply_from_template("results.html", sub, reply);
+
+    LOG(INFO, "done generating similar reply for db=%s, nr=%s, page=%d",
+              db.c_str(), nr.c_str(), page);
 }
 
 void M6Server::handle_search_ajax(const zh::request& request, const el::scope& scope, zh::reply& reply)
@@ -1708,6 +1737,9 @@ void M6Server::handle_search_ajax(const zh::request& request, const el::scope& s
     string db = params.get("db", "").as<string>();
     uint32 offset = params.get("offset", 0).as<uint32>();
     uint32 count = params.get("count", 0).as<uint32>();
+
+    LOG(INFO, "handling ajax search request for q=%s, db=%s, offset=%d, count=%d",
+              q.c_str(), db.c_str(), offset, count);
 
     if (count <= 0)
         count = 5;
@@ -1730,6 +1762,9 @@ void M6Server::handle_search_ajax(const zh::request& request, const el::scope& s
     result["error"] = error;
 
     reply.set_content(result.toJSON(), "text/javascript");
+
+    LOG(INFO, "done generating ajax search response for q=%s, db=%s, offset=%d, count=%d",
+              q.c_str(), db.c_str(), offset, count);
 }
 
 void M6Server::ProcessNewConfig(const string& inPage, zeep::http::parameter_map& inParams)
@@ -2401,16 +2436,19 @@ void M6Server::handle_rest_entry(const zh::request& request, const el::scope& sc
             id = (p++)->string();
     }
 
+    LOG(INFO, "handling rest entry request for id=%s, db=%s",
+              id.c_str(), db.c_str());
+
     if (id.empty())
         THROW(("No id specified"));
 
     if (db.empty())
         THROW(("No db specified"));
 
-    LOG (DEBUG, "handle_rest_entry with db=%s id=%s format=%s",
-                db.c_str (), id.c_str (), format.c_str ());
-
     reply.set_content(GetEntry(db, id, format), "text/plain");
+
+    LOG(INFO, "done generating rest entry response for id=%s, db=%s",
+              id.c_str(), db.c_str());
 }
 
 void M6Server::handle_rest_find(const zh::request& request, const el::scope& scope, zh::reply& reply)
@@ -2434,6 +2472,9 @@ void M6Server::handle_rest_find(const zh::request& request, const el::scope& sco
         if (p != path.end())
             q = (p++)->string();
     }
+
+    LOG(INFO, "handling rest find request for q=%s, db=%s, offset=%d, count=%d",
+              q.c_str(), db.c_str(), resultoffset, resultcount);
 
     if (q.empty())
         THROW(("No query specified"));
@@ -2467,6 +2508,9 @@ void M6Server::handle_rest_find(const zh::request& request, const el::scope& sco
 
         reply.set_content(s.str(), "text/plain");
     }
+
+    LOG(INFO, "done generating rest find response for q=%s, db=%s, offset=%d, count=%d",
+              q.c_str(), db.c_str(), resultoffset, resultcount);
 }
 
 // --------------------------------------------------------------------
@@ -2747,6 +2791,9 @@ void M6Server::handle_blast(const zeep::http::request& request, const el::scope&
     string db = params.get("db", "sprot").as<string>();
     uint32 nr = params.get("nr", "0").as<uint32>();
 
+    LOG(INFO, "handling blast request for db=%s, nr=%d",
+              db.c_str(), nr);
+
 //    string query = params.get("query", "").as<string>();
     string query;
     if (nr != 0 and not db.empty() and Load(db) != nullptr)
@@ -2784,6 +2831,9 @@ void M6Server::handle_blast(const zeep::http::request& request, const el::scope&
     sub.put("gapped", gapped);
 
     create_reply_from_template("blast.html", sub, reply);
+
+    LOG(INFO, "done generating blast response for db=%s, nr=%d",
+              db.c_str(), nr);
 }
 
 void M6Server::handle_blast_results_ajax(const zeep::http::request& request, const el::scope& scope, zeep::http::reply& reply)
@@ -3038,6 +3088,9 @@ void M6Server::handle_blast_submit_ajax(
     reportLimit = params.get("reportLimit", reportLimit).as<int>();
     filter = params.get("filter", true).as<bool>();
 
+    LOG(INFO, "handling ajax blast submit request for query=%s, db=%s",
+              query.c_str(), db.c_str());
+
     // validate and unalias the databank
     bool found = false;
     for (M6BlastDatabank& bdb : mBlastDatabanks)
@@ -3119,6 +3172,9 @@ void M6Server::handle_blast_submit_ajax(
     }
 
     reply.set_content(result.toJSON(), "text/javascript");
+
+    LOG(INFO, "done generating ajax blast submit response for query=%s, db=%s",
+              query.c_str(), db.c_str());
 }
 
 void M6Server::handle_align(const zh::request& request, const el::scope& scope, zh::reply& reply)
@@ -3129,6 +3185,8 @@ void M6Server::handle_align(const zh::request& request, const el::scope& scope, 
     el::scope sub(scope);
 
     string seqstr = params.get("seqs", "").as<string>();
+
+    LOG(INFO, "handle align request with seqs=%s", seqstr.c_str());
 
     ba::replace_all(seqstr, "\r\n", "\n");
     ba::replace_all(seqstr, "\r", "\n");
@@ -3153,6 +3211,8 @@ void M6Server::handle_align(const zh::request& request, const el::scope& scope, 
     }
 
     create_reply_from_template("align.html", sub, reply);
+
+    LOG(INFO, "done generating align response for seqs=%s", seqstr.c_str());
 }
 
 void M6Server::handle_align_submit_ajax(const zh::request& request, const el::scope& scope, zh::reply& reply)
@@ -3163,6 +3223,9 @@ void M6Server::handle_align_submit_ajax(const zh::request& request, const el::sc
     el::object result;
 
     string fasta = params.get("input", "").as<string>();
+
+    LOG(INFO, "handle ajax align request with fasta=%s", fasta.c_str());
+
     if (fasta.empty())
         result["error"] = "No input specified for align";
     else
@@ -3205,6 +3268,8 @@ void M6Server::handle_align_submit_ajax(const zh::request& request, const el::sc
     }
 
     reply.set_content(result.toJSON(), "text/javascript");
+
+    LOG(INFO, "done generating ajax align response for fasta=%s", fasta.c_str());
 }
 
 // --------------------------------------------------------------------
@@ -3215,6 +3280,8 @@ void M6Server::handle_status(const zh::request& request, const el::scope& scope,
     get_parameters(scope, params);
 
     el::scope sub(scope);
+
+    LOG(INFO, "handling status request");
 
     vector<el::object> databanks;
 //    for (M6LoadedDatabank& db : mLoadedDatabanks)
@@ -3249,12 +3316,17 @@ void M6Server::handle_status(const zh::request& request, const el::scope& scope,
 
     create_reply_from_template("status.html", sub, reply);
     reply.set_header("Cache-Control", "no-cache");
+
+    LOG(INFO, "done generating status response");
 }
 
 void M6Server::handle_status_ajax(const zh::request& request, const el::scope& scope, zh::reply& reply)
 {
     vector<el::object> databanks;
     vector<string> scheduled;
+
+    LOG(INFO, "handling ajax status request");
+
     M6Scheduler::Instance().GetScheduledDatabanks(scheduled);
 
     for (zx::element* db : M6Config::GetDatabanks())
@@ -3295,6 +3367,8 @@ void M6Server::handle_status_ajax(const zh::request& request, const el::scope& s
 
     reply.set_content(el::object(databanks).toJSON(), "text/javascript");
     reply.set_header("Cache-Control", "no-cache");
+
+    LOG(INFO, "done generating ajax status response");
 }
 
 void M6Server::handle_info(const zh::request& request, const el::scope& scope, zh::reply& reply)
@@ -3305,6 +3379,9 @@ void M6Server::handle_info(const zh::request& request, const el::scope& scope, z
     el::scope sub(scope);
 
     string dbAlias = params.get("db", "").as<string>();
+
+    LOG(INFO, "handling info request for db=%s", dbAlias.c_str());
+
     if (dbAlias.empty())
     {
         THROW(("No databank specified"));
@@ -3403,7 +3480,7 @@ void M6Server::handle_info(const zh::request& request, const el::scope& scope, z
         create_reply_from_template("info.html", sub, reply);
     }
 
-    LOG (DEBUG, "M6Server: done creating info reply");
+    LOG(INFO, "done generating info response for db=%s", dbAlias.c_str());
 }
 
 void M6Server::handle_browse(const zh::request& request, const el::scope& scope, zh::reply& reply)
@@ -3420,6 +3497,9 @@ void M6Server::handle_browse(const zh::request& request, const el::scope& scope,
     string ix = params.get("ix", "").as<string>();
     if (ix.empty())
         THROW(("No index specified"));
+
+    LOG(INFO, "handling browse request for db=%s, ix=%s",
+              db.c_str(), ix.c_str());
 
     M6Databank* mdb = Load(db);
     if (mdb == nullptr)
@@ -3460,6 +3540,9 @@ void M6Server::handle_browse(const zh::request& request, const el::scope& scope,
     }
 
     create_reply_from_template("browse.html", sub, reply);
+
+    LOG(INFO, "done generating browse response for db=%s, ix=%s",
+              db.c_str(), ix.c_str());
 }
 
 // --------------------------------------------------------------------

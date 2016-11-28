@@ -393,7 +393,11 @@ void M6Processor::ProcessFile(M6Progress& inProgress)
             {
                 M6DataSource data(path, inProgress);
                 for (M6DataSource::iterator i = data.begin(); i != data.end(); ++i)
+                {
+                    LOG(INFO, "M6Processor: processing file %s", i->mFilename.c_str());
                     ProcessFile(i->mFilename, i->mStream);
+                    LOG(INFO, "M6Processor: done processing file %s", i->mFilename.c_str());
+                }
             }
             catch (exception& e)
             {
@@ -544,7 +548,11 @@ void M6Processor::Process(vector<fs::path>& inFiles, M6Progress& inProgress,
     {
         M6DataSource data(inFiles.front(), inProgress);
         for (M6DataSource::iterator i = data.begin(); i != data.end(); ++i)
+        {
+            LOG(INFO, "M6Processor: processing file %s", i->mFilename.c_str());
             ProcessFile(i->mFilename, i->mStream);
+            LOG(INFO, "M6Processor: done processing file %s", i->mFilename.c_str());
+        }
     }
     else
     {
@@ -571,7 +579,9 @@ void M6Processor::Process(vector<fs::path>& inFiles, M6Progress& inProgress,
         // Now all the input files have been added to the queue.
 
         for (uint32 i = 0; i < inNrOfThreads; ++i)
-            mFileThreads.create_thread([&inProgress, this]() { this->ProcessFile(inProgress); });
+            mFileThreads.create_thread(
+                [&inProgress, this]() { this->ProcessFile(inProgress); }
+            );
 
         mFileThreads.join_all();
     }

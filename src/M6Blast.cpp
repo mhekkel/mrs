@@ -4,6 +4,7 @@
 //           http://www.boost.org/LICENSE_1_0.txt)
 
 #include "M6Lib.h"
+#include "M6Log.h"
 
 #include <limits>
 #include <numeric>
@@ -1475,6 +1476,8 @@ void BlastQuery<WORDSIZE>::SearchPart(const char* inFasta, size_t inLength, M6Pr
     int64 hitsToDb = 0, extensions = 0, successfulExtensions = 0;
     HitPtr hit;
 
+    LOG(INFO, "running SearchPart with inLength=%d", inLength);
+
     while (inFasta != end)
     {
         // make it possible to interrupt a search
@@ -1558,6 +1561,8 @@ void BlastQuery<WORDSIZE>::SearchPart(const char* inFasta, size_t inLength, M6Pr
 
     if (hit)
         AddHit(hit, outHits);
+
+    LOG(INFO, "finished SearchPart with inLength=%d", inLength);
 }
 
 template<int WORDSIZE>

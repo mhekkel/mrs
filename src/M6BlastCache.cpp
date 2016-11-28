@@ -543,6 +543,8 @@ void M6BlastCache::ExecuteJob(const string& inJobID, const uint32 n_threads)
 {
     try
     {
+        LOG(INFO, "executing blast job %s", inJobID.c_str());
+
         SetJobStatus(inJobID, bj_Running);
 
         M6BlastJob job;
@@ -561,6 +563,8 @@ void M6BlastCache::ExecuteJob(const string& inJobID, const uint32 n_threads)
             job.gapOpen, job.gapExtend, job.reportLimit, n_threads));
 
         CacheResult(inJobID, result);
+
+        LOG(INFO,"completed blast job %s", inJobID.c_str());
     }
     catch (exception& e)
     {

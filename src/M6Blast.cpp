@@ -39,18 +39,18 @@ namespace M6Blast
 // Code for amino acid sequences
 typedef std::basic_string<uint8> sequence;
 
-// 22 real letters and 1 dummy (X is the dummy, B and Z are pseudo letters)
-const char kResidues[] = "ABCDEFGHIKLMNPQRSTVWYZX";
+// 24 real letters and 1 dummy (X is the dummy, B and Z are pseudo letters)
+const char kResidues[] = "ABCDEFGHIKLMNPQRSTVWYZXUO";
 const uint8 kResidueNrTable[] = {
-//    A   B   C   D   E   F   G   H   I       K   L   M   N       P   Q   R   S   T  U=X  V   W   X   Y   Z
-    0,  1,  2,  3,  4,  5,  6,  7,  8, 23,  9, 10, 11, 12, 23, 13, 14, 15, 16, 17, 22, 18, 19, 22, 20, 21
+//  A   B   C   D   E   F   G   H   I   J   K   L   M   N   O   P   Q   R   S   T   U   V   W   X   Y   Z
+    0,  1,  2,  3,  4,  5,  6,  7,  8, 25,  9, 10, 11, 12, 24, 13, 14, 15, 16, 17, 23, 18, 19, 22, 20, 21
 };
 
 inline uint8 ResidueNr(char inAA)
 {
-    int result = 23;
+    int result = 25;
 
-    inAA |= 040;
+    inAA |= 040;  // to lower case
     if (inAA >= 'a' and inAA <= 'z')
         result = kResidueNrTable[inAA - 'a'];
 
@@ -67,7 +67,7 @@ std::string decode(const sequence& s);
 
 const uint32
     kAACount                = 22,    // 20 + B and Z
-    kResCount                = 23,    // includes X
+    kResCount                = 25,    // includes X, U, O
     kBits                    = 5,
     kThreshold                = 11,
     kUngappedDropOff        = 7,
@@ -78,7 +78,7 @@ const uint32
     kMaxSequenceLength        = numeric_limits<uint16>::max();
 
 const uint8
-    kGapCode                = 23;
+    kGapCode                = 25;
 
 const int32
     kHitWindow                = 40;
@@ -164,7 +164,7 @@ const uint32 kAlphabetSize        = 20;
 const double kLnAlphabetSize    = log(20.);
 
 const uint8 kAlphabetIndex[] = {
-//    A   B   C   D   E   F   G   H   I       K   L   M   N       P   Q   R   S   T  U=X  V   W   X   Y   Z
+//  A   B   C   D   E   F   G   H   I  J=X  K   L   M   N  O=X  P   Q   R   S   T  U=X  V   W   X   Y   Z
     0, 20,  1,  2,  3,  4,  5,  6,  7, 20,  8,  9, 10, 11, 20, 12, 13, 14, 15, 16, 20, 17, 18, 20, 19, 20
 };
 
@@ -1987,8 +1987,9 @@ Result* Search(const vector<fs::path>& inDatabanks,
             break;
 
         uint8 nr = ResidueNr(*i);
-        if (nr > 22)
-            THROW(("Query contains invalid characters"));
+        if (nr >= 25)
+            THROW(((boost::format("Query contains invalid characters: \'%c\'")
+                            % *i).str().c_str()));
 
         query += *i++;
     }

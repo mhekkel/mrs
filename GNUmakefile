@@ -58,6 +58,9 @@ LDFLAGS				+= -pg
 OBJDIR				:= $(OBJDIR).profile
 endif
 
+UNIT_TESTS			= unit_test_blast
+TESTS				= $(UNIT_TESTS)
+
 VPATH += src
 
 OBJECTS = \
@@ -91,7 +94,7 @@ OBJECTS = \
 	$(OBJDIR)/M6WSBlast.o \
 	$(OBJDIR)/M6WSSearch.o \
 
-all: mrs config/mrs-config.xml mrs.1 init.d/mrs
+all: mrs config/mrs-config.xml mrs.1 init.d/mrs run_tests
 
 checkcache: $(OBJDIR)/checkcache.o
 	$(CXX) -o $@ -I. $< $(LDFLAGS)
@@ -99,6 +102,14 @@ checkcache: $(OBJDIR)/checkcache.o
 mrs: $(OBJECTS)
 	@ echo "$(CXX) -o $@ -I. $^ $(LDFLAGS)"
 	@ $(CXX) -o $@ -I. $^ $(LDFLAGS)
+
+unit_test_blast: unit-tests/M6TestBlast.cpp $(OBJDIR)/M6Blast.o \
+		$(OBJDIR)/M6Matrix.o $(OBJDIR)/M6Error.o $(OBJDIR)/M6Progress.o \
+		$(OBJDIR)/M6Utilities.o
+	$(CXX) -o $@ -I src $^ $(LDFLAGS)
+
+run_tests: $(TESTS)
+	for test in $(TESTS); do ./$$test; done
 
 $(OBJDIR)/%.o: %.cpp | $(OBJDIR)
 	@ echo ">>" $<

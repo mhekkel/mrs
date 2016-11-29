@@ -3146,7 +3146,7 @@ void M6Server::handle_blast_submit_ajax(
         }
         else
         {
-            if (not ba::all(query, ba::is_any_of("LAGSVETKDPIRNQFYMHCWBZXU")))
+            if (not ba::all(query, ba::is_any_of("LAGSVETKDPIRNQFYMHCWBZXUO")))
             {
                 PRINT(("Error in parameters:\n%s", request.payload.c_str()));
                 THROW(("not a valid sequence"));

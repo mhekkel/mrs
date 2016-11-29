@@ -229,7 +229,7 @@ BlastJob.prototype = {
 	
 		this.query = this.query.replace(/\s/g, '');
 	
-		result = this.query.match(/([^LAGSVETKDPIRNQFYMHCWBZXU])/i);
+		result = this.query.match(/([^LAGSVETKDPIRNQFYMHCWBZXUO])/i);
 		if (result) {
 			alert("Query contains invalid characters: '" + result[1] + "'");
 			return false;

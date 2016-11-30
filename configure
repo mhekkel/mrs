@@ -381,7 +381,6 @@ END
 	
 	$header_check =<<END;
 #include "EXTERN.h"
-#include "perl.h"
 #include "XSUB.h"
 #include <iostream>
 int main() { std::cout << 1 << '\t' << 0; return 0; }

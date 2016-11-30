@@ -213,10 +213,10 @@
       <info>http://www.ebi.ac.uk/interpro/</info>
       <source fetch="ftp://ftp.ebi.ac.uk/pub/databases/interpro/54.0/" delete="false">interpro/interpro.xml.gz</source>
     </databank>
-    <databank id="oxford" parser="oxford" enabled="true" update="weekly" fasta="false">
+    <databank id="oxford" parser="oxford" enabled="false" update="never" fasta="false">
       <name>Oxford Human Mouse grid</name>
       <info>http://www.informatics.jax.org/</info>
-      <source fetch="ftp://ftp.informatics.jax.org/pub/reports" delete="false">oxford/HMD_Human3.rpt</source>
+      <source fetch="ftp://ftp.informatics.jax.org/pub/reports" delete="false">oxford/HMD_HumanPhenotype.rpt</source>
     </databank>
     <databank id="mimmap" parser="mimmap" enabled="true" update="never" fasta="false">
       <name>Mimmap, our view on genemap from OMIM</name>
@@ -235,7 +235,7 @@
       <info>http://pfam.sanger.ac.uk/</info>
       <source fetch="ftp://ftp.ebi.ac.uk/pub/databases/Pfam" delete="false">pfam/Pfam-A.full.gz</source>
     </databank>
-    <databank id="pfamb" parser="pfam" format="stockholm" enabled="true" update="weekly" fasta="false">
+    <databank id="pfamb" parser="pfam" format="stockholm" enabled="false" update="never" fasta="false">
       <aliases>
         <alias>pfam</alias>
       </aliases>

@@ -121,7 +121,7 @@
       <info>http://www.ncbi.nlm.nih.gov/entrez/query.fcgi?db=OMIM</info>
       <source fetch="ftp://ftp.ncbi.nih.gov/repository/OMIM/ARCHIVE/" delete="false">omim/omim.txt.Z</source>
     </databank>
-    <databank id="embl" parser="embl" format="embl" enabled="true" update="weekly" fasta="false">
+    <databank id="embl" parser="embl" format="embl" enabled="false" update="weekly" fasta="false">
       <name>EMBL</name>
       <info>http://www.ebi.ac.uk/embl/index.html</info>
       <source delete="true" fetch="rsync://ftp.ebi.ac.uk/pub/databases/embl/release/" recursive="true">embl/*.dat.gz</source>

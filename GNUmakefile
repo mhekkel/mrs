@@ -94,7 +94,7 @@ OBJECTS = \
 	$(OBJDIR)/M6WSBlast.o \
 	$(OBJDIR)/M6WSSearch.o \
 
-all: mrs config/mrs-config.xml mrs.1 init.d/mrs
+all: mrs config/mrs-config.xml mrs.1 init.d/mrs $(TESTS)
 
 checkcache: $(OBJDIR)/checkcache.o
 	$(CXX) -o $@ -I. $< $(LDFLAGS)
@@ -107,7 +107,6 @@ unit_test_blast: unit-tests/M6TestBlast.cpp $(OBJDIR)/M6Blast.o \
 		$(OBJDIR)/M6Matrix.o $(OBJDIR)/M6Error.o $(OBJDIR)/M6Progress.o \
 		$(OBJDIR)/M6Utilities.o $(OBJDIR)/M6Log.o $(OBJDIR)/M6Config.o
 	$(CXX) -o $@ -I src $^ $(LDFLAGS)
-
 
 $(OBJDIR)/%.o: %.cpp | $(OBJDIR)
 	@ echo ">>" $<
@@ -153,7 +152,7 @@ INSTALLDIRS = \
 		-e 's|__CLUSTALO__|$(CLUSTALO)|g' \
 		$< > $@
 
-install: mrs config/mrs-config.xml mrs.1 init.d/mrs logrotate.d/mrs $(TESTS)
+install: mrs config/mrs-config.xml mrs.1 init.d/mrs logrotate.d/mrs
 	@ echo "Creating directories"
 	@ for d in $(INSTALLDIRS); do \
 		if [ ! -d $$d ]; then \
@@ -201,7 +200,6 @@ install: mrs config/mrs-config.xml mrs.1 init.d/mrs logrotate.d/mrs $(TESTS)
 		echo ""; \
 		echo "Not overwriting /etc/logrotate.d/mrs file" ; \
 	  fi
-	@ for test in $(TESTS); do ./$$test; done
 
 DIST = mrs-$(VERSION)
 

@@ -39,5 +39,3 @@ RUN sed -i '30s/http\:\/\/chelonium\.cmbi\.umcn\.nl\:18090/http\:\/\/mrs.cmbi.um
 
 
 EXPOSE 18090
-
-CMD ["bash", "run.sh"]

@@ -540,7 +540,7 @@ void M6Processor::Process(vector<fs::path>& inFiles, M6Progress& inProgress,
     else
     {
         mUseDocQueue = true;
-        for (uint32 i = inFiles.size(); i < inNrOfThreads; ++i)
+        for (uint32 i = 0; i < inNrOfThreads; ++i)
             mDocThreads.create_thread([this]() { this->ProcessDocument(); });
     }
 
@@ -556,10 +556,14 @@ void M6Processor::Process(vector<fs::path>& inFiles, M6Progress& inProgress,
     }
     else
     {
-/*
         if (inNrOfThreads > inFiles.size())
             inNrOfThreads = static_cast<uint32>(inFiles.size());
- */
+
+        for (uint32 i = 0; i < inNrOfThreads; ++i)
+            mFileThreads.create_thread(
+                [&inProgress, this]() { this->ProcessFile(inProgress); }
+            );
+
         for (fs::path& file : inFiles)
         {
             if (not (mException == std::exception_ptr()))
@@ -577,11 +581,6 @@ void M6Processor::Process(vector<fs::path>& inFiles, M6Progress& inProgress,
         mFileQueue.Put(fs::path());
 
         // Now all the input files have been added to the queue.
-
-        for (uint32 i = 0; i < inNrOfThreads; ++i)
-            mFileThreads.create_thread(
-                [&inProgress, this]() { this->ProcessFile(inProgress); }
-            );
 
         mFileThreads.join_all();
     }

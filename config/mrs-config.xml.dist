@@ -18,7 +18,7 @@
   <!-- Scheduler section -->
   <scheduler enabled="false" time="20:00" weekday="friday"/>
   <!-- Logger section, determines what will be logged -->
-  <logger enabled="true" priority="INFO"/>
+  <logger enabled="true" priority="DEBUG"/>
   <!-- Users section, users can be added or modified using the command "mrs password" -->
   <users>
 <!--    <user name="scott" realm="MRS Administrator" password="b92ff7d60b994c8a0d2941ad9349e841"/>-->

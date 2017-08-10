@@ -10,4 +10,5 @@ services:
     volumes:
       - "/srv/data:/srv/mrs-data/raw"
       - "/srv/mrs:/srv/mrs-data/mrs"
+      - "/var/log/mrs:/var/log/mrs"
     command: mrs server start -p /var/run/mrs.pid --no-daemon

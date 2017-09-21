@@ -1374,7 +1374,7 @@ void BlastQuery<WORDSIZE>::Report(Result& outResult)
     outResult.mStats.mEntropy = mMatrix.GappedEntropy();
 
     boost::regex
-        kDefLineParser("^>gnl\\|([^| ]*)\\|([^| ]*)(?:\\|([^| ]*))?(?: (.+))\n?");
+        kDefLineParser("^>gnl\\|([^| ]*)\\|([^| ]*)(?:\\|([^| ]*))?(?: (.*))\n?");
 
     for (HitPtr hit : mHits)
     {

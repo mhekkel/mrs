@@ -5,6 +5,8 @@
 
 #include "M6Lib.h"
 
+#include <iostream>
+
 #include <boost/algorithm/string.hpp>
 #include <boost/format.hpp>
 #include <boost/lexical_cast.hpp>
@@ -111,9 +113,13 @@ M6Iterator* M6QueryParser::ParseQuery()
 
             default:
                 if (mImplicitIntersection)
+                {
                     result.reset(M6IntersectionIterator::Create(result.release(), ParseTest()));
+                }
                 else
+                {
                     result.reset(M6UnionIterator::Create(result.release(), ParseTest()));
+                }
                 break;
         }
     }
@@ -141,6 +147,7 @@ M6Iterator* M6QueryParser::ParseTest()
 
         case eM6TokenNOT:
         {
+
             Match(eM6TokenNOT);
             mIsBooleanQuery = true;
 
@@ -202,12 +209,17 @@ M6Iterator* M6QueryParser::ParseTest()
         case eM6TokenFloat:
         {
             string s = mTokenizer.GetTokenString();
+
             Match(mLookahead);
 
             if (mLookahead >= eM6TokenColon and mLookahead <= eM6TokenGreaterThan)
+            {
                 result.reset(ParseQualifiedTest(s));
+            }
             else if (mLookahead == eM6TokenBETWEEN)
+            {
                 result.reset(ParseBetween(s));
+            }
             else if (mLookahead == eM6TokenPunctuation)
             {
                 mQueryTerms.push_back(s);

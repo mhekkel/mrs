@@ -58,10 +58,10 @@ LDFLAGS				+= -pg
 OBJDIR				:= $(OBJDIR).profile
 endif
 
-UNIT_TESTS			= unit_test_blast
+UNIT_TESTS			= unit_test_blast unit_test_query
 TESTS				= $(UNIT_TESTS)
 
-VPATH += src
+VPATH += src unit-tests
 
 OBJECTS = \
 	$(OBJDIR)/M6BitStream.o \
@@ -103,14 +103,22 @@ mrs: $(OBJECTS)
 	@ echo "$(CXX) -o $@ -I. $^ $(LDFLAGS)"
 	@ $(CXX) -o $@ -I. $^ $(LDFLAGS)
 
-unit_test_blast: unit-tests/M6TestBlast.cpp $(OBJDIR)/M6Blast.o \
+unit_test_blast: $(OBJDIR)/M6TestBlast.o $(OBJDIR)/M6Blast.o \
 		$(OBJDIR)/M6Matrix.o $(OBJDIR)/M6Error.o $(OBJDIR)/M6Progress.o \
 		$(OBJDIR)/M6Utilities.o $(OBJDIR)/M6Log.o $(OBJDIR)/M6Config.o
-	$(CXX) -o $@ -I src $^ $(LDFLAGS)
+	$(CXX) -o $@ $^ $(LDFLAGS)
+
+unit_test_query:  $(OBJDIR)/M6TestQuery.o $(OBJDIR)/M6Query.o \
+		$(OBJDIR)/M6Databank.o $(OBJDIR)/M6Iterator.o $(OBJDIR)/M6BitStream.o \
+		$(OBJDIR)/M6Tokenizer.o $(OBJDIR)/M6Error.o $(OBJDIR)/M6Index.o \
+		$(OBJDIR)/M6File.o $(OBJDIR)/M6Progress.o $(OBJDIR)/M6DocStore.o \
+		$(OBJDIR)/M6Document.o $(OBJDIR)/M6Lexicon.o $(OBJDIR)/M6Dictionary.o \
+		$(OBJDIR)/M6Utilities.o
+	$(CXX) -o $@ $^ $(LDFLAGS)
 
 $(OBJDIR)/%.o: %.cpp | $(OBJDIR)
 	@ echo ">>" $<
-	@ $(CXX) -MD -c -o $@ $< $(CFLAGS) $(CXXFLAGS)
+	@ $(CXX) -MD -c -o $@ $< -I src $(CFLAGS) $(CXXFLAGS)
 
 $(OBJDIR)/M6Config.o: make.config
 

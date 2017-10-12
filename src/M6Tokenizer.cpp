@@ -610,7 +610,7 @@ M6Token M6Tokenizer::GetNextWord()
                     t = token;
                 else if (fast::is_han(c))        // chinese
                     result = eM6TokenWord;
-                else if (fast::isdigit(c))        // first try a number
+                else if (fast::isdigit(c) || c == '-')        // first try a number
                     state = 20;
                 else if (fast::isalnum(c))
                     state = 30;
@@ -634,7 +634,7 @@ M6Token M6Tokenizer::GetNextWord()
                     hasCombiningMarks = true;
                     state = 30;
                 }
-                else if (not fast::isdigit(c) and c != '-')
+                else if (not fast::isdigit(c))
                 {
                     Retract(*--t);
                     result = eM6TokenNumber;
@@ -645,7 +645,7 @@ M6Token M6Tokenizer::GetNextWord()
             case 30:
                 if (fast::iscombm(c))
                     hasCombiningMarks = true;
-                else if (fast::is_han(c) or not fast::isalnum(c))
+                else if (fast::is_han(c) or not fast::isalnum(c) and c != '-')
                 {
                     Retract(*--t);
                     result = eM6TokenWord;
@@ -852,7 +852,7 @@ M6Token M6Tokenizer::GetNextQueryToken()
                     isPattern = true;
                     state = 30;
                 }
-                else if (not fast::isdigit(c) and c != '-')
+                else if (not fast::isdigit(c))
                 {
                     Retract(*--t);
                     result = eM6TokenNumber;

@@ -12,3 +12,7 @@ services:
       - "/srv/mrs:/srv/mrs-data/mrs"
       - "/var/log/mrs:/var/log/mrs"
     command: mrs server start -p /var/run/mrs.pid --no-daemon
+    deploy:
+      resources:
+        limits:
+          memory: 100G

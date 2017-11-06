@@ -8,6 +8,7 @@ services:
     ports:
       - "18090:18090"
     volumes:
+      - "/srv/mrs-blast:/srv/mrs-data/blast-cache"
       - "/srv/data:/srv/mrs-data/raw"
       - "/srv/mrs:/srv/mrs-data/mrs"
       - "/var/log/mrs:/var/log/mrs"

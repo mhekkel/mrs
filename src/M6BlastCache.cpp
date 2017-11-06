@@ -305,13 +305,14 @@ void M6BlastCache::CacheResult(const string& inJobID, M6BlastResultPtr inResult)
         out.push(file);
 
         out << doc;
-        file.close();
 
         // Place the job with requested id at the beginning of the list
         auto j = i;
         advance(j, 1);
         if (i != mResultCache.begin())
             mResultCache.splice(mResultCache.begin(), mResultCache, i, j);
+
+        LOG(DEBUG, "closing output file for blast job with id: %s",inJobID.c_str());
     }
 
     // do some housekeeping, jobs at the back are first to be removed.
@@ -451,10 +452,9 @@ void M6BlastCache::StoreJob(const string& inJobID, const M6BlastJob& inJob)
 
     fs::ofstream file(mCacheDir / (inJobID + ".job"), ios_base::out|ios_base::trunc);
     file << doc;
-    file.close();
 }
 
-bool IsHighLoad (const M6BlastJob &job)
+bool IsHighLoad(const M6BlastJob &job)
 {
     // query sequence length:
     if (job.query.length () > 1e4)
@@ -472,7 +472,7 @@ bool IsHighLoad (const M6BlastJob &job)
     return false;
 }
 
-void M6BlastCache::Work (const bool highload)
+void M6BlastCache::Work(const bool highload)
 {
     using namespace boost::posix_time;
 
@@ -526,7 +526,7 @@ void M6BlastCache::Work (const bool highload)
     }
 }
 
-bool M6BlastCache::LoadCacheJob (const std::string& inJobID, M6BlastJob& job)
+bool M6BlastCache::LoadCacheJob(const std::string& inJobID, M6BlastJob& job)
 {
     boost::mutex::scoped_lock lock(mCacheMutex);
 

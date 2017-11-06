@@ -2369,8 +2369,12 @@ void M6Server::handle_admin_blast_queue_ajax(const zh::request& request,
 
     vector<el::object> jobs;
 
+    LOG(DEBUG, "M6Server: listing blast jobs for an admin request");
+
     for (const M6BlastJobDesc& jobDesc : M6BlastCache::Instance().GetJobList())
     {
+        LOG(DEBUG, "M6Server: iter job %s", jobDesc.id.c_str());
+
         el::object job;
         job["id"] = jobDesc.id;
         job["db"] = jobDesc.db;
@@ -2378,6 +2382,8 @@ void M6Server::handle_admin_blast_queue_ajax(const zh::request& request,
         job["status"] = jobDesc.status;
         jobs.push_back(job);
     }
+
+    LOG(DEBUG, "M6Server: returning blast jobs for an admin request");
 
     reply.set_content(el::object(jobs).toJSON(), "text/javascript");
 }

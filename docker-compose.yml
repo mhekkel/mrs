@@ -14,3 +14,4 @@ services:
       - "/var/log/mrs:/var/log/mrs"
     command: mrs server start -p /var/run/mrs.pid --no-daemon
     mem_limit: 100000000
+    memswap_limit: -1

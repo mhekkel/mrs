@@ -291,12 +291,12 @@ END
 		or length(@boost_version) == 0 or not defined $boost_version[0])
 	{
 		die "\n\nCannot continue since you don't seem to have boost installed\n",
-			"Please install e.g. the libboost1.48-all-dev package and run configure again.\n";
+			"Please install e.g. the libboost1.65-all-dev package and run configure again.\n";
 	}
 
 	@boost_version = split(m/_/, $boost_version[0]);
 	
-	die "MRS needs boost version 1.48 or higher\n" unless $boost_version[1] >= 48;
+	die "MRS needs boost version 1.65 or higher\n" unless $boost_version[1] >= 65;
 
 	# zeep libraries
 	if ($zeep)

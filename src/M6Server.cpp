@@ -11,6 +11,7 @@
 #include <sys/resource.h>
 #endif
 
+#include <sstream>
 #include <iostream>
 #include <numeric>
 #include <cmath>
@@ -24,6 +25,7 @@
 #include <boost/uuid/uuid_io.hpp>
 #include <boost/random/random_device.hpp>
 #include <boost/chrono.hpp>
+#include <boost/stacktrace.hpp>
 
 #include <zeep/envelope.hpp>
 
@@ -179,6 +181,10 @@ M6Server::M6Server(const zx::element* inConfig)
             }
             catch (exception& e)
             {
+                stringstream ss;
+                ss << boost::stacktrace::stacktrace();
+                LOG(ERROR, "web-service: %s\n%s", e.what(), ss.str().c_str());
+
                 if (request.method == "POST")
                 {
                     reply.set_content(zeep::make_fault(e));
@@ -823,314 +829,358 @@ void M6Server::handle_request(const zh::request& req, zh::reply& rep)
 
 void M6Server::handle_welcome(const zh::request& request, const el::scope& scope, zh::reply& reply)
 {
-    el::scope sub(scope);
-
-    LOG(INFO,"handling welcome page");
-
-    if (not mWebServices.empty())
+    try
     {
-        el::object wsdl;
+        el::scope sub(scope);
 
-        const char* wss[] = { "mrsws_search", "mrsws_blast", "mrsws_align" };
-        el::object wsc;
+        LOG(INFO,"handling welcome page");
 
-        for (const char* ws : wss)
+        if (not mWebServices.empty())
         {
-            if (zx::node* n = mConfig->find_first_node((boost::format("web-service[@service='%1%']/@location") % ws).str().c_str()))
-                wsdl[ws] = mBaseURL + n->str() + "/wsdl";
+            el::object wsdl;
+
+            const char* wss[] = { "mrsws_search", "mrsws_blast", "mrsws_align" };
+            el::object wsc;
+
+            for (const char* ws : wss)
+            {
+                if (zx::node* n = mConfig->find_first_node((boost::format("web-service[@service='%1%']/@location") % ws).str().c_str()))
+                    wsdl[ws] = mBaseURL + n->str() + "/wsdl";
+            }
+            sub.put("wsdl", wsdl);
         }
-        sub.put("wsdl", wsdl);
+
+        create_reply_from_template("index.html", sub, reply);
+
+        LOG(DEBUG,"done generating welcome page response");
     }
+    catch(...)
+    {
+        std::stringstream ss;
+        ss << boost::stacktrace::stacktrace();
+        LOG(ERROR, "handle_welcome: %s", ss.str().c_str());
 
-    create_reply_from_template("index.html", sub, reply);
-
-    LOG(DEBUG,"done generating welcome page response");
+        throw;
+    }
 }
 
 void M6Server::handle_file(const zh::request& request,
     const el::scope& scope, zh::reply& reply)
 {
-    LOG(INFO, "handling file request for %s",
-              scope["baseuri"].as<string>().c_str());
+    try
+    {
+        LOG(INFO, "handling file request for %s",
+                  scope["baseuri"].as<string>().c_str());
 
-    fs::path file = get_docroot() / scope["baseuri"].as<string>();
+        fs::path file = get_docroot() / scope["baseuri"].as<string>();
 
-    webapp::handle_file(request, scope, reply);
+        webapp::handle_file(request, scope, reply);
 
-    if (file.extension() == ".html")
-        reply.set_content_type("application/xhtml+xml");
+        if (file.extension() == ".html")
+            reply.set_content_type("application/xhtml+xml");
 
-    LOG(INFO, "Done generating file reply for %s",
-              scope["baseuri"].as<string>().c_str());
+        LOG(INFO, "Done generating file reply for %s",
+                  scope["baseuri"].as<string>().c_str());
+    }
+    catch(...)
+    {
+        std::stringstream ss;
+        ss << boost::stacktrace::stacktrace();
+        LOG(ERROR, "handle_file: %s", ss.str().c_str());
+
+        throw;
+    }
 }
 
 void M6Server::handle_download(const zh::request& request, const el::scope& scope, zh::reply& reply)
 {
-    zh::parameter_map params;
-    get_parameters(scope, params);
-
-    string format = params.get("format", "entry").as<string>();
-    string db = params.get("db", "").as<string>();
-
-    string id;
-    stringstream ss;
-    uint32 n = 0;
-
-    LOG(INFO, "download request recieved, format=%s, db=%s",
-               format.c_str (), db.c_str ());
-
-    for (auto& p : params)
+    try
     {
-        if (p.first == "id")
-        {
-            id = p.second.as<string>();
+        zh::parameter_map params;
+        get_parameters(scope, params);
 
-            string m_db = db;
-            size_t pos, pos2;
-            if ((pos = id.find ("/")) != string::npos)
+        string format = params.get("format", "entry").as<string>();
+        string db = params.get("db", "").as<string>();
+
+        string id;
+        stringstream ss;
+        uint32 n = 0;
+
+        LOG(INFO, "download request recieved, format=%s, db=%s",
+                   format.c_str (), db.c_str ());
+
+        for (auto& p : params)
+        {
+            if (p.first == "id")
             {
-                // databank name included in id
-                m_db = id.substr (0, pos);
+                id = p.second.as<string>();
 
-                if ((pos2 = id.find ("/", pos + 1)) != string::npos)
+                string m_db = db;
+                size_t pos, pos2;
+                if ((pos = id.find ("/")) != string::npos)
+                {
+                    // databank name included in id
+                    m_db = id.substr (0, pos);
 
-                    id = id.substr (pos + 1, pos2 - (pos + 1));
-                else
-                    id = id.substr (pos + 1);
+                    if ((pos2 = id.find ("/", pos + 1)) != string::npos)
+
+                        id = id.substr (pos + 1, pos2 - (pos + 1));
+                    else
+                        id = id.substr (pos + 1);
+                }
+
+                ss << GetEntry (m_db, id, format);
+                ++n;
             }
+            else if (p.first == "nr")
+            {
+                M6Databank* databank = Load(db);
+                if (databank == nullptr)
+                    THROW(("Databank %s not loaded", db.c_str()));
 
-            ss << GetEntry (m_db, id, format);
-            ++n;
+
+                ss << GetEntry(databank, format, boost::lexical_cast<uint32>(p.second.as<string>()));
+                ++n;
+            }
         }
-        else if (p.first == "nr")
-        {
-            M6Databank* databank = Load(db);
-            if (databank == nullptr)
-                THROW(("Databank %s not loaded", db.c_str()));
 
+        reply.set_content(ss.str(), "text/plain");
 
-            ss << GetEntry(databank, format, boost::lexical_cast<uint32>(p.second.as<string>()));
-            ++n;
-        }
+        if (n != 1 or id.empty())
+            id = "mrs-data";
+
+        reply.set_header("Content-disposition",
+            (boost::format("attachment; filename=%1%.txt") % id).str());
+
+        LOG(INFO, "done generating download reply format=%s, db=%s",
+                  format.c_str (), db.c_str ());
     }
+    catch(...)
+    {
+        std::stringstream ss;
+        ss << boost::stacktrace::stacktrace();
+        LOG(ERROR, "handle_download: %s", ss.str().c_str());
 
-    reply.set_content(ss.str(), "text/plain");
-
-    if (n != 1 or id.empty())
-        id = "mrs-data";
-
-    reply.set_header("Content-disposition",
-        (boost::format("attachment; filename=%1%.txt") % id).str());
-
-    LOG(INFO, "done generating download reply format=%s, db=%s",
-              format.c_str (), db.c_str ());
+        throw;
+    }
 }
 
 void M6Server::handle_entry(const zh::request& request, const el::scope& scope, zh::reply& reply)
 {
-    string db, nr, id;
-    string q, rq, format;
-
-    zh::parameter_map params;
-    get_parameters(scope, params);
-
-    db = params.get("db", "").as<string>();
-    nr = params.get("nr", "").as<string>();
-    id = params.get("id", "").as<string>();
-    q = params.get("q", "").as<string>();
-    rq = params.get("rq", "").as<string>();
-    format = params.get("format", "entry").as<string>();
-
-    LOG(INFO, "request entry format=%s db=%s id=%s nr=%s",
-              format.c_str (), db.c_str (), id.c_str (), nr.c_str ());
-
-    if (id.empty() and db.empty())
-    {
-        fs::path path(scope["baseuri"].as<string>());
-
-        fs::path::iterator p = path.begin();
-        if ((p++)->string() == "entry" and p != path.end())
-        {
-            db = (p++)->string();
-            if (p != path.end())
-                id = (p++)->string();
-            if (p != path.end())
-                format = (p++)->string();
-            if (p != path.end())
-                q = (p++)->string();
-        }
-    }
-
-    if (db.empty() or (nr.empty() and id.empty()))        // shortcut
-    {
-        reply = zh::reply::redirect(mBaseURL);
-
-        LOG(INFO, "redirecting empty entry request to base url");
-        return;
-    }
-
-    M6Databank* mdb = Load(db);
-    uint32 docNr = 0;
-
-    if (mdb == nullptr and not id.empty())
-    {
-        for (string adb : UnAlias(db))
-        {
-            mdb = Load(adb);
-            if (mdb != nullptr)
-            {
-                bool exists;
-                tie(exists, docNr) = mdb->Exists("id", id);
-                if (exists)
-                {
-                    db = adb;
-                    nr = to_string(docNr);
-                    break;
-                }
-            }
-        }
-    }
-
-    if (mdb == nullptr)
-        THROW(("Databank %s not loaded", db.c_str()));
-
-    if (nr.empty())
-    {
-        bool exists;
-        tie(exists, docNr) = mdb->Exists("id", id);
-        if (not exists)
-            THROW(("Entry %s does not exist in databank %s", id.c_str(), db.c_str()));
-        if (docNr == 0)
-            THROW(("Multiple entries with ID %s in databank %s", id.c_str(), db.c_str()));
-
-    }
-    else
-    {
-        docNr = boost::lexical_cast<uint32>(nr);
-        unique_ptr<M6Document> doc(mdb->Fetch(docNr));
-        if (doc)
-            id = doc->GetAttribute("id");
-    }
-
-    unique_ptr<M6Document> document(mdb->Fetch(docNr));
-
-    el::scope sub(scope);
-    sub.put("db", el::object(db));
-    sub.put("id", document->GetAttribute("id"));
-    sub.put("nr", el::object(docNr));
-    sub.put("text", document->GetText());
-    sub.put("blastable", el::object(find_if(mBlastDatabanks.begin(), mBlastDatabanks.end(),
-            [&db](M6BlastDatabank& bdb) -> bool { return bdb.mID == db; }) != mBlastDatabanks.end()));
-
-    vector<string> linkedDbs;
-    GetLinkedDbs(db, id, linkedDbs);
-    if (not linkedDbs.empty())
-    {
-        vector<el::object> linked;
-        for (string& db : linkedDbs)
-            linked.push_back(el::object(db));
-        sub.put("links", el::object(linked));
-    }
-
-    if (not q.empty())
-        sub.put("q", el::object(q));
-    else if (not rq.empty())
-    {
-        q = rq;
-        sub.put("redirect", el::object(rq));
-        sub.put("q", el::object(rq));
-    }
-    sub.put("format", el::object(format));
-
-    const zx::element* dbConfig = M6Config::GetEnabledDatabank(db);
-
-    // first stuff some data into scope
-
-    el::object databank;
-    databank["id"] = db;
-    if (zx::element* name = dbConfig->find_first("name"))
-        databank["name"] = name->content();
-    else
-        databank["name"] = db;
-    if (zx::element* info = dbConfig->find_first("info"))
-        databank["url"] = info->content();
-
-//#ifndef NO_BLAST
-//    databank["blastable"] = mNoBlast.count(db) == 0 and mdb->GetBlastDbCount() > 0;
-//#endif
-    sub.put("databank", databank);
-//    sub.put("title", document->GetAttribute("title"));
-
-    fs::ifstream data(get_docroot() / "entry.html");
-    zx::document doc;
-    doc.set_preserve_cdata(true);
-    doc.read(data);
-
-    zx::element* root = doc.child();
-
     try
     {
-        const zx::element* format = M6Config::GetFormat(dbConfig->get_attribute("format"));
-        if (format != nullptr)
-            sub["formatScript"] = format->get_attribute("script");
-        else if (not dbConfig->get_attribute("stylesheet").empty())
-            sub["formatXSLT"] = dbConfig->get_attribute("stylesheet");
+        string db, nr, id;
+        string q, rq, format;
 
-        process_xml(root, sub, "/");
+        zh::parameter_map params;
+        get_parameters(scope, params);
 
-        if (format != nullptr)
+        db = params.get("db", "").as<string>();
+        nr = params.get("nr", "").as<string>();
+        id = params.get("id", "").as<string>();
+        q = params.get("q", "").as<string>();
+        rq = params.get("rq", "").as<string>();
+        format = params.get("format", "entry").as<string>();
+
+        LOG(INFO, "request entry format=%s db=%s id=%s nr=%s",
+                  format.c_str (), db.c_str (), id.c_str (), nr.c_str ());
+
+        if (id.empty() and db.empty())
         {
-            zx::element_set links(format->find("link"));
-            for (zx::element* link : links)
+            fs::path path(scope["baseuri"].as<string>());
+
+            fs::path::iterator p = path.begin();
+            if ((p++)->string() == "entry" and p != path.end())
             {
-                try
-                {
-                    string ldb = link->get_attribute("db");
-                    string id = link->get_attribute("id");
-                    string ix = link->get_attribute("ix");
-                    string anchor = link->get_attribute("an");
-                    if (ldb.empty())
-                        ldb = db;
-                    if (id.empty())
-                        continue;
-                    boost::regex re(link->get_attribute("rx"));
-                    create_link_tags(root, re, ldb, ix, id, anchor);
-                }
-                catch (...) {}
+                db = (p++)->string();
+                if (p != path.end())
+                    id = (p++)->string();
+                if (p != path.end())
+                    format = (p++)->string();
+                if (p != path.end())
+                    q = (p++)->string();
             }
+        }
+
+        if (db.empty() or (nr.empty() and id.empty()))        // shortcut
+        {
+            reply = zh::reply::redirect(mBaseURL);
+
+            LOG(INFO, "redirecting empty entry request to base url");
+            return;
+        }
+
+        M6Databank* mdb = Load(db);
+        uint32 docNr = 0;
+
+        if (mdb == nullptr and not id.empty())
+        {
+            for (string adb : UnAlias(db))
+            {
+                mdb = Load(adb);
+                if (mdb != nullptr)
+                {
+                    bool exists;
+                    tie(exists, docNr) = mdb->Exists("id", id);
+                    if (exists)
+                    {
+                        db = adb;
+                        nr = to_string(docNr);
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (mdb == nullptr)
+            THROW(("Databank %s not loaded", db.c_str()));
+
+        if (nr.empty())
+        {
+            bool exists;
+            tie(exists, docNr) = mdb->Exists("id", id);
+            if (not exists)
+                THROW(("Entry %s does not exist in databank %s", id.c_str(), db.c_str()));
+            if (docNr == 0)
+                THROW(("Multiple entries with ID %s in databank %s", id.c_str(), db.c_str()));
+
+        }
+        else
+        {
+            docNr = boost::lexical_cast<uint32>(nr);
+            unique_ptr<M6Document> doc(mdb->Fetch(docNr));
+            if (doc)
+                id = doc->GetAttribute("id");
+        }
+
+        unique_ptr<M6Document> document(mdb->Fetch(docNr));
+
+        el::scope sub(scope);
+        sub.put("db", el::object(db));
+        sub.put("id", document->GetAttribute("id"));
+        sub.put("nr", el::object(docNr));
+        sub.put("text", document->GetText());
+        sub.put("blastable", el::object(find_if(mBlastDatabanks.begin(), mBlastDatabanks.end(),
+                [&db](M6BlastDatabank& bdb) -> bool { return bdb.mID == db; }) != mBlastDatabanks.end()));
+
+        vector<string> linkedDbs;
+        GetLinkedDbs(db, id, linkedDbs);
+        if (not linkedDbs.empty())
+        {
+            vector<el::object> linked;
+            for (string& db : linkedDbs)
+            linked.push_back(el::object(db));
+            sub.put("links", el::object(linked));
         }
 
         if (not q.empty())
+            sub.put("q", el::object(q));
+        else if (not rq.empty())
         {
-            try
+            q = rq;
+            sub.put("redirect", el::object(rq));
+            sub.put("q", el::object(rq));
+        }
+        sub.put("format", el::object(format));
+
+        const zx::element* dbConfig = M6Config::GetEnabledDatabank(db);
+
+        // first stuff some data into scope
+
+        el::object databank;
+        databank["id"] = db;
+        if (zx::element* name = dbConfig->find_first("name"))
+            databank["name"] = name->content();
+        else
+            databank["name"] = db;
+        if (zx::element* info = dbConfig->find_first("info"))
+            databank["url"] = info->content();
+
+//      #ifndef NO_BLAST
+//          databank["blastable"] = mNoBlast.count(db) == 0 and mdb->GetBlastDbCount() > 0;
+//      #endif
+        sub.put("databank", databank);
+//      sub.put("title", document->GetAttribute("title"));
+
+        fs::ifstream data(get_docroot() / "entry.html");
+        zx::document doc;
+        doc.set_preserve_cdata(true);
+        doc.read(data);
+
+        zx::element* root = doc.child();
+
+        try
+        {
+            const zx::element* format = M6Config::GetFormat(dbConfig->get_attribute("format"));
+            if (format != nullptr)
+                sub["formatScript"] = format->get_attribute("script");
+            else if (not dbConfig->get_attribute("stylesheet").empty())
+                sub["formatXSLT"] = dbConfig->get_attribute("stylesheet");
+
+            process_xml(root, sub, "/");
+
+            if (format != nullptr)
             {
-                vector<string> terms;
-                AnalyseQuery(q, terms);
-                if (not terms.empty())
+                zx::element_set links(format->find("link"));
+                for (zx::element* link : links)
                 {
-                    string pattern = ba::join(terms, "|");
-
-                    if (uc::contains_han(pattern))
-                        pattern = string("(") + pattern + ")";
-                    else
-                        pattern = string("\\b(") + pattern + ")\\b";
-
-                    boost::regex re(pattern, boost::regex_constants::icase);
-                    highlight_query_terms(root, re);
+                    try
+                    {
+                        string ldb = link->get_attribute("db");
+                        string id = link->get_attribute("id");
+                        string ix = link->get_attribute("ix");
+                        string anchor = link->get_attribute("an");
+                        if (ldb.empty())
+                            ldb = db;
+                        if (id.empty())
+                            continue;
+                        boost::regex re(link->get_attribute("rx"));
+                        create_link_tags(root, re, ldb, ix, id, anchor);
+                    }
+                    catch (...) {}
                 }
             }
-            catch (...) {}
+
+            if (not q.empty())
+            {
+                try
+                {
+                    vector<string> terms;
+                    AnalyseQuery(q, terms);
+                    if (not terms.empty())
+                    {
+                        string pattern = ba::join(terms, "|");
+
+                        if (uc::contains_han(pattern))
+                            pattern = string("(") + pattern + ")";
+                        else
+                            pattern = string("\\b(") + pattern + ")\\b";
+
+                        boost::regex re(pattern, boost::regex_constants::icase);
+                        highlight_query_terms(root, re);
+                    }
+                }
+                catch (...) {}
+            }
+
+            reply.set_content(doc);
+        }
+        catch (M6Redirect& redirect)
+        {
+            create_redirect(redirect.db, redirect.nr, "", false, request, reply);
         }
 
-        reply.set_content(doc);
+        LOG(INFO, "done generating reply for entry format=%s db=%s id=%s nr=%s",
+                  format.c_str (), db.c_str (), id.c_str (), nr.c_str ());
     }
-    catch (M6Redirect& redirect)
+    catch(...)
     {
-        create_redirect(redirect.db, redirect.nr, "", false, request, reply);
-    }
+        std::stringstream ss;
+        ss << boost::stacktrace::stacktrace();
+        LOG(ERROR, "handle_entry: %s", ss.str().c_str());
 
-    LOG(INFO, "done generating reply for entry format=%s db=%s id=%s nr=%s",
-              format.c_str (), db.c_str (), id.c_str (), nr.c_str ());
+        throw;
+    }
 }
 
 void M6Server::highlight_query_terms(zx::element* node, boost::regex& expr)
@@ -1272,440 +1322,367 @@ void M6Server::create_link_tags(zx::element* node, boost::regex& expr,
 void M6Server::handle_search(const zh::request& request,
     const el::scope& scope, zh::reply& reply)
 {
-    string q, db, id, firstDb;
-    uint32 page, hitCount = 0, firstDocNr = 0,
-           nDBsSearched = 0;
-
-    zh::parameter_map params;
-    get_parameters(scope, params);
-
-    q = params.get("q", "").as<string>();
-    if (q.empty())
-        q = params.get("query", "").as<string>();    // being backward compatible
-    db = params.get("db", "").as<string>();
-    page = params.get("page", 1).as<uint32>();
-
-    if (page < 1)
-        page = 1;
-
-    el::scope sub(scope);
-    sub.put("page", el::object(page));
-    sub.put("db", el::object(db));
-    sub.put("q", el::object(q));
-
-    std::vector<M6LoadedDatabank>::iterator nameMatchingDBs=
-        std::find_if(mLoadedDatabanks.begin(),mLoadedDatabanks.end(),
-        [&db](M6LoadedDatabank&d) -> bool { return d.mID == db; } );
-
-    bool dbIDMatched = nameMatchingDBs != mLoadedDatabanks.end() ;
-
-    LOG(INFO, "handling search request for db=\'%s\' q=\'%s\'",
-              db.c_str(), q.c_str());
-
-    if (db.empty() or q.empty() or (db == "all" and q == "*"))
+    try
     {
-        handle_welcome(request, scope, reply);
-    }
-    else if ( !dbIDMatched ) // db id not found, try aliases
-    {
-        uint32 hits_per_page = params.get("count", 3).as<uint32>();
-        if (hits_per_page > 5)
-            hits_per_page = 5;
+        string q, db, id, firstDb;
+        uint32 page, hitCount = 0, firstDocNr = 0,
+               nDBsSearched = 0;
 
-//        sub.put("linkeddbs", el::object(GetLinkedDbs(db)));
-        sub.put("count", el::object(hits_per_page));
-        sub.put("show", el::object(hits_per_page));
+        zh::parameter_map params;
+        get_parameters(scope, params);
 
-        string hitDb = db;
-        bool ranked = false;
+        q = params.get("q", "").as<string>();
+        if (q.empty())
+            q = params.get("query", "").as<string>();    // being backward compatible
+        db = params.get("db", "").as<string>();
+        page = params.get("page", 1).as<uint32>();
 
-        boost::thread_group thr;
-        boost::mutex m;
-        vector<el::object> databanks;
-        string error;
+        if (page < 1)
+            page = 1;
 
-        std::vector<M6LoadedDatabank> searchDatabanks;
-        if (db == "all")
-            searchDatabanks.assign(mLoadedDatabanks.begin(),mLoadedDatabanks.end());
-        else {
-            for (M6LoadedDatabank& d : mLoadedDatabanks) {
-
-                if (d.mAliases.count( db ) > 0)
-                    searchDatabanks.push_back( d );
-            }
-        }
-
-        for (M6LoadedDatabank& db : searchDatabanks)
-        {
-            thr.create_thread([&]() {
-                try
-                {
-                    vector<el::object> hits;
-                    uint32 c;
-                    bool r;
-                    string dbError;
-
-                    Find(db.mID, q, true, 0, 5, false, hits, c, r, dbError);
-                    nDBsSearched ++;
-
-                    boost::mutex::scoped_lock lock(m);
-
-                    if (not dbError.empty())
-                        error = dbError;
-
-                    hitCount += c;
-                    ranked = ranked or r;
-
-                    if (not hits.empty())
-                    {
-                        if (hitCount == c)
-                        {
-                            firstDb = db.mID;
-                            firstDocNr = hits.front()["docNr"].as<uint32>();
-                        }
-
-                        el::object databank;
-                        databank["id"] = db.mID;
-                        databank["name"] = db.mName;
-                        databank["hits"] = hits;
-                        databank["hitCount"] = c;
-                        databanks.push_back(databank);
-                    }
-                }
-                catch (...) { }
-            });
-        }
-        thr.join_all();
-
-        if (not error.empty())
-            sub.put("error", error);
-
-        if (not databanks.empty())
-        {
-            sub.put("ranked", el::object(ranked));
-            sub.put("hit-databanks", el::object(databanks));
-        }
-    }
-    else // given id matches 1 database
-    {
-        uint32 hits_per_page = params.get("show", 15).as<uint32>();
-        if (hits_per_page > 100)
-            hits_per_page = 100;
-
+        el::scope sub(scope);
         sub.put("page", el::object(page));
         sub.put("db", el::object(db));
-//        sub.put("linkeddbs", el::object(GetLinkedDbs(db)));
         sub.put("q", el::object(q));
-        sub.put("show", el::object(hits_per_page));
+
+        std::vector<M6LoadedDatabank>::iterator nameMatchingDBs=
+            std::find_if(mLoadedDatabanks.begin(),mLoadedDatabanks.end(),
+            [&db](M6LoadedDatabank&d) -> bool { return d.mID == db; } );
+
+        bool dbIDMatched = nameMatchingDBs != mLoadedDatabanks.end() ;
+
+        LOG(INFO, "handling search request for db=\'%s\' q=\'%s\'",
+                  db.c_str(), q.c_str());
+
+        if (db.empty() or q.empty() or (db == "all" and q == "*"))
+        {
+            handle_welcome(request, scope, reply);
+        }
+        else if ( !dbIDMatched ) // db id not found, try aliases
+        {
+            uint32 hits_per_page = params.get("count", 3).as<uint32>();
+            if (hits_per_page > 5)
+                hits_per_page = 5;
+
+    //        sub.put("linkeddbs", el::object(GetLinkedDbs(db)));
+            sub.put("count", el::object(hits_per_page));
+            sub.put("show", el::object(hits_per_page));
+
+            string hitDb = db;
+            bool ranked = false;
+
+            boost::thread_group thr;
+            boost::mutex m;
+            vector<el::object> databanks;
+            string error;
+
+            std::vector<M6LoadedDatabank> searchDatabanks;
+            if (db == "all")
+                searchDatabanks.assign(mLoadedDatabanks.begin(),mLoadedDatabanks.end());
+            else {
+                for (M6LoadedDatabank& d : mLoadedDatabanks) {
+
+                    if (d.mAliases.count( db ) > 0)
+                        searchDatabanks.push_back( d );
+                }
+            }
+
+            for (M6LoadedDatabank& db : searchDatabanks)
+            {
+                thr.create_thread([&]() {
+                    try
+                    {
+                        vector<el::object> hits;
+                        uint32 c;
+                        bool r;
+                        string dbError;
+
+                        Find(db.mID, q, true, 0, 5, false, hits, c, r, dbError);
+                        nDBsSearched ++;
+
+                        boost::mutex::scoped_lock lock(m);
+
+                        if (not dbError.empty())
+                            error = dbError;
+
+                        hitCount += c;
+                        ranked = ranked or r;
+
+                        if (not hits.empty())
+                        {
+                            if (hitCount == c)
+                            {
+                                firstDb = db.mID;
+                                firstDocNr = hits.front()["docNr"].as<uint32>();
+                            }
+
+                            el::object databank;
+                            databank["id"] = db.mID;
+                            databank["name"] = db.mName;
+                            databank["hits"] = hits;
+                            databank["hitCount"] = c;
+                            databanks.push_back(databank);
+                        }
+                    }
+                    catch (...) { }
+                });
+            }
+            thr.join_all();
+
+            if (not error.empty())
+                sub.put("error", error);
+
+            if (not databanks.empty())
+            {
+                sub.put("ranked", el::object(ranked));
+                sub.put("hit-databanks", el::object(databanks));
+            }
+        }
+        else // given id matches 1 database
+        {
+            uint32 hits_per_page = params.get("show", 15).as<uint32>();
+            if (hits_per_page > 100)
+                hits_per_page = 100;
+
+            sub.put("page", el::object(page));
+            sub.put("db", el::object(db));
+    //        sub.put("linkeddbs", el::object(GetLinkedDbs(db)));
+            sub.put("q", el::object(q));
+            sub.put("show", el::object(hits_per_page));
+
+            int32 maxresultcount = hits_per_page, resultoffset = 0;
+
+            if (page > 1)
+                resultoffset = (page - 1) * maxresultcount;
+
+            vector<el::object> hits;
+            bool ranked;
+            string error;
+
+            Find(db, q, true, resultoffset, maxresultcount, true, hits, hitCount, ranked, error);
+            if (hitCount == 0)
+            {
+                sub.put("relaxed", el::object(true));
+                Find(db, q, false, resultoffset, maxresultcount, true, hits, hitCount, ranked, error);
+            }
+            nDBsSearched ++;
+
+            if (not hits.empty())
+            {
+                sub.put("hits", el::object(hits));
+                if (hitCount == 1)
+                {
+                    firstDb = db;
+                    firstDocNr = hits.front()["docNr"].as<uint32>();
+                }
+            }
+
+            sub.put("first", el::object(resultoffset + 1));
+            sub.put("last", el::object((uint64)(resultoffset + hits.size())));
+            sub.put("hitCount", el::object(hitCount));
+            sub.put("lastPage", el::object(((hitCount - 1) / hits_per_page) + 1));
+            sub.put("ranked", ranked);
+            sub.put("error", error);
+        }
+
+        vector<string> terms;
+        AnalyseQuery(q, terms);
+        if (not terms.empty())
+        {
+            M6Tokenizer::CaseFold(q);
+
+            // add some spelling suggestions
+            sort(terms.begin(), terms.end());
+            terms.erase(unique(terms.begin(), terms.end()), terms.end());
+
+            vector<el::object> suggestions;
+            for (string& term : terms)
+            {
+                try
+                {
+                    boost::regex re(string("\\b") + term + "\\b");
+
+                    vector<pair<string,uint16>> s;
+                    SpellCheck(db, term, s);
+                    if (s.empty())
+                        continue;
+
+                    if (s.size() > 10)
+                        s.erase(s.begin() + 10, s.end());
+
+                    if (s.size() > 10)
+                        s.erase(s.begin() + 10, s.end());
+
+                    vector<el::object> alternatives;
+                    for (auto c : s)
+                    {
+                        el::object alt;
+                        alt["term"] = c.first;
+
+                        // construct new query, with the term replaced by the alternative
+                        ostringstream t;
+                        ostream_iterator<char, char> oi(t);
+                        boost::regex_replace(oi, q.begin(), q.end(), re, c.first,
+                            boost::match_default | boost::format_all);
+
+//                        if (Count(db, t.str()) > 0)
+//                        {
+                            alt["q"] = t.str();
+                            alternatives.push_back(alt);
+//                        }
+                    }
+
+                    if (alternatives.empty())
+                        continue;
+
+                    el::object so;
+                    so["term"] = term;
+                    so["alternatives"] = alternatives;
+                    suggestions.push_back(so);
+                }
+                catch (...) {}    // silently ignore errors
+            }
+
+            if (not suggestions.empty())
+                sub.put("suggestions", el::object(suggestions));
+        }
+
+        // OK, now if we only have one hit, we might as well show it directly of course...
+        if (hitCount == 1)
+            create_redirect(firstDb, firstDocNr, q, true, request, reply);
+
+        else if (dbIDMatched)
+            create_reply_from_template ("results.html", sub, reply);
+
+        else
+            create_reply_from_template ("results-for-all.html", sub, reply);
+
+        LOG(INFO, "done generating reply for search db=\'%s\' q=\'%s\'",
+                  db.c_str(),q.c_str());
+    }
+    catch(...)
+    {
+        std::stringstream ss;
+        ss << boost::stacktrace::stacktrace();
+        LOG(ERROR, "handle_search: %s", ss.str().c_str());
+
+        throw;
+    }
+}
+
+void M6Server::handle_link(const zh::request& request, const el::scope& scope, zh::reply& reply)
+{
+    try
+    {
+        string id, db, ix, q;
+
+        zeep::http::parameter_map params;
+        get_parameters(scope, params);
+
+        id = params.get("id", "").as<string>();
+        db = params.get("db", "").as<string>();
+        ix = params.get("ix", "").as<string>();        if (ix == "full-text") ix = "*";
+        q = params.get("q", "").as<string>();
+
+        LOG(INFO, "handling link request for id=%s, db=%s, ix=%s, q=%s",
+                  id.c_str(), db.c_str(), ix.c_str(), q.c_str());
+
+        M6Tokenizer::CaseFold(db);
+        M6Tokenizer::CaseFold(id);
+
+        create_redirect(db, ix, id, q, false, request, reply);
+
+        LOG(INFO, "done generating link reply for id=%s, db=%s, ix=%s, q=%s",
+                  id.c_str(), db.c_str(), ix.c_str(), q.c_str());
+    }
+    catch(...)
+    {
+        std::stringstream ss;
+        ss << boost::stacktrace::stacktrace();
+        LOG(ERROR, "handle_link: %s", ss.str().c_str());
+
+        throw;
+    }
+}
+
+void M6Server::handle_linked(const zh::request& request, const el::scope& scope, zh::reply& reply)
+{
+    try
+    {
+        string sdb, ddb;
+        uint32 page, nr, hits_per_page = 15;
+
+        zeep::http::parameter_map params;
+        get_parameters(scope, params);
+
+        sdb = params.get("s", "").as<string>();
+        ddb = params.get("d", "").as<string>();
+        nr = params.get("nr", "0").as<uint32>();
+        page = params.get("page", 1).as<uint32>();
+
+        LOG(INFO, "handling linked request for s=%s, d=%s, nr=%d, page=%d",
+                  sdb.c_str(), ddb.c_str(), nr, page);
+
+        if (page < 1)
+            page = 1;
 
         int32 maxresultcount = hits_per_page, resultoffset = 0;
 
         if (page > 1)
             resultoffset = (page - 1) * maxresultcount;
 
-        vector<el::object> hits;
-        bool ranked;
-        string error;
+        el::scope sub(scope);
+        sub.put("page", el::object(page));
+        sub.put("db", el::object(ddb));
 
-        Find(db, q, true, resultoffset, maxresultcount, true, hits, hitCount, ranked, error);
-        if (hitCount == 0)
-        {
-            sub.put("relaxed", el::object(true));
-            Find(db, q, false, resultoffset, maxresultcount, true, hits, hitCount, ranked, error);
-        }
-        nDBsSearched ++;
+        if (nr == 0 or sdb.empty() or ddb.empty())
+            THROW(("Invalid linked reference"));
 
-        if (not hits.empty())
-        {
-            sub.put("hits", el::object(hits));
-            if (hitCount == 1)
-            {
-                firstDb = db;
-                firstDocNr = hits.front()["docNr"].as<uint32>();
-            }
-        }
+        M6Databank* msdb = Load(sdb);
+        M6Databank* mddb = Load(ddb);
 
-        sub.put("first", el::object(resultoffset + 1));
-        sub.put("last", el::object((uint64)(resultoffset + hits.size())));
-        sub.put("hitCount", el::object(hitCount));
-        sub.put("lastPage", el::object(((hitCount - 1) / hits_per_page) + 1));
-        sub.put("ranked", ranked);
-        sub.put("error", error);
-    }
+        if (msdb == nullptr or mddb == nullptr)
+            THROW(("Invalid databanks"));
 
-    vector<string> terms;
-    AnalyseQuery(q, terms);
-    if (not terms.empty())
-    {
-        M6Tokenizer::CaseFold(q);
+        unique_ptr<M6Document> doc(msdb->Fetch(nr));
+        if (not doc)
+            THROW(("Document not found"));
 
-        // add some spelling suggestions
-        sort(terms.begin(), terms.end());
-        terms.erase(unique(terms.begin(), terms.end()), terms.end());
+        string id = doc->GetAttribute("id");
 
-        vector<el::object> suggestions;
-        for (string& term : terms)
-        {
-            try
-            {
-                boost::regex re(string("\\b") + term + "\\b");
+        el::object linkedInfo;
+        linkedInfo["db"] = sdb;
+        linkedInfo["id"] = id;
+        sub.put("linked", linkedInfo);
 
-                vector<pair<string,uint16>> s;
-                SpellCheck(db, term, s);
-                if (s.empty())
-                    continue;
+        string q = string("[") + sdb + '/' + id + ']';
+        sub.put("q", el::object(q));
 
-                if (s.size() > 10)
-                    s.erase(s.begin() + 10, s.end());
+        // Collect the links
+        unique_ptr<M6Iterator> iter(mddb->GetLinkedDocuments(sdb, id));
 
-                if (s.size() > 10)
-                    s.erase(s.begin() + 10, s.end());
-
-                vector<el::object> alternatives;
-                for (auto c : s)
-                {
-                    el::object alt;
-                    alt["term"] = c.first;
-
-                    // construct new query, with the term replaced by the alternative
-                    ostringstream t;
-                    ostream_iterator<char, char> oi(t);
-                    boost::regex_replace(oi, q.begin(), q.end(), re, c.first,
-                        boost::match_default | boost::format_all);
-
-//                    if (Count(db, t.str()) > 0)
-//                    {
-                        alt["q"] = t.str();
-                        alternatives.push_back(alt);
-//                    }
-                }
-
-                if (alternatives.empty())
-                    continue;
-
-                el::object so;
-                so["term"] = term;
-                so["alternatives"] = alternatives;
-
-                suggestions.push_back(so);
-            }
-            catch (...) {}    // silently ignore errors
-        }
-
-        if (not suggestions.empty())
-            sub.put("suggestions", el::object(suggestions));
-    }
-
-    // OK, now if we only have one hit, we might as well show it directly of course...
-    if (hitCount == 1)
-
-        create_redirect(firstDb, firstDocNr, q, true, request, reply);
-
-    else if (dbIDMatched)
-
-        create_reply_from_template ("results.html", sub, reply);
-    else
-        create_reply_from_template ("results-for-all.html", sub, reply);
-
-    LOG(INFO, "done generating reply for search db=\'%s\' q=\'%s\'",
-              db.c_str(),q.c_str());
-}
-
-void M6Server::handle_link(const zh::request& request, const el::scope& scope, zh::reply& reply)
-{
-    string id, db, ix, q;
-
-    zeep::http::parameter_map params;
-    get_parameters(scope, params);
-
-    id = params.get("id", "").as<string>();
-    db = params.get("db", "").as<string>();
-    ix = params.get("ix", "").as<string>();        if (ix == "full-text") ix = "*";
-    q = params.get("q", "").as<string>();
-
-    LOG(INFO, "handling link request for id=%s, db=%s, ix=%s, q=%s",
-              id.c_str(), db.c_str(), ix.c_str(), q.c_str());
-
-    M6Tokenizer::CaseFold(db);
-    M6Tokenizer::CaseFold(id);
-
-    create_redirect(db, ix, id, q, false, request, reply);
-
-    LOG(INFO, "done generating link reply for id=%s, db=%s, ix=%s, q=%s",
-              id.c_str(), db.c_str(), ix.c_str(), q.c_str());
-}
-
-void M6Server::handle_linked(const zh::request& request, const el::scope& scope, zh::reply& reply)
-{
-    string sdb, ddb;
-    uint32 page, nr, hits_per_page = 15;
-
-    zeep::http::parameter_map params;
-    get_parameters(scope, params);
-
-    sdb = params.get("s", "").as<string>();
-    ddb = params.get("d", "").as<string>();
-    nr = params.get("nr", "0").as<uint32>();
-    page = params.get("page", 1).as<uint32>();
-
-    LOG(INFO, "handling linked request for s=%s, d=%s, nr=%d, page=%d",
-              sdb.c_str(), ddb.c_str(), nr, page);
-
-    if (page < 1)
-        page = 1;
-
-    int32 maxresultcount = hits_per_page, resultoffset = 0;
-
-    if (page > 1)
-        resultoffset = (page - 1) * maxresultcount;
-
-    el::scope sub(scope);
-    sub.put("page", el::object(page));
-    sub.put("db", el::object(ddb));
-
-    if (nr == 0 or sdb.empty() or ddb.empty())
-        THROW(("Invalid linked reference"));
-
-    M6Databank* msdb = Load(sdb);
-    M6Databank* mddb = Load(ddb);
-
-    if (msdb == nullptr or mddb == nullptr)
-        THROW(("Invalid databanks"));
-
-    unique_ptr<M6Document> doc(msdb->Fetch(nr));
-    if (not doc)
-        THROW(("Document not found"));
-
-    string id = doc->GetAttribute("id");
-
-    el::object linkedInfo;
-    linkedInfo["db"] = sdb;
-    linkedInfo["id"] = id;
-    sub.put("linked", linkedInfo);
-
-    string q = string("[") + sdb + '/' + id + ']';
-    sub.put("q", el::object(q));
-
-    // Collect the links
-    unique_ptr<M6Iterator> iter(mddb->GetLinkedDocuments(sdb, id));
-
-    uint32 docNr, count = iter->GetCount();
-    float score;
-
-    nr = 1;
-    while (resultoffset-- > 0 and iter->Next(docNr, score))
-        ++nr;
-
-    vector<el::object> hits;
-    sub.put("first", el::object(nr));
-
-    while (maxresultcount-- > 0 and iter->Next(docNr, score))
-    {
-        el::object hit;
-
-        unique_ptr<M6Document> doc(mddb->Fetch(docNr));
-
-        hit["nr"] = nr;
-        hit["docNr"] = docNr;
-        hit["id"] = doc->GetAttribute("id");
-        hit["title"] = doc->GetAttribute("title");;
-
-        AddLinks(sdb, doc->GetAttribute("id"), hit);
-
-        hits.push_back(hit);
-
-        ++nr;
-    }
-
-    if (maxresultcount > 0 and count + 1 > nr)
-        count = nr - 1;
-
-    if (count == 1)
-        create_redirect(ddb, docNr, q, true, request, reply);
-    else
-    {
-        sub.put("hits", el::object(hits));
-        sub.put("hitCount", el::object(count));
-        sub.put("lastPage", el::object(((count - 1) / hits_per_page) + 1));
-        sub.put("last", el::object(nr - 1));
-        sub.put("ranked", el::object(false));
-
-        create_reply_from_template("results.html", sub, reply);
-    }
-
-    LOG(INFO, "done generating linked response for s=%s, d=%s, nr=%d, page=%d",
-              sdb.c_str(), ddb.c_str(), nr, page);
-}
-
-void M6Server::handle_similar(const zh::request& request, const el::scope& scope, zh::reply& reply)
-{
-    string db, id, nr;
-    uint32 page, hits_per_page = 15;
-
-    zeep::http::parameter_map params;
-    get_parameters(scope, params);
-
-    db = params.get("db", "").as<string>();
-    nr = params.get("nr", "").as<string>();
-    page = params.get("page", 1).as<uint32>();
-
-    LOG(INFO, "handling similar request for db=%s, nr=%s, page=%d",
-              db.c_str(), nr.c_str(), page);
-
-    int32 maxresultcount = hits_per_page, resultoffset = 0;
-
-    if (page > 1)
-        resultoffset = (page - 1) * maxresultcount;
-
-    el::scope sub(scope);
-    sub.put("page", el::object(page));
-    sub.put("db", el::object(db));
-//    sub.put("linkeddbs", el::object(GetLinkedDbs(db)));
-    sub.put("similar", el::object(nr));
-
-    M6Databank* mdb = Load(db);
-    if (mdb == nullptr) THROW(("Databank %s not loaded", db.c_str()));
-
-    vector<string> queryTerms;
-
-    unique_ptr<M6Document> doc(mdb->Fetch(boost::lexical_cast<uint32>(nr)));
-    if (not doc)
-        THROW(("Unable to fetch document"));
-
-    M6Builder::IndexDocument(db, mdb, doc->GetText(), doc->GetAttribute("filename"), queryTerms);
-
-    M6Iterator* filter = nullptr;
-    unique_ptr<M6Iterator> results(mdb->Find(queryTerms, filter, false, resultoffset + maxresultcount));
-    delete filter;
-
-    if (results)
-    {
-        uint32 docNr, nr = 1, count = results->GetCount();
+        uint32 docNr, count = iter->GetCount();
         float score;
 
-        while (resultoffset-- > 0 and results->Next(docNr, score))
+        nr = 1;
+        while (resultoffset-- > 0 and iter->Next(docNr, score))
             ++nr;
 
         vector<el::object> hits;
         sub.put("first", el::object(nr));
 
-        while (maxresultcount-- > 0 and results->Next(docNr, score))
+        while (maxresultcount-- > 0 and iter->Next(docNr, score))
         {
             el::object hit;
 
-            unique_ptr<M6Document> doc(mdb->Fetch(docNr));
-
-            score *= 100;
-            if (score > 100)
-                score = 100;
+            unique_ptr<M6Document> doc(mddb->Fetch(docNr));
 
             hit["nr"] = nr;
             hit["docNr"] = docNr;
             hit["id"] = doc->GetAttribute("id");
             hit["title"] = doc->GetAttribute("title");;
-            hit["score"] = trunc(score);
 
-            AddLinks(db, doc->GetAttribute("id"), hit);
+            AddLinks(sdb, doc->GetAttribute("id"), hit);
 
             hits.push_back(hit);
 
@@ -1715,56 +1692,182 @@ void M6Server::handle_similar(const zh::request& request, const el::scope& scope
         if (maxresultcount > 0 and count + 1 > nr)
             count = nr - 1;
 
-        sub.put("hits", el::object(hits));
-        sub.put("hitCount", el::object(count));
-        sub.put("lastPage", el::object(((count - 1) / hits_per_page) + 1));
-        sub.put("last", el::object(nr - 1));
-        sub.put("ranked", el::object(true));
+        if (count == 1)
+            create_redirect(ddb, docNr, q, true, request, reply);
+        else
+        {
+            sub.put("hits", el::object(hits));
+            sub.put("hitCount", el::object(count));
+            sub.put("lastPage", el::object(((count - 1) / hits_per_page) + 1));
+            sub.put("last", el::object(nr - 1));
+            sub.put("ranked", el::object(false));
+
+            create_reply_from_template("results.html", sub, reply);
+        }
+
+        LOG(INFO, "done generating linked response for s=%s, d=%s, nr=%d, page=%d",
+                  sdb.c_str(), ddb.c_str(), nr, page);
     }
+    catch(...)
+    {
+        std::stringstream ss;
+        ss << boost::stacktrace::stacktrace();
+        LOG(ERROR, "handle_linked: %s", ss.str().c_str());
 
-    create_reply_from_template("results.html", sub, reply);
+        throw;
+    }
+}
 
-    LOG(INFO, "done generating similar reply for db=%s, nr=%s, page=%d",
-              db.c_str(), nr.c_str(), page);
+void M6Server::handle_similar(const zh::request& request, const el::scope& scope, zh::reply& reply)
+{
+    try
+    {
+        string db, id, nr;
+        uint32 page, hits_per_page = 15;
+
+        zeep::http::parameter_map params;
+        get_parameters(scope, params);
+
+        db = params.get("db", "").as<string>();
+        nr = params.get("nr", "").as<string>();
+        page = params.get("page", 1).as<uint32>();
+
+        LOG(INFO, "handling similar request for db=%s, nr=%s, page=%d",
+                  db.c_str(), nr.c_str(), page);
+
+        int32 maxresultcount = hits_per_page, resultoffset = 0;
+
+        if (page > 1)
+            resultoffset = (page - 1) * maxresultcount;
+
+        el::scope sub(scope);
+        sub.put("page", el::object(page));
+        sub.put("db", el::object(db));
+    //    sub.put("linkeddbs", el::object(GetLinkedDbs(db)));
+        sub.put("similar", el::object(nr));
+
+        M6Databank* mdb = Load(db);
+        if (mdb == nullptr) THROW(("Databank %s not loaded", db.c_str()));
+
+        vector<string> queryTerms;
+
+        unique_ptr<M6Document> doc(mdb->Fetch(boost::lexical_cast<uint32>(nr)));
+        if (not doc)
+            THROW(("Unable to fetch document"));
+
+        M6Builder::IndexDocument(db, mdb, doc->GetText(), doc->GetAttribute("filename"), queryTerms);
+
+        M6Iterator* filter = nullptr;
+        unique_ptr<M6Iterator> results(mdb->Find(queryTerms, filter, false, resultoffset + maxresultcount));
+        delete filter;
+
+        if (results)
+        {
+            uint32 docNr, nr = 1, count = results->GetCount();
+            float score;
+
+            while (resultoffset-- > 0 and results->Next(docNr, score))
+                ++nr;
+
+            vector<el::object> hits;
+            sub.put("first", el::object(nr));
+
+            while (maxresultcount-- > 0 and results->Next(docNr, score))
+            {
+                el::object hit;
+
+                unique_ptr<M6Document> doc(mdb->Fetch(docNr));
+
+                score *= 100;
+                if (score > 100)
+                    score = 100;
+
+                hit["nr"] = nr;
+                hit["docNr"] = docNr;
+                hit["id"] = doc->GetAttribute("id");
+                hit["title"] = doc->GetAttribute("title");;
+                hit["score"] = trunc(score);
+
+                AddLinks(db, doc->GetAttribute("id"), hit);
+
+                hits.push_back(hit);
+
+                ++nr;
+            }
+
+            if (maxresultcount > 0 and count + 1 > nr)
+                count = nr - 1;
+
+            sub.put("hits", el::object(hits));
+            sub.put("hitCount", el::object(count));
+            sub.put("lastPage", el::object(((count - 1) / hits_per_page) + 1));
+            sub.put("last", el::object(nr - 1));
+            sub.put("ranked", el::object(true));
+        }
+
+        create_reply_from_template("results.html", sub, reply);
+
+        LOG(INFO, "done generating similar reply for db=%s, nr=%s, page=%d",
+                  db.c_str(), nr.c_str(), page);
+    }
+    catch(...)
+    {
+        std::stringstream ss;
+        ss << boost::stacktrace::stacktrace();
+        LOG(ERROR, "handle_similar: %s", ss.str().c_str());
+
+        throw;
+    }
 }
 
 void M6Server::handle_search_ajax(const zh::request& request, const el::scope& scope, zh::reply& reply)
 {
-    zh::parameter_map params;
-    get_parameters(scope, params);
+    try
+    {
+        zh::parameter_map params;
+        get_parameters(scope, params);
 
-    string q = params.get("q", "").as<string>();
-    string db = params.get("db", "").as<string>();
-    uint32 offset = params.get("offset", 0).as<uint32>();
-    uint32 count = params.get("count", 0).as<uint32>();
+        string q = params.get("q", "").as<string>();
+        string db = params.get("db", "").as<string>();
+        uint32 offset = params.get("offset", 0).as<uint32>();
+        uint32 count = params.get("count", 0).as<uint32>();
 
-    LOG(INFO, "handling ajax search request for q=%s, db=%s, offset=%d, count=%d",
-              q.c_str(), db.c_str(), offset, count);
+        LOG(INFO, "handling ajax search request for q=%s, db=%s, offset=%d, count=%d",
+                  q.c_str(), db.c_str(), offset, count);
 
-    if (count <= 0)
-        count = 5;
+        if (count <= 0)
+            count = 5;
 
-    vector<el::object> hits;
+        vector<el::object> hits;
 
-    uint32 hitCount;
-    bool ranked;
-    string error;
+        uint32 hitCount;
+        bool ranked;
+        string error;
 
-    Find(db, q, true, offset, count, true, hits, hitCount, ranked, error);
-    if (hitCount == 0)
-        Find(db, q, false, offset, count, true, hits, hitCount, ranked, error);
+        Find(db, q, true, offset, count, true, hits, hitCount, ranked, error);
+        if (hitCount == 0)
+            Find(db, q, false, offset, count, true, hits, hitCount, ranked, error);
 
-    el::object result;
-    if (not hits.empty())
-        result["hits"] = hits;
+        el::object result;
+        if (not hits.empty())
+            result["hits"] = hits;
 
-    result["ranked"] = ranked;
-    result["error"] = error;
+        result["ranked"] = ranked;
+        result["error"] = error;
 
-    reply.set_content(result.toJSON(), "text/javascript");
+        reply.set_content(result.toJSON(), "text/javascript");
 
-    LOG(INFO, "done generating ajax search response for q=%s, db=%s, offset=%d, count=%d",
-              q.c_str(), db.c_str(), offset, count);
+        LOG(INFO, "done generating ajax search response for q=%s, db=%s, offset=%d, count=%d",
+                  q.c_str(), db.c_str(), offset, count);
+    }
+    catch(...)
+    {
+        std::stringstream ss;
+        ss << boost::stacktrace::stacktrace();
+        LOG(ERROR, "handle_search_ajax: %s", ss.str().c_str());
+
+        throw;
+    }
 }
 
 void M6Server::ProcessNewConfig(const string& inPage, zeep::http::parameter_map& inParams)
@@ -2123,281 +2226,314 @@ void M6Server::ProcessNewConfig(const string& inPage, zeep::http::parameter_map&
 void M6Server::handle_admin(const zh::request& request,
     const el::scope& scope, zh::reply& reply)
 {
-    if (mConfigCopy == nullptr)
-        mConfigCopy = new M6Config::File();
-
-    zeep::http::parameter_map params;
-    get_parameters(scope, params);
-
-    string submitted = params.get("submit", "").as<string>();
-    if (not submitted.empty())
+    try
     {
-        if (submitted == "restart")
+        if (mConfigCopy == nullptr)
+            mConfigCopy = new M6Config::File();
+
+        zeep::http::parameter_map params;
+        get_parameters(scope, params);
+
+        string submitted = params.get("submit", "").as<string>();
+        if (not submitted.empty())
         {
-            mConfigCopy->WriteOut();
+            if (submitted == "restart")
+            {
+                mConfigCopy->WriteOut();
 
-            M6Config::Reload();
-            M6SignalCatcher::Signal(SIGHUP);
+                M6Config::Reload();
+                M6SignalCatcher::Signal(SIGHUP);
 
-            el::scope sub(scope);
-            zx::element* n;
-            if ((n = mConfigCopy->GetServer()->find_first("base-url")) != nullptr)
-                sub.put("baseurl", n->content());
+                el::scope sub(scope);
+                zx::element* n;
+                if ((n = mConfigCopy->GetServer()->find_first("base-url")) != nullptr)
+                    sub.put("baseurl", n->content());
 
-            create_reply_from_template("restarting.html", sub, reply);
-        }
-        else
-        {
-            ProcessNewConfig(submitted, params);
-            reply = zh::reply::redirect("admin");
-        }
-        return;
-    }
-
-    el::scope sub(scope);
-
-    auto sortByID = [](const el::object& a, const el::object& b ) -> bool { return a["id"] < b["id"]; };
-
-    // add the global settings
-    el::object global, dirs, tools;
-
-    dirs["mrs"] = mConfigCopy->GetDirectory("mrs")->content();
-    dirs["raw"] = mConfigCopy->GetDirectory("raw")->content();
-    dirs["blast"] = mConfigCopy->GetDirectory("blast")->content();
-    dirs["docroot"] = mConfigCopy->GetDirectory("docroot")->content();
-    dirs["parser"] = mConfigCopy->GetDirectory("parser")->content();
-    global["dirs"] = dirs;
-
-    tools["clustalo"] = mConfigCopy->GetTool("clustalo")->content();
-    tools["rsync"] = mConfigCopy->GetTool("rsync")->content();
-    global["tools"] = tools;
-
-    sub.put("global", global);
-
-    // add server settings
-    const zx::element* serverConfig = mConfigCopy->GetServer();
-    if (serverConfig != nullptr)
-    {
-        el::object server;
-
-        server["addr"] = serverConfig->get_attribute("addr");
-        server["port"] = serverConfig->get_attribute("port");
-        server["log_forwarded"] = serverConfig->get_attribute("log-forwarded");
-
-        zx::node* n;
-
-        if ((n = serverConfig->find_first("base-url")) != nullptr)
-            server["baseurl"] = n->str();
-
-        const char* wss[] = { "mrsws_search", "mrsws_blast", "mrsws_align" };
-        el::object wsc;
-
-        for (const char* ws : wss)
-        {
-            if ((n = serverConfig->find_first_node((boost::format("web-service[@service='%1%']/@location") % ws).str().c_str())) != nullptr)
-                wsc[ws] = n->str();
-        }
-        server["ws"] = wsc;
-
-        sub.put("server", server);
-    }
-
-    // add parser settings
-    vector<el::object> parsers;
-    fs::path parserDir(mConfigCopy->GetDirectory("parser")->content());
-    for (auto p = fs::directory_iterator(parserDir); p != fs::directory_iterator(); ++p)
-    {
-        fs::path path = p->path();
-
-        if (path.extension().string() != ".pm" or path.filename().string() == "M6Script.pm")
-            continue;
-
-        el::object parser;
-        parser["id"] = parser["script"] = path.filename().stem().string();
-        parsers.push_back(parser);
-    }
-
-    for (const zx::element* e : mConfigCopy->GetParsers())
-    {
-        el::object parser;
-        parser["id"] = e->get_attribute("id");
-        parsers.push_back(parser);
-    }
-
-    sort(parsers.begin(), parsers.end(), sortByID);
-    sub.put("parsers", parsers.begin(), parsers.end());
-
-    // add formats
-    vector<el::object> formats;
-    for (const zx::element* e : mConfigCopy->GetFormats())
-    {
-        el::object format;
-        format["id"] = e->get_attribute("id");
-        format["script"] = e->get_attribute("script");
-
-        vector<el::object> links;
-        for (const zx::element* l : e->find("link"))
-        {
-            el::object link;
-            link["nr"] = el::object((uint64)links.size() + 1);
-            link["rx"] = l->get_attribute("rx");
-            link["db"] = l->get_attribute("db");
-            link["id"] = l->get_attribute("id");
-            link["ix"] = l->get_attribute("ix");
-            link["an"] = l->get_attribute("an");
-            links.push_back(link);
+                create_reply_from_template("restarting.html", sub, reply);
+            }
+            else
+            {
+                ProcessNewConfig(submitted, params);
+                reply = zh::reply::redirect("admin");
+            }
+            return;
         }
 
-        if (not links.empty())
-            format["links"] = el::object(links);
+        el::scope sub(scope);
 
-        formats.push_back(format);
-    }
-    sort(formats.begin(), formats.end(), sortByID);
-    sub.put("formats", formats);
+        auto sortByID = [](const el::object& a, const el::object& b ) -> bool { return a["id"] < b["id"]; };
 
-    vector<el::object> scripts;
-    fs::path scriptDir(mConfigCopy->GetDirectory("docroot")->content());
-    for (auto p = fs::directory_iterator(scriptDir / "formats"); p != fs::directory_iterator(); ++p)
-    {
-        fs::path path = p->path();
+        // add the global settings
+        el::object global, dirs, tools;
 
-        if (path.extension().string() != ".js")
-            continue;
+        dirs["mrs"] = mConfigCopy->GetDirectory("mrs")->content();
+        dirs["raw"] = mConfigCopy->GetDirectory("raw")->content();
+        dirs["blast"] = mConfigCopy->GetDirectory("blast")->content();
+        dirs["docroot"] = mConfigCopy->GetDirectory("docroot")->content();
+        dirs["parser"] = mConfigCopy->GetDirectory("parser")->content();
+        global["dirs"] = dirs;
 
-        el::object script;
-        script["id"] = script["script"] = path.filename().stem().string();
-        scripts.push_back(script);
-    }
+        tools["clustalo"] = mConfigCopy->GetTool("clustalo")->content();
+        tools["rsync"] = mConfigCopy->GetTool("rsync")->content();
+        global["tools"] = tools;
 
-    sort(parsers.begin(), parsers.end(), sortByID);
-    sub.put("scripts", scripts.begin(), scripts.end());
+        sub.put("global", global);
 
-    // add the databank settings
-    vector<el::object> databanks;
-    set<string> aliases;
-    map<string,string> aliasnames;
-
-    for (const zx::element* db : mConfigCopy->GetDatabanks())
-    {
-        zx::element* e;
-
-        string id = db->get_attribute("id");
-        string name = id;
-
-        el::object databank;
-        databank["id"] = id;
-        if (db->get_attribute("stylesheet").empty())
-            databank["format"] = db->get_attribute("format");
-        else
+        // add server settings
+        const zx::element* serverConfig = mConfigCopy->GetServer();
+        if (serverConfig != nullptr)
         {
-            databank["stylesheet"] = db->get_attribute("stylesheet");
-            databank["format"] = "xml";
-        }
-        databank["parser"] = db->get_attribute("parser");
-        databank["update"] = db->get_attribute("update");
-        databank["enabled"] = db->get_attribute("enabled") == "true";
-        databank["fasta"] = db->get_attribute("fasta") == "true";
-        if ((e = db->find_first("filter")) != nullptr)
-            databank["filter"] = e->content();
-        if ((e = db->find_first("name")) != nullptr)
-            databank["name"] = name = e->content();
-        if ((e = db->find_first("info")) != nullptr)
-            databank["info"] = e->content();
-        if ((e = db->find_first("source")) != nullptr)
-        {
-            databank["source"] = e->content();
+            el::object server;
 
-            el::object fetch;
-            fetch["src"] = e->get_attribute("fetch");
-            fetch["delete"] = e->get_attribute("delete");
-            fetch["recursive"] = e->get_attribute("recursive");
-            fetch["port"] = e->get_attribute("port");
-            databank["fetch"] = fetch;
+            server["addr"] = serverConfig->get_attribute("addr");
+            server["port"] = serverConfig->get_attribute("port");
+            server["log_forwarded"] = serverConfig->get_attribute("log-forwarded");
+
+            zx::node* n;
+
+            if ((n = serverConfig->find_first("base-url")) != nullptr)
+                server["baseurl"] = n->str();
+
+            const char* wss[] = { "mrsws_search", "mrsws_blast", "mrsws_align" };
+            el::object wsc;
+
+            for (const char* ws : wss)
+            {
+                if ((n = serverConfig->find_first_node((boost::format("web-service[@service='%1%']/@location") % ws).str().c_str())) != nullptr)
+                    wsc[ws] = n->str();
+            }
+            server["ws"] = wsc;
+
+            sub.put("server", server);
         }
 
-        aliases.insert(id);
-        aliasnames[id] = name;
-
-        vector<el::object> dbaliases;
-        for (const zx::element* a : db->find("aliases/alias"))
+        // add parser settings
+        vector<el::object> parsers;
+        fs::path parserDir(mConfigCopy->GetDirectory("parser")->content());
+        for (auto p = fs::directory_iterator(parserDir); p != fs::directory_iterator(); ++p)
         {
-            el::object alias;
-            alias["name"] = alias["id"] = a->content();
-            if (not a->get_attribute("name").empty())
-                alias["name"] = a->get_attribute("name");
-            dbaliases.push_back(alias);
+            fs::path path = p->path();
 
-            aliases.insert(a->content());
-            aliasnames[a->content()] = alias["name"].as<string>();
+            if (path.extension().string() != ".pm" or path.filename().string() == "M6Script.pm")
+                continue;
+
+            el::object parser;
+            parser["id"] = parser["script"] = path.filename().stem().string();
+            parsers.push_back(parser);
         }
 
-        databank["aliases"] = dbaliases;
+        for (const zx::element* e : mConfigCopy->GetParsers())
+        {
+            el::object parser;
+            parser["id"] = e->get_attribute("id");
+            parsers.push_back(parser);
+        }
 
-        databanks.push_back(databank);
+        sort(parsers.begin(), parsers.end(), sortByID);
+        sub.put("parsers", parsers.begin(), parsers.end());
+
+        // add formats
+        vector<el::object> formats;
+        for (const zx::element* e : mConfigCopy->GetFormats())
+        {
+            el::object format;
+            format["id"] = e->get_attribute("id");
+            format["script"] = e->get_attribute("script");
+
+            vector<el::object> links;
+            for (const zx::element* l : e->find("link"))
+            {
+                el::object link;
+                link["nr"] = el::object((uint64)links.size() + 1);
+                link["rx"] = l->get_attribute("rx");
+                link["db"] = l->get_attribute("db");
+                link["id"] = l->get_attribute("id");
+                link["ix"] = l->get_attribute("ix");
+                link["an"] = l->get_attribute("an");
+                links.push_back(link);
+            }
+
+            if (not links.empty())
+                format["links"] = el::object(links);
+
+            formats.push_back(format);
+        }
+        sort(formats.begin(), formats.end(), sortByID);
+        sub.put("formats", formats);
+
+        vector<el::object> scripts;
+        fs::path scriptDir(mConfigCopy->GetDirectory("docroot")->content());
+        for (auto p = fs::directory_iterator(scriptDir / "formats"); p != fs::directory_iterator(); ++p)
+        {
+            fs::path path = p->path();
+
+            if (path.extension().string() != ".js")
+                continue;
+
+            el::object script;
+            script["id"] = script["script"] = path.filename().stem().string();
+            scripts.push_back(script);
+        }
+
+        sort(parsers.begin(), parsers.end(), sortByID);
+        sub.put("scripts", scripts.begin(), scripts.end());
+
+        // add the databank settings
+        vector<el::object> databanks;
+        set<string> aliases;
+        map<string,string> aliasnames;
+
+        for (const zx::element* db : mConfigCopy->GetDatabanks())
+        {
+            zx::element* e;
+
+            string id = db->get_attribute("id");
+            string name = id;
+
+            el::object databank;
+            databank["id"] = id;
+            if (db->get_attribute("stylesheet").empty())
+                databank["format"] = db->get_attribute("format");
+            else
+            {
+                databank["stylesheet"] = db->get_attribute("stylesheet");
+                databank["format"] = "xml";
+            }
+            databank["parser"] = db->get_attribute("parser");
+            databank["update"] = db->get_attribute("update");
+            databank["enabled"] = db->get_attribute("enabled") == "true";
+            databank["fasta"] = db->get_attribute("fasta") == "true";
+            if ((e = db->find_first("filter")) != nullptr)
+                databank["filter"] = e->content();
+            if ((e = db->find_first("name")) != nullptr)
+                databank["name"] = name = e->content();
+            if ((e = db->find_first("info")) != nullptr)
+                databank["info"] = e->content();
+            if ((e = db->find_first("source")) != nullptr)
+            {
+                databank["source"] = e->content();
+
+                el::object fetch;
+                fetch["src"] = e->get_attribute("fetch");
+                fetch["delete"] = e->get_attribute("delete");
+                fetch["recursive"] = e->get_attribute("recursive");
+                fetch["port"] = e->get_attribute("port");
+                databank["fetch"] = fetch;
+            }
+
+            aliases.insert(id);
+            aliasnames[id] = name;
+
+            vector<el::object> dbaliases;
+            for (const zx::element* a : db->find("aliases/alias"))
+            {
+                el::object alias;
+                alias["name"] = alias["id"] = a->content();
+                if (not a->get_attribute("name").empty())
+                    alias["name"] = a->get_attribute("name");
+                dbaliases.push_back(alias);
+
+                aliases.insert(a->content());
+                aliasnames[a->content()] = alias["name"].as<string>();
+            }
+
+            databank["aliases"] = dbaliases;
+
+            databanks.push_back(databank);
+        }
+
+        sort(databanks.begin(), databanks.end(), sortByID);
+        sub.put("config-databanks", el::object(databanks));
+
+        vector<el::object> aliasobjects;
+        for (const string& alias : aliases)
+        {
+            el::object aliasobject;
+            aliasobject["id"] = alias;
+            aliasobject["name"] = aliasnames[alias].empty() ? alias : aliasnames[alias];
+            aliasobjects.push_back(aliasobject);
+        }
+        sub.put("aliases", aliasobjects.begin(), aliasobjects.end());
+
+        // add the scheduler settings
+        el::object scheduler;
+        zx::element* schedule = mConfigCopy->GetSchedule();
+        scheduler["enabled"] = schedule->get_attribute("enabled") == "true";
+        scheduler["time"] = schedule->get_attribute("time");
+        scheduler["weekday"] = schedule->get_attribute("weekday");
+        sub.put("scheduler", scheduler);
+
+        create_reply_from_template("admin.html", sub, reply);
     }
-
-    sort(databanks.begin(), databanks.end(), sortByID);
-    sub.put("config-databanks", el::object(databanks));
-
-    vector<el::object> aliasobjects;
-    for (const string& alias : aliases)
+    catch(...)
     {
-        el::object aliasobject;
-        aliasobject["id"] = alias;
-        aliasobject["name"] = aliasnames[alias].empty() ? alias : aliasnames[alias];
-        aliasobjects.push_back(aliasobject);
+        std::stringstream ss;
+        ss << boost::stacktrace::stacktrace();
+        LOG(ERROR, "handle_admin: %s", ss.str().c_str());
+
+        throw;
     }
-    sub.put("aliases", aliasobjects.begin(), aliasobjects.end());
-
-    // add the scheduler settings
-    el::object scheduler;
-    zx::element* schedule = mConfigCopy->GetSchedule();
-    scheduler["enabled"] = schedule->get_attribute("enabled") == "true";
-    scheduler["time"] = schedule->get_attribute("time");
-    scheduler["weekday"] = schedule->get_attribute("weekday");
-    sub.put("scheduler", scheduler);
-
-    create_reply_from_template("admin.html", sub, reply);
 }
 
 void M6Server::handle_admin_blast_queue_ajax(const zh::request& request,
     const el::scope& scope, zh::reply& reply)
 {
-    zeep::http::parameter_map params;
-    get_parameters(scope, params);
-
-    vector<el::object> jobs;
-
-    LOG(DEBUG, "M6Server: listing blast jobs for an admin request");
-
-    for (const M6BlastJobDesc& jobDesc : M6BlastCache::Instance().GetJobList())
+    try
     {
-        LOG(DEBUG, "M6Server: iter job %s", jobDesc.id.c_str());
+        zeep::http::parameter_map params;
+        get_parameters(scope, params);
 
-        el::object job;
-        job["id"] = jobDesc.id;
-        job["db"] = jobDesc.db;
-        job["queryLength"] = jobDesc.queryLength;
-        job["status"] = jobDesc.status;
-        jobs.push_back(job);
+        vector<el::object> jobs;
+
+        LOG(DEBUG, "M6Server: listing blast jobs for an admin request");
+
+        for (const M6BlastJobDesc& jobDesc : M6BlastCache::Instance().GetJobList())
+        {
+            LOG(DEBUG, "M6Server: iter job %s", jobDesc.id.c_str());
+
+            el::object job;
+            job["id"] = jobDesc.id;
+            job["db"] = jobDesc.db;
+            job["queryLength"] = jobDesc.queryLength;
+            job["status"] = jobDesc.status;
+            jobs.push_back(job);
+        }
+
+        LOG(DEBUG, "M6Server: returning blast jobs for an admin request");
+
+        reply.set_content(el::object(jobs).toJSON(), "text/javascript");
     }
+    catch(...)
+    {
+        std::stringstream ss;
+        ss << boost::stacktrace::stacktrace();
+        LOG(ERROR, "handle_admin_blast_queue_ajax: %s", ss.str().c_str());
 
-    LOG(DEBUG, "M6Server: returning blast jobs for an admin request");
-
-    reply.set_content(el::object(jobs).toJSON(), "text/javascript");
+        throw;
+    }
 }
 
 void M6Server::handle_admin_blast_delete_ajax(const zh::request& request,
     const el::scope& scope, zh::reply& reply)
 {
-    zeep::http::parameter_map params;
-    get_parameters(scope, params);
+    try
+    {
+        zeep::http::parameter_map params;
+        get_parameters(scope, params);
 
-    string id = params.get("job", "").as<string>();
+        string id = params.get("job", "").as<string>();
 
-    M6BlastCache::Instance().DeleteJob(id);
-    reply.set_content(el::object("ok").toJSON(), "text/javascript");
+        M6BlastCache::Instance().DeleteJob(id);
+        reply.set_content(el::object("ok").toJSON(), "text/javascript");
+    }
+    catch(...)
+    {
+        std::stringstream ss;
+        ss << boost::stacktrace::stacktrace();
+        LOG(ERROR, "handle_admin_blast_delete_ajax: %s", ss.str().c_str());
+
+        throw;
+    }
 }
 
 // --------------------------------------------------------------------
@@ -2405,118 +2541,151 @@ void M6Server::handle_admin_blast_delete_ajax(const zh::request& request,
 
 void M6Server::handle_rest(const zh::request& request, const el::scope& scope, zh::reply& reply)
 {
-    reply = zh::reply::stock_reply(zh::not_found);
-
-    fs::path path(scope["baseuri"].as<string>());
-    fs::path::iterator p = path.begin();
-
-    if ((p++)->string() == "rest")
+    try
     {
-        string call = (p++)->string();
+        reply = zh::reply::stock_reply(zh::not_found);
 
-        if (call == "entry")
-            handle_rest_entry(request, scope, reply);
-        else if (call == "find")
-            handle_rest_find(request, scope, reply);
+        fs::path path(scope["baseuri"].as<string>());
+        fs::path::iterator p = path.begin();
+
+        if ((p++)->string() == "rest")
+        {
+            string call = (p++)->string();
+
+            if (call == "entry")
+                handle_rest_entry(request, scope, reply);
+            else if (call == "find")
+                handle_rest_find(request, scope, reply);
+        }
+    }
+    catch(...)
+    {
+        std::stringstream ss;
+        ss << boost::stacktrace::stacktrace();
+        LOG(ERROR, "handle_rest: %s", ss.str().c_str());
+
+        throw;
     }
 }
 
 void M6Server::handle_rest_entry(const zh::request& request, const el::scope& scope, zh::reply& reply)
 {
-    string db, id;
-
-    zh::parameter_map params;
-    get_parameters(scope, params);
-
-    string format = params.get("format", "entry").as<string>();
-
-    fs::path path(scope["baseuri"].as<string>());
-    fs::path::iterator p = path.begin();
-
-    if ((p++)->string() == "rest" and
-        (p++)->string() == "entry" and
-        p != path.end())
+    try
     {
-        db = (p++)->string();
-        if (p != path.end())
-            id = (p++)->string();
+        string db, id;
+
+        zh::parameter_map params;
+        get_parameters(scope, params);
+
+        string format = params.get("format", "entry").as<string>();
+
+        fs::path path(scope["baseuri"].as<string>());
+        fs::path::iterator p = path.begin();
+
+        if ((p++)->string() == "rest" and
+            (p++)->string() == "entry" and
+            p != path.end())
+        {
+            db = (p++)->string();
+            if (p != path.end())
+                id = (p++)->string();
+        }
+
+        LOG(INFO, "handling rest entry request for id=%s, db=%s",
+                  id.c_str(), db.c_str());
+
+        if (id.empty())
+            THROW(("No id specified"));
+
+        if (db.empty())
+            THROW(("No db specified"));
+
+        reply.set_content(GetEntry(db, id, format), "text/plain");
+
+        LOG(INFO, "done generating rest entry response for id=%s, db=%s",
+                  id.c_str(), db.c_str());
     }
+    catch(...)
+    {
+        std::stringstream ss;
+        ss << boost::stacktrace::stacktrace();
+        LOG(ERROR, "handle_rest_entry: %s", ss.str().c_str());
 
-    LOG(INFO, "handling rest entry request for id=%s, db=%s",
-              id.c_str(), db.c_str());
-
-    if (id.empty())
-        THROW(("No id specified"));
-
-    if (db.empty())
-        THROW(("No db specified"));
-
-    reply.set_content(GetEntry(db, id, format), "text/plain");
-
-    LOG(INFO, "done generating rest entry response for id=%s, db=%s",
-              id.c_str(), db.c_str());
+        throw;
+    }
 }
 
 void M6Server::handle_rest_find(const zh::request& request, const el::scope& scope, zh::reply& reply)
 {
-    string db, q;
-
-    zh::parameter_map params;
-    get_parameters(scope, params);
-
-    uint32 resultoffset = params.get("offset", "0").as<uint32>();
-    uint32 resultcount = params.get("count", "100").as<uint32>();
-
-    fs::path path(scope["baseuri"].as<string>());
-    fs::path::iterator p = path.begin();
-
-    if ((p++)->string() == "rest" and
-        (p++)->string() == "find" and
-        p != path.end())
+    try
     {
-        db = (p++)->string();
-        if (p != path.end())
-            q = (p++)->string();
-    }
+        string db, q;
 
-    LOG(INFO, "handling rest find request for q=%s, db=%s, offset=%d, count=%d",
-              q.c_str(), db.c_str(), resultoffset, resultcount);
+        zh::parameter_map params;
+        get_parameters(scope, params);
 
-    if (q.empty())
-        THROW(("No query specified"));
+        uint32 resultoffset = params.get("offset", "0").as<uint32>();
+        uint32 resultcount = params.get("count", "100").as<uint32>();
 
-    if (db.empty())
-        THROW(("No db specified"));
+        fs::path path(scope["baseuri"].as<string>());
+        fs::path::iterator p = path.begin();
 
-    vector<el::object> hits;
-    uint32 hitCount;
-    bool ranked;
-    string error;
-
-    Find(db, q, true, resultoffset, resultcount, false, hits, hitCount, ranked, error);
-
-    if (not error.empty())
-        reply.set_content(string("Error parsing query: ") + error, "text/plain");
-    else if (hits.empty())
-        reply.set_content("no hits found", "text/plain");
-    else
-    {
-        ostringstream s;
-
-        s << hitCount << " hits found, displaying " << hits.size() << " hits starting from " << resultoffset << endl;
-        for (el::object& hit : hits)
+        if ((p++)->string() == "rest" and
+            (p++)->string() == "find" and
+            p != path.end())
         {
-            s << hit["nr"] << '\t'
-              << hit["id"] << '\t'
-              << hit["score"] << '\t'
-              << hit["title"] << endl;
+            db = (p++)->string();
+            if (p != path.end())
+                q = (p++)->string();
         }
 
-        reply.set_content(s.str(), "text/plain");
-    }
+        LOG(INFO, "handling rest find request for q=%s, db=%s, offset=%d, count=%d",
+                  q.c_str(), db.c_str(), resultoffset, resultcount);
 
-    LOG(INFO, "done generating rest find response for q=%s, db=%s, offset=%d, count=%d",
-              q.c_str(), db.c_str(), resultoffset, resultcount);
+        if (q.empty())
+            THROW(("No query specified"));
+
+        if (db.empty())
+            THROW(("No db specified"));
+
+        vector<el::object> hits;
+        uint32 hitCount;
+        bool ranked;
+        string error;
+
+        Find(db, q, true, resultoffset, resultcount, false, hits, hitCount, ranked, error);
+
+        if (not error.empty())
+            reply.set_content(string("Error parsing query: ") + error, "text/plain");
+        else if (hits.empty())
+            reply.set_content("no hits found", "text/plain");
+        else
+        {
+            ostringstream s;
+
+            s << hitCount << " hits found, displaying " << hits.size() << " hits starting from " << resultoffset << endl;
+            for (el::object& hit : hits)
+            {
+                s << hit["nr"] << '\t'
+                  << hit["id"] << '\t'
+                  << hit["score"] << '\t'
+                  << hit["title"] << endl;
+            }
+
+            reply.set_content(s.str(), "text/plain");
+        }
+
+        LOG(INFO, "done generating rest find response for q=%s, db=%s, offset=%d, count=%d",
+                  q.c_str(), db.c_str(), resultoffset, resultcount);
+    }
+    catch(...)
+    {
+        std::stringstream ss;
+        ss << boost::stacktrace::stacktrace();
+        LOG(ERROR, "handle_rest_find: %s", ss.str().c_str());
+
+        throw;
+    }
 }
 
 // --------------------------------------------------------------------
@@ -2774,234 +2943,256 @@ void M6Server::SpellCheck(const string& inDatabank, const string& inTerm,
 
 void M6Server::handle_blast(const zeep::http::request& request, const el::scope& scope, zeep::http::reply& reply)
 {
-    // default parameters
-    string matrix = "BLOSUM62", expect = "10.0";
-    int wordSize = 0, gapOpen = -1, gapExtend = -1, reportLimit = 250;
-    bool filter = true, gapped = true;
-
-    zeep::http::parameter_map params;
-    get_parameters(scope, params);
-
-    el::scope sub(scope);
-
-    vector<el::object> blastdatabanks;
-    for (M6BlastDatabank& ldb : mBlastDatabanks)
+    try
     {
-        el::object databank;
-        databank["id"] = ldb.mID;
-        databank["name"] = ldb.mName;
-        blastdatabanks.push_back(databank);
+        // default parameters
+        string matrix = "BLOSUM62", expect = "10.0";
+        int wordSize = 0, gapOpen = -1, gapExtend = -1, reportLimit = 250;
+        bool filter = true, gapped = true;
+
+        zeep::http::parameter_map params;
+        get_parameters(scope, params);
+
+        el::scope sub(scope);
+
+        vector<el::object> blastdatabanks;
+        for (M6BlastDatabank& ldb : mBlastDatabanks)
+        {
+            el::object databank;
+            databank["id"] = ldb.mID;
+            databank["name"] = ldb.mName;
+            blastdatabanks.push_back(databank);
+        }
+
+        // fetch some parameters, if any
+        string db = params.get("db", "sprot").as<string>();
+        uint32 nr = params.get("nr", "0").as<uint32>();
+
+        LOG(INFO, "handling blast request for db=%s, nr=%d",
+                  db.c_str(), nr);
+
+//      string query = params.get("query", "").as<string>();
+        string query;
+        if (nr != 0 and not db.empty() and Load(db) != nullptr)
+            query = GetEntry(Load(db), "fasta", nr);
+
+        sub.put("blastdatabanks", el::object(blastdatabanks));
+        sub.put("blastdb", db);
+        sub.put("query", query);
+
+        const char* expectRange[] = { "0.001", "0.01", "0.1", "1.0", "10.0", "100.0", "1000.0" };
+        sub.put("expectRange", expectRange, boost::end(expectRange));
+        sub.put("expect", expect);
+
+        uint32 wordSizeRange[] = { 2, 3, 4 };
+        sub.put("wordSizeRange", wordSizeRange, boost::end(wordSizeRange));
+        sub.put("wordSize", wordSize);
+
+        const char* matrices[] = { "BLOSUM45", "BLOSUM50", "BLOSUM62", "BLOSUM80", "BLOSUM90", "PAM30", "PAM70", "PAM250" };
+        sub.put("matrices", matrices, boost::end(matrices));
+        sub.put("matrix", matrix);
+
+        int32 gapOpenRange[] = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14 };
+        sub.put("gapOpenRange", gapOpenRange, boost::end(gapOpenRange));
+        sub.put("gapOpen", gapOpen);
+
+        int32 gapExtendRange[] = { 1, 2, 3, 4 };
+        sub.put("gapExtendRange", gapExtendRange, boost::end(gapExtendRange));
+        sub.put("gapExtend", gapExtend);
+
+        uint32 reportLimitRange[] = { 100, 250, 500, 1000 };
+        sub.put("reportLimitRange", reportLimitRange, boost::end(reportLimitRange));
+        sub.put("reportLimit", reportLimit);
+
+        sub.put("filter", filter);
+        sub.put("gapped", gapped);
+
+        create_reply_from_template("blast.html", sub, reply);
+
+        LOG(INFO, "done generating blast response for db=%s, nr=%d",
+                  db.c_str(), nr);
     }
+    catch(...)
+    {
+        std::stringstream ss;
+        ss << boost::stacktrace::stacktrace();
+        LOG(ERROR, "handle_blast: %s", ss.str().c_str());
 
-    // fetch some parameters, if any
-    string db = params.get("db", "sprot").as<string>();
-    uint32 nr = params.get("nr", "0").as<uint32>();
-
-    LOG(INFO, "handling blast request for db=%s, nr=%d",
-              db.c_str(), nr);
-
-//    string query = params.get("query", "").as<string>();
-    string query;
-    if (nr != 0 and not db.empty() and Load(db) != nullptr)
-        query = GetEntry(Load(db), "fasta", nr);
-
-    sub.put("blastdatabanks", el::object(blastdatabanks));
-    sub.put("blastdb", db);
-    sub.put("query", query);
-
-    const char* expectRange[] = { "0.001", "0.01", "0.1", "1.0", "10.0", "100.0", "1000.0" };
-    sub.put("expectRange", expectRange, boost::end(expectRange));
-    sub.put("expect", expect);
-
-    uint32 wordSizeRange[] = { 2, 3, 4 };
-    sub.put("wordSizeRange", wordSizeRange, boost::end(wordSizeRange));
-    sub.put("wordSize", wordSize);
-
-    const char* matrices[] = { "BLOSUM45", "BLOSUM50", "BLOSUM62", "BLOSUM80", "BLOSUM90", "PAM30", "PAM70", "PAM250" };
-    sub.put("matrices", matrices, boost::end(matrices));
-    sub.put("matrix", matrix);
-
-    int32 gapOpenRange[] = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14 };
-    sub.put("gapOpenRange", gapOpenRange, boost::end(gapOpenRange));
-    sub.put("gapOpen", gapOpen);
-
-    int32 gapExtendRange[] = { 1, 2, 3, 4 };
-    sub.put("gapExtendRange", gapExtendRange, boost::end(gapExtendRange));
-    sub.put("gapExtend", gapExtend);
-
-    uint32 reportLimitRange[] = { 100, 250, 500, 1000 };
-    sub.put("reportLimitRange", reportLimitRange, boost::end(reportLimitRange));
-    sub.put("reportLimit", reportLimit);
-
-    sub.put("filter", filter);
-    sub.put("gapped", gapped);
-
-    create_reply_from_template("blast.html", sub, reply);
-
-    LOG(INFO, "done generating blast response for db=%s, nr=%d",
-              db.c_str(), nr);
+        throw;
+    }
 }
 
 void M6Server::handle_blast_results_ajax(const zeep::http::request& request, const el::scope& scope, zeep::http::reply& reply)
 {
-    zeep::http::parameter_map params;
-    get_parameters(scope, params);
-
-    string id = params.get("job", "").as<string>();
-    uint32 hitNr = params.get("hit", 0).as<uint32>();
-
-    el::object result;
-
-    M6BlastResultPtr job(M6BlastCache::Instance().JobResult(id));
-    if (not job)
-        result["error"] = "Job expired";
-    else if (hitNr > 0)    // we need to return the hsps for this hit
+    try
     {
-        const list<M6Blast::Hit>& hits(job->mHits);
-        if (hitNr > hits.size())
-            THROW(("Hitnr out of range"));
+        zeep::http::parameter_map params;
+        get_parameters(scope, params);
 
-        list<M6Blast::Hit>::const_iterator hit = hits.begin();
-        advance(hit, hitNr - 1);
+        string id = params.get("job", "").as<string>();
+        uint32 hitNr = params.get("hit", 0).as<uint32>();
 
-        const list<M6Blast::Hsp>& hsps(hit->mHsps);
+        el::object result;
 
-        vector<el::object> jhsps;
-
-        for (const M6Blast::Hsp& hsp : hsps)
+        M6BlastResultPtr job(M6BlastCache::Instance().JobResult(id));
+        if (not job)
+            result["error"] = "Job expired";
+        else if (hitNr > 0)    // we need to return the hsps for this hit
         {
-            string queryAlignment = hsp.mQueryAlignment;
+            const list<M6Blast::Hit>& hits(job->mHits);
+            if (hitNr > hits.size())
+                THROW(("Hitnr out of range"));
 
-            // calculate the offsets for the graphical representation of this hsp
-            uint32 qf = hsp.mQueryStart;
-            uint32 qt = hsp.mQueryEnd;
-            uint32 ql = job->mQueryLength;
+            list<M6Blast::Hit>::const_iterator hit = hits.begin();
+            advance(hit, hitNr - 1);
 
-            uint32 sf = hsp.mTargetStart;
-            uint32 st = hsp.mTargetEnd;
-            uint32 sl = hsp.mTargetLength;
+            const list<M6Blast::Hsp>& hsps(hit->mHsps);
 
-            uint32 length = static_cast<uint32>(queryAlignment.length());
-            uint32 before = qf;
-            if (before < sf)
-                before = sf;
+            vector<el::object> jhsps;
 
-            uint32 after = ql - qt;
-            if (after < sl - st)
-                after = sl - st;
+            for (const M6Blast::Hsp& hsp : hsps)
+            {
+                string queryAlignment = hsp.mQueryAlignment;
 
-            length += before + after;
+                // calculate the offsets for the graphical representation of this hsp
+                uint32 qf = hsp.mQueryStart;
+                uint32 qt = hsp.mQueryEnd;
+                uint32 ql = job->mQueryLength;
 
-            float factor = 150;
-            factor /= length;
+                uint32 sf = hsp.mTargetStart;
+                uint32 st = hsp.mTargetEnd;
+                uint32 sl = hsp.mTargetLength;
 
-            uint32 ql1, ql2, ql3, ql4, sl1, sl2, sl3, sl4;
+                uint32 length = static_cast<uint32>(queryAlignment.length());
+                uint32 before = qf;
+                if (before < sf)
+                    before = sf;
 
-            if (qf < before)
-                ql1 = uint32(factor * (before - qf));
-            else
-                ql1 = 0;
-            ql2 = uint32(factor * qf);
-            ql3 = uint32(factor * queryAlignment.length());
-            ql4 = uint32(factor * (ql - qt));
+                uint32 after = ql - qt;
+                if (after < sl - st)
+                    after = sl - st;
 
-            if (sf < before)
-                sl1 = uint32(factor * (before - sf));
-            else
-                sl1 = 0;
-            sl2 = uint32(factor * sf);
-            sl3 = uint32(factor * queryAlignment.length());
-            sl4 = uint32(factor * (sl - st));
+                length += before + after;
 
-            if (ql1 > 0 and ql1 + ql2 < sl2)
-                ql1 = sl2 - ql2;
+                float factor = 150;
+                factor /= length;
 
-            if (sl1 > 0 and sl1 + sl2 < ql2)
-                sl1 = ql2 - sl2;
+                uint32 ql1, ql2, ql3, ql4, sl1, sl2, sl3, sl4;
 
-            el::object h;
-            h["nr"] = (uint64)jhsps.size() + 1;
-            h["score"] = hsp.mScore;
-            h["bitScore"] = hsp.mBitScore;
-            h["expect"] = hsp.mExpect;
-            h["queryAlignment"] = queryAlignment;
-            h["queryStart"] = hsp.mQueryStart;
-            h["subjectAlignment"] = hsp.mTargetAlignment;
-            h["subjectStart"] = hsp.mTargetStart;
-            h["midLine"] = hsp.mMidLine;
-            h["identity"] = hsp.mIdentity;
-            h["positive"] = hsp.mPositive;
-            h["gaps"] = hsp.mGaps;
+                if (qf < before)
+                    ql1 = uint32(factor * (before - qf));
+                else
+                    ql1 = 0;
+                ql2 = uint32(factor * qf);
+                ql3 = uint32(factor * queryAlignment.length());
+                ql4 = uint32(factor * (ql - qt));
 
-            vector<el::object> qls(4);
-            qls[0] = ql1; qls[1] = ql2; qls[2] = ql3; qls[3] = ql4;
-            h["ql"] = qls;
+                if (sf < before)
+                    sl1 = uint32(factor * (before - sf));
+                else
+                    sl1 = 0;
+                sl2 = uint32(factor * sf);
+                sl3 = uint32(factor * queryAlignment.length());
+                sl4 = uint32(factor * (sl - st));
 
-            vector<el::object> sls(4);
-            sls[0] = sl1; sls[1] = sl2; sls[2] = sl3; sls[3] = sl4;
-            h["sl"] = sls;
+                if (ql1 > 0 and ql1 + ql2 < sl2)
+                    ql1 = sl2 - ql2;
 
-            jhsps.push_back(h);
+                if (sl1 > 0 and sl1 + sl2 < ql2)
+                    sl1 = ql2 - sl2;
+
+                el::object h;
+                h["nr"] = (uint64)jhsps.size() + 1;
+                h["score"] = hsp.mScore;
+                h["bitScore"] = hsp.mBitScore;
+                h["expect"] = hsp.mExpect;
+                h["queryAlignment"] = queryAlignment;
+                h["queryStart"] = hsp.mQueryStart;
+                h["subjectAlignment"] = hsp.mTargetAlignment;
+                h["subjectStart"] = hsp.mTargetStart;
+                h["midLine"] = hsp.mMidLine;
+                h["identity"] = hsp.mIdentity;
+                h["positive"] = hsp.mPositive;
+                h["gaps"] = hsp.mGaps;
+
+                vector<el::object> qls(4);
+                qls[0] = ql1; qls[1] = ql2; qls[2] = ql3; qls[3] = ql4;
+                h["ql"] = qls;
+
+                vector<el::object> sls(4);
+                sls[0] = sl1; sls[1] = sl2; sls[2] = sl3; sls[3] = sl4;
+                h["sl"] = sls;
+
+                jhsps.push_back(h);
+            }
+
+            result = jhsps;
+        }
+        else
+        {
+            const list<M6Blast::Hit>& hits(job->mHits);
+
+            vector<el::object> jhits;
+
+            for (const M6Blast::Hit& hit : hits)
+            {
+                const list<M6Blast::Hsp>& hsps(hit.mHsps);
+                if (hsps.empty())
+                    continue;
+                const M6Blast::Hsp& best = hsps.front();
+
+                uint32 coverageStart = 0, coverageLength = 0, coverageColor = 1;
+                float bin = (best.mPositive * 4.0f) / best.mQueryAlignment.length();
+
+                if (bin >= 3.5)
+                    coverageColor = 1;
+                else if (bin >= 3)
+                    coverageColor = 2;
+                else if (bin >= 2.5)
+                    coverageColor = 3;
+                else if (bin >= 2)
+                    coverageColor = 4;
+                else
+                    coverageColor = 5;
+
+                float queryLength = static_cast<float>(job->mQueryLength);
+                const int kGraphicWidth = 100;
+
+                coverageStart = uint32(best.mQueryStart * kGraphicWidth / queryLength);
+                coverageLength = uint32(best.mQueryAlignment.length() * kGraphicWidth / queryLength);
+
+                el::object h;
+                h["nr"] = (uint64)jhits.size() + 1;
+                h["db"] = hit.mDb;
+                h["doc"] = hit.mID;
+                h["seq"] = hit.mChain;
+                h["desc"] = hit.mTitle;
+                h["bitScore"] = best.mBitScore;
+                h["expect"] = best.mExpect;
+                h["hsps"] = (uint64)hsps.size();
+
+                el::object coverage;
+                coverage["start"] = coverageStart;
+                coverage["length"] = coverageLength;
+                coverage["color"] = coverageColor;
+                h["coverage"] = coverage;
+
+                jhits.push_back(h);
+            }
+
+            result = jhits;
         }
 
-        result = jhsps;
+        reply.set_content(result.toJSON(), "text/javascript");
     }
-    else
+    catch(...)
     {
-        const list<M6Blast::Hit>& hits(job->mHits);
+        std::stringstream ss;
+        ss << boost::stacktrace::stacktrace();
+        LOG(ERROR, "handle_blast_results_ajax: %s", ss.str().c_str());
 
-        vector<el::object> jhits;
-
-        for (const M6Blast::Hit& hit : hits)
-        {
-            const list<M6Blast::Hsp>& hsps(hit.mHsps);
-            if (hsps.empty())
-                continue;
-            const M6Blast::Hsp& best = hsps.front();
-
-            uint32 coverageStart = 0, coverageLength = 0, coverageColor = 1;
-            float bin = (best.mPositive * 4.0f) / best.mQueryAlignment.length();
-
-            if (bin >= 3.5)
-                coverageColor = 1;
-            else if (bin >= 3)
-                coverageColor = 2;
-            else if (bin >= 2.5)
-                coverageColor = 3;
-            else if (bin >= 2)
-                coverageColor = 4;
-            else
-                coverageColor = 5;
-
-            float queryLength = static_cast<float>(job->mQueryLength);
-            const int kGraphicWidth = 100;
-
-            coverageStart = uint32(best.mQueryStart * kGraphicWidth / queryLength);
-            coverageLength = uint32(best.mQueryAlignment.length() * kGraphicWidth / queryLength);
-
-            el::object h;
-            h["nr"] = (uint64)jhits.size() + 1;
-            h["db"] = hit.mDb;
-            h["doc"] = hit.mID;
-            h["seq"] = hit.mChain;
-            h["desc"] = hit.mTitle;
-            h["bitScore"] = best.mBitScore;
-            h["expect"] = best.mExpect;
-            h["hsps"] = (uint64)hsps.size();
-
-            el::object coverage;
-            coverage["start"] = coverageStart;
-            coverage["length"] = coverageLength;
-            coverage["color"] = coverageColor;
-            h["coverage"] = coverage;
-
-            jhits.push_back(h);
-        }
-
-        result = jhits;
+        throw;
     }
-
-    reply.set_content(result.toJSON(), "text/javascript");
 }
 
 ostream& operator<<(ostream& os, M6BlastJobStatus status)
@@ -3011,59 +3202,70 @@ ostream& operator<<(ostream& os, M6BlastJobStatus status)
 
 void M6Server::handle_blast_status_ajax(const zeep::http::request& request, const el::scope& scope, zeep::http::reply& reply)
 {
-    zeep::http::parameter_map params;
-    get_parameters(scope, params);
-
-    string ids = params.get("jobs", "").as<string>();
-    vector<string> jobs;
-
-    LOG (DEBUG, "handle_blast_status_ajax for jobs string of length %d", ids.size ());
-
-    if (not ids.empty())
-        ba::split(jobs, ids, ba::is_any_of(";"));
-
-    vector<el::object> jjobs;
-
-    for (const string& id : jobs)
+    try
     {
-        try
+        zeep::http::parameter_map params;
+        get_parameters(scope, params);
+
+        string ids = params.get("jobs", "").as<string>();
+        vector<string> jobs;
+
+        LOG (DEBUG, "handle_blast_status_ajax for jobs string of length %d", ids.size ());
+
+        if (not ids.empty())
+            ba::split(jobs, ids, ba::is_any_of(";"));
+
+        vector<el::object> jjobs;
+
+        for (const string& id : jobs)
         {
-            M6BlastJobStatus status;
-            string error;
-            uint32 hitCount;
-            double bestScore;
-
-            tie(status, error, hitCount, bestScore) = M6BlastCache::Instance().JobStatus(id);
-
-            el::object jjob;
-            jjob["id"] = id;
-            jjob["status"] = StatusToString (status);
-
-            switch (status)
+            try
             {
-                case bj_Finished:
-                    jjob["hitCount"] = hitCount;
-                    jjob["bestEValue"] = bestScore;
-                    break;
+                M6BlastJobStatus status;
+                string error;
+                uint32 hitCount;
+                double bestScore;
 
-                case bj_Error:
-                    jjob["error"] = error;
-                    break;
+                tie(status, error, hitCount, bestScore) = M6BlastCache::Instance().JobStatus(id);
 
-                default:
-                    break;
+                el::object jjob;
+                jjob["id"] = id;
+                jjob["status"] = StatusToString (status);
+
+                switch (status)
+                {
+                    case bj_Finished:
+                        jjob["hitCount"] = hitCount;
+                        jjob["bestEValue"] = bestScore;
+                        break;
+
+                    case bj_Error:
+                        jjob["error"] = error;
+                        break;
+
+                    default:
+                        break;
+                }
+
+                jjobs.push_back(jjob);
             }
+            catch (...)
+            {
+                LOG (ERROR, "handle_blast_status_ajax error: \"%s\"", id.c_str ());
+            }
+        }
 
-            jjobs.push_back(jjob);
-        }
-        catch (...)
-        {
-            LOG (ERROR, "handle_blast_status_ajax error: \"%s\"", id.c_str ());
-        }
+        el::object json(jjobs);
+        reply.set_content(json.toJSON(), "text/javascript");
     }
+    catch(...)
+    {
+        std::stringstream ss;
+        ss << boost::stacktrace::stacktrace();
+        LOG(ERROR, "handle_blast_status_ajax: %s", ss.str().c_str());
 
-    el::object json(jjobs);
-    reply.set_content(json.toJSON(), "text/javascript");
+        throw;
+    }
 }
 
 void M6Server::handle_blast_submit_ajax(
@@ -3071,484 +3273,562 @@ void M6Server::handle_blast_submit_ajax(
     const el::scope&            scope,
     zeep::http::reply&            reply)
 {
-    // default parameters
-    string id, db, matrix, expect, query, program;
-    int wordSize = 0, gapOpen = -1, gapExtend = -1, reportLimit = 250;
-    bool filter = true, gapped = true;
-
-    zeep::http::parameter_map params;
-    get_parameters(scope, params);
-
-    // fetch the parameters
-    id = params.get("id", "").as<string>();            // id is used by the client
-    db = params.get("db", "pdb").as<string>();
-    matrix = params.get("matrix", "BLOSUM62").as<string>();
-    expect = params.get("expect", "10.0").as<string>();
-    query = params.get("query", "").as<string>();
-    program = params.get("program", "blastp").as<string>();
-
-    wordSize = params.get("wordSize", wordSize).as<int>();
-    gapped = params.get("gapped", true).as<bool>();
-    gapOpen = params.get("gapOpen", gapOpen).as<int>();
-    gapExtend = params.get("gapExtend", gapExtend).as<int>();
-    reportLimit = params.get("reportLimit", reportLimit).as<int>();
-    filter = params.get("filter", true).as<bool>();
-
-    LOG(INFO, "handling ajax blast submit request for query=%s, db=%s",
-              query.c_str(), db.c_str());
-
-    // validate and unalias the databank
-    bool found = false;
-    for (M6BlastDatabank& bdb : mBlastDatabanks)
-    {
-        if (bdb.mID == db)
-        {
-            db = ba::join(bdb.mIDs, ";");
-            found = true;
-            break;
-        }
-    }
-
-    if (not found)
-        THROW(("Databank '%s' not configured", db.c_str()));
-
-    // first parse the query (in case it is in FastA format)
-    ba::replace_all(query, "\r\n", "\n");
-    ba::replace_all(query, "\r", "\n");
-    istringstream is(query);
-    string qid;
-
-    el::object result;
-    result["clientId"] = id;
-
     try
     {
-        query.clear();
-        for (;;)
+        // default parameters
+        string id, db, matrix, expect, query, program;
+        int wordSize = 0, gapOpen = -1, gapExtend = -1, reportLimit = 250;
+        bool filter = true, gapped = true;
+
+        zeep::http::parameter_map params;
+        get_parameters(scope, params);
+
+        // fetch the parameters
+        id = params.get("id", "").as<string>();            // id is used by the client
+        db = params.get("db", "pdb").as<string>();
+        matrix = params.get("matrix", "BLOSUM62").as<string>();
+        expect = params.get("expect", "10.0").as<string>();
+        query = params.get("query", "").as<string>();
+        program = params.get("program", "blastp").as<string>();
+
+        wordSize = params.get("wordSize", wordSize).as<int>();
+        gapped = params.get("gapped", true).as<bool>();
+        gapOpen = params.get("gapOpen", gapOpen).as<int>();
+        gapExtend = params.get("gapExtend", gapExtend).as<int>();
+        reportLimit = params.get("reportLimit", reportLimit).as<int>();
+        filter = params.get("filter", true).as<bool>();
+
+        LOG(INFO, "handling ajax blast submit request for query=%s, db=%s",
+                  query.c_str(), db.c_str());
+
+        // validate and unalias the databank
+        bool found = false;
+        for (M6BlastDatabank& bdb : mBlastDatabanks)
         {
-            string line;
-            getline(is, line);
-            if (line.empty() and is.eof())
+            if (bdb.mID == db)
+            {
+                db = ba::join(bdb.mIDs, ";");
+                found = true;
                 break;
-
-            if (qid.empty() and ba::starts_with(line, ">"))
-            {
-                qid = line.substr(1);
-                continue;
             }
-
-            ba::to_upper(line);
-            query += line;
         }
 
-            // validate the sequence
-        if (program == "blastn" or program == "blastx" or program == "tblastx")
+        if (not found)
+            THROW(("Databank '%s' not configured", db.c_str()));
+
+        // first parse the query (in case it is in FastA format)
+        ba::replace_all(query, "\r\n", "\n");
+        ba::replace_all(query, "\r", "\n");
+        istringstream is(query);
+        string qid;
+
+        el::object result;
+        result["clientId"] = id;
+
+        try
         {
-            if (not ba::all(query, ba::is_any_of("ACGT")))
+            query.clear();
+            for (;;)
             {
-                PRINT(("Error in parameters:\n%s", request.payload.c_str()));
-                THROW(("not a valid sequence"));
+                string line;
+                getline(is, line);
+                if (line.empty() and is.eof())
+                    break;
+
+                if (qid.empty() and ba::starts_with(line, ">"))
+                {
+                    qid = line.substr(1);
+                    continue;
+                }
+
+                ba::to_upper(line);
+                query += line;
             }
+
+                // validate the sequence
+            if (program == "blastn" or program == "blastx" or program == "tblastx")
+            {
+                if (not ba::all(query, ba::is_any_of("ACGT")))
+                {
+                    PRINT(("Error in parameters:\n%s", request.payload.c_str()));
+                    THROW(("not a valid sequence"));
+                }
+            }
+            else
+            {
+                if (not ba::all(query, ba::is_any_of("LAGSVETKDPIRNQFYMHCWBZXUO")))
+                {
+                    PRINT(("Error in parameters:\n%s", request.payload.c_str()));
+                    THROW(("not a valid sequence"));
+                }
+            }
+
+            string jobId = M6BlastCache::Instance().Submit(
+                db, query, program, matrix, wordSize,
+                boost::lexical_cast<double>(expect), filter,
+                gapped, gapOpen, gapExtend, reportLimit);
+
+            LOG (DEBUG, "handle_blast_submit_ajax: created new job with id: %s", jobId.c_str ());
+
+            // and answer with the created job ID
+            result["id"] = jobId;
+            result["qid"] = qid;
+            result["status"] = StatusToString (bj_Queued);
         }
-        else
+        catch (exception& e)
         {
-            if (not ba::all(query, ba::is_any_of("LAGSVETKDPIRNQFYMHCWBZXUO")))
-            {
-                PRINT(("Error in parameters:\n%s", request.payload.c_str()));
-                THROW(("not a valid sequence"));
-            }
+            result["status"] = StatusToString (bj_Error);
+            result["error"] = e.what();
         }
 
-        string jobId = M6BlastCache::Instance().Submit(
-            db, query, program, matrix, wordSize,
-            boost::lexical_cast<double>(expect), filter,
-            gapped, gapOpen, gapExtend, reportLimit);
+        reply.set_content(result.toJSON(), "text/javascript");
 
-        LOG (DEBUG, "handle_blast_submit_ajax: created new job with id: %s", jobId.c_str ());
-
-        // and answer with the created job ID
-        result["id"] = jobId;
-        result["qid"] = qid;
-        result["status"] = StatusToString (bj_Queued);
+        LOG(INFO, "done generating ajax blast submit response for query=%s, db=%s",
+                  query.c_str(), db.c_str());
     }
-    catch (exception& e)
+    catch(...)
     {
-        result["status"] = StatusToString (bj_Error);
-        result["error"] = e.what();
+        std::stringstream ss;
+        ss << boost::stacktrace::stacktrace();
+        LOG(ERROR, "handle_blast_submit_ajax: %s", ss.str().c_str());
+
+        throw;
     }
-
-    reply.set_content(result.toJSON(), "text/javascript");
-
-    LOG(INFO, "done generating ajax blast submit response for query=%s, db=%s",
-              query.c_str(), db.c_str());
 }
 
 void M6Server::handle_align(const zh::request& request, const el::scope& scope, zh::reply& reply)
 {
-    zeep::http::parameter_map params;
-    get_parameters(scope, params);
-
-    el::scope sub(scope);
-
-    string seqstr = params.get("seqs", "").as<string>();
-
-    LOG(INFO, "handle align request with seqs=%s", seqstr.c_str());
-
-    ba::replace_all(seqstr, "\r\n", "\n");
-    ba::replace_all(seqstr, "\r", "\n");
-
-    map<string,shared_ptr<M6Parser>> parsers;
-
-    if (not seqstr.empty())
+    try
     {
-        vector<string> seqs;
-        ba::split(seqs, seqstr, ba::is_any_of(";"));
-        string fasta;
+        zeep::http::parameter_map params;
+        get_parameters(scope, params);
 
-        for (string& ts : seqs)
+        el::scope sub(scope);
+
+        string seqstr = params.get("seqs", "").as<string>();
+
+        LOG(INFO, "handle align request with seqs=%s", seqstr.c_str());
+
+        ba::replace_all(seqstr, "\r\n", "\n");
+        ba::replace_all(seqstr, "\r", "\n");
+
+        map<string,shared_ptr<M6Parser>> parsers;
+
+        if (not seqstr.empty())
         {
-            string::size_type s = ts.find('/');
-            if (s == string::npos)
-                THROW(("Invalid parameters passed for align"));
-            fasta += GetEntry(ts.substr(0, s), ts.substr(s + 1), "fasta");
+            vector<string> seqs;
+            ba::split(seqs, seqstr, ba::is_any_of(";"));
+            string fasta;
+
+            for (string& ts : seqs)
+            {
+                string::size_type s = ts.find('/');
+                if (s == string::npos)
+                    THROW(("Invalid parameters passed for align"));
+                fasta += GetEntry(ts.substr(0, s), ts.substr(s + 1), "fasta");
+            }
+
+            sub.put("input", el::object(fasta));
         }
 
-        sub.put("input", el::object(fasta));
+        create_reply_from_template("align.html", sub, reply);
+
+        LOG(INFO, "done generating align response for seqs=%s", seqstr.c_str());
     }
+    catch(...)
+    {
+        std::stringstream ss;
+        ss << boost::stacktrace::stacktrace();
+        LOG(ERROR, "handle_align: %s", ss.str().c_str());
 
-    create_reply_from_template("align.html", sub, reply);
-
-    LOG(INFO, "done generating align response for seqs=%s", seqstr.c_str());
+        throw;
+    }
 }
 
 void M6Server::handle_align_submit_ajax(const zh::request& request, const el::scope& scope, zh::reply& reply)
 {
-    zeep::http::parameter_map params;
-    get_parameters(scope, params);
-
-    el::object result;
-
-    string fasta = params.get("input", "").as<string>();
-
-    LOG(INFO, "handle ajax align request with fasta=%s", fasta.c_str());
-
-    if (fasta.empty())
-        result["error"] = "No input specified for align";
-    else
+    try
     {
-        try
+        zeep::http::parameter_map params;
+        get_parameters(scope, params);
+
+        el::object result;
+
+        string fasta = params.get("input", "").as<string>();
+
+        LOG(INFO, "handle ajax align request with fasta=%s", fasta.c_str());
+
+        if (fasta.empty())
+            result["error"] = "No input specified for align";
+        else
         {
-            string clustalo = M6Config::GetTool("clustalo");
-            if (clustalo.empty())
-                clustalo = "/usr/bin/clustalo";
-
-            vector<const char*> args;
-            args.push_back(clustalo.c_str());
-            args.push_back("-i");
-            args.push_back("-");
-            args.push_back(nullptr);
-
-            double maxRunTime = M6Config::GetMaxRunTime("clustalo");
-            if (maxRunTime == 0)
-                maxRunTime = 30;
-            stringstream in(fasta), out, err;
-
-            if (ForkExec(args, maxRunTime, in, out, err) == 0)
+            try
             {
-                result["alignment"] = out.str();
-                if (not err.str().empty())
-                    result["error"] = err.str();
+                string clustalo = M6Config::GetTool("clustalo");
+                if (clustalo.empty())
+                    clustalo = "/usr/bin/clustalo";
+
+                vector<const char*> args;
+                args.push_back(clustalo.c_str());
+                args.push_back("-i");
+                args.push_back("-");
+                args.push_back(nullptr);
+
+                double maxRunTime = M6Config::GetMaxRunTime("clustalo");
+                if (maxRunTime == 0)
+                    maxRunTime = 30;
+                stringstream in(fasta), out, err;
+
+                if (ForkExec(args, maxRunTime, in, out, err) == 0)
+                {
+                    result["alignment"] = out.str();
+                    if (not err.str().empty())
+                        result["error"] = err.str();
+                }
+                else
+                {
+                    string error_message = "Error running clustalo";
+                    error_message += err.str();
+
+                    result["error"] = error_message;
+                }
             }
-            else
+            catch (exception& e)
             {
-                string error_message = "Error running clustalo";
-                error_message += err.str();
-
-                result["error"] = error_message;
+                result["error"] = e.what();
             }
         }
-        catch (exception& e)
-        {
-            result["error"] = e.what();
-        }
+
+        reply.set_content(result.toJSON(), "text/javascript");
+
+        LOG(INFO, "done generating ajax align response for fasta=%s", fasta.c_str());
     }
+    catch(...)
+    {
+        std::stringstream ss;
+        ss << boost::stacktrace::stacktrace();
+        LOG(ERROR, "handle_align_submit_ajax: %s", ss.str().c_str());
 
-    reply.set_content(result.toJSON(), "text/javascript");
-
-    LOG(INFO, "done generating ajax align response for fasta=%s", fasta.c_str());
+        throw;
+    }
 }
 
 // --------------------------------------------------------------------
 
 void M6Server::handle_status(const zh::request& request, const el::scope& scope, zh::reply& reply)
 {
-    zeep::http::parameter_map params;
-    get_parameters(scope, params);
-
-    el::scope sub(scope);
-
-    LOG(INFO, "handling status request");
-
-    vector<el::object> databanks;
-//    for (M6LoadedDatabank& db : mLoadedDatabanks)
-
-    for (zx::element* db : M6Config::GetDatabanks())
+    try
     {
-        if (db->get_attribute("enabled") == "false")
-            continue;
+        zeep::http::parameter_map params;
+        get_parameters(scope, params);
 
-        string id = db->get_attribute("id");
+        el::scope sub(scope);
 
-        el::object databank;
-        databank["id"] = id;
-        if (zx::element* n = db->find_first("name"))
-            databank["name"] = n->content();
+        LOG(INFO, "handling status request");
 
-        M6DatabankInfo info = {};
-        M6Databank* dbo = Load(id);
+        vector<el::object> databanks;
+//      for (M6LoadedDatabank& db : mLoadedDatabanks)
 
-        if (dbo != nullptr)
-            dbo->GetInfo(info);
+        for (zx::element* db : M6Config::GetDatabanks())
+        {
+            if (db->get_attribute("enabled") == "false")
+                continue;
 
-        databank["entries"] = info.mDocCount;
-        databank["version"] = info.mVersion;
-        databank["buildDate"] = info.mLastUpdate;
-//        databank["size"] = info.mTotalSize;
-        databank["size"] = info.mRawTextSize;
+            string id = db->get_attribute("id");
 
-        databanks.push_back(databank);
+            el::object databank;
+            databank["id"] = id;
+            if (zx::element* n = db->find_first("name"))
+                databank["name"] = n->content();
+
+            M6DatabankInfo info = {};
+            M6Databank* dbo = Load(id);
+
+            if (dbo != nullptr)
+                dbo->GetInfo(info);
+
+            databank["entries"] = info.mDocCount;
+            databank["version"] = info.mVersion;
+            databank["buildDate"] = info.mLastUpdate;
+//          databank["size"] = info.mTotalSize;
+            databank["size"] = info.mRawTextSize;
+
+            databanks.push_back(databank);
+        }
+        sub.put("statusDatabanks", el::object(databanks));
+
+        create_reply_from_template("status.html", sub, reply);
+        reply.set_header("Cache-Control", "no-cache");
+
+        LOG(INFO, "done generating status response");
     }
-    sub.put("statusDatabanks", el::object(databanks));
+    catch(...)
+    {
+        std::stringstream ss;
+        ss << boost::stacktrace::stacktrace();
+        LOG(ERROR, "handle_status: %s", ss.str().c_str());
 
-    create_reply_from_template("status.html", sub, reply);
-    reply.set_header("Cache-Control", "no-cache");
-
-    LOG(INFO, "done generating status response");
+        throw;
+    }
 }
 
 void M6Server::handle_status_ajax(const zh::request& request, const el::scope& scope, zh::reply& reply)
 {
-    vector<el::object> databanks;
-    vector<string> scheduled;
-
-    LOG(INFO, "handling ajax status request");
-
-    M6Scheduler::Instance().GetScheduledDatabanks(scheduled);
-
-    for (zx::element* db : M6Config::GetDatabanks())
+    try
     {
-        if (db->get_attribute("enabled") == "false")
-            continue;
+        vector<el::object> databanks;
+        vector<string> scheduled;
 
-        string id = db->get_attribute("id");
+        LOG(INFO, "handling ajax status request");
 
-        el::object databank;
-        databank["id"] = id;
+        M6Scheduler::Instance().GetScheduledDatabanks(scheduled);
 
-        bool dbScheduled = find(scheduled.begin(), scheduled.end(), id) != scheduled.end();
-
-        string stage;
-        float progress;
-        if (M6Status::Instance().GetUpdateStatus(id, stage, progress))
+        for (zx::element* db : M6Config::GetDatabanks())
         {
-            el::object update;
-            if (progress < 0 and dbScheduled)
-                update["stage"] = "scheduled";
-            else
+            if (db->get_attribute("enabled") == "false")
+                continue;
+
+            string id = db->get_attribute("id");
+
+            el::object databank;
+            databank["id"] = id;
+
+            bool dbScheduled = find(scheduled.begin(), scheduled.end(), id) != scheduled.end();
+
+            string stage;
+            float progress;
+            if (M6Status::Instance().GetUpdateStatus(id, stage, progress))
             {
-                update["progress"] = progress;
-                update["stage"] = stage;
+                el::object update;
+                if (progress < 0 and dbScheduled)
+                    update["stage"] = "scheduled";
+                else
+                {
+                    update["progress"] = progress;
+                    update["stage"] = stage;
+                }
+                databank["update"] = update;
             }
-            databank["update"] = update;
-        }
-        else if (dbScheduled)
-        {
-            el::object update;
-            update["stage"] = "scheduled";
-            databank["update"] = update;
+            else if (dbScheduled)
+            {
+                el::object update;
+                update["stage"] = "scheduled";
+                databank["update"] = update;
+            }
+
+            databanks.push_back(databank);
         }
 
-        databanks.push_back(databank);
+        reply.set_content(el::object(databanks).toJSON(), "text/javascript");
+        reply.set_header("Cache-Control", "no-cache");
+
+        LOG(INFO, "done generating ajax status response");
     }
+    catch(...)
+    {
+        std::stringstream ss;
+        ss << boost::stacktrace::stacktrace();
+        LOG(ERROR, "handle_status_ajax: %s", ss.str().c_str());
 
-    reply.set_content(el::object(databanks).toJSON(), "text/javascript");
-    reply.set_header("Cache-Control", "no-cache");
-
-    LOG(INFO, "done generating ajax status response");
+        throw;
+    }
 }
 
 void M6Server::handle_info(const zh::request& request, const el::scope& scope, zh::reply& reply)
 {
-    zeep::http::parameter_map params;
-    get_parameters(scope, params);
-
-    el::scope sub(scope);
-
-    string dbAlias = params.get("db", "").as<string>();
-
-    LOG(INFO, "handling info request for db=%s", dbAlias.c_str());
-
-    if (dbAlias.empty())
+    try
     {
-        THROW(("No databank specified"));
-    }
+        zeep::http::parameter_map params;
+        get_parameters(scope, params);
 
-    LOG (DEBUG, "M6Server: info request is for databank %s", dbAlias.c_str ());
+        el::scope sub(scope);
 
-    vector<string> aliased = UnAlias(dbAlias);
-    bool bAlias = aliased.size()>1 ||
-                    aliased.size () == 1 && aliased[0] != dbAlias ;
+        string dbAlias = params.get("db", "").as<string>();
 
-    vector<el::object> databanks;
-    for (string db : aliased)
-    {
-        LOG (DEBUG, "M6Server: Resolved %s to %s", dbAlias.c_str (), db.c_str ());
+        LOG(INFO, "handling info request for db=%s", dbAlias.c_str());
 
-    for (M6LoadedDatabank& ldb : mLoadedDatabanks)
-    {
-        if (ldb.mID != db)
-            continue;
-
-        const zx::element* dbConfig = M6Config::GetEnabledDatabank(db);
-
-        M6DatabankInfo info;
-        ldb.mDatabank->GetInfo(info);
-
-        el::object databank;
-        databank["id"] = ldb.mID;
-        databank["name"] = ldb.mName;
-        databank["count"] = info.mDocCount;
-        databank["version"] = info.mVersion;
-        databank["path"] = info.mDbDirectory.string();
-        databank["onDiskSize"] = info.mTotalSize;
-        databank["rawDataSize"] = info.mRawTextSize;
-        databank["buildDate"] = info.mLastUpdate;
-        databank["parser"] = dbConfig->get_attribute("parser");
-        if (zx::element* info = dbConfig->find_first("info"))
-            databank["info"] = info->content();
-
-        vector<el::object> indices;
-        for (M6IndexInfo& iinfo : info.mIndexInfo)
+        if (dbAlias.empty())
         {
-            el::object index;
+            THROW(("No databank specified"));
+        }
 
-            index["id"] = iinfo.mName;
-            index["desc"] = iinfo.mDesc;
+        LOG (DEBUG, "M6Server: info request is for databank %s", dbAlias.c_str ());
 
-            switch (iinfo.mType)
+        vector<string> aliased = UnAlias(dbAlias);
+        bool bAlias = aliased.size()>1 ||
+                        aliased.size () == 1 && aliased[0] != dbAlias ;
+
+        vector<el::object> databanks;
+        for (string db : aliased)
+        {
+            LOG (DEBUG, "M6Server: Resolved %s to %s", dbAlias.c_str (), db.c_str ());
+
+            for (M6LoadedDatabank& ldb : mLoadedDatabanks)
             {
-                case eM6CharIndex:            index["type"] = "unique string"; break;
-                case eM6NumberIndex:        index["type"] = "unique number"; break;
-                case eM6FloatIndex:         index["type"] = "unique fp number"; break;
-//                case eM6DateIndex:            index["type"] = "date"; break;
-                case eM6CharMultiIndex:        index["type"] = "string"; break;
-                case eM6NumberMultiIndex:    index["type"] = "number"; break;
-                case eM6FloatMultiIndex:    index["type"] = "floating point number"; break;
-//                case eM6DateMultiIndex:        index["type"] = "date"; break;
-                case eM6CharMultiIDLIndex:    index["type"] = "string"; break;
-                case eM6CharWeightedIndex:    index["type"] = "full text"; break;
+                if (ldb.mID != db)
+                    continue;
+
+                const zx::element* dbConfig = M6Config::GetEnabledDatabank(db);
+
+                M6DatabankInfo info;
+                ldb.mDatabank->GetInfo(info);
+
+                el::object databank;
+                databank["id"] = ldb.mID;
+                databank["name"] = ldb.mName;
+                databank["count"] = info.mDocCount;
+                databank["version"] = info.mVersion;
+                databank["path"] = info.mDbDirectory.string();
+                databank["onDiskSize"] = info.mTotalSize;
+                databank["rawDataSize"] = info.mRawTextSize;
+                databank["buildDate"] = info.mLastUpdate;
+                databank["parser"] = dbConfig->get_attribute("parser");
+                if (zx::element* info = dbConfig->find_first("info"))
+                    databank["info"] = info->content();
+
+                vector<el::object> indices;
+                for (M6IndexInfo& iinfo : info.mIndexInfo)
+                {
+                    el::object index;
+
+                    index["id"] = iinfo.mName;
+                    index["desc"] = iinfo.mDesc;
+
+                    switch (iinfo.mType)
+                    {
+                        case eM6CharIndex:            index["type"] = "unique string"; break;
+                        case eM6NumberIndex:        index["type"] = "unique number"; break;
+                        case eM6FloatIndex:         index["type"] = "unique fp number"; break;
+//                      case eM6DateIndex:            index["type"] = "date"; break;
+                        case eM6CharMultiIndex:        index["type"] = "string"; break;
+                        case eM6NumberMultiIndex:    index["type"] = "number"; break;
+                        case eM6FloatMultiIndex:    index["type"] = "floating point number"; break;
+//                      case eM6DateMultiIndex:        index["type"] = "date"; break;
+                        case eM6CharMultiIDLIndex:    index["type"] = "string"; break;
+                        case eM6CharWeightedIndex:    index["type"] = "full text"; break;
+                    }
+
+                    index["count"] = iinfo.mCount;
+                    index["size"] = iinfo.mFileSize;
+
+                    indices.push_back(index);
+                }
+
+                databank["indices"] = el::object(indices);
+
+                databanks.push_back(databank);
+                if (!bAlias)
+                    sub.put("databank", databank);
+                break;
+            }
+        }
+
+        LOG (DEBUG, "M6Server: creating info reply for %d databanks",
+                    aliased.size ());
+
+        if(bAlias) {
+
+            string dbList = "";
+            for (string db : aliased) {
+                if(! dbList.empty() )
+                    dbList += " + ";
+                dbList += db ;
             }
 
-            index["count"] = iinfo.mCount;
-            index["size"] = iinfo.mFileSize;
+            sub.put("info-databanks", el::object(databanks));
+            sub.put("alias",dbAlias);
+            sub.put("aliased",dbList);
 
-            indices.push_back(index);
+            create_reply_from_template("info-alias.html", sub, reply);
+        }
+        else
+        {
+            create_reply_from_template("info.html", sub, reply);
         }
 
-        databank["indices"] = el::object(indices);
-
-        databanks.push_back(databank);
-        if (!bAlias)
-            sub.put("databank", databank);
-        break;
+        LOG(INFO, "done generating info response for db=%s", dbAlias.c_str());
     }
+    catch(...)
+    {
+        std::stringstream ss;
+        ss << boost::stacktrace::stacktrace();
+        LOG(ERROR, "handle_info: %s", ss.str().c_str());
+
+        throw;
     }
-
-    LOG (DEBUG, "M6Server: creating info reply for %d databanks",
-                aliased.size ());
-
-    if(bAlias) {
-
-        string dbList = "";
-        for (string db : aliased) {
-            if(! dbList.empty() )
-                dbList += " + ";
-            dbList += db ;
-        }
-
-        sub.put("info-databanks", el::object(databanks));
-        sub.put("alias",dbAlias);
-        sub.put("aliased",dbList);
-
-        create_reply_from_template("info-alias.html", sub, reply);
-    }
-    else {
-        create_reply_from_template("info.html", sub, reply);
-    }
-
-    LOG(INFO, "done generating info response for db=%s", dbAlias.c_str());
 }
 
 void M6Server::handle_browse(const zh::request& request, const el::scope& scope, zh::reply& reply)
 {
-    zeep::http::parameter_map params;
-    get_parameters(scope, params);
-
-    el::scope sub(scope);
-
-    string db = params.get("db", "").as<string>();
-    if (db.empty())
-        THROW(("No databank specified"));
-
-    string ix = params.get("ix", "").as<string>();
-    if (ix.empty())
-        THROW(("No index specified"));
-
-    LOG(INFO, "handling browse request for db=%s, ix=%s",
-              db.c_str(), ix.c_str());
-
-    M6Databank* mdb = Load(db);
-    if (mdb == nullptr)
-        THROW(("Databank not loaded"));
-
-    string iFirst = params.get("first", "").as<string>();
-    string iLast = params.get("last", "").as<string>();
-
-    sub.put("db", db);
-    sub.put("ix", ix);
-    sub.put("first", iFirst);
-    sub.put("last", iLast);
-
-    vector<pair<string,string>> sections;
-    if (mdb->BrowseSectionsForIndex(ix, iFirst, iLast, 30, sections))
+    try
     {
-        vector<el::object> elSections;
+        zeep::http::parameter_map params;
+        get_parameters(scope, params);
 
-        for (auto& section : sections)
+        el::scope sub(scope);
+
+        string db = params.get("db", "").as<string>();
+        if (db.empty())
+            THROW(("No databank specified"));
+
+        string ix = params.get("ix", "").as<string>();
+        if (ix.empty())
+            THROW(("No index specified"));
+
+        LOG(INFO, "handling browse request for db=%s, ix=%s",
+                  db.c_str(), ix.c_str());
+
+        M6Databank* mdb = Load(db);
+        if (mdb == nullptr)
+            THROW(("Databank not loaded"));
+
+        string iFirst = params.get("first", "").as<string>();
+        string iLast = params.get("last", "").as<string>();
+
+        sub.put("db", db);
+        sub.put("ix", ix);
+        sub.put("first", iFirst);
+        sub.put("last", iLast);
+
+        vector<pair<string,string>> sections;
+        if (mdb->BrowseSectionsForIndex(ix, iFirst, iLast, 30, sections))
         {
-            el::object elSection;
-            elSection["first"] = section.first;
-            elSection["last"] = section.second;
-            elSections.push_back(elSection);
+            vector<el::object> elSections;
+
+            for (auto& section : sections)
+            {
+                el::object elSection;
+                elSection["first"] = section.first;
+                elSection["last"] = section.second;
+                elSections.push_back(elSection);
+            }
+
+            sub.put("sections", elSections.begin(), elSections.end());
+        }
+        else
+        {
+            vector<string> keys;
+            mdb->ListIndexEntries(ix, iFirst, iLast, keys);
+
+            for (auto& key : keys)
+                LOG (DEBUG, "key for %s - %s: %s", iFirst.c_str (), iLast.c_str (), key.c_str ());
+
+            sub.put("keys", keys.begin(), keys.end());
         }
 
-        sub.put("sections", elSections.begin(), elSections.end());
+        create_reply_from_template("browse.html", sub, reply);
+
+        LOG(INFO, "done generating browse response for db=%s, ix=%s",
+                  db.c_str(), ix.c_str());
     }
-    else
+    catch(...)
     {
-        vector<string> keys;
-        mdb->ListIndexEntries(ix, iFirst, iLast, keys);
+        std::stringstream ss;
+        ss << boost::stacktrace::stacktrace();
+        LOG(ERROR, "handle_browse: %s", ss.str().c_str());
 
-        for (auto& key : keys)
-            LOG (DEBUG, "key for %s - %s: %s", iFirst.c_str (), iLast.c_str (), key.c_str ());
-
-        sub.put("keys", keys.begin(), keys.end());
+        throw;
     }
-
-    create_reply_from_template("browse.html", sub, reply);
-
-    LOG(INFO, "done generating browse response for db=%s, ix=%s",
-              db.c_str(), ix.c_str());
 }
 
 // --------------------------------------------------------------------
@@ -3572,105 +3852,116 @@ void RunMainLoop(uint32 inNrOfThreads, bool redirectOutputToLog)
 {
     for (;;)
     {
-        if (redirectOutputToLog)
+        try
         {
-            LOG(DEBUG,"RunMainLoop: redirecting output to log");
-
-            // (re-)open the log files.
-            fs::path logfile = fs::path(M6Config::GetDirectory("log")) / "access.log";
-            fs::path errfile = fs::path(M6Config::GetDirectory("log")) / "error.log";
-            OpenLogFile(logfile.string(), errfile.string());
-        }
-
-        LOG(DEBUG,"RunMainLoop: importing namespaces");
-
-        using namespace boost::local_time;
-        using namespace boost::posix_time;
-
-        local_time_facet* lf(new local_time_facet("[%d/%b/%Y:%H:%M:%S %z]"));
-        cerr.imbue(std::locale(std::cout.getloc(), lf));
-        cerr << local_date_time(second_clock::local_time(), time_zone_ptr())
-             << " Restarting services...";
-
-        LOG(DEBUG,"RunMainLoop: blocking signals");
-
-        M6SignalCatcher catcher;
-        catcher.BlockSignals();
-
-        LOG(DEBUG,"RunMainLoop: get config");
-
-        const zx::element* config = M6Config::GetServer();
-        if (config == nullptr)
-            THROW(("Missing server configuration"));
-
-        string addr = config->get_attribute("addr");
-        string port = config->get_attribute("port");
-
-        if (port.empty())
-            port = "80";
-
-        LOG(DEBUG,"RunMainLoop: configuring server");
-
-        shared_ptr<M6Server> server(new M6Server(config));
-
-        LOG(DEBUG,"RunMainLoop: binding server to %s:%s",addr.c_str(),port.c_str());
-
-        server->bind(addr, boost::lexical_cast<uint16>(port));
-        boost::thread thread(boost::bind(&zeep::http::server::run, boost::ref(*server), inNrOfThreads));
-
-        cerr << " done" << endl
-             << local_date_time(second_clock::local_time(), time_zone_ptr())
-             << " listening at " << addr << ':' << port << endl;
-
-        LOG(DEBUG,"RunMainLoop: unblocking signals");
-
-        catcher.UnblockSignals();
-
-        LOG(DEBUG,"RunMainLoop: waiting for signals..");
-
-        int sig;
-        do
-        {
-            sig = catcher.WaitForSignal();
-
-            // signal logging
-            string sigstr;
-            switch(sig)
+            if (redirectOutputToLog)
             {
-            case SIGINT : sigstr = "SIGINT";  break;
-            case SIGHUP : sigstr = "SIGHUP";  break;
-            case SIGSEGV: sigstr = "SIGSEGV"; break;
-            case SIGQUIT: sigstr = "SIGQUIT"; break;
-            case SIGTERM: sigstr = "SIGTERM"; break;
-            default: sigstr = to_string(sig); break;
+                LOG(DEBUG,"RunMainLoop: redirecting output to log");
+
+                // (re-)open the log files.
+                fs::path logfile = fs::path(M6Config::GetDirectory("log")) / "access.log";
+                fs::path errfile = fs::path(M6Config::GetDirectory("log")) / "error.log";
+                OpenLogFile(logfile.string(), errfile.string());
             }
 
-            LOG(WARN,"RunMainLoop: recieved signal: %s",sigstr.c_str());
+            LOG(DEBUG,"RunMainLoop: importing namespaces");
 
-            //cerr << local_date_time(second_clock::local_time(), time_zone_ptr()) << " RunMainLoop recieved signal: " << sigstr << endl;
+            using namespace boost::local_time;
+            using namespace boost::posix_time;
+
+            local_time_facet* lf(new local_time_facet("[%d/%b/%Y:%H:%M:%S %z]"));
+            cerr.imbue(std::locale(std::cout.getloc(), lf));
+            cerr << local_date_time(second_clock::local_time(), time_zone_ptr())
+                 << " Restarting services...";
+
+            LOG(DEBUG,"RunMainLoop: blocking signals");
+
+            M6SignalCatcher catcher;
+            catcher.BlockSignals();
+
+            LOG(DEBUG,"RunMainLoop: get config");
+
+            const zx::element* config = M6Config::GetServer();
+            if (config == nullptr)
+                THROW(("Missing server configuration"));
+
+            string addr = config->get_attribute("addr");
+            string port = config->get_attribute("port");
+
+            if (port.empty())
+                port = "80";
+
+            LOG(DEBUG,"RunMainLoop: configuring server");
+
+            shared_ptr<M6Server> server(new M6Server(config));
+
+            LOG(DEBUG,"RunMainLoop: binding server to %s:%s",addr.c_str(),port.c_str());
+
+            server->bind(addr, boost::lexical_cast<uint16>(port));
+            boost::thread thread(boost::bind(&zeep::http::server::run, boost::ref(*server), inNrOfThreads));
+
+            cerr << " done" << endl
+                 << local_date_time(second_clock::local_time(), time_zone_ptr())
+                 << " listening at " << addr << ':' << port << endl;
+
+            LOG(DEBUG,"RunMainLoop: unblocking signals");
+
+            catcher.UnblockSignals();
+
+            LOG(DEBUG,"RunMainLoop: waiting for signals..");
+
+            int sig;
+            do
+            {
+                sig = catcher.WaitForSignal();
+
+                // signal logging
+                string sigstr;
+                switch(sig)
+                {
+                case SIGINT : sigstr = "SIGINT";  break;
+                case SIGHUP : sigstr = "SIGHUP";  break;
+                case SIGSEGV: sigstr = "SIGSEGV"; break;
+                case SIGQUIT: sigstr = "SIGQUIT"; break;
+                case SIGTERM: sigstr = "SIGTERM"; break;
+                default: sigstr = to_string(sig); break;
+                }
+
+                LOG(WARN,"RunMainLoop: recieved signal: %s",sigstr.c_str());
+
+                //cerr << local_date_time(second_clock::local_time(), time_zone_ptr()) << " RunMainLoop recieved signal: " << sigstr << endl;
+            }
+            while (sig == SIGCHLD); // we don't care about these in MRS server
+
+            server->stop();
+
+            LOG(DEBUG,"RunMainLoop: stopped server");
+
+            #ifdef BOOST_CHRONO_EXTENSIONS
+                if (not thread.try_join_for(boost::chrono::seconds(5)))
+            #else
+                if (not thread.timed_join(boost::posix_time::seconds(5)))
+            #endif
+            {
+                thread.interrupt();
+                thread.detach();
+            }
+
+            LOG(DEBUG,"RunMainLoop: ending iteration");
+
+            if (sig == SIGHUP)
+                continue;
+
+            break;
         }
-        while (sig == SIGCHLD); // we don't care about these in MRS server
-
-        server->stop();
-
-        LOG(DEBUG,"RunMainLoop: stopped server");
-
-#ifdef BOOST_CHRONO_EXTENSIONS
-        if (not thread.try_join_for(boost::chrono::seconds(5)))
-#else
-        if (not thread.timed_join(boost::posix_time::seconds(5)))
-#endif
+        catch(...)
         {
-            thread.interrupt();
-            thread.detach();
+            std::stringstream ss;
+            ss << boost::stacktrace::stacktrace();
+            LOG(ERROR, "RunMainLoop: %s", ss.str().c_str());
+
+            throw;
         }
-
-        LOG(DEBUG,"RunMainLoop: ending iteration");
-
-        if (sig == SIGHUP)
-            continue;
-
-        break;
     }
 }
 

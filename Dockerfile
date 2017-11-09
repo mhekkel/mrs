@@ -1,4 +1,4 @@
-FROM ubuntu:16.04
+FROM ubuntu:17.10
 
 RUN mkdir -p /app
 WORKDIR /app
@@ -6,8 +6,16 @@ WORKDIR /app
 RUN apt-get update
 RUN apt-get install -y clustalo ncbi-tools-bin
 RUN apt-get install -y make rsync wget
-RUN apt-get install -y git g++ libboost-all-dev libz-dev libbz2-dev doxygen xsltproc docbook docbook-xsl docbook-xml autoconf automake autotools-dev liblog4cpp5-dev libperl-dev
+RUN apt-get install -y git g++ libz-dev libbz2-dev bzip2 doxygen xsltproc docbook docbook-xsl docbook-xml autoconf automake autotools-dev liblog4cpp5-dev libperl-dev
 RUN mkdir -p /deps
+
+# Install boost 1.65
+WORKDIR /deps/
+RUN wget https://dl.bintray.com/boostorg/release/1.65.1/source/boost_1_65_1.tar.bz2 && tar xjf boost_1_65_1.tar.bz2 && rm boost_1_65_1.tar.bz2
+WORKDIR /deps/boost_1_65_1
+RUN ./bootstrap.sh && ./b2 install && ldconfig
+RUN install bjam /usr/local/bin/bjam
+ENV BOOST_ROOT /deps/boost_1_65_1
 
 # Install libzeep
 RUN git clone https://github.com/mhekkel/libzeep.git /deps/libzeep ;\

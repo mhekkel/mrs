@@ -302,6 +302,8 @@ function mrsLoad()
 
 	if (! mrsCookie.load())
 	{
+		alert("This site uses cookies to store your results. Click OK if you agree.")
+
 		mrsCookie.hitsToShow = 2;
 		mrsCookie.orderBy = "databank";
 		mrsCookie.store();

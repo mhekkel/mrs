@@ -255,8 +255,9 @@ tuple<M6BlastJobStatus,string,uint32,double> M6BlastCache::JobStatus(const strin
 
 M6BlastResultPtr M6BlastCache::JobResult(const string& inJobID)
 {
+    fs::path xmlPath = mCacheDir / (inJobID + ".xml.bz2");
     io::filtering_stream<io::input> in;
-    fs::ifstream file(mCacheDir / (inJobID + ".xml.bz2"), ios::binary);
+    fs::ifstream file(xmlPath, ios::binary);
     if (not file.is_open())
         throw M6Exception("missing blast result file");
 
@@ -265,8 +266,17 @@ M6BlastResultPtr M6BlastCache::JobResult(const string& inJobID)
 
     M6BlastResultPtr result(new M6Blast::Result);
 
-    zeep::xml::document doc(in);
-    doc.deserialize("blast-result", const_cast<M6Blast::Result&>(*result));
+    try
+    {
+        zeep::xml::document doc(in);
+        doc.deserialize("blast-result", const_cast<M6Blast::Result&>(*result));
+    }
+    catch(exception &ex)
+    {
+        LOG(WARN,"Cannot parse result file %s: %s", xmlPath.string().c_str(), ex.what());
+        fs::remove(xmlPath);
+        SetJobStatus(inJobID, bj_Queued);
+    }
 
     return result;
 }
@@ -533,11 +543,22 @@ bool M6BlastCache::LoadCacheJob(const std::string& inJobID, M6BlastJob& job)
     fs::ifstream file(mCacheDir / (inJobID + ".job"));
     if (file.is_open())
     {
-        zeep::xml::document doc(file);
-        doc.deserialize("blastjob", job);
+        try
+        {
+            zeep::xml::document doc(file);
+            doc.deserialize("blastjob", job);
+        }
+        catch(exception &ex)
+        {
+            LOG(ERROR, "cannot parse job %s: %s", inJobID.c_str(), ex.what());
+
+            return false;
+        }
 
         return true;
     }
+
+    LOG(ERROR, "cannot missing job file for %s: %s", inJobID.c_str());
 
     return false;
 }
@@ -552,7 +573,7 @@ void M6BlastCache::ExecuteJob(const string& inJobID, const uint32 n_threads)
         M6BlastJob job;
         if (!LoadCacheJob (inJobID, job))
         {
-            SetJobStatus(inJobID, bj_Error);
+            DeleteJob(inJobID);
             return;
         }
 

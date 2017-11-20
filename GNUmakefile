@@ -58,7 +58,7 @@ LDFLAGS				+= -pg
 OBJDIR				:= $(OBJDIR).profile
 endif
 
-UNIT_TESTS			= unit_test_blast unit_test_query
+UNIT_TESTS			= unit_test_blast unit_test_query unit_test_exec
 TESTS				= $(UNIT_TESTS)
 
 VPATH += src unit-tests
@@ -114,6 +114,15 @@ unit_test_query:  $(OBJDIR)/M6TestQuery.o $(OBJDIR)/M6Query.o \
 		$(OBJDIR)/M6File.o $(OBJDIR)/M6Progress.o $(OBJDIR)/M6DocStore.o \
 		$(OBJDIR)/M6Document.o $(OBJDIR)/M6Lexicon.o $(OBJDIR)/M6Dictionary.o \
 		$(OBJDIR)/M6Utilities.o
+	$(CXX) -o $@ $^ $(LDFLAGS)
+
+unit_test_exec: $(OBJDIR)/M6TestExec.o $(OBJDIR)/M6Exec.o $(OBJDIR)/M6Error.o \
+		$(OBJDIR)/M6Server.o $(OBJDIR)/M6Utilities.o $(OBJDIR)/M6Log.o $(OBJDIR)/M6Parser.o \
+		$(OBJDIR)/M6Databank.o $(OBJDIR)/M6Iterator.o $(OBJDIR)/M6BitStream.o $(OBJDIR)/M6Tokenizer.o \
+		$(OBJDIR)/M6Builder.o $(OBJDIR)/M6Document.o $(OBJDIR)/M6Config.o $(OBJDIR)/M6Query.o \
+		$(OBJDIR)/M6BlastCache.o $(OBJDIR)/M6WSSearch.o $(OBJDIR)/M6WSBlast.o $(OBJDIR)/M6Lexicon.o \
+		$(OBJDIR)/M6DocStore.o $(OBJDIR)/M6DataSource.o $(OBJDIR)/M6File.o $(OBJDIR)/M6Dictionary.o \
+		$(OBJDIR)/M6Index.o $(OBJDIR)/M6Progress.o $(OBJDIR)/M6Blast.o $(OBJDIR)/M6Matrix.o
 	$(CXX) -o $@ $^ $(LDFLAGS)
 
 $(OBJDIR)/%.o: %.cpp | $(OBJDIR)

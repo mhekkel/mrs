@@ -4052,6 +4052,8 @@ int M6Server::Start(const string& inRunAs, const string& inPidFile, bool inForeg
 
 int M6Server::Stop(const string& inPidFile)
 {
+    LOG(DEBUG, "stop server called");
+
     int result = 1;
 
     const zx::element* config = M6Config::GetServer();
@@ -4062,6 +4064,8 @@ int M6Server::Stop(const string& inPidFile)
 
     if (IsPIDFileForExecutable(pidfile))
     {
+        LOG(DEBUG, "stopping daemon");
+
         ifstream file(pidfile);
         if (not file.is_open())
             THROW(("Failed to open pid file"));
@@ -4079,7 +4083,11 @@ int M6Server::Stop(const string& inPidFile)
         }
         catch (...) {}
 
-    } else {
+    } 
+    else
+    {
+        LOG(ERROR, "stop called, but not my pid file");
+
         THROW(("Not my pid file: %s", pidfile.c_str()));
     }
 

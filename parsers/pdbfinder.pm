@@ -111,11 +111,13 @@ sub to_fasta
         {
             $chainid = $1;
         }
-        elsif ($line =~ /^\s*Sequence\s*:\s*(\w+)/)
+        elsif ($line =~ /^\s*Sequence\s*:\s*([\-\w]+)/)
         {
             my $seq = uc $1;
-            $seq =~ tr/ARNDCQEGHILKMFPSTWYVBZX//dc;
-            $seq{$chainid} = $seq;
+
+            my @seqs = $seq =~ m/[ARNDCQEGHILKMFPSTWYVBZX]+/g;
+
+            $seq{$chainid} = [@seqs];
         }
     }
 
@@ -124,8 +126,11 @@ sub to_fasta
     {
         foreach my $chain (keys %seq)
         {
-            my $seq = $seq{$chain};
-            $result .= ">gnl|$db|$id|$chain $title\n$seq\n";
+            my @seqs = @{$seq{$chain}};
+            foreach my $seq (@seqs)
+            {
+                $result .= ">gnl|$db|$id|$chain $title\n$seq\n";
+            }
         }
     }
 

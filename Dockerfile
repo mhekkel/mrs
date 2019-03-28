@@ -43,7 +43,7 @@ RUN mkdir -p /srv/files && cp -r /srv/mrs-data/* /srv/files
 #
 # We can workaround this by replacing the <base-url> value in the generated
 # config.
-RUN sed -i '30s/http\:\/\/chelonium\.cmbi\.umcn\.nl\:18090/http\:\/\/mrs.cmbi.umcn.nl/' /usr/local/etc/mrs/mrs-config.xml
+RUN sed -i '30s/http\:\/\/chelonium\.cmbi\.umcn\.nl\:18090/https\:\/\/mrs.cmbi.umcn.nl/' /usr/local/etc/mrs/mrs-config.xml
 
 
 EXPOSE 18090

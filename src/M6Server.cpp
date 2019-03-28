@@ -53,7 +53,7 @@ namespace ba = boost::algorithm;
 namespace pt = boost::posix_time;
 namespace po = boost::program_options;
 
-const string kM6ServerNS = "http://mrs.cmbi.ru.nl/mrs-web/ml";
+const string kM6ServerNS = "https://mrs.cmbi.ru.nl/mrs-web/ml";
 
 // --------------------------------------------------------------------
 
@@ -1941,7 +1941,7 @@ void M6Server::ProcessNewConfig(const string& inPage, zeep::http::parameter_map&
                 {
                     e = new zx::element("web-service");
                     e->set_attribute("service", ws);
-                    e->set_attribute("ns", string("http://mrs.cmbi.ru.nl/mrsws/") + ws);
+                    e->set_attribute("ns", string("https://mrs.cmbi.ru.nl/mrsws/") + ws);
                     server->append(e);
                 }
                 e->set_attribute("location", s);
@@ -2824,7 +2824,7 @@ void M6Server::create_redirect(const string& databank, const string& inIndex, co
             if (docNr != 0)
             {
                 location =
-                    (boost::format("http://%1%/entry?db=%2%&nr=%3%&%4%=%5%")
+                    (boost::format("https://%1%/entry?db=%2%&nr=%3%&%4%=%5%")
                         % host
                         % zh::encode_url(databank)
                         % docNr
@@ -2835,7 +2835,7 @@ void M6Server::create_redirect(const string& databank, const string& inIndex, co
             else
             {
                 location =
-                    (boost::format("http://%1%/search?db=%2%&q=%3%:\"%4%\"")
+                    (boost::format("https://%1%/search?db=%2%&q=%3%:\"%4%\"")
                         % host
                         % zh::encode_url(databank)
                         % inIndex
@@ -2889,7 +2889,7 @@ void M6Server::create_redirect(const string& databank, uint32 inDocNr,
     else
     {
         string location =
-            (boost::format("http://%1%/entry?db=%2%&nr=%3%&%4%=%5%")
+            (boost::format("https://%1%/entry?db=%2%&nr=%3%&%4%=%5%")
                 % host
                 % zh::encode_url(databank)
                 % inDocNr

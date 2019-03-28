@@ -22,7 +22,7 @@ my $db = 'pdb';
 eval
 {	
 	# Retrieving and processing the WSDL
-	my $wsdl = get('http://mrs.cmbi.ru.nl/m6/mrsws/blast/wsdl');
+	my $wsdl = get('https://mrs.cmbi.ru.nl/m6/mrsws/blast/wsdl');
 	$wsdl  = XML::LibXML->load_xml(string => $wsdl);
 	my $proxy = XML::Compile::WSDL11->new($wsdl);
 	

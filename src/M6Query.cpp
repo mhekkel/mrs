@@ -256,7 +256,7 @@ M6Iterator* M6QueryParser::ParseTest()
             break;
         }
 
-        default:// force an exception
+        default:  // force an exception
             Match(eM6TokenWord);
     }
 

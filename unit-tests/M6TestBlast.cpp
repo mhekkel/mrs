@@ -2,11 +2,15 @@
 #define BOOST_TEST_MODULE BlastTest
 #include <boost/test/included/unit_test.hpp>
 
+#include "M6Config.h"
 #include "M6Lib.h"
 #include "M6Blast.h"
 
+
 BOOST_AUTO_TEST_CASE(TestBlast1)
 {
+    M6Config::SetConfigFilePath("unit-tests/data/mrs-config.xml");
+
     std::string matrix("BLOSUM62"), program = "blastp",
                 query = ">gnl|pdb|1CRN|A\nTTCCPSIVARSNFNVCRLPGTPEAICATYTGCIIIPGATCPGDYAN";
     int32 gapOpen = -1, gapExtend = -1, wordSize = 0,

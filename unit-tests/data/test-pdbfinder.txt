@@ -1,0 +1,33 @@
+ID           : 1XXX
+Header       : UNKNOWN PROTEIN
+ Date        : 1981-07-28
+Compound     : crambin
+Source       : (crambe hispanica subsp. abyssinica)
+Source       : organism_taxid: 3721;
+Author       : W.A.Hendrickson
+Author       : M.M.Teeter
+Exp-Method   : X
+ Resolution  : 1.00
+ R-Factor    : 0.114
+Ref-Prog     : PROLSQ
+HSSP-N-Align : 106
+T-Frac-Helix : 0.48
+T-Frac-Beta  : 0.09
+T-Nres-Prot  : 46
+Chain        : A
+ Ch-Compnd   : crambin
+ Sec-Struc   : 46
+  Helix      : 22
+   i,i+3     : 3
+  Beta       : 4
+   Anti-Hb   : 4
+ Amino-Acids : 46
+  CYSS       : 6
+ Sequence    : TTCCPSIVARSNFNVCRLPGTPEAICATYTGCIIIPGATCPGDYAN
+ DSSP        : CEECSSHHHHHHHHHHHTTTCCHHHHHHHHSCEECSSSCCCGGGCC
+ Nalign      : 2999999999999999999999999999999999999999999999|102.2609
+ Nindel      : 0000000000000000000400000000000010100700100000|  0.7391
+ Entropy     : 0100242431251150145153356016531032353640254244|  0.3004
+ Cons-Weight : 9899546468539739853845532982267956746339635843|  0.6320
+//
+

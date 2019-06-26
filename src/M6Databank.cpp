@@ -589,7 +589,6 @@ class M6BasicValueIx
     virtual ~M6BasicValueIx();
 
     virtual void AddValue(const string& inValue, uint32 inDoc) = 0;
-    virtual void AddValue(double inValue, uint32 inDoc) = 0;
     virtual void Finish() = 0;
   protected:
     fs::path                mEntryBufferFile;
@@ -613,7 +612,6 @@ class M6ValueIx : public M6BasicValueIx
   public:
     M6ValueIx(const fs::path& inDBDirectory, const string& inName, M6MultiBasicIndex* inIndex);
     ~M6ValueIx();
-    void AddValue(double inValue, uint32 inDoc)         { THROW(("Invalid use of index")); }
     void AddValue(const string& inValue, uint32 inDoc)    { THROW(("Invalid use of index")); }
     void Finish();
   protected:
@@ -724,9 +722,10 @@ M6ValueIx<T>::~M6ValueIx()
     }
 }
 template<>
-void M6ValueIx<double>::AddValue(double inValue, uint32 inDoc)
+void M6ValueIx<double>::AddValue(const string &inValue, uint32 inDoc)
 {
-    mEntryRun->entries[mEntryRun->count].value = inValue;
+    mEntryRun->entries[mEntryRun->count].value = boost::lexical_cast<double>(inValue);
+
     mEntryRun->entries[mEntryRun->count].doc = inDoc;
     ++mEntryRun->count;
     if (mEntryRun->count == kM6EntryRunCount)
@@ -739,6 +738,7 @@ template<>
 void M6ValueIx<uint32>::AddValue(const string& inValue, uint32 inDoc)
 {
     mEntryRun->entries[mEntryRun->count].value = boost::lexical_cast<uint32>(inValue);
+
     mEntryRun->entries[mEntryRun->count].doc = inDoc;
     ++mEntryRun->count;
     if (mEntryRun->count == kM6EntryRunCount)
@@ -1466,28 +1466,6 @@ void M6BatchIndexProcessor::IndexValue(const string& inIndexName,
     }
 }
 
-void M6BatchIndexProcessor::IndexValue(const string& inIndexName,
-    double inValue, bool inUnique, uint32 inDocNr)
-{
-    if (inUnique)
-    {
-        M6BasicIndexPtr index = mDatabank.CreateIndex(inIndexName, eM6FloatIndex);
-        try
-        {
-            index->Insert(inValue, inDocNr);
-        }
-        catch (M6DuplicateKeyException& e)
-        {
-            cerr << endl << inValue << ": " << e.what() << endl;
-        }
-    }
-    else
-    {
-        M6BasicValueIx* index = GetValueIndex<eM6FloatMultiIndex,M6FloatIx>(inIndexName);
-        index->AddValue(inValue, inDocNr);
-    }
-}
-
 void M6BatchIndexProcessor::IndexLink(uint32 inDocNr, const string& inDB, const string& inID)
 {
     string db = zeep::http::encode_url(inDB);
@@ -1961,11 +1939,7 @@ void M6DatabankImpl::IndexThread()
 
             for (const M6InputDocument::M6IndexValue& v : doc->GetIndexValues())
             {
-                switch (v.mDataType)
-                {
-                    case eM6FloatData:    mBatch->IndexValue(v.mIndexName, v.mIndexFloatValue, v.mUnique, docNr); break;
-                    default:            mBatch->IndexValue(v.mIndexName, v.mDataType, v.mIndexValue, v.mUnique, docNr); break;
-                }
+                mBatch->IndexValue(v.mIndexName, v.mDataType, v.mIndexValue, v.mUnique, docNr);
             }
 
             for (const auto& lDb : doc->GetLinks())
@@ -2087,12 +2061,18 @@ M6Iterator* M6DatabankImpl::Find(const string& inQuery, bool inAllTermsRequired,
     ParseQuery(mDatabank, inQuery, true, terms, filter, isBooleanQuery);
 
     if (isBooleanQuery)
+    {
         inAllTermsRequired = false;
+    }
 
     if (terms.empty())
+    {
         result = filter;
+    }
     else
+    {
         result = Find(terms, filter, inAllTermsRequired, inReportLimit);
+    }
 
     return result;
 }
@@ -2668,24 +2648,8 @@ void M6DatabankImpl::DumpIndex(const string& inIndex, ostream& inStream)
     if (index == nullptr)
         THROW(("Index %s not found", inIndex.c_str()));
 
-//#if DEBUG
-// index->Dump();
-//#else
-    if (type == eM6FloatMultiIndex or type == eM6FloatIndex)
-    {
-        for (const string& key : *index)
-        {
-            assert(key.length() == sizeof(double));
-            double k = *((double*)key.c_str());
-            inStream << k << endl;
-        }
-    }
-    else
-    {
-        for (const string& key : *index)
-            inStream << key << endl;
-    }
-//#endif
+    for (const string& key : *index)
+        inStream << key << endl;
 }
 
 // --------------------------------------------------------------------

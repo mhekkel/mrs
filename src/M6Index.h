@@ -11,6 +11,7 @@
 
 #include <boost/function.hpp>
 #include <boost/filesystem/path.hpp>
+#include <boost/lexical_cast.hpp>
 
 #include "M6File.h"
 #include "M6BitStream.h"
@@ -212,8 +213,8 @@ struct M6FloatComparator
 {
     int operator()(const char* inKeyA, size_t inKeyLengthA, const char* inKeyB, size_t inKeyLengthB) const;
 
-    std::string StringToKey(const std::string& key);
-    std::string KeyToString(const std::string& key);
+    std::string StringToKey(const std::string& key) { return key; }
+    std::string KeyToString(const std::string& key) { return key; }
 };
 
 typedef M6Index<M6BasicIndex, M6BasicComparator, eM6CharIndex>    M6SimpleIndex;

@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mrs-config SYSTEM "unit-tests/data/mrs-config.dtd">
+<mrs-config>
+  <!-- Paths where all the data and files are stored -->
+  <directories>
+    <directory id="mrs">test/mrs</directory>
+    <directory id="raw">unit-tests/data</directory>
+    <directory id="log">test/log</directory>
+    <directory id="blast">test/blast-cache</directory>
+    <directory id="parser">parsers</directory>
+    <directory id="docroot">docroot</directory>
+  </directories>
+  <!-- Tools section, specify external executables used by MRS -->
+  <tools>
+    <tool id="clustalo">/usr/bin/clustalo</tool>
+    <tool id="rsync">/usr/bin/rsync</tool>
+  </tools>
+  <!-- Scheduler section -->
+  <scheduler enabled="false" time="20:00" weekday="friday"/>
+  <!-- Logger section, determines what will be logged -->
+  <logger enabled="true" priority="DEBUG"/>
+  <!-- Users section, users can be added or modified using the command "mrs password" -->
+  <users>
+<!--    <user name="scott" realm="MRS Administrator" password="b92ff7d60b994c8a0d2941ad9349e841"/>-->
+      <user name="admin" realm="MRS Administrator" password="e75d9285211a1f0db651b45f0385b700"/>
+  </users>
+  <!-- Server section -->
+  <server addr="0.0.0.0" port="__MRS_PORT__" user="__MRS_USER__" pidfile="__MRS_RUN_DIR__/mrs.pid">
+    <admin realm="MRS Administrator"/>
+    <base-url>__MRS_BASE_URL__</base-url>
+    <web-service service="mrsws_search" ns="https://mrs.cmbi.ru.nl/mrsws/search" location="mrsws/search"/>
+    <web-service service="mrsws_blast" ns="https://mrs.cmbi.ru.nl/mrsws/blast" location="mrsws/blast"/>
+    <blaster nthread="4"/>
+    <builder nthread="4"/>
+  </server>
+  <!-- Formats section, formats are used to add links to entries and
+		 to link a JavaScript pretty printer -->
+  <formats>
+    <format id="omim" script="omim">
+      <link rx="(?&lt;=\()(?:[^();]+?; )?(\d{6})(?:\.(\d{4}))?(?=\))" db="omim" ix="id" id="$1" an="$2"/>
+    </format>
+    <format id="uniprot" script="uniprot">
+      <link rx="(?&lt;=DR   EMBL; )(\S+)(?=;)" db="embl" ix="id" id="$1"/>
+      <link rx="(?&lt;=DR   PDB; )(\S+)(?=;)" db="pdb" ix="id" id="$1"/>
+      <link rx="(?&lt;=DR   RefSeq; )(?:(\S+)\.\d+)(?=;)" db="refseq" ix="id" id="$1"/>
+      <link rx="(?&lt;=DR   UniGene; )(\S+)(?=;)" db="unigene" ix="id" id="$1"/>
+      <link rx="(?&lt;=DR   GO; )GO:(\S+)(?=;)" db="go" ix="id" id="$1"/>
+      <link rx="(?&lt;=DR   InterPro; )(\S+)(?=;)" db="interpro" ix="id" id="$1"/>
+      <link rx="(?&lt;=DR   Pfam; )(\S+)(?=;)" db="pfam" ix="ac" id="$1"/>
+      <link rx="(?&lt;=DR   PRINTS; )(\S+)(?=;)" db="prints" ix="id" id="$1"/>
+      <link rx="(?&lt;=DR   PROSITE; )(\S+)(?=;)" db="prosite" ix="ac" id="$1"/>
+      <link rx="(?&lt;=DR   MIM; )(\S+)(?=;)" db="omim" ix="id" id="$1"/>
+    </format>
+    <format id="embl" script="embl"/>
+    <format id="enzyme">
+      <link rx="([A-Z]+[A-Z0-9]+)(?=, )" db="sprot" ix="ac" id="$1"/>
+    </format>
+    <format id="taxonomy">
+      <link rx="(?&lt;=^PARENT ID                 : )(\d+)" ix="id" id="$1" db="taxonomy"/>
+    </format>
+    <format id="stockholm">
+      <link rx="^(?:#=GF DR\s+PFAMA;\s)(\S+)(?=;)" db="pfama" ix="id" id="$1"/>
+      <link rx="^(?:#=GF DR\s+PFAMB;\s)(\S+)(?=;)" db="pfamb" ix="id" id="$1"/>
+      <link rx="^(?:#=GF DR\s+PDB;\s)(\S+)(?=;)" db="pdb" ix="id" id="$1"/>
+      <link rx="^(?:#=GF DR\s+PROSITE;\s)(\S+)(?=;)" db="prosite" ix="id" id="$1"/>
+      <link rx="^(?:#=GF DR\s+INTERPRO;\s)(\S+)(?=;)" db="interpro" ix="id" id="$1"/>
+      <link rx="^(?:#=GS .+?AC )([0-9A-Z]+)" db="uniprot" ix="ac" id="$1"/>
+      <link rx="^(?:#=GS .+?DR PDB; )([0-9A-Z]{4})" db="pdb" ix="id" id="$1"/>
+    </format>
+  </formats>
+  <!-- Parsers section, parsers in this section are for XML databanks only
+		 and are XPath based. For huge databanks you're probably better off
+		 writing a Perl parser since XPath processing is relatively bit slow. -->
+  <parsers>
+    <parser id="pmc" chunk="/article">
+      <index name="id" type="string" xpath="/article/front/article-meta/article-id[@pub-id-type=&quot;pmc&quot;]" attr="true" unique="false"/>
+      <!-- really, in pmc id is not unique...  unique="true"  -->
+      <index name="pmid" type="string" xpath="/article/front/article-meta/article-id[@pub-id-type=&quot;pmid&quot;]" attr="false" unique="false"/>
+      <index name="doi" type="string" xpath="/article/front/article-meta/article-id[@pub-id-type=&quot;doi&quot;]" attr="false" unique="false"/>
+      <index name="subject" type="text" xpath="/article/front/article-meta/article-categories/subj-group[@subj-group-type=&quot;heading&quot;]/subject" attr="false" unique="false"/>
+      <index name="title" type="text" xpath="/article/front/article-meta/title-group/article-title" attr="true" unique="false"/>
+      <index name="authors" type="text" xpath="/article/front/article-meta/contrib-group/contrib/name/*" attr="false" unique="false"/>
+      <index name="aff" type="text" xpath="/article/front/article-meta/aff" attr="false" unique="false"/>
+      <index name="abstract" type="text" xpath="/article/front/article-meta/abstract" attr="false" unique="false"/>
+      <index name="body" type="text" xpath="/article/body" attr="false" unique="false"/>
+    </parser>
+    <!--	<parser id="gene" chunk="/Entrezgene-Set/Entrezgene">-->
+    <!--		<index name='id'		type="string"	xpath='Entrezgene_track-info/Gene-track/Gene-track_geneid'-->
+    <!--			   attr="true"		/>-->
+    <!--		<index name='title'		type="text"		xpath='Entrezgene_prot/Prot-ref/Prot-ref_name/Prot-ref_name_E'-->
+    <!--			   attr="true"	/>-->
+    <!--		<index name='text'		type='text'		xpath='.//*' />-->
+    <!--	</parser>-->
+    <parser id="interpro" chunk="/interprodb/interpro">
+      <index name="id" type="string" xpath="@id" attr="true" unique="true"/>
+      <index name="title" type="text" xpath="name" attr="true" unique="false"/>
+      <index name="type" type="string" xpath="@type" attr="false" unique="false"/>
+      <index name="name" type="string" xpath="@short_name" attr="false" unique="false"/>
+      <!-- Everything else (all nodes that are not 'name') -->
+      <index name="text" type="text" xpath="*[name() != &quot;name&quot;]" attr="false" unique="false"/>
+      <!-- All attributes -->
+      <index name="attr" type="text" xpath=".//@*" attr="false" unique="false"/>
+      <add-link xpath="db_xref" db="@db" id="@dbkey"/>
+    </parser>
+  </parsers>
+  <!-- And finally, the databanks section -->
+  <databanks>
+    <databank id="test-pdbfinder" parser="pdbfinder" enabled="true" update="never" fasta="true">
+      <name>PDBFINDER</name>
+      <source fetch="xxx" recursive="false">test-pdbfinder.txt</source>
+    </databank>
+  </databanks>
+</mrs-config>

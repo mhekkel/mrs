@@ -1,0 +1,90 @@
+<!ELEMENT mrs-config (directories,tools,scheduler,logger,users,server,formats,parsers,databanks)>
+
+<!ELEMENT directories (directory+)>
+<!ELEMENT directory (#PCDATA)>
+<!ATTLIST directory id ID #REQUIRED>
+	
+<!ELEMENT tools (tool+)>
+<!ELEMENT tool (#PCDATA)>
+<!ATTLIST tool id ID #REQUIRED>
+<!ATTLIST tool max-run-time NMTOKEN #IMPLIED>
+
+<!ELEMENT scheduler EMPTY>
+<!ATTLIST scheduler enabled (true|false) "true"
+					time CDATA #REQUIRED
+					weekday CDATA #REQUIRED>
+
+<!ELEMENT logger EMPTY>
+<!ATTLIST logger enabled (true|false) "true"
+					priority (EMERG|ALERT|CRIT|ERROR|WARN|NOTICE|INFO|DEBUG) #REQUIRED>
+	
+<!ELEMENT users (user*)>
+<!ELEMENT user (#PCDATA)>
+<!ATTLIST user name ID #REQUIRED
+			   realm CDATA #REQUIRED
+			   password CDATA #REQUIRED>
+	
+<!ELEMENT server (admin?,base-url?,blaster?,builder?,web-service*)+>
+<!ATTLIST server addr NMTOKEN #REQUIRED
+				 port NMTOKEN #REQUIRED
+				 user NMTOKEN #IMPLIED
+				 log-forwarded (true|false) "false"
+				 pidfile CDATA #IMPLIED>
+<!ELEMENT admin EMPTY>
+<!ATTLIST admin realm CDATA #REQUIRED>
+<!ELEMENT base-url (#PCDATA)>
+<!ELEMENT blaster EMPTY>
+<!ATTLIST blaster nthread CDATA #REQUIRED>
+<!ELEMENT builder EMPTY>
+<!ATTLIST builder nthread CDATA #REQUIRED>
+<!ELEMENT web-service EMPTY>
+<!ATTLIST web-service service (mrsws_search|mrsws_blast|mrsws_align) #REQUIRED
+					  ns CDATA #REQUIRED
+					  location CDATA #REQUIRED>
+	
+<!ELEMENT formats (format+)>
+<!ELEMENT format (link*)>
+<!ATTLIST format id NMTOKEN #REQUIRED
+				 script CDATA #IMPLIED>
+<!ELEMENT link EMPTY>
+<!ATTLIST link rx CDATA #REQUIRED
+			   db CDATA #REQUIRED
+			   id CDATA #REQUIRED
+			   ix CDATA "id"
+			   an CDATA #IMPLIED>
+	
+<!ELEMENT parsers (parser+)>
+<!ELEMENT parser (index|add-link)+>
+<!ATTLIST parser id NMTOKEN #REQUIRED
+				 chunk CDATA #REQUIRED>
+<!ELEMENT index EMPTY>
+<!ATTLIST index name NMTOKEN #REQUIRED
+				type (string|text|number) #REQUIRED
+				xpath CDATA #REQUIRED
+				attr (true|false) "false"
+				unique (true|false) "false">
+<!ELEMENT add-link EMPTY>
+<!ATTLIST add-link xpath CDATA #REQUIRED
+				   db CDATA #REQUIRED
+				   id CDATA #REQUIRED>
+	
+<!ELEMENT databanks (databank+)>
+<!ELEMENT databank (aliases|name|info|source|filter)*>
+<!ATTLIST databank id ID #REQUIRED
+				   enabled (true|false) "true"
+				   parser NMTOKEN #REQUIRED
+				   fasta (true|false) "false"
+				   update (never|daily|weekly|monthly) "never"
+				   format NMTOKEN #IMPLIED
+				   stylesheet CDATA #IMPLIED>
+<!ELEMENT aliases (alias+)>
+<!ELEMENT alias (#PCDATA)>
+<!ATTLIST alias name CDATA #IMPLIED>
+<!ELEMENT name (#PCDATA)>
+<!ELEMENT info (#PCDATA)>
+<!ELEMENT source (#PCDATA)>
+<!ATTLIST source fetch CDATA #IMPLIED
+				 delete (true|false) "false"
+				 recursive (true|false) "false"
+				 port CDATA #IMPLIED>
+<!ELEMENT filter (#PCDATA)>

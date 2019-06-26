@@ -4,14 +4,11 @@ our @ISA = "M6::Script";
 
 my %NUMBER = (
     natom => 1,
-    resolution => 1000,
-    r_factor => 1000,
     t_nres_nucl => 1,
     t_water_mols => 1,
     het_groups => 1,
     hssp_n_align => 1,
     t_nres_prot => 1,
-    free_r => 1000,
     n_models => 1,
     t_non_std => 1,
     t_alternates => 1
@@ -19,7 +16,10 @@ my %NUMBER = (
 
 my %FLOAT = (
     t_frac_helix => 1,
-    t_frac_beta => 1
+    t_frac_beta => 1,
+    resolution => 1,
+    r_factor => 1,
+    free_r => 1
 );
 
 sub new

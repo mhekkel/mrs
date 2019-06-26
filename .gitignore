@@ -38,3 +38,5 @@ checkcache
 mrs.1
 obj/
 obj.dbg/
+test/
+unit_test_*

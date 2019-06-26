@@ -7,12 +7,16 @@
 #define BOOST_TEST_MODULE BlastTest
 #include <boost/test/included/unit_test.hpp>
 
+#include "M6Config.h"
 #include "M6Exec.h"
 
 int VERBOSE = 1;
 
+
 BOOST_AUTO_TEST_CASE(TestClustal)
 {
+    M6Config::SetConfigFilePath("unit-tests/data/mrs-config.xml");
+
     std::vector<const char*> args;
     args.push_back("/usr/bin/clustalo");
     args.push_back("-i");

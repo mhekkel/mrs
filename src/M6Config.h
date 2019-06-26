@@ -11,6 +11,9 @@
 
 #include <zeep/xml/document.hpp>
 
+#include "M6Lib.h"
+
+
 namespace M6Config
 {
 

@@ -100,6 +100,7 @@ M6Server::M6Server(const zx::element* inConfig)
 
     mount("rest",            boost::bind(&M6Server::handle_rest, this, _1, _2, _3));
 
+    mount("dtd/mrs-config.dtd", boost::bind(&M6Server::handle_file, this, _1, _2, _3));
     mount("favicon.ico",    boost::bind(&M6Server::handle_file, this, _1, _2, _3));
     mount("robots.txt",        boost::bind(&M6Server::handle_file, this, _1, _2, _3));
 

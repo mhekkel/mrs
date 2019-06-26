@@ -74,73 +74,40 @@ M6DuplicateKeyException::M6DuplicateKeyException(const string& inKey)
 
 int M6NumericComparator::operator()(const char* inKeyA, size_t inKeyLengthA, const char* inKeyB, size_t inKeyLengthB) const
 {
-    int d = 0;
-    const char* ai = inKeyA + inKeyLengthA;
-    const char* bi = inKeyB + inKeyLengthB;
-    while (ai > inKeyA and bi > inKeyB)
+    try
     {
-        --ai; --bi;
-        if (*ai != *bi)
-            d = *ai - *bi;
-    }
+        uint32 a = boost::lexical_cast<uint32>(std::string(inKeyA, inKeyLengthA)),
+               b = boost::lexical_cast<uint32>(std::string(inKeyB, inKeyLengthB));
 
-    while (ai > inKeyA)
+        return a - b;
+    }
+    catch (const boost::bad_lexical_cast &ex)
     {
-        --ai;
-        if (*ai != '0')
-        {
-            d = 1;
-            break;
-        }
+        return memcmp(inKeyA, inKeyB, std::min(inKeyLengthA, inKeyLengthB));
     }
-
-    while (bi > inKeyB)
-    {
-        --bi;
-        if (*bi != '0')
-        {
-            d = -1;
-            break;
-        }
-    }
-
-    return d;
 }
 
 // --------------------------------------------------------------------
 
 int M6FloatComparator::operator()(const char* inKeyA, size_t inKeyLengthA, const char* inKeyB, size_t inKeyLengthB) const
 {
-    int d = 0;
+    try
+    {
+        double a = boost::lexical_cast<double>(std::string(inKeyA, inKeyLengthA)),
+               b = boost::lexical_cast<double>(std::string(inKeyB, inKeyLengthB));
 
-    assert(inKeyLengthA == sizeof(double));
-    assert(inKeyLengthB == sizeof(double));
+        if (a > b)
+            return 1;
 
-    double a = *((double*)inKeyA);
-    double b = *((double*)inKeyB);
-
-//  double a = atof(string(inKeyA, inKeyLengthA).c_str());
-//  double b = atof(string(inKeyB, inKeyLengthB).c_str());
-
-    if (a < b)
-        d = -1;
-    else if (a > b)
-        d = 1;
-
-    return d;
-}
-
-string M6FloatComparator::StringToKey(const string& s)
-{
-    double d = atof(s.c_str());
-    return string((char*)&d, sizeof(d));
-}
-
-string M6FloatComparator::KeyToString(const string& s)
-{
-    assert(s.length() == sizeof(double));
-    double d = *(double*)s.c_str();
-    return to_string(d);
+        else if (a < b)
+            return -1;
+        else
+            return 0;
+    }
+    catch (const boost::bad_lexical_cast &ex)
+    {
+        return memcmp(inKeyA, inKeyB, std::min(inKeyLengthA, inKeyLengthB));
+    }
 }
 
 // --------------------------------------------------------------------
@@ -2935,7 +2902,7 @@ M6Iterator* M6IndexImplT<M6MultiIDLData>::FindString(const string& inString)
             if (token == eM6TokenEOF)
                 break;
 
-            if (token == eM6TokenWord or token == eM6TokenNumber)
+            if (token == eM6TokenWord or token == eM6TokenNumber or token == eM6TokenFloat)
             {
                 if (not root->Find(tokenizer.GetTokenString(), data))
                 {
@@ -3840,15 +3807,9 @@ void M6MultiBasicIndex::Insert(uint32 inKey, const vector<uint32>& inDocuments)
     CompressSimpleArraySelector(bits, inDocuments);
     mImpl->StoreBits(bits, data.mBitVector);
 
-// TODO: ouch! In batch mode keys are inserted in a different format. Not a very clean solution!
-
-   if (mImpl->IsInBatchMode())
-       mImpl->Insert(inKey, data);
-   else
-       mImpl->Insert(to_string(inKey), data);
+    mImpl->Insert(to_string(inKey), data);
 }
 
-// double ouch!
 void M6MultiBasicIndex::Insert(double inKey, const vector<uint32>& inDocuments)
 {
    M6MultiData data = { static_cast<uint32>(inDocuments.size()) };
@@ -3857,9 +3818,7 @@ void M6MultiBasicIndex::Insert(double inKey, const vector<uint32>& inDocuments)
    CompressSimpleArraySelector(bits, inDocuments);
    mImpl->StoreBits(bits, data.mBitVector);
 
-   string key((char*)&inKey, sizeof(inKey));
-
-   mImpl->Insert(key, data);
+   mImpl->Insert(to_string(inKey), data);
 }
 
 //bool M6MultiBasicIndex::Find(const string& inKey, M6CompressedArray& outDocuments)

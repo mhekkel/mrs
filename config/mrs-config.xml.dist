@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE mrs-config SYSTEM "https://mrs.cmbi.ru.nl/dtd/mrs-config.dtd">
+<!DOCTYPE mrs-config SYSTEM "https://mrs.cmbi.umcn.nl/dtd/mrs-config.dtd">
 <mrs-config>
   <!-- Paths where all the data and files are stored -->
   <directories>

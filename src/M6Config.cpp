@@ -69,7 +69,7 @@ void SetConfigFilePath(const fs::path& inConfigFile)
 
 istream* File::LoadDTD(const string& inBase, const string& inPublicID, const string& inSystemID)
 {
-    if (inSystemID == "https://mrs.cmbi.ru.nl/dtd/mrs-config.dtd")
+    if (inSystemID == "https://mrs.cmbi.umcn.nl/dtd/mrs-config.dtd")
     {
         fs::path p(sConfigFile.parent_path() / "mrs-config.dtd");
         return new fs::ifstream(p);
@@ -91,7 +91,7 @@ void File::Validate()
 
     zx::writer w(xml, true);
     w.xml_decl(false);
-    w.doctype("mrs-config", "", "https://mrs.cmbi.ru.nl/dtd/mrs-config.dtd");
+    w.doctype("mrs-config", "", "https://mrs.cmbi.umcn.nl/dtd/mrs-config.dtd");
     mConfig.write(w);
 
     zx::document doc;
@@ -122,7 +122,7 @@ void File::WriteOut()
 
     zx::writer w(configFileStream, true);
     w.xml_decl(false);
-    w.doctype("mrs-config", "", "https://mrs.cmbi.ru.nl/dtd/mrs-config.dtd");
+    w.doctype("mrs-config", "", "https://mrs.cmbi.umcn.nl/dtd/mrs-config.dtd");
     mConfig.write(w);
 }
 

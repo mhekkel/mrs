@@ -189,6 +189,7 @@ void M6InputDocument::Index(const string& inIndex, M6DataType inDataType,
     {
         tokenize = inDataType == eM6StringData;
         M6IndexValue v = { inDataType, inIndex, string(inText, inSize), 0, isUnique };
+
         if (inDataType == eM6StringData)
             M6Tokenizer::CaseFold(v.mIndexValue);
         mValues.push_back(v);
@@ -218,7 +219,7 @@ void M6InputDocument::Index(const string& inIndex, M6DataType inDataType,
 #endif
             assert(l > 0);
 
-            if ((token == eM6TokenNumber and not inIndexNumbers) or
+            if (((token == eM6TokenNumber or token == eM6TokenFloat) and not inIndexNumbers) or
                 token == eM6TokenPunctuation or
                 l > kM6MaxKeyLength)
             {
@@ -227,19 +228,13 @@ void M6InputDocument::Index(const string& inIndex, M6DataType inDataType,
                 continue;
             }
 
-            if (token != eM6TokenNumber and token != eM6TokenWord)
+            if (token != eM6TokenNumber and token != eM6TokenFloat and token != eM6TokenWord)
                 continue;
 
             uint32 t = mDocLexicon.Store(tokenizer.GetTokenValue(), l);
             ix->mTokens.push_back(t);
         }
     }
-}
-
-void M6InputDocument::Index(const std::string& inIndex, bool isUnique, double inValue)
-{
-    M6IndexValue v = { eM6FloatData, inIndex, "", inValue, isUnique };
-    mValues.push_back(v);
 }
 
 void M6InputDocument::Index(const string& inIndex,

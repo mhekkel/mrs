@@ -37,17 +37,17 @@
 
 #endif
 
-#include <boost/cstdint.hpp>
 #include <boost/type_traits/is_integral.hpp>
+#include <cstdint>
 
-typedef boost::int8_t        int8;
-typedef boost::uint8_t        uint8;
-typedef boost::int16_t        int16;
-typedef boost::uint16_t        uint16;
-typedef boost::int32_t        int32;
-typedef boost::uint32_t        uint32;
-typedef boost::int64_t        int64;
-typedef boost::uint64_t        uint64;
+typedef std::int8_t        int8;
+typedef std::uint8_t        uint8;
+typedef std::int16_t        int16;
+typedef std::uint16_t        uint16;
+typedef std::int32_t        int32;
+typedef std::uint32_t        uint32;
+typedef std::int64_t        int64;
+typedef std::uint64_t        uint64;
 
 // --------------------------------------------------------------------
 // some types used throughout m6

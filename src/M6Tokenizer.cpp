@@ -583,6 +583,14 @@ M6Token M6Tokenizer::GetNextWord()
     bool hasCombiningMarks = false;
 
     int state = 10;
+
+    auto Restart = [&t,&token,&state,this](int s)
+    {
+        while (t > token)
+            this->Retract(*--t);
+        state = s;
+    };
+
     while (result == eM6TokenNone)
     {
         uint32 c = GetNextCharacter();
@@ -603,6 +611,7 @@ M6Token M6Tokenizer::GetNextWord()
 
         switch (state)
         {
+            // Nothing matched yet
             case 10:
                 if (c == 0)
                     result = eM6TokenEOF;
@@ -610,8 +619,12 @@ M6Token M6Tokenizer::GetNextWord()
                     t = token;
                 else if (fast::is_han(c))        // chinese
                     result = eM6TokenWord;
-                else if (fast::isdigit(c) || c == '-')        // first try a number
-                    state = 20;
+                else if (fast::isdigit(c))  // first try a number
+                    state = 203;
+                else if (c == '-')
+                    state = 201;
+                else if (c == '+')
+                    state = 202;
                 else if (fast::isalnum(c))
                     state = 30;
                 else if (uc::iscombm(c))
@@ -623,8 +636,87 @@ M6Token M6Tokenizer::GetNextWord()
                     result = eM6TokenPunctuation;
                 else
                     state = 40;
+
                 break;
 
+            // test for numbers since we found '-' or '+'
+            case 201: // '-' seen
+                if (fast::isdigit(c))
+                    state = 203;
+                else
+                {
+                    Retract(*--t);
+                    result = eM6TokenPunctuation;
+                }
+                break;
+
+            case 202: // '+' seen
+                if (fast::isdigit(c))
+                    state = 203;
+                else
+                {
+                    Retract(*--t);
+                    result = eM6TokenPunctuation;
+                }
+                break;
+
+            case 203: // parsing a number, previous char was digit
+                if (uc::isalpha(c) or c == '-')
+                    state = 30;
+                else if (c == '.')
+                    state = 204;
+                else if (c == 'e' or c == 'E')
+                    state = 205;
+                else if (fast::isdigit(c))
+                    state = 203;
+                else
+                {
+                    Retract(*--t);
+                    result = eM6TokenNumber;
+                }
+
+                break;
+
+            case 204:  // previously seen digit, followed by dot
+                if (c == 'e' or c == 'E')
+                    state = 205;
+
+                else if (not fast::isdigit(c))
+                {
+                    // not a digit, number ends
+
+                    Retract(*--t);
+                    result = eM6TokenFloat;
+                }
+                break;
+
+            case 205: // previous was float pattern: [0-9][Ee], -/+ is optional
+                if (c == '+' or c == '-')
+
+                    state = 206;
+
+                // otherwise fall through
+
+            case 206: // previous was float pattern: [0-9][Ee][-+]?
+                if (fast::isdigit(c))
+
+                    state = 207;
+                else
+                    /* Discard the entire pattern, it can't be a [0-9][Ee][-+]?[0-9] float.
+                       It might be a [0-9] number though.
+                     */
+                    Restart(20);
+
+                break;
+
+            case 207: // previous was float pattern: [0-9][Ee][-+]?[0-9]
+                if (not fast::isdigit(c))
+                {
+                    // No more digits to add to this number
+                    Retract(*--t);
+                    result = eM6TokenFloat;
+                }
+                break;
             // matched a digit, allow only integers or an identifier starting with a digit
             case 20:
                 if (fast::isalpha(c))
@@ -634,7 +726,7 @@ M6Token M6Tokenizer::GetNextWord()
                     hasCombiningMarks = true;
                     state = 30;
                 }
-                else if (not fast::isdigit(c))
+                else if (not fast::isdigit(c) and c != '-')
                 {
                     Retract(*--t);
                     result = eM6TokenNumber;
@@ -715,9 +807,9 @@ M6Token M6Tokenizer::GetNextQueryToken()
             case 10:
                 switch (c)
                 {
-                    case 0:        result = eM6TokenEOF; break;
-//                    case '-':    result = eM6TokenHyphen; break;
-//                    case '+':    result = eM6TokenPlus; break;
+                    case 0:      result = eM6TokenEOF; break;
+//                  case '-':    result = eM6TokenHyphen; break;
+//                  case '+':    result = eM6TokenPlus; break;
                     case '(':    result = eM6TokenOpenParenthesis; break;
                     case ')':    result = eM6TokenCloseParenthesis; break;
                     case '[':    result = eM6TokenOpenBracket; break;
@@ -778,7 +870,7 @@ M6Token M6Tokenizer::GetNextQueryToken()
 
             // test for numbers since we found '-' or '+'
             case 201: // '-' seen
-                if (c >= '0' and c <= '9')
+                if (fast::isdigit(c))
                     state = 203;
                 else
                 {
@@ -788,7 +880,7 @@ M6Token M6Tokenizer::GetNextQueryToken()
                 break;
 
             case 202: // '+' seen
-                if (c >= '0' and c <= '9')
+                if (fast::isdigit(c))
                     state = 203;
                 else
                 {
@@ -797,20 +889,31 @@ M6Token M6Tokenizer::GetNextQueryToken()
                 }
                 break;
 
-            case 203: // previous char was digit
-                if (c == '.')
+            case 203: // parsing a number, previous char was digit
+                if (uc::isalpha(c) or c == '-')
+                    state = 30;
+                else if (c == '.')
                     state = 204;
                 else if (c == 'e' or c == 'E')
                     state = 205;
+                else if (fast::isdigit(c))
+                    state = 203;
                 else
-                    Restart(20);
+                {
+                    Retract(*--t);
+                    result = eM6TokenNumber;
+                }
+
                 break;
 
-            case 204:
+            case 204:  // previously seen digit, followed by dot
                 if (c == 'e' or c == 'E')
                     state = 205;
-                else if (c < '0' or c > '9')
+
+                else if (not fast::isdigit(c))
                 {
+                    // not a digit, number ends
+
                     Retract(*--t);
                     result = eM6TokenFloat;
                 }
@@ -824,7 +927,7 @@ M6Token M6Tokenizer::GetNextQueryToken()
                 // otherwise fall through
 
             case 206: // previous was float pattern: [0-9][Ee][-+]?
-                if (c >= '0' and c <= '9')
+                if (fast::isdigit(c))
 
                     state = 207;
                 else
@@ -832,10 +935,11 @@ M6Token M6Tokenizer::GetNextQueryToken()
                        It might be a [0-9] number though.
                      */
                     Restart(20);
+
                 break;
 
             case 207: // previous was float pattern: [0-9][Ee][-+]?[0-9]
-                if (c < '0' or c > '9')
+                if (not fast::isdigit(c))
                 {
                     // No more digits to add to this number
                     Retract(*--t);
@@ -852,7 +956,7 @@ M6Token M6Tokenizer::GetNextQueryToken()
                     isPattern = true;
                     state = 30;
                 }
-                else if (not fast::isdigit(c))
+                else if (not fast::isdigit(c) and c != '-')
                 {
                     Retract(*--t);
                     result = eM6TokenNumber;

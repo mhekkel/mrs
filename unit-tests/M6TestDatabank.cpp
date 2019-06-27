@@ -2,6 +2,7 @@
 #include <vector>
 #include <cstdint>
 
+#include <boost/filesystem.hpp>
 #define BOOST_TEST_MODULE DatabankTest
 #include <boost/test/included/unit_test.hpp>
 
@@ -20,6 +21,9 @@ BOOST_AUTO_TEST_CASE(TestDatabank1)
     std::string dbName = "test-pdbfinder";
 
     M6Config::SetConfigFilePath("unit-tests/data/mrs-config.xml");
+
+    if (not boost::filesystem::is_directory("test/mrs"))
+        boost::filesystem::create_directory("test/mrs");
 
     M6Builder builder(dbName);
     builder.Build(1);

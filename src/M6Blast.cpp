@@ -1245,14 +1245,26 @@ void BlastQuery<WORDSIZE>::Search(const vector<fs::path>& inDatabanks, M6Progres
             boost::mutex m;
 
             size_t k = length / inNrOfThreads;
+            const char *prevEnd = data;
             for (uint32 i = 0; i < inNrOfThreads and length > 0; ++i)
             {
                 size_t n = k;
                 if (n > length)
                     n = length;
                 const char* end = data + n;
+
+                while (end <= prevEnd)
+                {
+                    end++;
+                    n++;
+                }
+                prevEnd = end;
+
                 while (n < length and *end != '>')
-                    ++end, ++n;
+                {
+                    ++end;
+                    ++n;
+                }
 
                 t.create_thread([data, n, &m, &inProgress, &ex, this]() {
                     try

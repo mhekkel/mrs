@@ -30,7 +30,7 @@ DEFINES				+= MRS_ETC_DIR='"$(MRS_ETC_DIR)"' \
 
 BOOST_LIBS			= system thread filesystem regex math_c99 math_c99f program_options date_time iostreams timer random chrono
 BOOST_LIBS			:= $(BOOST_LIBS:%=boost_%$(BOOST_LIB_SUFFIX))
-LIBS				= m pthread rt z bz2 zeep
+LIBS				= m pthread rt z bz2 zeep $(BOOST_LIBS)
 
 CXX					?= c++
 
@@ -40,7 +40,7 @@ CFLAGS				+= -Wno-deprecated -Wno-multichar
 CFLAGS				+= $(shell $(PERL) -MExtUtils::Embed -e perl_inc)
 CFLAGS				+= $(DEFINES:%=-D%)
 
-LDFLAGS				+= $(LIBRARY_DIR:%=-L %) $(LIBS:%=-l%) $(BOOST_LIBS:%=-l%) -g
+LDFLAGS				+= $(LIBRARY_DIR:%=-L %) $(LIBS:%=-l%) -g
 LDFLAGS				+= $(shell $(PERL) -MExtUtils::Embed -e ldopts)
 
 OBJDIR				= obj

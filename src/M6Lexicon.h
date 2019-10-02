@@ -1,7 +1,7 @@
-//   Copyright Maarten L. Hekkelman, Radboud University 2012.
-//  Distributed under the Boost Software License, Version 1.0.
-//     (See accompanying file LICENSE_1_0.txt or copy at
-//           http://www.boost.org/LICENSE_1_0.txt)
+//	 Copyright Maarten L. Hekkelman, Radboud University 2012.
+//	Distributed under the Boost Software License, Version 1.0.
+//	   (See accompanying file LICENSE_1_0.txt or copy at
+//			 http://www.boost.org/LICENSE_1_0.txt)
 
 #pragma once
 
@@ -17,121 +17,186 @@
 
 class M6Lexicon
 {
-    friend struct CLexPage;
+	friend struct CLexPage;
 
   public:
 
-    // since we now have several locations where a M6Lexicon class
-    // is used, we have the option to create a lightweight version.
-                    M6Lexicon();
-    virtual            ~M6Lexicon();
+	// since we now have several locations where a M6Lexicon class
+	// is used, we have the option to create a lightweight version.
+					M6Lexicon();
+	virtual 		~M6Lexicon();
 
-    // M6Lexicon is one of the most heavily used classes.
-    // To optimize, we now use separate threads but there
-    // can only be one lexicon. So we need locking.
-    // Profiling has shown that locking is taking a
-    // disproportionate amount of time, so we split the
-    // code into a part that looks up words first in a
-    // shared lock mode and then stores those unknown
-    // in a unique lock mode.
+	// M6Lexicon is one of the most heavily used classes.
+	// To optimize, we now use separate threads but there
+	// can only be one lexicon. So we need locking.
+	// Profiling has shown that locking is taking a
+	// disproportionate amount of time, so we split the
+	// code into a part that looks up words first in a
+	// shared lock mode and then stores those unknown
+	// in a unique lock mode.
 
-    class M6SharedLock
-    {
-      public:
-                    M6SharedLock(M6Lexicon& inLexicon)
-                        : mMutex(inLexicon.mMutex)
-                    {
-                        mMutex.lock_shared();
-                    }
+	class M6SharedLock
+	{
+	  public:
+					M6SharedLock(M6Lexicon& inLexicon)
+						: mMutex(inLexicon.mMutex)
+					{
+						mMutex.lock_shared();
+					}
 
-                    ~M6SharedLock()
-                    {
-                        mMutex.unlock_shared();
-                    }
+					~M6SharedLock()
+					{
+						mMutex.unlock_shared();
+					}
 
-      private:
-        boost::shared_mutex&    mMutex;
-    };
+	  private:
+		boost::shared_mutex&	mMutex;
+	};
 
-    class M6UniqueLock
-    {
-      public:
-                    M6UniqueLock(M6Lexicon& inLexicon)
-                        : mMutex(inLexicon.mMutex)
-                    {
-                        mMutex.lock();
-                    }
+	class M6UniqueLock
+	{
+	  public:
+					M6UniqueLock(M6Lexicon& inLexicon)
+						: mMutex(inLexicon.mMutex)
+					{
+						mMutex.lock();
+					}
 
-                    ~M6UniqueLock()
-                    {
-                        mMutex.unlock();
-                    }
+					~M6UniqueLock()
+					{
+						mMutex.unlock();
+					}
 
-      private:
-        boost::shared_mutex&    mMutex;
-    };
+	  private:
+		boost::shared_mutex&	mMutex;
+	};
 
-    friend class M6SharedLock;
-    friend class M6UniqueLock;
+	friend class M6SharedLock;
+	friend class M6UniqueLock;
 
-    uint32            Lookup(const std::string& inWord) const;
-    uint32            Lookup(const char* inWord, size_t inWordLength) const;
+	uint32			Lookup(const std::string& inWord) const;
+	uint32			Lookup(const char* inWord, size_t inWordLength) const;
 
-    uint32            Store(const std::string& inWord);
-    uint32            Store(const char* inWord, size_t inWordLength);
+	uint32			Store(const std::string& inWord);
+	uint32			Store(const char* inWord, size_t inWordLength);
 
-    std::string        GetString(uint32 inNr) const;
-    void            GetString(uint32 inNr, const char*& outWord, size_t& outWordLength) const;
+	std::string 	GetString(uint32 inNr) const;
+	void			GetString(uint32 inNr, const char*& outWord, size_t& outWordLength) const;
 
-    int                Compare(uint32 inA, uint32 inB) const;
+	int 			Compare(uint32 inA, uint32 inB) const;
 
-    template<class Comparator>
-    int                Compare(uint32 inA, uint32 inB, Comparator inComp) const;
+	template<class Comparator>
+	int 			Compare(uint32 inA, uint32 inB, Comparator inComp) const;
 
-    uint32            Count() const;
+	uint32			Count() const;
+	
+	struct iterator : public std::iterator<std::bidirectional_iterator_tag, const std::string>
+	{
+		typedef std::iterator<std::bidirectional_iterator_tag, const std::string>	base_type;
+		typedef base_type::reference												reference;
+		typedef base_type::pointer													pointer;
+
+		iterator(M6Lexicon& lexicon, uint32 ix)
+			: mLexicon(&lexicon), mIndex(ix)
+		{
+			if (mLexicon != nullptr and mIndex < mLexicon->Count())
+				mCurrent = mLexicon->GetString(mIndex);
+		}
+		
+		iterator(const iterator& rhs)
+			: mLexicon(rhs.mLexicon), mIndex(rhs.mIndex), mCurrent(rhs.mCurrent)
+		{
+		}
+		
+		iterator& operator=(const iterator& rhs)
+		{
+			if (this != &rhs)
+			{
+				mLexicon = rhs.mLexicon;
+				mIndex = rhs.mIndex;
+				mCurrent = rhs.mCurrent;
+			}
+			return *this;
+		}
+		
+		reference			operator*()			{ return mCurrent; }
+		pointer				operator->()		{ return &mCurrent; }
+
+		iterator&			operator++()
+		{
+			++mIndex;
+			if (mLexicon != nullptr and mIndex < mLexicon->Count())
+				mCurrent = mLexicon->GetString(mIndex);
+			else
+				mCurrent.clear();
+			return *this;
+		}
+		iterator			operator++(int)		{ iterator result(*this); ++mIndex; return result; }
+
+		iterator&			operator--()
+		{
+			--mIndex;
+			if (mLexicon != nullptr and mIndex < mLexicon->Count())
+				mCurrent = mLexicon->GetString(mIndex);
+			else
+				mCurrent.clear();
+			return *this;
+		}
+		iterator			operator--(int)		{ iterator result(*this); --mIndex; return result; }
+
+		bool				operator==(const iterator& rhs) const	{ return mLexicon == rhs.mLexicon and mIndex == rhs.mIndex; }
+		bool				operator!=(const iterator& rhs) const	{ return mLexicon != rhs.mLexicon or mIndex != rhs.mIndex; }
+		
+		const M6Lexicon*	mLexicon;
+		uint32				mIndex;
+		std::string			mCurrent;
+	};
+	
+	iterator		begin()			{ return iterator(*this, 0); }
+	iterator		end()			{ return iterator(*this, Count()); }
 
   private:
-                    M6Lexicon(const M6Lexicon&);
-    M6Lexicon&        operator=(const M6Lexicon&);
+					M6Lexicon(const M6Lexicon&);
+	M6Lexicon&		operator=(const M6Lexicon&);
 
-    struct M6LexiconImpl*    mImpl;
-    boost::shared_mutex        mMutex;
+	struct M6LexiconImpl*	mImpl;
+	boost::shared_mutex 	mMutex;
 };
 
 // --------------------------------------------------------------------
 
 inline uint32 M6Lexicon::Lookup(const std::string& inWord) const
 {
-    return Lookup(inWord.c_str(), inWord.length());
+	return Lookup(inWord.c_str(), inWord.length());
 }
 
 inline uint32 M6Lexicon::Store(const std::string& inWord)
 {
-    return Store(inWord.c_str(), inWord.length());
+	return Store(inWord.c_str(), inWord.length());
 }
 
 inline std::string M6Lexicon::GetString(uint32 inNr) const
 {
-    const char* w;
-    size_t l;
+	const char* w;
+	size_t l;
 
-    GetString(inNr, w, l);
+	GetString(inNr, w, l);
 
-    return std::string(w, l);
+	return std::string(w, l);
 }
 
 template<class Comparator>
 inline int M6Lexicon::Compare(uint32 inA, uint32 inB, Comparator inComp) const
 {
-    const char* wA;
-    size_t lA;
+	const char* wA;
+	size_t lA;
 
-    GetString(inA, wA, lA);
+	GetString(inA, wA, lA);
 
-    const char* wB;
-    size_t lB;
+	const char* wB;
+	size_t lB;
 
-    GetString(inB, wB, lB);
+	GetString(inB, wB, lB);
 
-    return inComp(wA, lA, wB, lB);
+	return inComp(wA, lA, wB, lB);
 }

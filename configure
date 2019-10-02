@@ -323,6 +323,7 @@ END
 	push @libs, "boost_thread";
 	push @libs, "boost_filesystem";
 	push @libs, "boost_math_c99";
+	push @libs, "boost_random";
 	push @libs, "rt";
 
 	if (not CheckLib("zeep", $header_check, $lib_check))
@@ -380,6 +381,7 @@ END
 	$cxxflags =~ s/\s+/ /g;
 	
 	$header_check =<<END;
+#define PERL_NO_INLINE_FUNCTIONS	1
 #include "EXTERN.h"
 #include "perl.h"
 #include "XSUB.h"
@@ -388,6 +390,7 @@ int main() { std::cout << 1 << '\t' << 0; return 0; }
 END
 
 	$lib_check =<<END;
+#define PERL_NO_INLINE_FUNCTIONS	1
 #include "EXTERN.h"
 #include "perl.h"
 #include "XSUB.h"

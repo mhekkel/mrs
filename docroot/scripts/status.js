@@ -106,8 +106,8 @@ Status = {
 			rowArray[i - 1] = rows[i];
 		
 		rowArray.sort(function (a, b) {
-			var ka = a.attributes.getNamedItemNS("http://mrs.cmbi.ru.nl/mrs-web/nl/my-ns", "keys").value.split('|')[column];
-			var kb = b.attributes.getNamedItemNS("http://mrs.cmbi.ru.nl/mrs-web/nl/my-ns", "keys").value.split('|')[column];
+			var ka = a.attributes.getNamedItemNS("https://mrs.cmbi.ru.nl/mrs-web/nl/my-ns", "keys").value.split('|')[column];
+			var kb = b.attributes.getNamedItemNS("https://mrs.cmbi.ru.nl/mrs-web/nl/my-ns", "keys").value.split('|')[column];
 
 			if (ka.match(/^s=/)) {
 				ka = ka.substr(2).toLowerCase();

@@ -24,8 +24,8 @@ Status =
 			rowArray[i] = rows[i];
 
 		rowArray.sort(function (a, b) {
-			var ka = a.attributes.getNamedItemNS("http://mrs.cmbi.ru.nl/mrs-web/nl/my-ns", "key").value;
-			var kb = b.attributes.getNamedItemNS("http://mrs.cmbi.ru.nl/mrs-web/nl/my-ns", "key").value;
+			var ka = a.attributes.getNamedItemNS("https://mrs.cmbi.ru.nl/mrs-web/nl/my-ns", "key").value;
+			var kb = b.attributes.getNamedItemNS("https://mrs.cmbi.ru.nl/mrs-web/nl/my-ns", "key").value;
 
 			var d = 0;
 			if (ka < kb) {

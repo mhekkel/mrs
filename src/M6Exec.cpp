@@ -28,6 +28,7 @@
 #include "M6Exec.h"
 #include "M6Error.h"
 #include "M6Server.h"
+#include "M6Log.h"
 
 using namespace std;
 namespace fs = boost::filesystem;
@@ -423,6 +424,8 @@ int ForkExec(vector<const char*>& args, double maxRunTime, istream& stdin, ostre
 
     int ifd[2], ofd[2], efd[2], err;
 
+    LOG(DEBUG, "ForkExec piping %s", args.front());
+
     err = pipe(ifd); if (err < 0) THROW(("Pipe error: %s", strerror(errno)));
     err = pipe(ofd); if (err < 0) THROW(("Pipe error: %s", strerror(errno)));
     err = pipe(efd); if (err < 0) THROW(("Pipe error: %s", strerror(errno)));
@@ -436,14 +439,28 @@ int ForkExec(vector<const char*>& args, double maxRunTime, istream& stdin, ostre
 
     int pid = fork();
 
+    LOG(DEBUG, "running fork as process %d", pid);
+
     if (pid == 0)    // the child
     {
+        LOG(DEBUG, "running as fork child");
+
         if (ioService != nullptr)
         {
+            LOG(DEBUG, "notify fork child");
+
             ioService->notify_fork(boost::asio::io_service::fork_child);
 
-            M6Server::Instance()->stop();
+            LOG(DEBUG, "stop server instance");
+
+            /*
+                Actually, network connections need to be closed here,
+                but 'stop' hangs.
+             */
+            //M6Server::Instance()->stop();
         }
+
+        LOG(DEBUG, "detaching fork child from process group");
 
         setpgid(0, 0);        // detach from the process group, create new
 
@@ -461,8 +478,12 @@ int ForkExec(vector<const char*>& args, double maxRunTime, istream& stdin, ostre
         close(efd[0]);
         close(efd[1]);
 
+        LOG(DEBUG, "fork child executing args");
+
         const char* env[] = { nullptr };
         (void)execve(args.front(), const_cast<char* const*>(&args[0]), const_cast<char* const*>(env));
+
+        LOG(DEBUG, "ending fork child");
         exit(-1);
     }
 
@@ -488,6 +509,8 @@ int ForkExec(vector<const char*>& args, double maxRunTime, istream& stdin, ostre
     {
         char buffer[1024];
 
+        LOG(DEBUG, "running ForkExec thread");
+
         while (not stdin.eof())
         {
             streamsize k = io::read(stdin, buffer, sizeof(buffer));
@@ -508,6 +531,8 @@ int ForkExec(vector<const char*>& args, double maxRunTime, istream& stdin, ostre
         }
 
         close(ifd[1]);
+
+        LOG(DEBUG, "ending ForkExec thread");
     });
 
     // make stdout and stderr non-blocking
@@ -525,6 +550,8 @@ int ForkExec(vector<const char*>& args, double maxRunTime, istream& stdin, ostre
     // read from the pipes until done.
 
     bool errDone = false, outDone = false, killed = false;
+
+    LOG(DEBUG, "ForkExec reading pipes");
 
     while (not errDone and not outDone and not killed)
     {
@@ -565,11 +592,15 @@ int ForkExec(vector<const char*>& args, double maxRunTime, istream& stdin, ostre
                 stderr << endl
                        << "maximum run time exceeded"
                        << endl;
+
+                LOG(DEBUG, "maximum run time exceeded");
             }
             else
                 sleep(1);
         }
     }
+
+    LOG(DEBUG, "ForkExec joining thread");
 
     thread.join();
 

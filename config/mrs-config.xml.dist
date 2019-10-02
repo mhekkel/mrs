@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE mrs-config SYSTEM "http://mrs.cmbi.ru.nl/dtd/mrs-config.dtd">
+<!DOCTYPE mrs-config SYSTEM "https://mrs.cmbi.umcn.nl/dtd/mrs-config.dtd">
 <mrs-config>
   <!-- Paths where all the data and files are stored -->
   <directories>
@@ -16,9 +16,9 @@
     <tool id="rsync">__RSYNC__</tool>
   </tools>
   <!-- Scheduler section -->
-  <scheduler enabled="true" time="20:00" weekday="friday"/>
+  <scheduler enabled="false" time="20:00" weekday="friday"/>
   <!-- Logger section, determines what will be logged -->
-  <logger enabled="true" priority="INFO"/>
+  <logger enabled="true" priority="DEBUG"/>
   <!-- Users section, users can be added or modified using the command "mrs password" -->
   <users>
 <!--    <user name="scott" realm="MRS Administrator" password="b92ff7d60b994c8a0d2941ad9349e841"/>-->
@@ -28,8 +28,8 @@
   <server addr="0.0.0.0" port="__MRS_PORT__" user="__MRS_USER__" pidfile="__MRS_RUN_DIR__/mrs.pid">
     <admin realm="MRS Administrator"/>
     <base-url>__MRS_BASE_URL__</base-url>
-    <web-service service="mrsws_search" ns="http://mrs.cmbi.ru.nl/mrsws/search" location="mrsws/search"/>
-    <web-service service="mrsws_blast" ns="http://mrs.cmbi.ru.nl/mrsws/blast" location="mrsws/blast"/>
+    <web-service service="mrsws_search" ns="https://mrs.cmbi.ru.nl/mrsws/search" location="mrsws/search"/>
+    <web-service service="mrsws_blast" ns="https://mrs.cmbi.ru.nl/mrsws/blast" location="mrsws/blast"/>
     <blaster nthread="4"/>
     <builder nthread="4"/>
   </server>
@@ -121,10 +121,10 @@
       <info>http://www.ncbi.nlm.nih.gov/entrez/query.fcgi?db=OMIM</info>
       <source fetch="ftp://ftp.ncbi.nih.gov/repository/OMIM/ARCHIVE/" delete="false">omim/omim.txt.Z</source>
     </databank>
-    <databank id="embl" parser="embl" format="embl" enabled="true" update="weekly" fasta="false">
+    <databank id="embl" parser="embl" format="embl" enabled="false" update="weekly" fasta="false">
       <name>EMBL</name>
       <info>http://www.ebi.ac.uk/embl/index.html</info>
-      <source delete="true" fetch="rsync://ftp.ebi.ac.uk/pub/databases/embl/release/" recursive="true">embl_release/*.dat.gz</source>
+      <source delete="true" fetch="rsync://ftp.ebi.ac.uk/pub/databases/embl/release/" recursive="true">embl/*.dat.gz</source>
     </databank>
     <databank id="enzyme" parser="enzyme" format="enzyme" enabled="true" update="daily" fasta="false">
       <name>Enzyme</name>
@@ -174,17 +174,17 @@
     <databank enabled="true" fasta="true" id="pdb_redo" parser="pdb" update="weekly">
       <name>PDB Redo</name>
       <info>http://www.cmbi.ru.nl/pdb_redo</info>
-      <source delete="true" fetch="rsync://rsync.cmbi.ru.nl/pdb_redo/" recursive="true">pdb_redo/??/????/????_final.pdb</source>
+      <source delete="true" fetch="rsync://rsync.pdb-redo.eu/pdb-redo/" recursive="true">pdb_redo/??/????/????_final.pdb</source>
     </databank>
     <databank id="pdb" parser="pdb" enabled="true" update="daily" fasta="true">
       <name>PDB</name>
       <info>http://www.rcsb.org/pdb/</info>
       <source delete="true" fetch="rsync.wwpdb.org::ftp_data/structures/divided/pdb/" port="33444" recursive="true">pdb/all/pdb????.ent.gz</source>
     </databank>
-    <databank id="dssp" parser="dssp" enabled="true" update="daily" fasta="false">
+    <databank id="dssp" parser="dssp" enabled="true" update="daily" fasta="true">
       <name>DSSP</name>
       <info>http://www.cmbi.ru.nl/dssp.html</info>
-      <source delete="true" fetch="ftp://ftp.cmbi.ru.nl/pub/molbio/data/dssp/">dssp/????.dssp</source>
+      <source delete="true" fetch="rsync://rsync.cmbi.ru.nl/dssp/" recursive="true">dssp/????.dssp</source>
     </databank>
     <databank id="hssp" parser="hssp" enabled="true" update="daily" fasta="false">
       <name>HSSP</name>
@@ -213,10 +213,10 @@
       <info>http://www.ebi.ac.uk/interpro/</info>
       <source fetch="ftp://ftp.ebi.ac.uk/pub/databases/interpro/54.0/" delete="false">interpro/interpro.xml.gz</source>
     </databank>
-    <databank id="oxford" parser="oxford" enabled="true" update="weekly" fasta="false">
+    <databank id="oxford" parser="oxford" enabled="false" update="never" fasta="false">
       <name>Oxford Human Mouse grid</name>
       <info>http://www.informatics.jax.org/</info>
-      <source fetch="ftp://ftp.informatics.jax.org/pub/reports" delete="false">oxford/HMD_Human3.rpt</source>
+      <source fetch="ftp://ftp.informatics.jax.org/pub/reports" delete="false">oxford/HMD_HumanPhenotype.rpt</source>
     </databank>
     <databank id="mimmap" parser="mimmap" enabled="true" update="never" fasta="false">
       <name>Mimmap, our view on genemap from OMIM</name>
@@ -235,7 +235,7 @@
       <info>http://pfam.sanger.ac.uk/</info>
       <source fetch="ftp://ftp.ebi.ac.uk/pub/databases/Pfam" delete="false">pfam/Pfam-A.full.gz</source>
     </databank>
-    <databank id="pfamb" parser="pfam" format="stockholm" enabled="true" update="weekly" fasta="false">
+    <databank id="pfamb" parser="pfam" format="stockholm" enabled="false" update="never" fasta="false">
       <aliases>
         <alias>pfam</alias>
       </aliases>
@@ -301,7 +301,7 @@
       <info>http://www.cmbi.ru.nl/hssp</info>
       <source delete="true" fetch="rsync://rsync.cmbi.ru.nl/hssp3/" recursive="false">hssp3/????.hssp.bz2</source>
     </databank>
-    <databank enabled="true" fasta="false" id="ptt" parser="ptt" update="weekly">
+    <databank enabled="false" fasta="false" id="ptt" parser="ptt" update="weekly">
       <name>PTT</name>
       <source fetch="ftp://ftp.ncbi.nih.gov/genomes/">ptt/Bacteria/*/*.ptt</source>
     </databank>
@@ -313,7 +313,7 @@
     <databank enabled="true" fasta="true" id="mmcif" parser="mmcif" update="daily">
       <name>mmCIF - macromolecular Crystallographic Information File</name>
       <info>http://mmcif.rcsb.org/</info>
-      <source delete="true" fetch="rsync.wwpdb.org::ftp_data/structures/divided/mmCIF/" port="33444" recursive="true">mmCIF/??/????.cif.gz</source>
+      <source delete="true" fetch="rsync.wwpdb.org::ftp_data/structures/divided/mmCIF/" port="33444" recursive="true">mmCIF/????.cif.gz</source>
     </databank>
   </databanks>
 </mrs-config>

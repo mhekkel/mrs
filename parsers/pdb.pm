@@ -102,6 +102,12 @@ sub parse
             }
             $self->index_text('compnd', $text);
         }
+        elsif ($fld eq 'KEYWDS')
+        {
+            foreach my $wrd (split(m/ /, $text)) {
+                $self->index_string('keyword', $wrd);
+            }
+        }
         elsif ($fld eq 'AUTHOR')
         {
             # split out the author name, otherwise users won't be able to find them

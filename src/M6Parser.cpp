@@ -65,8 +65,8 @@ struct M6ParserImpl
                             { mDocument->Index(inIndex, eM6DateData, false, inText, inLength); }
     void                IndexNumber(const string& inIndex, const char* inText, size_t inLength)
                             { mDocument->Index(inIndex, eM6NumberData, false, inText, inLength); }
-    void                IndexFloat(const string& inIndex, double inValue)
-                            { mDocument->Index(inIndex, false, inValue); }
+    void                IndexFloat(const string& inIndex, const char* inText, size_t inLength)
+                            { mDocument->Index(inIndex, eM6FloatData, false, inText, inLength); }
 
     void                AddLink(const string& inDatabank, const string& inValue)
                             { mDocument->AddLink(inDatabank, inValue); }
@@ -862,7 +862,7 @@ XS(_M6_Script_index_number)
 
     // fetch the parameters
 
-    string index, value;
+    string index;
     const char* ptr;
     STRLEN len;
 
@@ -911,23 +911,17 @@ XS(_M6_Script_index_float)
 
     index.assign(ptr, len);
 
-    // cast the value explicitly to a double
-    double value = SvNV(ST(2));
+    ptr = SvPV(ST(2), len);
+    if (ptr == nullptr or len == 0)
+        croak("Error, value is undefined in call to index_float");
 
-    if (std::isnan(value) or std::isinf(value))
-        warn("Invalid value for index_float");
-    else
+    try
     {
-        try
-        {
-            // Simply store the double as if it were a string of size sizeof(double).
-            // Should work.
-            proxy->IndexFloat(index, value);
-        }
-        catch (exception& e)
-        {
-            croak(e.what());
-        }
+        proxy->IndexFloat(index, ptr, len);
+    }
+    catch (exception& e)
+    {
+        croak(e.what());
     }
 
     XSRETURN(0);

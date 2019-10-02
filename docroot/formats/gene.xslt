@@ -5,7 +5,7 @@
 	
 	An xml style sheet to reformat a Gene entry into some HTML.
 -->
-<xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:mrs="http://mrs.cmbi.ru.nl/mrs-web/ml" version="1.0">
+<xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:mrs="https://mrs.cmbi.ru.nl/mrs-web/ml" version="1.0">
 	
 	<xsl:template match="Date">
 		<xsl:value-of select="Date_std/Date-std/Date-std_year"/>-<xsl:value-of select="Date_std/Date-std/Date-std_month"/>-<xsl:value-of select="Date_std/Date-std/Date-std_day"/>

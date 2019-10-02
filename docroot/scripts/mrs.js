@@ -148,16 +148,16 @@ function orderBy(by)
 		
 		if (by == 'relevance')
 		{
-			var scA = a.attributes.getNamedItemNS("http://mrs.cmbi.ru.nl/mrs-web/nl/my-ns", "score");
-			var scB = b.attributes.getNamedItemNS("http://mrs.cmbi.ru.nl/mrs-web/nl/my-ns", "score");
+			var scA = a.attributes.getNamedItemNS("https://mrs.cmbi.ru.nl/mrs-web/nl/my-ns", "score");
+			var scB = b.attributes.getNamedItemNS("https://mrs.cmbi.ru.nl/mrs-web/nl/my-ns", "score");
 	
 			d = scB.value - scA.value;
 		}
 		
 		if (d == 0)
 		{
-			var dbA = a.attributes.getNamedItemNS("http://mrs.cmbi.ru.nl/mrs-web/nl/my-ns", "db");
-			var dbB = b.attributes.getNamedItemNS("http://mrs.cmbi.ru.nl/mrs-web/nl/my-ns", "db");
+			var dbA = a.attributes.getNamedItemNS("https://mrs.cmbi.ru.nl/mrs-web/nl/my-ns", "db");
+			var dbB = b.attributes.getNamedItemNS("https://mrs.cmbi.ru.nl/mrs-web/nl/my-ns", "db");
 
 			if (dbA.value > dbB.value)
 				d = 1;
@@ -165,8 +165,8 @@ function orderBy(by)
 				d = -1;
 			else
 			{
-				var nrA = a.attributes.getNamedItemNS("http://mrs.cmbi.ru.nl/mrs-web/nl/my-ns", "hitNr");
-				var nrB = b.attributes.getNamedItemNS("http://mrs.cmbi.ru.nl/mrs-web/nl/my-ns", "hitNr");
+				var nrA = a.attributes.getNamedItemNS("https://mrs.cmbi.ru.nl/mrs-web/nl/my-ns", "hitNr");
+				var nrB = b.attributes.getNamedItemNS("https://mrs.cmbi.ru.nl/mrs-web/nl/my-ns", "hitNr");
 				
 				d = nrA.value - nrB.value;
 			}
@@ -201,7 +201,7 @@ function nrOfHitsToShow(nr, max)
 	{
 		var row = rows[d];
 		
-		var hitNr = row.attributes.getNamedItemNS("http://mrs.cmbi.ru.nl/mrs-web/nl/my-ns", "hitNr");
+		var hitNr = row.attributes.getNamedItemNS("https://mrs.cmbi.ru.nl/mrs-web/nl/my-ns", "hitNr");
 		
 		for (var c = 0; c < row.cells.length; ++c)
 		{
@@ -302,6 +302,8 @@ function mrsLoad()
 
 	if (! mrsCookie.load())
 	{
+		alert("This site uses cookies to store your results. Click OK if you agree.")
+
 		mrsCookie.hitsToShow = 2;
 		mrsCookie.orderBy = "databank";
 		mrsCookie.store();

@@ -1,7 +1,7 @@
 <?xml version="1.0" ?>
 <div id="header">
 	
-<ul xmlns:mrs="http://mrs.cmbi.ru.nl/mrs-web/ml" id="menu">
+<ul xmlns:mrs="https://mrs.cmbi.ru.nl/mrs-web/ml" id="menu">
 	<li><a href=".">Home</a></li>
 	<mrs:if test="${blastEnabled and not mobile}"><li><a href="blast">Blast</a></li></mrs:if>
 	<mrs:if test="${alignEnabled and not mobile}"><li><a href="align">Align</a></li></mrs:if>
@@ -10,7 +10,7 @@
 	<li class="help"><a href="admin">Admin</a></li>
 </ul>
 
-<form xmlns:mrs="http://mrs.cmbi.ru.nl/mrs-web/ml"
+<form xmlns:mrs="https://mrs.cmbi.ru.nl/mrs-web/ml"
 	id="queryForm"
 	class="blackbox" action="search" method="get">
 	<mrs:if test="${not mobile}">

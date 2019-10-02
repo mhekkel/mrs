@@ -51,7 +51,7 @@ the m6src is now searchable.
 
 # Building MRS
 
-You need gcc 4.6, log4cpp >= 5 and boost >= 1.48 to build MRS. Intel compilers are supported
+You need gcc 4.6, log4cpp >= 5 and boost >= 1.65 to build MRS. Intel compilers are supported
 and Visual Studio 2010 is OK too.
 
 ## Docker
@@ -85,7 +85,7 @@ to the host.
 You need to have the following to build MRS from source code:
 
 - gcc 4.6
-- libboost >= 1.48
+- libboost >= 1.65
 - liblog4cpp-dev >= 5		( http://log4cpp.sourceforge.net/ )
 - libperl-dev			Development files for Perl
 
@@ -140,7 +140,7 @@ experience building Windows software using Visual Studio.
 First of all, you need to have MSVC set up correctly to build 64 bit
 executables. You then need to build the Boost libraries with static
 runtime libraries. The mrs project file assumes you've installed Boost in
-C:\Boost and you're using version 1.48. Also, make sure you build Boost
+C:\Boost and you're using version 1.65. Also, make sure you build Boost
 with zlib and bz2 support. The way I did it is, download boost, extract it,
 run boostrap and then:
 

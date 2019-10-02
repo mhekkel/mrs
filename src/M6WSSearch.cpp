@@ -36,7 +36,7 @@ using namespace std;
 namespace ba = boost::algorithm;
 namespace pt = boost::posix_time;
 
-const string kSearchNS = "http://mrs.cmbi.ru.nl/mrsws/search";
+const string kSearchNS = "https://mrs.cmbi.ru.nl/mrsws/search";
 
 // --------------------------------------------------------------------
 //

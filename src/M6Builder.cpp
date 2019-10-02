@@ -393,7 +393,11 @@ void M6Processor::ProcessFile(M6Progress& inProgress)
             {
                 M6DataSource data(path, inProgress);
                 for (M6DataSource::iterator i = data.begin(); i != data.end(); ++i)
+                {
+                    LOG(INFO, "M6Processor: processing file %s", i->mFilename.c_str());
                     ProcessFile(i->mFilename, i->mStream);
+                    LOG(INFO, "M6Processor: done processing file %s", i->mFilename.c_str());
+                }
             }
             catch (exception& e)
             {
@@ -536,7 +540,7 @@ void M6Processor::Process(vector<fs::path>& inFiles, M6Progress& inProgress,
     else
     {
         mUseDocQueue = true;
-        for (uint32 i = inFiles.size(); i < inNrOfThreads; ++i)
+        for (uint32 i = 0; i < inNrOfThreads; ++i)
             mDocThreads.create_thread([this]() { this->ProcessDocument(); });
     }
 
@@ -544,14 +548,22 @@ void M6Processor::Process(vector<fs::path>& inFiles, M6Progress& inProgress,
     {
         M6DataSource data(inFiles.front(), inProgress);
         for (M6DataSource::iterator i = data.begin(); i != data.end(); ++i)
+        {
+            LOG(INFO, "M6Processor: processing file %s", i->mFilename.c_str());
             ProcessFile(i->mFilename, i->mStream);
+            LOG(INFO, "M6Processor: done processing file %s", i->mFilename.c_str());
+        }
     }
     else
     {
-/*
         if (inNrOfThreads > inFiles.size())
             inNrOfThreads = static_cast<uint32>(inFiles.size());
- */
+
+        for (uint32 i = 0; i < inNrOfThreads; ++i)
+            mFileThreads.create_thread(
+                [&inProgress, this]() { this->ProcessFile(inProgress); }
+            );
+
         for (fs::path& file : inFiles)
         {
             if (not (mException == std::exception_ptr()))
@@ -569,9 +581,6 @@ void M6Processor::Process(vector<fs::path>& inFiles, M6Progress& inProgress,
         mFileQueue.Put(fs::path());
 
         // Now all the input files have been added to the queue.
-
-        for (uint32 i = 0; i < inNrOfThreads; ++i)
-            mFileThreads.create_thread([&inProgress, this]() { this->ProcessFile(inProgress); });
 
         mFileThreads.join_all();
     }

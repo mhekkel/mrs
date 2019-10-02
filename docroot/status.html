@@ -1,5 +1,5 @@
 <html xmlns="http://www.w3.org/1999/xhtml"
-	xmlns:mrs="http://mrs.cmbi.ru.nl/mrs-web/ml"
+	xmlns:mrs="https://mrs.cmbi.ru.nl/mrs-web/ml"
 	xml:lang="en" lang="en">
 <head>
     <title>M6</title>
@@ -34,7 +34,7 @@
 		
 		<mrs:if test="${not mobile}">
 		<table id="databanks" class="list status" cellspacing="0" cellpadding="0" style="width:100%;"
-			xmlns:m2="http://mrs.cmbi.ru.nl/mrs-web/nl/my-ns">
+			xmlns:m2="https://mrs.cmbi.ru.nl/mrs-web/nl/my-ns">
 		<caption>Indexed databanks</caption>
 		<tr>
 			<th><a href="#" onclick="Status.sortTable('databanks', 0);">ID</a> </th>
@@ -62,7 +62,7 @@
 		</mrs:if>
 
 		<mrs:if test="${mobile}">
-		<ul id="ul-db-list" class="status-list" xmlns:m2="http://mrs.cmbi.ru.nl/mrs-web/nl/my-ns">
+		<ul id="ul-db-list" class="status-list" xmlns:m2="https://mrs.cmbi.ru.nl/mrs-web/nl/my-ns">
 			<mrs:iterate collection="statusDatabanks" var="db">
 			<li id="db-${db.id}" m2:key="${db.buildDate}">
 				<ul class="status-sub-list">

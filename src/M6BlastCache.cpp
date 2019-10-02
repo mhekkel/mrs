@@ -255,8 +255,9 @@ tuple<M6BlastJobStatus,string,uint32,double> M6BlastCache::JobStatus(const strin
 
 M6BlastResultPtr M6BlastCache::JobResult(const string& inJobID)
 {
+    fs::path xmlPath = mCacheDir / (inJobID + ".xml.bz2");
     io::filtering_stream<io::input> in;
-    fs::ifstream file(mCacheDir / (inJobID + ".xml.bz2"), ios::binary);
+    fs::ifstream file(xmlPath, ios::binary);
     if (not file.is_open())
         throw M6Exception("missing blast result file");
 
@@ -265,8 +266,17 @@ M6BlastResultPtr M6BlastCache::JobResult(const string& inJobID)
 
     M6BlastResultPtr result(new M6Blast::Result);
 
-    zeep::xml::document doc(in);
-    doc.deserialize("blast-result", const_cast<M6Blast::Result&>(*result));
+    try
+    {
+        zeep::xml::document doc(in);
+        doc.deserialize("blast-result", const_cast<M6Blast::Result&>(*result));
+    }
+    catch(exception &ex)
+    {
+        LOG(WARN,"Cannot parse result file %s: %s", xmlPath.string().c_str(), ex.what());
+        fs::remove(xmlPath);
+        SetJobStatus(inJobID, bj_Queued);
+    }
 
     return result;
 }
@@ -311,6 +321,8 @@ void M6BlastCache::CacheResult(const string& inJobID, M6BlastResultPtr inResult)
         advance(j, 1);
         if (i != mResultCache.begin())
             mResultCache.splice(mResultCache.begin(), mResultCache, i, j);
+
+        LOG(DEBUG, "closing output file for blast job with id: %s",inJobID.c_str());
     }
 
     // do some housekeeping, jobs at the back are first to be removed.
@@ -452,7 +464,7 @@ void M6BlastCache::StoreJob(const string& inJobID, const M6BlastJob& inJob)
     file << doc;
 }
 
-bool IsHighLoad (const M6BlastJob &job)
+bool IsHighLoad(const M6BlastJob &job)
 {
     // query sequence length:
     if (job.query.length () > 1e4)
@@ -470,7 +482,7 @@ bool IsHighLoad (const M6BlastJob &job)
     return false;
 }
 
-void M6BlastCache::Work (const bool highload)
+void M6BlastCache::Work(const bool highload)
 {
     using namespace boost::posix_time;
 
@@ -524,18 +536,29 @@ void M6BlastCache::Work (const bool highload)
     }
 }
 
-bool M6BlastCache::LoadCacheJob (const std::string& inJobID, M6BlastJob& job)
+bool M6BlastCache::LoadCacheJob(const std::string& inJobID, M6BlastJob& job)
 {
     boost::mutex::scoped_lock lock(mCacheMutex);
 
     fs::ifstream file(mCacheDir / (inJobID + ".job"));
     if (file.is_open())
     {
-        zeep::xml::document doc(file);
-        doc.deserialize("blastjob", job);
+        try
+        {
+            zeep::xml::document doc(file);
+            doc.deserialize("blastjob", job);
+        }
+        catch(exception &ex)
+        {
+            LOG(ERROR, "cannot parse job %s: %s", inJobID.c_str(), ex.what());
+
+            return false;
+        }
 
         return true;
     }
+
+    LOG(ERROR, "cannot missing job file for %s: %s", inJobID.c_str());
 
     return false;
 }
@@ -543,12 +566,14 @@ void M6BlastCache::ExecuteJob(const string& inJobID, const uint32 n_threads)
 {
     try
     {
+        LOG(INFO, "executing blast job %s", inJobID.c_str());
+
         SetJobStatus(inJobID, bj_Running);
 
         M6BlastJob job;
         if (!LoadCacheJob (inJobID, job))
         {
-            SetJobStatus(inJobID, bj_Error);
+            DeleteJob(inJobID);
             return;
         }
 
@@ -561,6 +586,8 @@ void M6BlastCache::ExecuteJob(const string& inJobID, const uint32 n_threads)
             job.gapOpen, job.gapExtend, job.reportLimit, n_threads));
 
         CacheResult(inJobID, result);
+
+        LOG(INFO,"completed blast job %s", inJobID.c_str());
     }
     catch (exception& e)
     {

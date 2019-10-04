@@ -81,25 +81,23 @@ class M6TagProcessor : public zh::tag_processor_v1
 	void process_tag(const std::string& tag, zx::element* node, const el::scope& scope, boost::filesystem::path dir, zh::basic_webapp& webapp)
 	{
 			 if (tag == "link")		process_mrs_link(node, scope, dir, webapp);
-		else if (tag == "enable")	process_mrs_enable(node, scope, dir, webapp);
 		else zh::tag_processor_v1::process_tag(tag, node, scope, dir, webapp);
 	}
 
 	void process_mrs_link(zx::element *node, const el::scope &scope, boost::filesystem::path dir, zh::basic_webapp& webapp);
-	void process_mrs_enable(zx::element *node, const el::scope &scope, boost::filesystem::path dir, zh::basic_webapp& webapp);
 };
 
 // --------------------------------------------------------------------
 
 void M6TagProcessor::process_mrs_link(zx::element* node, const el::scope& scope, fs::path dir, zh::basic_webapp& webapp)
 {
-    string db = node->get_attribute("db");			el::process_el(scope, db);
-    string nr = node->get_attribute("nr");			el::process_el(scope, nr);
-    string id = node->get_attribute("id");			el::process_el(scope, id);
-    string ix = node->get_attribute("index");		el::process_el(scope, ix);
-    string an = node->get_attribute("anchor");		el::process_el(scope, an);
-    string title = node->get_attribute("title");	el::process_el(scope, title);
-    string q = node->get_attribute("q");			el::process_el(scope, q);
+    string db = node->get_attribute("db");
+    string nr = node->get_attribute("nr");
+    string id = node->get_attribute("id");
+    string ix = node->get_attribute("index");
+    string an = node->get_attribute("anchor");
+    string title = node->get_attribute("title");
+    string q = node->get_attribute("q");
 
     bool exists = false;
 
@@ -160,32 +158,6 @@ void M6TagProcessor::process_mrs_link(zx::element* node, const el::scope& scope,
     {
         zx::node* clone = c->clone();
         a->push_back(clone);
-		process_xml(clone, scope, dir, webapp);
-    }
-}
-
-void M6TagProcessor::process_mrs_enable(zx::element* node, const el::scope& scope, fs::path dir, zh::basic_webapp& webapp)
-{
-    string test = node->get_attribute("test");
-    bool enabled = el::process_el(scope, test);
-
-    for (zx::node* c : node->nodes())
-    {
-        zx::node* clone = c->clone();
-        zx::element* e = dynamic_cast<zx::element*>(clone);
-
-        if (e != nullptr and (e->name() == "input" or e->name() == "option" or e->name() == "select"))
-        {
-            if (enabled)
-                e->remove_attribute("disabled");
-            else
-                e->set_attribute("disabled", "disabled");
-        }
-
-        zx::container* parent = node->parent();
-        assert(parent);
-
-        parent->insert(node, clone);    // insert before processing, to assign namespaces
 		process_xml(clone, scope, dir, webapp);
     }
 }

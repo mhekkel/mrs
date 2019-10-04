@@ -35,12 +35,10 @@ addLoadEvent(updateFindAllStatus);
 		<div z2:test="${not mobile and not hitDatabanks.empty}">
 
 		<div class="nav">
-				<mrs:if test="${ranked}">
-					<span class="left chooseLink" id="chooseOrder">Order by
-						<a href="javascript:orderBy('databank');">databank</a> or
-						<a href="javascript:orderBy('relevance');">relevance</a>
-					</span>
-				</mrs:if>
+				<span z2:if="${ranked}" class="left chooseLink" id="chooseOrder">Order by
+					<a href="javascript:orderBy('databank');">databank</a> or
+					<a href="javascript:orderBy('relevance');">relevance</a>
+				</span>
 				<span class="right chooseLink" id="chooseCount">
 					Show <a href="javascript:nrOfHitsToShow(1);">1</a>
 							<a href="javascript:nrOfHitsToShow(2, ${show});">2</a>
@@ -63,11 +61,12 @@ addLoadEvent(updateFindAllStatus);
 				</tr>
 				<tbody z2:each="db: ${hitDatabanks}">
 	
-					<tr z2:each="hit: ${db.hits}" m2:hitNr="${hit.nr}" m2:db="${db.name}" m2:score="${db.hits[0].score}">
+					<tr z2:each="hit: ${db.hits}"
+						z2:attr="m2:hitNr=${hit.nr}, m2:db=${db.name}, m2:score=${db.hits[0].score}">
 						<td z2:if="${hit.nr = 1}" z2:rowspan="${db.hits.count}"><a z2:href="search?db=${db.id}&amp;q=${q}" z2:text="${db.name}"></a></td>
 						<td z2:if="${hit.nr = 1}" z2:rowspan="${db.hits.count}" style="text-align:right" z2:text="${db.hitCount}"></td>
 						<td z2:style="${(hit.nr > cookies.hitsToShow) ? 'display:none' : '' }">
-							<mrs:link db="${db.id}" nr="${hit.docNr}" index="id" q="${q}" z2:text="${hit.id}"></mrs:link>
+							<mrs:link z2:attr="db=${db.id},nr=${hit.docNr},index='id',q=${q}" z2:text="${hit.id}"></mrs:link>
 						</td>
 						<td z2:if="${ranked}" z2:style="${(hit.nr > cookies.hitsToShow) ? 'display:none' : '' }"><img src="images/pixel-red.png" z2:width="${hit.score}" height="7" style="padding-top:4px" alt=""/></td>
 						<td z2:style="${hit.nr > cookies.hitsToShow ? 'display:none' : '' }" z2:text="${hit.title}"></td>
@@ -76,7 +75,6 @@ addLoadEvent(updateFindAllStatus);
 				</tbody>
 			</table>
 		</div>
-
 
 		<table z2:if="${mobile}" id="tabel" cellspacing="0" cellpadding="0" style="position:relative;" class="list">
 			<caption>Results for query [${q}]</caption>
@@ -89,12 +87,12 @@ addLoadEvent(updateFindAllStatus);
 				<td z2:text="${hit.title}"></td>
 			</tr>
 			<tr z2:if="${db.hitCount gt db.hits.length}">
-				<td colspan="2"><a z2:href="search?db=${db.id}&amp;q=${q};show=50">more...</a></td>
+				<td colspan="2"><a z2:href="@{search(db=${db.id},q=${q},show=50)">more...</a></td>
 			</tr>
 			</mrs:iterate>
 		</table>
 
-		<!-- <div z2:replace="spelling-suggestions.html :: suggestions" /> -->
+		<div z2:replace="spelling-suggestions.html :: suggestions" />
 	</div>
 </body>
 </html>

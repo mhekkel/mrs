@@ -11,7 +11,7 @@
 		<li z2:if="${blastEnabled and not mobile}"><a href="blast">Blast</a></li>
 		<li z2:if="${alignEnabled and not mobile}"><a href="align">Align</a></li>
 		<li><a id="status-menu" href="status">Status</a></li>
-		<li z2:if="${db and db != 'all' and not mobile}"><a z2:href="info?db=${db}" z2:text="Databank: ${db}"></a></li>
+		<li z2:if="${db and db != 'all' and not mobile}"><a z2:href="@{info(db=${db})}" z2:text="|Databank: ${db}|"></a></li>
 		<li class="help"><a href="admin">Admin</a></li>
 	</ul>
 	
@@ -27,7 +27,7 @@
 		</label>
 		<label>
 			for
-			<input id="q" type="text" name="q" size="40" z2:value="${q}" />
+			<input id="q" type="text" name="q" size="40" z2:value="${q ?: ''}" />
 		</label>
 		<input type="submit" value="Search" class="submit"/>
 		</div>

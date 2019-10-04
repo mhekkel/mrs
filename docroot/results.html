@@ -1,4 +1,5 @@
 <html xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:z2="http://www.hekkelman.com/libzeep/m2"
 	xmlns:mrs="https://mrs.cmbi.ru.nl/mrs-web/ml"
 	xml:lang="en" lang="en">
 <head>
@@ -11,47 +12,34 @@
 
 	<link rel="stylesheet" type="text/css" href="css/mrs-style.css" />
 
-	<script src="scripts/jquery/jquery.js" type="text/javascript">
-	</script>
-	
-	<script src="scripts/mrs.js" type="text/javascript">
-	</script>
-
-	<mrs:if test="${mobile}">
-	<script src="scripts/mrs-m.js" type="text/javascript">
-	</script>
-	</mrs:if>
+	<script src="scripts/jquery/jquery.js" type="text/javascript"></script>
+	<script src="scripts/mrs.js" type="text/javascript"></script>
+	<script z2:if="${mobile}" src="scripts/mrs-m.js" type="text/javascript"></script>
 </head>
 <body>
 
-<script type="text/javascript">
+<script z2:if="${mobile}" z2:inline="javascript" type="text/javascript">
 $(document).ready(function(){
 	if (M6M.init != null)
-		M6M.init(${hitCount}, '${db}', '${q}');
+		M6M.init(${hitCount}, [[${db}]], [[${q}]]);
 });
 </script>
 
-	<mrs:include file="header.html" />
+	<div z2:replace="header :: #header" />
 
 	<div id="main">
-		<mrs:if test="${error}">
-			<div class="relaxed">The query contained a syntax error (${error})</div>
-		</mrs:if>
+		<div z2:if="${error}" class="relaxed">The query contained a syntax error (<span z2:text="${error}"></span>")</div>
 
-		<mrs:if test="${empty hits}">
-		<div class="no-hits">No hits found</div>
-		</mrs:if>
+		<div z2:if="${hits.empty}" class="no-hits">No hits found</div>
 
-		<mrs:if test="${relaxed and hits}">
-			<div class="relaxed">Query did not return an exact result, displaying the closest matches</div>
-		</mrs:if>
+		<div z2:if="${relaxed and hits}" class="relaxed">Query did not return an exact result, displaying the closest matches</div>
 
-		<mrs:if test="${not empty hits}">
+		<mrs:if test="${not hits.empty}">
 		
 		<mrs:if test="${not mobile}">
 		<div class="nav">
 			<span class="left">
-				Records ${first}-${last} of <mrs:number f="#,##0" n="${hitCount}"/>
+				Records <span z2:text="${first}"></span>-<span z2:text="${last}"></span> of <span z2:text="${#numbers.formatDecimal(hitCount)}"/>
 			</span>
 			
 			<span class="right">
@@ -76,9 +64,9 @@ $(document).ready(function(){
 		</div>
 		<table id="tabel" cellspacing="0" cellpadding="0" style="position:relative;" class="list">
 			<caption>
-				<mrs:if test="${q and not linked.db}">Results for query [${q}]</mrs:if>
-				<mrs:if test="${similar}">Records similar to ${db}/${similar}</mrs:if>
-				<mrs:if test="${linked.db}">Records linked to ${linked.db}/${linked.id}</mrs:if>
+				<span z2:if="${q and not linked.db}">Results for query [<span z2:text="${q}"></span>]</span>
+				<span z2:if="${similar}">Records similar to <span z2:text="${db+'/'+similar}"></span></span>
+				<span z2:if="${linked.db}">Records linked to <span z2:text="${linked.db+'/'+linked.id}"></span></span>
 			</caption>
 			<tr>
 				<th colspan="2">Nr</th>
@@ -141,7 +129,7 @@ $(document).ready(function(){
 		</mrs:if>
 		</mrs:if>
 
-		<mrs:include file="spelling-suggestions.html" />
+		<div z2:replace="spelling-suggestions :: suggestions" />
 	</div>
 
 	<mrs:include file="select.html" />

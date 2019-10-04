@@ -1,114 +1,122 @@
 <?xml version="1.0" ?>
-<div>
+<html xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:z2="http://www.hekkelman.com/libzeep/m2"
+	xml:lang="en" lang="en">
 
-<style type="text/css">
-/* <![CDATA[ */
-#browser-warning, #firefox-storage-warning {
-	border: solid 10px #2f506c;
-	padding: 10px;
-	font-size: 11pt;
-	font-weight: bold;
-}
-/* ]]> */
-</style>
+	<body>
+		<div z2:fragment="welcome">
 
-<p id="browser-warning">
-	You are using '__BROWSER__' version '__VERSION__' which is too old for this version of MRS. Please upgrade to e.g.:
-		Firefox 3.5,
-		Microsoft Internet Explorer 9,
-		Opera 9.8 or
-		Chrome 10.0.
-</p>
-
-<div id="firefox-storage-warning" style="display:none;" >
-	<p>You should enable DOM storage in Firefox, you can do so in about:config, the key you need to edit is dom.storage.enable and it should be 'true'.</p>
-</div>
-
-<script src="scripts/browser-detect.js" type="text/javascript">
-</script>
-
-<div class="wbox">
-<div class="wleft">
-
-<h2>Welcome!</h2>
-
-<p>This is MRS, a search engine for biological and medical databanks.
-Use it to search well over a terabyte of indexed text.</p>
-
-<h2>Usage</h2>
-
-<p>Usage of MRS should be straightforward. Just type some search terms in the search field at the top of the 
-window and hit the Search button. More complex queries can be used as well.
-
-<!--, see the <a href="help">manual</a>for more information-->
-</p>
-
-<h2>New version 6</h2>
-
-<p>MRS 6, or M6, is a complete rewrite of MRS.</p>
-
-<h2>Feedback</h2>
-
-<p>If you have suggestions for improvement, please mail to
-<a href="mailto:maarten@hekkelman.com?subject=MRS feedback">M.L. Hekkelman</a>.
-</p>
-
-</div>
-
-<div class="wright">
-
-<mrs:if test="${wsdl.length}">
-
-<h2>SOAP access</h2>
-
-<p>This MRS server can be accessed using SOAP, the wsdl's are located at:</p>
-<ul style="list-style-type: none;">
-	<mrs:if test="${wsdl['mrsws_search']}"><li><a href="${wsdl['mrsws_search']}">${wsdl['mrsws_search']}</a></li></mrs:if>
-	<mrs:if test="${wsdl['mrsws_blast']}"><li><a href="${wsdl['mrsws_blast']}">${wsdl['mrsws_blast']}</a></li></mrs:if>
-	<mrs:if test="${wsdl['mrsws_align']}"><li><a href="${wsdl['mrsws_align']}">${wsdl['mrsws_align']}</a></li></mrs:if>
-</ul>
-
-</mrs:if>
-
-<h2>Open Source</h2>
-
-<p>MRS was designed and implemented by Maarten Hekkelman at the
-CMBI with the help and contributions from many others.
-Version 6 is distributed under a Boost license. You can find the source code
-for this version at
-
-<blockquote><a href='ftp://ftp.cmbi.ru.nl/pub/software/mrs/'>ftp://ftp.cmbi.ru.nl/pub/software/mrs/</a></blockquote>
-</p>
-
-<h2>Abstract</h2>
-
-<p>The biological data explosion of the
-'omics' era requires fast access to many data types in rapidly
-growing data banks. The MRS software provides the tools to
-rapidly and reliably download, store, index, and query
-flat-file databanks. Data stored and indexed by MRS takes
-considerably less space on disk than the raw data, despite that
-these raw data are included. The MRS index information is part
-of the stored data. Therefore, public and private data can be
-combined by simple concatenation and thus without computational
-overheads.
-</p>
-
-<p>When using this server or the software, please refer
-to:</p>
-
-<p><cite>MRS: A fast and compact retrieval system for
-biological data. Hekkelman M.L., Vriend G.<br />
-<a href=
-"http://nar.oxfordjournals.org/cgi/content/full/33/suppl_2/W766?ijkey=1hM9Po54JADYz0b&amp;keytype=ref">
-Nucleic Acids Research 2005 33(Web Server issue):W766-W769;
-doi:10.1093/nar/gki422.</a></cite></p>
-
-</div>
-
-<div class="wclear" />
-
-</div>
-
-
-</div>
+			<style type="text/css">
+			/* <![CDATA[ */
+			#browser-warning, #firefox-storage-warning {
+				border: solid 10px #2f506c;
+				padding: 10px;
+				font-size: 11pt;
+				font-weight: bold;
+			}
+			/* ]]> */
+			</style>
+			
+			<p id="browser-warning">
+				You are using '__BROWSER__' version '__VERSION__' which is too old for this version of MRS. Please upgrade to e.g.:
+					Firefox 3.5,
+					Microsoft Internet Explorer 9,
+					Opera 9.8 or
+					Chrome 10.0.
+			</p>
+			
+			<div id="firefox-storage-warning" style="display:none;" >
+				<p>You should enable DOM storage in Firefox, you can do so in about:config, the key you need to edit is dom.storage.enable and it should be 'true'.</p>
+			</div>
+			
+			<script src="scripts/browser-detect.js" type="text/javascript">
+			</script>
+			
+			<div class="wbox">
+			<div class="wleft">
+			
+			<h2>Welcome!</h2>
+			
+			<p>This is MRS, a search engine for biological and medical databanks.
+			Use it to search well over a terabyte of indexed text.</p>
+			
+			<h2>Usage</h2>
+			
+			<p>Usage of MRS should be straightforward. Just type some search terms in the search field at the top of the 
+			window and hit the Search button. More complex queries can be used as well.
+			
+			<!--, see the <a href="help">manual</a>for more information-->
+			</p>
+			
+			<h2>New version 6</h2>
+			
+			<p>MRS 6, or M6, is a complete rewrite of MRS.</p>
+			
+			<h2>Feedback</h2>
+			
+			<p>If you have suggestions for improvement, please mail to
+			<a href="mailto:maarten@hekkelman.com?subject=MRS feedback">M.L. Hekkelman</a>.
+			</p>
+			
+			</div>
+			
+			<div class="wright">
+			
+			<div if="${wsdl.length}">
+			
+			<h2>SOAP access</h2>
+			
+			<p>This MRS server can be accessed using SOAP, the wsdl's are located at:</p>
+			<ul style="list-style-type: none;">
+				<li z2:if="${wsdl['mrsws_search']}"><a z2:href="${wsdl['mrsws_search']}" z2:text="${wsdl['mrsws_search']}"></a></li>
+				<li z2:if="${wsdl['mrsws_blast']}"><a z2:href="${wsdl['mrsws_blast']}" z2:text="${wsdl['mrsws_blast']}"></a></li>
+				<li z2:if="${wsdl['mrsws_align']}"><a z2:href="${wsdl['mrsws_align']}" z2:text="${wsdl['mrsws_align']}"></a></li>
+			</ul>
+			
+			</div>
+			
+			<h2>Open Source</h2>
+			
+			<p>MRS was designed and implemented by Maarten Hekkelman at the
+			CMBI with the help and contributions from many others.
+			Version 6 is distributed under a Boost license. You can find the source code
+			for this version at
+			
+			<blockquote><a href='ftp://ftp.cmbi.ru.nl/pub/software/mrs/'>ftp://ftp.cmbi.ru.nl/pub/software/mrs/</a></blockquote>
+			</p>
+			
+			<h2>Abstract</h2>
+			
+			<p>The biological data explosion of the
+			'omics' era requires fast access to many data types in rapidly
+			growing data banks. The MRS software provides the tools to
+			rapidly and reliably download, store, index, and query
+			flat-file databanks. Data stored and indexed by MRS takes
+			considerably less space on disk than the raw data, despite that
+			these raw data are included. The MRS index information is part
+			of the stored data. Therefore, public and private data can be
+			combined by simple concatenation and thus without computational
+			overheads.
+			</p>
+			
+			<p>When using this server or the software, please refer
+			to:</p>
+			
+			<p><cite>MRS: A fast and compact retrieval system for
+			biological data. Hekkelman M.L., Vriend G.<br />
+			<a href=
+			"http://nar.oxfordjournals.org/cgi/content/full/33/suppl_2/W766?ijkey=1hM9Po54JADYz0b&amp;keytype=ref">
+			Nucleic Acids Research 2005 33(Web Server issue):W766-W769;
+			doi:10.1093/nar/gki422.</a></cite></p>
+			
+			</div>
+			
+			<div class="wclear" />
+			
+			</div>
+			
+			
+			</div>
+			
+	</body>
+</html>

@@ -59,7 +59,7 @@ M6Exception::M6Exception(const char* inMessage, ...)
     // copy
     strcpy(sLastWhat, mMessage);
 
-#if DEBUG
+#ifndef NDEBUG
     cerr << mMessage << endl;
 #endif
 }
@@ -78,7 +78,7 @@ const char* M6Exception::last_what()
     return sLastWhat;
 }
 
-#if DEBUG
+#ifndef NDEBUG
 void ReportThrow(const char* inFunc, const char* inFile, int inLine)
 {
     cerr << endl << "Exception in " << inFunc << ", " << inFile << ':' << inLine << endl;

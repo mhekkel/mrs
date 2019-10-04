@@ -9,6 +9,7 @@
 #include <boost/regex.hpp>
 #include <boost/bind.hpp>
 #include <boost/algorithm/string.hpp>
+#include <boost/filesystem/operations.hpp>
 
 #include "M6Config.h"
 #include "M6Error.h"
@@ -47,15 +48,15 @@ Parameters::Parameters(boost::optional<Parameters>& rhs)
     , gapExtend(1)
 {
     if (rhs)
-    {
-        matrix =                boost::get_optional_value_or(rhs.get().matrix, "BLOSUM62");
-        wordSize =                boost::get_optional_value_or(rhs.get().wordSize, 3);
-        expect =                boost::get_optional_value_or(rhs.get().expect, 10);
-        lowComplexityFilter =    boost::get_optional_value_or(rhs.get().lowComplexityFilter, true);
-        gapped =                boost::get_optional_value_or(rhs.get().gapped, true);
-        gapOpen =                boost::get_optional_value_or(rhs.get().gapOpen, 11);
-        gapExtend =                boost::get_optional_value_or(rhs.get().gapExtend, 1);
-    }
+	{
+		matrix = boost::get_optional_value_or(rhs.get().matrix, "BLOSUM62");
+		wordSize = boost::get_optional_value_or(rhs.get().wordSize, 3);
+		expect = boost::get_optional_value_or(rhs.get().expect, 10);
+		lowComplexityFilter = boost::get_optional_value_or(rhs.get().lowComplexityFilter, true);
+		gapped = boost::get_optional_value_or(rhs.get().gapped, true);
+		gapOpen = boost::get_optional_value_or(rhs.get().gapOpen, 11);
+		gapExtend = boost::get_optional_value_or(rhs.get().gapExtend, 1);
+	}
 }
 
 }
@@ -82,25 +83,10 @@ M6WSBlast::M6WSBlast(M6Server& inServer, const string& inNS, const string& inSer
     SOAP_XML_ADD_ENUM(JobStatus, error);
     SOAP_XML_ADD_ENUM(JobStatus, finished);
 
-    const char* kBlastArgs[] = {
-        "query", "program", "db", "params", "reportLimit", "jobId"
-    };
-    register_action("Blast", this, &M6WSBlast::Blast, kBlastArgs);
-
-    const char* kBlastJobStatusArgs[] = {
-        "jobId", "status"
-    };
-    register_action("BlastJobStatus", this, &M6WSBlast::BlastJobStatus, kBlastJobStatusArgs);
-
-    const char* kBlastJobResultArgs[] = {
-        "jobId", "result"
-    };
-    register_action("BlastJobResult", this, &M6WSBlast::BlastJobResult, kBlastJobResultArgs);
-
-    const char* kBlastJobErrorArgs[] = {
-        "jobId", "error"
-    };
-    register_action("BlastJobError", this, &M6WSBlast::BlastJobError, kBlastJobErrorArgs);
+	register_action("Blast", this, &M6WSBlast::Blast, {"query", "program", "db", "params", "reportLimit", "jobId"});
+	register_action("BlastJobStatus", this, &M6WSBlast::BlastJobStatus, {"jobId", "status"});
+	register_action("BlastJobResult", this, &M6WSBlast::BlastJobResult, {"jobId", "result"});
+	register_action("BlastJobError", this, &M6WSBlast::BlastJobError, {"jobId", "error"});
 }
 
 M6WSBlast::~M6WSBlast()

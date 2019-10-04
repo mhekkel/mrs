@@ -23,7 +23,7 @@ class M6Exception : public std::exception
     char        mMessage[512];
 };
 
-#if DEBUG
+#ifndef NDEBUG
 
 void            ReportThrow(const char* inFunction, const char* inFile, int inLine);
 

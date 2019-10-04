@@ -2502,7 +2502,7 @@ void M6IndexImplT<M6DataType>::Insert(const string& inKey, const M6DataType& inV
         Release(root);
 
 // check for refcounted pages
-#if DEBUG
+#ifndef NDEBUG
 for (uint32 ix = 0; ix < mCacheCount; ++ix)
     assert(mCache[ix].mRefCount == 0);
 #endif

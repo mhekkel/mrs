@@ -18,18 +18,18 @@ namespace M6WSBlastNS
 
 struct Parameters
 {
-    boost::optional<std::string>    matrix;
-    boost::optional<uint32>            wordSize;
-    boost::optional<double>            expect;
-    boost::optional<bool>            lowComplexityFilter;
-    boost::optional<bool>            gapped;
-    boost::optional<uint32>            gapOpen;
-    boost::optional<uint32>            gapExtend;
+	boost::optional<std::string> matrix;
+	boost::optional<uint32> wordSize;
+	boost::optional<double> expect;
+	boost::optional<bool> lowComplexityFilter;
+	boost::optional<bool> gapped;
+	boost::optional<uint32> gapOpen;
+	boost::optional<uint32> gapExtend;
 
-                                    Parameters();
-                                    Parameters(boost::optional<Parameters>& rhs);
+	Parameters();
+	Parameters(boost::optional<Parameters> &rhs);
 
-    template<class Archive>
+	template<class Archive>
     void serialize(Archive& ar, const unsigned int version)
     {
         ar & BOOST_SERIALIZATION_NVP(matrix)

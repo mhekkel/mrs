@@ -856,7 +856,7 @@ void WordHitIterator<WORDSIZE>::Init(const sequence& inQuery,
     }
 
     assert(data == &outStaticData.mOffsets[0] + M);
-#if DEBUG
+#ifndef NDEBUG
     outStaticData.mOffsets.push_back(0);
 #endif
 }

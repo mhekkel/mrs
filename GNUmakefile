@@ -23,6 +23,7 @@ MRS_BASE_URL		?= http://chelonium.cmbi.umcn.nl:$(MRS_PORT)/
 MRS_USER			?= $(shell whoami)
 
 PERL				?= $(shell which perl)
+PERL				:= LANG=C $(PERL)
 
 DEFINES				+= MRS_ETC_DIR='"$(MRS_ETC_DIR)"' \
 					   MRS_USER='"$(MRS_USER)"' \
@@ -34,7 +35,7 @@ LIBS				= m pthread rt z bz2 zeep $(BOOST_LIBS)
 
 CXX					?= c++
 
-CXXFLAGS			+= -std=c++11
+CXXFLAGS			+= -std=c++14
 CFLAGS				+= $(INCLUDE_DIR:%=-I%) -I. -pthread
 CFLAGS				+= -Wno-deprecated -Wno-multichar
 CFLAGS				+= $(shell $(PERL) -MExtUtils::Embed -e perl_inc)
@@ -48,7 +49,7 @@ OBJDIR				= obj
 ifneq ($(DEBUG),1)
 CFLAGS				+= -O3 -DNDEBUG -g
 else
-CFLAGS				+= -g -DDEBUG 
+CFLAGS				+= -g
 OBJDIR				:= $(OBJDIR).dbg
 endif
 
@@ -151,7 +152,7 @@ $(OBJDIR)/M6Config.o: make.config
 unicode/M6UnicodeTables.h src/../unicode/M6UnicodeTables.h:
 	cd unicode; $(PERL) unicode-table-creator.pl > $(@F)
 
-include $(OBJECTS:%.o=%.d)
+-include $(OBJECTS:%.o=%.d)
 
 $(OBJECTS:.o=.d):
 

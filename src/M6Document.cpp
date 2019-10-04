@@ -207,7 +207,7 @@ void M6InputDocument::Index(const string& inIndex, M6DataType inDataType,
                 break;
 
             size_t l = tokenizer.GetTokenLength();
-#if DEBUG
+#ifndef NDEBUG
             if (l == 0)
             {
                 cerr << endl

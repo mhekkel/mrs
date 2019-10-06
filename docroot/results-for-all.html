@@ -27,7 +27,7 @@ addLoadEvent(updateFindAllStatus);
 <body>
 	<nav z2:replace="header.html :: #header" />
 
-	<div id="main">
+	<div id="main" class="show-2-hits">
 		<div z2:if="${error}" class="relaxed">The query contained a syntax error (${error})</div>
 
 		<div z2:if="${hitDatabanks.empty}" class="no-hits">No hits found</div>
@@ -40,11 +40,11 @@ addLoadEvent(updateFindAllStatus);
 					<a href="javascript:orderBy('relevance');">relevance</a>
 				</span>
 				<span class="right chooseLink" id="chooseCount">
-					Show <a href="javascript:nrOfHitsToShow(1);">1</a>
-							<a href="javascript:nrOfHitsToShow(2, ${show});">2</a>
-							<a href="javascript:nrOfHitsToShow(3, ${show});">3</a>
-							<a href="javascript:nrOfHitsToShow(4, ${show});">4</a>
-							<a href="javascript:nrOfHitsToShow(5, ${show});">5</a> hits per databank
+					Show <a class="show-1" href="javascript:nrOfHitsToShow(1);">1</a>
+						 <a class="show-2" href="javascript:nrOfHitsToShow(2);">2</a>
+						 <a class="show-3" href="javascript:nrOfHitsToShow(3);">3</a>
+						 <a class="show-4" href="javascript:nrOfHitsToShow(4);">4</a>
+						 <a class="show-5" href="javascript:nrOfHitsToShow(5);">5</a> hits per databank
 				</span>
 				&#x00a0;
 			</div>
@@ -61,15 +61,15 @@ addLoadEvent(updateFindAllStatus);
 				</tr>
 				<tbody z2:each="db: ${hitDatabanks}">
 	
-					<tr z2:each="hit: ${db.hits}"
+					<tr z2:each="hit, i: ${db.hits}" z2:class="|hit-${i.count}|"
 						z2:attr="m2:hitNr=${hit.nr}, m2:db=${db.name}, m2:score=${db.hits[0].score}">
-						<td z2:if="${hit.nr = 1}" z2:rowspan="${db.hits.count}"><a z2:href="search?db=${db.id}&amp;q=${q}" z2:text="${db.name}"></a></td>
-						<td z2:if="${hit.nr = 1}" z2:rowspan="${db.hits.count}" style="text-align:right" z2:text="${db.hitCount}"></td>
-						<td z2:style="${(hit.nr > cookies.hitsToShow) ? 'display:none' : '' }">
+						<td z2:if="${i.index == 0}" z2:rowspan="${db.hits.count}"><a z2:href="@{search(db=${db.id},q=${q})}" z2:text="${db.name}"></a></td>
+						<td z2:if="${i.index == 0}" z2:rowspan="${db.hits.count}" style="text-align:right" z2:text="${db.hitCount}"></td>
+						<td>
 							<mrs:link z2:attr="db=${db.id},nr=${hit.docNr},index='id',q=${q}" z2:text="${hit.id}"></mrs:link>
 						</td>
-						<td z2:if="${ranked}" z2:style="${(hit.nr > cookies.hitsToShow) ? 'display:none' : '' }"><img src="images/pixel-red.png" z2:width="${hit.score}" height="7" style="padding-top:4px" alt=""/></td>
-						<td z2:style="${hit.nr > cookies.hitsToShow ? 'display:none' : '' }" z2:text="${hit.title}"></td>
+						<td z2:if="${ranked}"><img src="images/pixel-red.png" z2:width="${hit.score}" height="7" style="padding-top:4px" alt=""/></td>
+						<td z2:text="${hit.title}"></td>
 					</tr>
 					
 				</tbody>

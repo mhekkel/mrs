@@ -194,37 +194,11 @@ function nrOfHitsToShow(nr, max)
 		return;
 	}
 	
-	var rows = document.getElementById("tabel").rows;
-	var db;
-	
-	for (var d = 1; d < rows.length; ++d)
-	{
-		var row = rows[d];
-		
-		var hitNr = row.attributes.getNamedItemNS("https://mrs.cmbi.ru.nl/mrs-web/nl/my-ns", "hitNr");
-		
-		for (var c = 0; c < row.cells.length; ++c)
-		{
-			var cell = row.cells[c];
-			if (hitNr.value > nr)
-				cell.style.display = "none";
-			else
-				cell.style.display = "";
-		}
-	}
-	
-	var c = document.getElementById('chooseCount');
-	if (c == null)
-		return;
-
-	for (var i = 0; i < c.children.length; ++i)
-	{
-		var a = c.children[i];
-		if (a.nodeName == "a" && a.text == nr)
-			a.className = "selected";
-		else	
-			a.className = "";
-	}
+	const main = document.getElementById("main");
+	main.classList.toggle("show-1-hit", nr == 1);
+	main.classList.toggle("show-2-hits", nr == 2);
+	main.classList.toggle("show-3-hits", nr == 3);
+	main.classList.toggle("show-4-hits", nr == 4);
 }
 
 // --------------------------------------------------------------------

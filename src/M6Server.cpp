@@ -1442,14 +1442,6 @@ void M6Server::handle_search(const zh::request& request,
         }
         else if ( !dbIDMatched ) // db id not found, try aliases
         {
-            uint32 hits_per_page = request.get_parameter("count", 3UL);
-            if (hits_per_page > 5)
-                hits_per_page = 5;
-
-    //        sub.put("linkeddbs", el::object(GetLinkedDbs(db)));
-            sub.put("count", el::object(hits_per_page));
-            sub.put("show", el::object(hits_per_page));
-
             string hitDb = db;
             bool ranked = false;
 

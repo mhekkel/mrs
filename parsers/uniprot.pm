@@ -65,8 +65,18 @@ sub parse
             my $n = 0;
             foreach my $ac (split(m/;\s*/, $value))
             {
-                $self->index_string('ac', $ac);
-                $self->set_attribute('ac', $ac) unless ++$n > 1;
+                $n++;
+                if ($n == 1)
+                {
+                    # primary accession code
+
+                    $self->index_unique_string('ac', $ac);
+                    $self->set_attribute('ac', $ac);
+                }
+                else
+                {
+                    $self->index_string('ac', $ac);
+                }
             }
         }
         elsif ($key eq 'DE')

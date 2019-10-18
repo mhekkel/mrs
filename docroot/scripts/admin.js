@@ -245,11 +245,7 @@ Admin = {
 			cell = row.insertCell(4);
 			
 			// work around msie missing features
-			if (jQuery.browser.msie == null || jQuery.browser.version > 8) {
-				cell.className = 'c5 delete';
-			} else {
-				cell.className = 'c5';
-			}
+			cell.className = 'c5';
 			
 			// apparently, a td is not clickable?
 			var img = document.createElement('img');

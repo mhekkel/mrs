@@ -110,8 +110,6 @@ Embl = {
 		}
 
 		var nl = '\n';
-		if ($.browser.msie && $.browser.version < 9)
-			nl = '\r';
 		
 		var result = $("<pre/>"), i = 0;
 		for (j in Embl.segments) {

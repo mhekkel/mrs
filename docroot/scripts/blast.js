@@ -764,9 +764,6 @@ BlastResult.prototype.calculateAlignment = function(hsp) {
         offset += stringLength;
     }
 
-	if ($.browser.msie && $.browser.version < 9)
-		hsp.alignment = hsp.alignment.replace(/\n/g, '<br/>');
-    
     var pre = document.createElement('pre');
     $(pre).html(hsp.alignment);
     hsp.alignment = pre;
@@ -1032,11 +1029,7 @@ BlastJobs = {
 					cell = row.insertCell(4);
 					
 					// work around msie missing features
-					if (jQuery.browser.msie == null || jQuery.browser.version > 8) {
-						cell.className = 'c5 delete';
-					} else {
-						cell.className = 'c5';
-					}
+					cell.className = 'c5';
 					
 					// apparently, a td is not clickable?
 					var img = document.createElement('img');

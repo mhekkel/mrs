@@ -75,7 +75,7 @@ sub parse
                 }
                 else
                 {
-                    $self->index_string('ac', $ac);
+                    $self->index_unique_string('ac', $ac);
                 }
             }
         }

@@ -3,286 +3,237 @@
 //	JavaScript for the Admin pages
 //
 
-Admin = {
-	timeout: null,
+class Admin {
+	constructor() {
+		this.timeout = null;
 
-	init: function()
-	{
-		$("div.nav a").each(function()
-		{
-			$(this).click(function()
-			{
-				var section = this.id;
-				Admin.selectSection(section);
+		document.querySelectorAll("div.nav a")
+			.forEach(a => a.addEventListener("click", () => this.selectSection(a.dataset.id)));
+
+		document.querySelectorAll("div.section")
+			.forEach(section => {
+				section.querySelectorAll("table.select_form tr")
+					.forEach(tr => {
+						tr.addEventListener("click", () => {
+							this.selectForm(section.id, tr.dataset.target);
+						});
+					})
 			});
-		});
 
-		$("div.section").each(function()
-		{
-			var section = $(this);
-			var sectionId = section.attr("id");
+		document.querySelectorAll("div.delete")
+			.forEach(d => d.addEventListener("click", () => {
+				const tr = d.parentElement.parentElement;
+				tr.remove();
+			}))
 
-			$(this).find("table.select_form tr").each(function()
-			{
-				if (this.id == null || this.id.length == 0)
-					this.id = $(this).text();
-				var rowId = this.id;
-				$(this).click(function() {
-					Admin.selectForm(sectionId, rowId);
-				});
+		document.querySelectorAll("select[name='format']")
+			.forEach(s => {
+				s.addEventListener("change", () => this.changeFormat(s));
+
+				if (s.nodeValue === 'xml' && s.nextElementSibling !== null)
+					s.nextElementSibling.style.display = 'unset';
+			})
+
+		document.querySelectorAll('span.add-alias')
+			.forEach(addAliasBtn => addAliasBtn.addEventListener("click", (evt) => {
+				evt.preventDefault();
+				this.addAliasToDb(addAliasBtn.dataset.db);
+			})
+			);
+		
+		document.querySelectorAll('button.add-link')
+			.forEach(btn => {
+				btn.addEventListener("click", (evt) => {
+					evt.preventDefault();
+					this.addLinkToFormat(btn.dataset.format);
+				})
 			});
-		});
-		
-		$("div.delete").click(function()
-		{
-			$(this).parent().parent().remove();
-		});
 
-		$("select[name='format']").each(function()
-		{
-			if ($(this).val() == 'xml')
-				$(this).next().show();
-		});
-		
-		var v = sessionStorage.getItem('selected-adminpage');
+		let v = sessionStorage.getItem('selected-adminpage');
 		if (v == null)
 			v = 'global';
-		Admin.selectSection(v);
-		
+		this.selectSection(v);
+
 		// Poll the blast queue
-		Admin.poll();
-	},
-	
-	selectSection: function(section)
-	{
-		$("div.section").each(function()
-		{
-			if (this.id == section)	{ $(this).show(); }
-			else					{ $(this).hide(); }
-		});
+		this.poll();
+	}
 
-		$("div.nav li a").each(function()
-		{
-			if (this.id == section)	{ $(this).addClass("selected"); }
-			else					{ $(this).removeClass("selected"); }
-		});
-		
+	selectSection(section) {
+		document.querySelectorAll("div.section")
+			.forEach(d => {
+				if (d.id === section)
+					d.style.display = 'unset';
+				else
+					d.style.display = 'none';
+			})
+
+		document.querySelectorAll("div.nav a")
+			.forEach(a => a.classList.toggle("selected", a.dataset.id === section));
+
 		sessionStorage.setItem('selected-adminpage', section);
-		
-		var f = Admin.selectedForm(section);
-		if (f != '')
-			Admin.selectForm(section, f);
-	},
-	
-	selectForm: function(section, id)
-	{
-		var sect = $("#" + section + ".section");
-	
-		sect.find("form.admin_form").hide();
-		sect.find("#" + id).show();
-		
-		sect.find("table.select_form tr").each(function()
-		{
-			if (this.id == id)		{ $(this).addClass('selected'); }
-			else					{ $(this).removeClass('selected'); }
-		});
-		
-		sect.find("form.add-del input[name='selected']").attr("value", id);
-		
-		try {
-			sessionStorage.setItem("selected-" + section, id);
-		} catch (e) {}
-	},
 
-	addLinkToFormat: function(form)
-	{
-		var lastRow = $('#' + form + " table tr:last");
-		var newRow = lastRow.clone();
-		
-		newRow.find("div.delete").click(function()
-		{
-			$(this).parent().parent().remove();
-		});
-		
-		lastRow.before(newRow);
-		newRow.show();
-		$('#' + form + " table").show();
-	},
-	
-	addAliasToDb: function(db)
-	{
-		var table = $('#' + db + "-aliases");
-		var lastRow = table.find("tr:last");
-		var newRow = lastRow.clone();
-		
-		newRow.find("div.delete").click(function()
-		{
-			$(this).parent().parent().remove();
-		});
-		
-		lastRow.before(newRow);
-		newRow.show();
-		table.show();
-	},
-	
-	changeFormat: function(db)
-	{
-		var selected = $('#' + db + " select[name='format']").val();
-		var stylesheetrow = $('#' + db + " input[name='stylesheet']");
-		
-		if (selected == 'xml')
-			stylesheetrow.show('fast');
-		else
-			stylesheetrow.hide('fast');
-	},
-	
-	selectedForm: function(section)
-	{
-		var result = sessionStorage.getItem("selected-" + section);
-		if (result == null)
-		{
-			var sect = $('#' + section + '.section');
-			result = sect.find("table.select_form tr:first td:first").text();
+		const f = this.selectedForm(section);
+		if (f !== '')
+			this.selectForm(section, f);
+	}
+
+	selectedForm(section) {
+		let result = sessionStorage.getItem("selected-" + section);
+		if (result == null) {
+			const sect = document.querySelector(`#${section} table.select_form td:first-child`);
+			result = sect ? sect.textContent : '';
 		}
 		return result;
-	},
-	
+	}
+
+	selectForm(section, id) {
+		const sect = document.getElementById(section);
+
+		sect.querySelectorAll("form.admin_form").forEach(f => f.style.display = 'none');
+		sect.querySelector(`form[data-id=${id}`).style.display = 'unset';
+
+		sect.querySelectorAll("table.select_form tr")
+			.forEach(tr => tr.classList.toggle('selected', tr.textContent === id));
+
+		const btns = sect.querySelectorAll("form.add-del input[name='selected']");
+		if (btns != null)
+			btns.forEach(btn => btn.nodeValue = id);
+
+		try {
+			sessionStorage.setItem(`selected-${section}`, id);
+		} catch (e) { }
+	}
+
+	changeFormat(select) {
+		const db = select.dataset.db;
+		const form = document.querySelector(`form[data-id=db-${db}]`);
+		const selected = select.options[select.selectedIndex].value;
+
+		const stylesheet = form.querySelector("input[name='stylesheet']");
+
+		if (selected == 'xml')
+			stylesheet.style.display = '';
+		else
+			stylesheet.style.display = 'none';
+	}
+
+	addLinkToFormat(formatID) {
+		const table = document.getElementById(`format-link-table-${formatID}`);
+		const lastRow = table.querySelector("tr:last-child");
+		const newRow = lastRow.cloneNode(true);
+
+		newRow.querySelector("div.delete")
+			.addEventListener("click", () => table.removeChild(newRow));
+
+		table.insertBefore(newRow, lastRow);
+
+		newRow.style.display = '';
+		table.style.display = '';
+	}
+
+	addAliasToDb(db) {
+		const table = document.querySelector(`table[data-id="${db}-aliases"]`);
+		const lastRow = table.querySelector("tr:last-child");
+		const newRow = lastRow.cloneNode(true);
+
+		newRow.querySelector("div.delete")
+			.addEventListener("click", () => table.removeChild(newRow));
+
+		table.insertBefore(newRow, lastRow);
+
+		newRow.style.display = '';
+		table.style.display = '';
+	}
+
 	// Blast Queue management
-	
-	poll: function()
-	{
-		if (Admin.timeout != null)
-			clearTimeout(Admin.timeout);
-		Admin.timeout = null;
-	
-		try
-		{
-			jQuery.getJSON("ajax/blast/queue",
-				function(data, status) {
-					if (status == "success") 
-					{
-						if (data.error != null) {
-							alert("Retrieving blast queue failed:\n" + data.error);
-						} else {
-							Admin.updateBlastQueue(data);
-						}
-					}
-				});
-		} catch (e) {}
-	
-		Admin.timeout = setTimeout("Admin.poll();", 10000);
-	},
-	
-	updateBlastQueue: function(data)
-	{
-		var table = document.getElementById("blastQueue");
-	
+
+	poll() {
+		if (this.timeout != null)
+			clearTimeout(this.timeout);
+		this.timeout = null;
+
+		fetch("ajax/blast/queue")
+			.then(response => {
+				if (response.ok)
+					return response.json();
+				throw "Retrieving blast queue failed";
+			})
+			.then(data => {
+				if (data.error != null)
+					throw "Retrieving blast queue failed:\n" + data.error;
+				this.updateBlastQueue(data);
+			})
+			.catch(err => alert(err));
+
+		this.timeout = setTimeout(() => this.poll(), 10000);
+	}
+
+	updateBlastQueue(data) {
+		const table = document.getElementById("blastQueue");
+
 		// remove previous results
 		while (table.tBodies[0].rows.length > 0) {
 			table.tBodies[0].deleteRow(table.tBodies[0].rows.length - 1);
 		}
-		
-		for (ix in data) {
-			var job = data[ix];
-		
-			var row = table.tBodies[0].insertRow(-1);
-			
-			row.className = 'clickable';
+
+		for (let ix in data) {
+			const job = data[ix];
+			const row = table.tBodies[0].insertRow(-1);
+
+			row.classList.add('clickable');
 			row.id = job.id;
 
 			// ID
-			cell = row.insertCell(row.cells.length);
-			$(cell).text(job.id);
-			cell.className = 'jobID';
-			
+			let cell = row.insertCell(row.cells.length);
+			cell.textContent = job.id;
+			cell.classList.add('jobID');
+
 			// query length
 			cell = row.insertCell(row.cells.length);
-			$(cell).text(job.queryLength).attr('style', 'text-align:right');
-			cell.className = 'nr';
-			
+			cell.textContent = job.queryLength;
+			cell.style.textAlign = 'right';
+			cell.classList.add('nr');
+
 			// databank
 			cell = row.insertCell(row.cells.length);
-			$(cell).text(job.db);
-			
+			cell.textContent = job.db;
+
 			// status
 			cell = row.insertCell(row.cells.length);
-			$(cell).text(job.status);
-			
-			if (job.status == 'running')
-				$(row).addClass('active');
-			else if (job.status == 'queued')
-				$(row).addClass('scheduled');
-			
-/*			// HTML 5 canvas
-			var canvas = document.createElement('canvas');
-			if (canvas != null && canvas.getContext != null) {
-				cell.appendChild(canvas);
-				
-				canvas.height = 4;
-				canvas.width = 100;
-				
-				var ctx = canvas.getContext('2d');
-				if (ctx != null)
-				{
-					if (hit.coverage.start > 0)
-					{
-						ctx.fillStyle = '#CCCCCC';
-						ctx.fillRect(0, 0, hit.coverage.start, 4);
-					}
-					
-					ctx.fillStyle = BlastResult.colorTable[hit.coverage.color - 1];
-					ctx.fillRect(hit.coverage.start, 0, hit.coverage.start + hit.coverage.length, 4);
-					
-					if (hit.coverage.start + hit.coverage.length < 100)
-					{
-						ctx.fillStyle = '#CCCCCC';
-						ctx.fillRect(hit.coverage.start + hit.coverage.length, 0, 100, 4);
-					}
-				}
-			}
-	*/
+			cell.textContent = job.status;
+
+			cell.classList.toggle('active', job.status === 'running');
+			cell.classList.toggle('scheduled', job.status === 'queued');
+
 			// remove link
 			cell = row.insertCell(4);
-			
-			// work around msie missing features
-			if (jQuery.browser.msie == null || jQuery.browser.version > 8) {
-				cell.className = 'c5 delete';
-			} else {
-				cell.className = 'c5';
-			}
-			
+			cell.classList.add('c5', 'delete');
+
 			// apparently, a td is not clickable?
-			var img = document.createElement('img');
+			const img = document.createElement('img');
 			img.src = 'images/edit-delete.png';
-			
 			img.jobId = job.id;
-			jQuery(img).click(function() {
-				Admin.deleteJob(this.jobId);
-				return false;
-			});
+			img.addEventListener('click', () => this.deleteJob(job.id));
 			cell.appendChild(img);
 		}
-	},
-	
-	deleteJob: function(id)
-	{
-		try
-		{
-			jQuery.getJSON("ajax/blast/delete", { job: id },
-				function(data, status) {
-					if (status == "success") 
-					{
-						Admin.poll();
-					
-						if (data.error != null) {
-							alert("Deleting blast job failed:\n" + data.error);
-						}
-					}
-				});
-		} catch (e) {}
 	}
-	
-}
 
-// register a load handler
-addLoadEvent(Admin.init);
+	deleteJob(id) {
+		fetch(`ajax/blast/delete?job=${id}`)
+			.then(response => {
+				if (response.ok)
+					return response.json();
+				throw "Deleting blast job failed";
+			})
+			.then(data => {
+				if (data.error)
+					throw "Deleting blast job failed:\n" + data.error;
+				this.poll();
+			})
+			.catch(err => alert(err));
+	}
+};
+
+window.addEventListener("load", () => {
+	new Admin();
+});

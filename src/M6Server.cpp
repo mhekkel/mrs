@@ -179,57 +179,56 @@ M6Server::M6Server(const zx::element* inConfig)
 
     log_forwarded(mConfig->get_attribute("log-forwarded") == "true");
 
-    mount("",                boost::bind(&M6Server::handle_welcome, this, _1, _2, _3));
-    mount("download",        boost::bind(&M6Server::handle_download, this, _1, _2, _3));
-    mount("entry",            boost::bind(&M6Server::handle_entry, this, _1, _2, _3));
-    mount("link",            boost::bind(&M6Server::handle_link, this, _1, _2, _3));
-    mount("linked",            boost::bind(&M6Server::handle_linked, this, _1, _2, _3));
-    mount("search",            boost::bind(&M6Server::handle_search, this, _1, _2, _3));
-    mount("similar",        boost::bind(&M6Server::handle_similar, this, _1, _2, _3));
-    mount("scripts",        boost::bind(&M6Server::handle_file, this, _1, _2, _3));
-    mount("formats",        boost::bind(&M6Server::handle_file, this, _1, _2, _3));
-    mount("css",            boost::bind(&M6Server::handle_file, this, _1, _2, _3));
-//    mount("man",            boost::bind(&M6Server::handle_file, this, _1, _2, _3));
-    mount("images",            boost::bind(&M6Server::handle_file, this, _1, _2, _3));
+	mount("", 					boost::bind(&M6Server::handle_welcome, this, _1, _2, _3));
+	mount("download", 			boost::bind(&M6Server::handle_download, this, _1, _2, _3));
+	mount("entry", 				boost::bind(&M6Server::handle_entry, this, _1, _2, _3));
+	mount("link", 				boost::bind(&M6Server::handle_link, this, _1, _2, _3));
+	mount("linked", 			boost::bind(&M6Server::handle_linked, this, _1, _2, _3));
+	mount("search", 			boost::bind(&M6Server::handle_search, this, _1, _2, _3));
+	mount("similar", 			boost::bind(&M6Server::handle_similar, this, _1, _2, _3));
+	mount("scripts", 			boost::bind(&M6Server::handle_file, this, _1, _2, _3));
+	mount("formats", 			boost::bind(&M6Server::handle_file, this, _1, _2, _3));
+	mount("css", 				boost::bind(&M6Server::handle_file, this, _1, _2, _3));
+	//    mount("man",			boost::bind(&M6Server::handle_file, this, _1, _2, _3));
+	mount("images", 			boost::bind(&M6Server::handle_file, this, _1, _2, _3));
 
-    mount("ajax/search",    boost::bind(&M6Server::handle_search_ajax, this, _1, _2, _3));
+	mount("ajax/search", 		boost::bind(&M6Server::handle_search_ajax, this, _1, _2, _3));
 
-    mount("rest",            boost::bind(&M6Server::handle_rest, this, _1, _2, _3));
+	mount("rest", 				boost::bind(&M6Server::handle_rest, this, _1, _2, _3));
 
-    mount("dtd/mrs-config.dtd", boost::bind(&M6Server::handle_file, this, _1, _2, _3));
-    mount("favicon.ico",    boost::bind(&M6Server::handle_file, this, _1, _2, _3));
-    mount("robots.txt",        boost::bind(&M6Server::handle_file, this, _1, _2, _3));
+	mount("dtd/mrs-config.dtd", boost::bind(&M6Server::handle_file, this, _1, _2, _3));
+	mount("favicon.ico", 		boost::bind(&M6Server::handle_file, this, _1, _2, _3));
+	mount("robots.txt", 		boost::bind(&M6Server::handle_file, this, _1, _2, _3));
 
-    mount("blast",                boost::bind(&M6Server::handle_blast, this, _1, _2, _3));
-    mount("ajax/blast/submit",    boost::bind(&M6Server::handle_blast_submit_ajax, this, _1, _2, _3));
-    mount("ajax/blast/status",    boost::bind(&M6Server::handle_blast_status_ajax, this, _1, _2, _3));
-    mount("ajax/blast/result",    boost::bind(&M6Server::handle_blast_results_ajax, this, _1, _2, _3));
+	mount("blast", 				boost::bind(&M6Server::handle_blast, this, _1, _2, _3));
+	mount("ajax/blast/submit", 	boost::bind(&M6Server::handle_blast_submit_ajax, this, _1, _2, _3));
+	mount("ajax/blast/status", 	boost::bind(&M6Server::handle_blast_status_ajax, this, _1, _2, _3));
+	mount("ajax/blast/result", 	boost::bind(&M6Server::handle_blast_results_ajax, this, _1, _2, _3));
 
-    mount("align",                boost::bind(&M6Server::handle_align, this, _1, _2, _3));
-    mount("ajax/align/submit",    boost::bind(&M6Server::handle_align_submit_ajax, this, _1, _2, _3));
+	mount("align", 				boost::bind(&M6Server::handle_align, this, _1, _2, _3));
+	mount("ajax/align/submit", 	boost::bind(&M6Server::handle_align_submit_ajax, this, _1, _2, _3));
 
-    mount("status",            boost::bind(&M6Server::handle_status, this, _1, _2, _3));
-    mount("ajax/status",    boost::bind(&M6Server::handle_status_ajax, this, _1, _2, _3));
-    mount("info",            boost::bind(&M6Server::handle_info, this, _1, _2, _3));
-    mount("browse",            boost::bind(&M6Server::handle_browse, this, _1, _2, _3));
+	mount("status", 			boost::bind(&M6Server::handle_status, this, _1, _2, _3));
+	mount("ajax/status", 		boost::bind(&M6Server::handle_status_ajax, this, _1, _2, _3));
+	mount("info", 				boost::bind(&M6Server::handle_info, this, _1, _2, _3));
+	mount("browse", 			boost::bind(&M6Server::handle_browse, this, _1, _2, _3));
 
-    zx::node* realm = mConfig->find_first_node("admin/@realm");
+	zx::node* realm = mConfig->find_first_node("admin/@realm");
     if (realm == nullptr)
     {
-        mount("admin", boost::bind(&M6Server::handle_admin, this, _1, _2, _3));
-        mount("ajax/blast/queue", boost::bind(&M6Server::handle_admin_blast_queue_ajax, this, _1, _2, _3));
-        mount("ajax/blast/delete", boost::bind(&M6Server::handle_admin_blast_delete_ajax, this, _1, _2, _3));
+        mount("admin",				boost::bind(&M6Server::handle_admin, this, _1, _2, _3));
+        mount("ajax/blast/queue",	boost::bind(&M6Server::handle_admin_blast_queue_ajax, this, _1, _2, _3));
+        mount("ajax/blast/delete",	boost::bind(&M6Server::handle_admin_blast_delete_ajax, this, _1, _2, _3));
     }
     else
     {
-        mount("admin", realm->str(), boost::bind(&M6Server::handle_admin, this, _1, _2, _3));
-        mount("ajax/blast/queue", realm->str(), boost::bind(&M6Server::handle_admin_blast_queue_ajax, this, _1, _2, _3));
-        mount("ajax/blast/delete", realm->str(), boost::bind(&M6Server::handle_admin_blast_delete_ajax, this, _1, _2, _3));
+        mount("admin",				realm->str(), boost::bind(&M6Server::handle_admin, this, _1, _2, _3));
+        mount("ajax/blast/queue",	realm->str(), boost::bind(&M6Server::handle_admin_blast_queue_ajax, this, _1, _2, _3));
+        mount("ajax/blast/delete",	realm->str(), boost::bind(&M6Server::handle_admin_blast_delete_ajax, this, _1, _2, _3));
     }
 
     LOG(DEBUG,"M6Server: add processors");
 
-#warning("fix me")
 	register_tag_processor<zh::tag_processor_v2>(zh::tag_processor_v2::ns());
 	register_tag_processor<M6TagProcessor>(kM6ServerNS);
 
@@ -999,18 +998,20 @@ void M6Server::handle_download(const zh::request& request, const el::scope& scop
         string format = request.get_parameter("format", "entry");
         string db = request.get_parameter("db");
 
-        string id;
+        string id = request.get_parameter("id", "");
+		int32 nr = request.get_parameter("nr", 0);;
+
         stringstream ss;
         uint32 n = 0;
 
         LOG(INFO, "download request recieved, format=%s, db=%s",
                    format.c_str (), db.c_str ());
 
-        for (auto& p : request.path_params)
+        for (auto& p : request.get_parameters())
         {
-            if (p.name == "id")
+            if (p.first == "id")
             {
-                id = p.value;
+                id = p.second;
 
                 string m_db = db;
                 size_t pos, pos2;
@@ -1029,13 +1030,13 @@ void M6Server::handle_download(const zh::request& request, const el::scope& scop
                 ss << GetEntry (m_db, id, format);
                 ++n;
             }
-            else if (p.name == "nr")
+            else if (p.first == "nr")
             {
                 M6Databank* databank = Load(db);
                 if (databank == nullptr)
                     THROW(("Databank %s not loaded", db.c_str()));
 
-                ss << GetEntry(databank, format, boost::lexical_cast<uint32>(p.value));
+                ss << GetEntry(databank, format, boost::lexical_cast<uint32>(p.second));
                 ++n;
             }
         }
@@ -1928,357 +1929,369 @@ void M6Server::handle_search_ajax(const zh::request& request, const el::scope& s
     }
 }
 
-// void M6Server::ProcessNewConfig(const string& inPage, el::object config)
-// {
-//     // typedef zh::parameter_map::iterator iter;
-//     // typedef pair<iter,iter> range;
+void M6Server::ProcessNewConfig(const string& inPage, const zh::request& request)
+{
+    unique_ptr<M6Config::File> config(new M6Config::File(*mConfigCopy));
+	
+	auto params = request.get_parameters();
+	using iter = decltype(params)::const_iterator;
+	using range = pair<iter,iter>;
 
-//     unique_ptr<M6Config::File> config(new M6Config::File(*mConfigCopy));
+    string btn = request.get_parameter("btn");
 
-//     string btn = request.get_parameter("btn");
+    if (inPage == "global")
+    {
+        const char* dirs[] = { "mrs", "raw", "parser", "docroot", "blast" };
+        for (const char* dir : dirs)
+        {
+            fs::path p = request.get_parameter(dir);
+            if (not fs::is_directory(p))
+                THROW(("%s directory does not exist", dir));
+            config->GetDirectory(dir)->content(p.string());
+        }
 
-//     if (inPage == "global")
-//     {
-//         const char* dirs[] = { "mrs", "raw", "parser", "docroot", "blast" };
-//         for (const char* dir : dirs)
-//         {
-//             fs::path p = request.get_parameter(dir);
-//             if (not fs::is_directory(p))
-//                 THROW(("%s directory does not exist", dir));
-//             config->GetDirectory(dir)->content(p.string());
-//         }
+        const char* tools[] = { "clustalo", "rsync" };
+        for (const char* tool : tools)
+        {
+            fs::path p = request.get_parameter(tool);
+            if (not p.empty() and not fs::exists(p))
+                THROW(("The %s tool does not exist", tool));
+            config->GetTool(tool)->content(p.string());
+        }
+    }
+    else if (inPage == "server")
+    {
+        zx::element* server = config->GetServer();
+        server->set_attribute("addr", request.get_parameter("addr"));
+        server->set_attribute("port", request.get_parameter("port"));
+        server->set_attribute("log-forwarded", request.get_parameter("log_forwarded", false) ? "true" : "false");
 
-//         const char* tools[] = { "clustalo", "rsync" };
-//         for (const char* tool : tools)
-//         {
-//             fs::path p = request.get_parameter(tool);
-//             if (not p.empty() and not fs::exists(p))
-//                 THROW(("The %s tool does not exist", tool));
-//             config->GetTool(tool)->content(p.string());
-//         }
-//     }
-//     else if (inPage == "server")
-//     {
-//         zx::element* server = config->GetServer();
-//         server->set_attribute("addr", request.get_parameter("addr"));
-//         server->set_attribute("port", request.get_parameter("port"));
-//         server->set_attribute("log-forwarded", request.get_parameter("log_forwarded", false) ? "true" : "false");
+        zx::element* e = server->find_first("base-url");
+        string s = request.get_parameter("baseurl");
 
-//         zx::element* e = server->find_first("base-url");
-//         string s = request.get_parameter("baseurl");
+        if (s.empty())
+        {
+            if (e != nullptr)
+                server->remove(e);
+        }
+        else
+        {
+            if (e == nullptr)
+            {
+                e = new zx::element("base-url");
+                server->append(e);
+            }
+            e->content(s);
+        }
 
-//         if (s.empty())
-//         {
-//             if (e != nullptr)
-//                 server->remove(e);
-//         }
-//         else
-//         {
-//             if (e == nullptr)
-//             {
-//                 e = new zx::element("base-url");
-//                 server->append(e);
-//             }
-//             e->content(s);
-//         }
+        const char* wss[] = { "mrsws_search", "mrsws_blast", "mrsws_align" };
+        for (const char* ws : wss)
+        {
+            e = server->find_first((boost::format("web-service[@service='%1%']") % ws).str());
+            s = request.get_parameter(ws);
 
-//         const char* wss[] = { "mrsws_search", "mrsws_blast", "mrsws_align" };
-//         for (const char* ws : wss)
-//         {
-//             e = server->find_first((boost::format("web-service[@service='%1%']") % ws).str());
-//             s = request.get_parameter(ws);
+            if (s.empty())
+            {
+                if (e != nullptr)
+                    server->remove(e);
+            }
+            else
+            {
+                if (e == nullptr)
+                {
+                    e = new zx::element("web-service");
+                    e->set_attribute("service", ws);
+                    e->set_attribute("ns", string("https://mrs.cmbi.ru.nl/mrsws/") + ws);
+                    server->append(e);
+                }
+                e->set_attribute("location", s);
+            }
+        }
 
-//             if (s.empty())
-//             {
-//                 if (e != nullptr)
-//                     server->remove(e);
-//             }
-//             else
-//             {
-//                 if (e == nullptr)
-//                 {
-//                     e = new zx::element("web-service");
-//                     e->set_attribute("service", ws);
-//                     e->set_attribute("ns", string("https://mrs.cmbi.ru.nl/mrsws/") + ws);
-//                     server->append(e);
-//                 }
-//                 e->set_attribute("location", s);
-//             }
-//         }
+        server->set_attribute("addr", request.get_parameter("addr"));
+    }
+    else if (inPage == "parsers")
+    {
+//        if (btn == "delete")
+//        {
+//            string parserID = request.get_parameter("selected");
+//            zx::element* parser = config->GetParser(parserID);
+//            if (parser != nullptr)
+//            {
+//                parser->parent()->remove(parser);
+//                delete parser;
+//            }
+//        }
+//        else if (btn == "add")
+//        {
+//
+//        }
+//        else
+//        {
+//
+//        }
+    }
+    else if (inPage == "formats")
+    {
+        if (btn == "delete")
+        {
+            string formatID = request.get_parameter("selected");
+            zx::element* fmt = config->GetFormat(formatID);
+            if (fmt != nullptr)
+            {
+                fmt->parent()->remove(fmt);
+                delete fmt;
+            }
+        }
+        else if (btn == "add")
+        {
+            config->CreateFormat();
+        }
+        else
+        {
+            string formatID = request.get_parameter("original-id");
+            zx::element* fmt = config->GetFormat(formatID);
+            if (fmt == nullptr)
+                THROW(("Unknown format %s", formatID.c_str()));
 
-//         server->set_attribute("addr", request.get_parameter("addr"));
-//     }
-//     else if (inPage == "parsers")
-//     {
-// //        if (btn == "delete")
-// //        {
-// //            string parserID = request.get_parameter("selected");
-// //            zx::element* parser = config->GetParser(parserID);
-// //            if (parser != nullptr)
-// //            {
-// //                parser->parent()->remove(parser);
-// //                delete parser;
-// //            }
-// //        }
-// //        else if (btn == "add")
-// //        {
-// //
-// //        }
-// //        else
-// //        {
-// //
-// //        }
-//     }
-//     else if (inPage == "formats")
-//     {
-//         if (btn == "delete")
-//         {
-//             string formatID = request.get_parameter("selected");
-//             zx::element* fmt = config->GetFormat(formatID);
-//             if (fmt != nullptr)
-//             {
-//                 fmt->parent()->remove(fmt);
-//                 delete fmt;
-//             }
-//         }
-//         else if (btn == "add")
-//         {
-//             config->CreateFormat();
-//         }
-//         else
-//         {
-//             string formatID = request.get_parameter("original-id");
-//             zx::element* fmt = config->GetFormat(formatID);
-//             if (fmt == nullptr)
-//                 THROW(("Unknown format %s", formatID.c_str()));
+            string id = request.get_parameter("format-id");
+            if (id != formatID)
+                fmt->set_attribute("id", id);
 
-//             string id = request.get_parameter("id");
-//             if (id != formatID)
-//                 fmt->set_attribute("id", id);
+            string script = request.get_parameter("script");
+            fmt->set_attribute("script", script);
 
-//             string script = request.get_parameter("script");
-//             fmt->set_attribute("script", script);
+            range r[5] = {
+                params.equal_range("rx"),
+                params.equal_range("db"),
+                params.equal_range("id"),
+                params.equal_range("ix"),
+                params.equal_range("an")
+            };
 
-//             auto r[5] = {
-//                 request.get_parameters("rx"),
-//                 request.get_parameters("db"),
-//                 request.get_parameters("id"),
-//                 request.get_parameters("ix"),
-//                 request.get_parameters("an")
-//             };
+			size_t n = distance(r[0].first, r[0].second);
+            for_each(r, boost::end(r), [n](auto& ri) {
+				size_t m = distance(ri.first, ri.second);
+                if (m != n) THROW((("invalid data, number of items for " + ri.first->first + " does not match rx").c_str()));
+            });
 
-//             for_each(r, boost::end(r), [](auto& ri) {
-//                 if (ri.empty()) THROW(("invalid data"));
-//             });
+            zx::container::iterator l = fmt->begin();
 
-//             zx::container::iterator l = fmt->begin();
+            while (r[0].first != r[0].second)
+            {
+				string rx = (r[0].first++)->second;
+				string db = (r[1].first++)->second;
+				string id = (r[2].first++)->second;
+				string ix = (r[3].first++)->second;
+				string an = (r[4].first++)->second;
 
-//             while (not r[0].empty())
-//             {
-//                 if (l == fmt->end())
-//                     l = fmt->insert(l, new zx::element("link"));
+				if (db.empty() or rx.empty() or ix.empty() or id.empty())
+				{
+					LOG(ERROR, "Failed to store link rx=%s db=%s id=%s ix=%s an=%s", rx, db, id, ix, an);
+					continue;
+				}
 
-//                 zx::element* link = *l;
-//                 ++l;
+                if (l == fmt->end())
+                    l = fmt->insert(l, new zx::element("link"));
 
-//                 for_each(r, boost::end(r), [link](auto& ri) {
-//                     string v = ri.front();
-//                     if (v.empty())
-//                         link->remove_attribute(ri.first->first);
-//                     else
-//                         link->set_attribute(ri.first->first, v);
-//                     ++ri.first;
-//                 });
-//             }
+                zx::element* link = *l;
+                ++l;
 
-//             if (l != fmt->end())
-//                 fmt->erase(l, fmt->end());
-//         }
-//     }
-//     else if (inPage == "databanks")
-//     {
-//         if (btn == "delete")
-//         {
-//             string dbID = request.get_parameter("selected");
-//             zx::element* db = config->GetConfiguredDatabank(dbID);
+				link->set_attribute("rx", rx);
+				link->set_attribute("db", db);
+				link->set_attribute("id", id);
+				link->set_attribute("ix", ix);
+				link->set_attribute("an", an);
+            }
 
-//             db->parent()->remove(db);
-//             delete db;
-//         }
-//         else if (btn == "add")
-//         {
-//             config->CreateDatabank();
-//         }
-//         else
-//         {
-//             string dbID = request.get_parameter("original-id");
-//             zx::element* db = config->GetConfiguredDatabank(dbID);
+            if (l != fmt->end())
+                fmt->erase(l, fmt->end());
+        }
+    }
+    else if (inPage == "databanks")
+    {
+        if (btn == "delete")
+        {
+            string dbID = request.get_parameter("selected");
+            zx::element* db = config->GetConfiguredDatabank(dbID);
 
-//             string id = request.get_parameter("id");
-//             if (id != dbID)
-//                 db->set_attribute("id", id);
+            db->parent()->remove(db);
+            delete db;
+        }
+        else if (btn == "add")
+        {
+            config->CreateDatabank();
+        }
+        else
+        {
+            string dbID = request.get_parameter("original-id");
+            zx::element* db = config->GetConfiguredDatabank(dbID);
 
-//             db->set_attribute("enabled", request.get_parameter("enabled", false) ? "true" : "false");
-//             db->set_attribute("parser", request.get_parameter("parser"));
-//             db->set_attribute("fasta", request.get_parameter("fasta", false) ? "true" : "false");
-//             db->set_attribute("update", request.get_parameter("update", "never"));
+            string id = request.get_parameter("id");
+            if (id != dbID)
+                db->set_attribute("id", id);
 
-//             string format = request.get_parameter("format", "none");
-//             if (format == "none")
-//                 db->remove_attribute("format");
-//             else if (format == "xml")
-//             {
-//                 db->remove_attribute("format");
-//                 db->set_attribute("stylesheet", request.get_parameter("stylesheet"));
-//             }
-//             else
-//                 db->set_attribute("format", format);
+            db->set_attribute("enabled", request.get_parameter("enabled", false) ? "true" : "false");
+            db->set_attribute("parser", request.get_parameter("parser"));
+            db->set_attribute("fasta", request.get_parameter("fasta", false) ? "true" : "false");
+            db->set_attribute("update", request.get_parameter("update", "never"));
 
-//             range r[] = {
-//                 inParams.equal_range("alias-id"),
-//                 inParams.equal_range("alias-name")
-//             };
+            string format = request.get_parameter("format", "none");
+            if (format == "none")
+                db->remove_attribute("format");
+            else if (format == "xml")
+            {
+                db->remove_attribute("format");
+                db->set_attribute("stylesheet", request.get_parameter("stylesheet"));
+            }
+            else
+                db->set_attribute("format", format);
 
-//             for_each(r, boost::end(r), [](range& ri) {
-//                 if (ri.first == ri.second) THROW(("invalid data"));
-//                 --ri.second;
-//             });
+            range r[] = {
+                params.equal_range("alias-id"),
+                params.equal_range("alias-name")
+            };
 
-//             zx::element* a = db->find_first("aliases");
-//             if (r[0].first == r[0].second)        // no aliases
-//             {
-//                 if (a != nullptr)
-//                 {
-//                     db->remove(a);
-//                     delete a;
-//                 }
-//             }
-//             else
-//             {
-//                 if (a == nullptr)
-//                 {
-//                     a = new zx::element("aliases");
-//                     db->append(a);
-//                 }
+            for_each(r, boost::end(r), [](range& ri) {
+                if (ri.first == ri.second) THROW(("invalid data"));
+                --ri.second;
+            });
 
-//                 zx::container::iterator ai = a->begin();
+            zx::element* a = db->find_first("aliases");
+            if (r[0].first == r[0].second)        // no aliases
+            {
+                if (a != nullptr)
+                {
+                    db->remove(a);
+                    delete a;
+                }
+            }
+            else
+            {
+                if (a == nullptr)
+                {
+                    a = new zx::element("aliases");
+                    db->append(a);
+                }
 
-//                 while (r[0].first != r[0].second)
-//                 {
-//                     string id = r[0].first->second.as<string>();
-//                     ++r[0].first;
-//                     string name = r[1].first->second.as<string>();
-//                     ++r[1].first;
+                zx::container::iterator ai = a->begin();
 
-//                     if (id.empty())
-//                         continue;
+                while (r[0].first != r[0].second)
+                {
+                    string id = r[0].first->second;
+                    ++r[0].first;
+                    string name = r[1].first->second;
+                    ++r[1].first;
 
-//                     if (ai == a->end())
-//                         ai = a->insert(ai, new zx::element("alias"));
+                    if (id.empty())
+                        continue;
 
-//                     zx::element* alias = *ai;
-//                     ++ai;
+                    if (ai == a->end())
+                        ai = a->insert(ai, new zx::element("alias"));
 
-//                     alias->content(id);
-//                     if (name.empty())
-//                         alias->remove_attribute("name");
-//                     else
-//                         alias->set_attribute("name", name);
-//                 }
+                    zx::element* alias = *ai;
+                    ++ai;
 
-//                 if (ai != a->end())
-//                     a->erase(ai, a->end());
-//             }
+                    alias->content(id);
+                    if (name.empty())
+                        alias->remove_attribute("name");
+                    else
+                        alias->set_attribute("name", name);
+                }
 
-//             const char* fields[] = { "name", "info", "filter", "source" };
-//             for (const char* field : fields)
-//             {
-//                 string s = request.get_parameter(field);
-//                 zx::element* e = db->find_first(field);
-//                 if (s.empty())
-//                 {
-//                     if (e != nullptr)
-//                         db->remove(e);
-//                     delete e;
-//                 }
-//                 else
-//                 {
-//                     if (e == nullptr)
-//                         db->append(e = new zx::element(field));
-//                     e->content(s);
-//                 }
-//             }
+                if (ai != a->end())
+                    a->erase(ai, a->end());
+            }
 
-//             zx::element* source = db->find_first("source");
-//             string fetch = request.get_parameter("fetch");
-//             string port = request.get_parameter("port");
+            const char* fields[] = { "name", "info", "filter", "source" };
+            for (const char* field : fields)
+            {
+                string s = request.get_parameter(field);
+                zx::element* e = db->find_first(field);
+                if (s.empty())
+                {
+                    if (e != nullptr)
+                        db->remove(e);
+                    delete e;
+                }
+                else
+                {
+                    if (e == nullptr)
+                        db->append(e = new zx::element(field));
+                    e->content(s);
+                }
+            }
 
-//             if (not fetch.empty() and source == nullptr)
-//                 THROW(("invalid: fetch contains text but source is empty"));
+            zx::element* source = db->find_first("source");
+            string fetch = request.get_parameter("fetch");
+            string port = request.get_parameter("port");
 
-//             if (fetch.empty())
-//                 source->remove_attribute("fetch");
-//             else
-//                 source->set_attribute("fetch", fetch);
+            if (not fetch.empty() and source == nullptr)
+                THROW(("invalid: fetch contains text but source is empty"));
 
-//             if (request.get_parameter("delete", false))
-//                 source->set_attribute("delete", "true");
-//             else
-//                 source->remove_attribute("delete");
+            if (fetch.empty())
+                source->remove_attribute("fetch");
+            else
+                source->set_attribute("fetch", fetch);
 
-//             if (request.get_parameter("recursive", false))
-//                 source->set_attribute("recursive", "true");
-//             else
-//                 source->remove_attribute("recursive");
+            if (request.get_parameter("delete", false))
+                source->set_attribute("delete", "true");
+            else
+                source->remove_attribute("delete");
 
-//             if (port.empty())
-//                 source->remove_attribute("port");
-//             else
-//                 source->set_attribute("port", port);
-//         }
-//     }
-//     else if (inPage == "scheduler")
-//     {
-//         zx::element* schedule = config->GetSchedule();
+            if (request.get_parameter("recursive", false))
+                source->set_attribute("recursive", "true");
+            else
+                source->remove_attribute("recursive");
 
-//         if (request.get_parameter("enabled", true))
-//             schedule->set_attribute("enabled", "true");
-//         else
-//             schedule->set_attribute("enabled", "false");
+            if (port.empty())
+                source->remove_attribute("port");
+            else
+                source->set_attribute("port", port);
+        }
+    }
+    else if (inPage == "scheduler")
+    {
+        zx::element* schedule = config->GetSchedule();
 
-//         string time = request.get_parameter("time");
+        if (request.get_parameter("enabled", true))
+            schedule->set_attribute("enabled", "true");
+        else
+            schedule->set_attribute("enabled", "false");
 
-//         if (time.empty())
-//             schedule->remove_attribute("time");
-//         else
-//         {
-//             vector<string> p;
-//             ba::split(p, time, ba::is_any_of(":"));
+        string time = request.get_parameter("time");
 
-//             if (p.size() != 2)
-//                 THROW(("Invalid time"));
+        if (time.empty())
+            schedule->remove_attribute("time");
+        else
+        {
+            vector<string> p;
+            ba::split(p, time, ba::is_any_of(":"));
 
-//             uint32 hours = boost::lexical_cast<uint32>(p[0]);
-//             uint32 minutes = boost::lexical_cast<uint32>(p[1]);
+            if (p.size() != 2)
+                THROW(("Invalid time"));
 
-//             if (hours >= 24 or minutes > 59)
-//                 THROW(("Invalid.time"));
+            uint32 hours = boost::lexical_cast<uint32>(p[0]);
+            uint32 minutes = boost::lexical_cast<uint32>(p[1]);
 
-//             schedule->set_attribute("time", (boost::format("%02.2d:%02.2d") % hours % minutes).str());
-//         }
+            if (hours >= 24 or minutes > 59)
+                THROW(("Invalid.time"));
 
-//         string weekday = request.get_parameter("weekday", "friday");
-//         const char* kWeekDays[] = { "sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday" };
-//         if (find(kWeekDays, boost::end(kWeekDays), weekday) == boost::end(kWeekDays))
-//             THROW(("Invalid weekday"));
+            schedule->set_attribute("time", (boost::format("%02.2d:%02.2d") % hours % minutes).str());
+        }
 
-//         schedule->set_attribute("weekday", weekday);
-//     }
+        string weekday = request.get_parameter("weekday", "friday");
+        const char* kWeekDays[] = { "sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday" };
+        if (find(kWeekDays, boost::end(kWeekDays), weekday) == boost::end(kWeekDays))
+            THROW(("Invalid weekday"));
 
-//     config->Validate();
-//     delete mConfigCopy;
-//     mConfigCopy = config.release();
-// }
+        schedule->set_attribute("weekday", weekday);
+    }
+
+    config->Validate();
+    delete mConfigCopy;
+    mConfigCopy = config.release();
+}
 
 void M6Server::handle_admin(const zh::request& request,
     const el::scope& scope, zh::reply& reply)
@@ -2308,7 +2321,7 @@ void M6Server::handle_admin(const zh::request& request,
             else
             {
 #warning("fixme")
-                // ProcessNewConfig(submitted, params);
+                ProcessNewConfig(submitted, request);
                 reply = zh::reply::redirect("admin");
             }
             return;
@@ -3449,10 +3462,8 @@ void M6Server::handle_status(const zh::request& request, const el::scope& scope,
 
         LOG(INFO, "handling status request");
 
-        vector<el::object> databanks;
-//      for (M6LoadedDatabank& db : mLoadedDatabanks)
-
-        for (zx::element* db : M6Config::GetDatabanks())
+        el::object databanks;
+		for (zx::element* db : M6Config::GetDatabanks())
         {
             if (db->get_attribute("enabled") == "false")
                 continue;
@@ -3478,7 +3489,7 @@ void M6Server::handle_status(const zh::request& request, const el::scope& scope,
 
             databanks.push_back(databank);
         }
-        sub.put("statusDatabanks", el::object(databanks));
+        sub.put("statusDatabanks", databanks);
 
         create_reply_from_template("status.html", sub, reply);
         reply.set_header("Cache-Control", "no-cache");

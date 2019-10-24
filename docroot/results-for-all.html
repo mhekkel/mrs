@@ -51,27 +51,27 @@ addLoadEvent(updateFindAllStatus);
 	
 			<table id="tabel" cellspacing="0" cellpadding="0" style="position:relative;" class="list"
 				xmlns:m2="https://mrs.cmbi.ru.nl/mrs-web/nl/my-ns">
-				<caption z2:text="${'Results for query [' + q + ']'}"></caption>
-				<tr>
-					<th>Nr</th>
-					<th>Hits</th>
-					<th>ID</th>
-					<th if="${ranked}">Relevance</th>
-					<th>Title</th>
-				</tr>
+				<caption z2:text="|Results for query [${q}]|"></caption>
+				<thead>
+					<tr>
+						<th>Nr</th>
+						<th>Hits</th>
+						<th>ID</th>
+						<th if="${ranked}">Relevance</th>
+						<th>Title</th>
+					</tr>
+				</thead>
 				<tbody z2:each="db: ${hitDatabanks}">
-	
 					<tr z2:each="hit, i: ${db.hits}" z2:class="|hit-${i.count}|"
 						z2:attr="m2:hitNr=${hit.nr}, m2:db=${db.name}, m2:score=${db.hits[0].score}">
-						<td z2:if="${i.index == 0}" z2:rowspan="${db.hits.count}"><a z2:href="@{search(db=${db.id},q=${q})}" z2:text="${db.name}"></a></td>
-						<td z2:if="${i.index == 0}" z2:rowspan="${db.hits.count}" style="text-align:right" z2:text="${db.hitCount}"></td>
+						<td class="rowspan-dep" z2:if="${i.index == 0}" z2:rowspan="${db.hits.count}" z2:attr="data-hit-count=${db.hits.count}"><a z2:href="@{search(db=${db.id},q=${q})}" z2:text="${db.name}"></a></td>
+						<td class="rowspan-dep" z2:if="${i.index == 0}" z2:rowspan="${db.hits.count}" z2:attr="data-hit-count=${db.hits.count}" style="text-align:right" z2:text="${db.hitCount}"></td>
 						<td>
 							<mrs:link z2:attr="db=${db.id},nr=${hit.docNr},index='id',q=${q}" z2:text="${hit.id}"></mrs:link>
 						</td>
 						<td z2:if="${ranked}"><img src="images/pixel-red.png" z2:width="${hit.score}" height="7" style="padding-top:4px" alt=""/></td>
 						<td z2:text="${hit.title}"></td>
 					</tr>
-					
 				</tbody>
 			</table>
 		</div>

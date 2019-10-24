@@ -199,6 +199,12 @@ function nrOfHitsToShow(nr, max)
 	main.classList.toggle("show-2-hits", nr == 2);
 	main.classList.toggle("show-3-hits", nr == 3);
 	main.classList.toggle("show-4-hits", nr == 4);
+
+	[...document.querySelectorAll("#tabel td.rowspan-dep")]
+		.forEach(td => {
+			const rowSpan = +td.dataset.hitCount;
+			td.rowSpan = rowSpan > nr ? nr : rowSpan;
+		});
 }
 
 // --------------------------------------------------------------------

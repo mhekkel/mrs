@@ -101,7 +101,7 @@ private:
 
 	virtual std::string
 	get_hashed_password(const std::string &username, const std::string &realm);
-	// void ProcessNewConfig(const std::string &inPage, zh::request &inRequest);
+	void ProcessNewConfig(const std::string &inPage, const zh::request &inRequest);
 
 	void handle_download(const zh::request &request, const el::scope &scope, zh::reply &reply);
 	void handle_entry(const zh::request &request, const el::scope &scope, zh::reply &reply);
@@ -152,11 +152,9 @@ private:
 	void SpellCheck(const std::string &inDatabank, const std::string &inTerm,
 					std::vector<std::pair<std::string, uint16>> &outCorrections);
 
-	static M6Server *
-		sInstance;
+	static M6Server* sInstance;
 
-	const zx::element *
-		mConfig;
+	const zx::element* mConfig;
 	M6DbList mLoadedDatabanks;
 	M6BlastDbList mBlastDatabanks;
 	M6LinkMap mLinkMap;

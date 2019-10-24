@@ -3411,7 +3411,7 @@ void M6IndexImplT<M6DataType>::GetBrowseSections(const string& inFirst, const st
     }
 
     // hmmmm, somehow sections miss the last key in the index, sometimes
-    if (inLast.empty())
+    if (inLast.empty() and page != nullptr)
     {
         while (page->GetLink() != 0)
         {

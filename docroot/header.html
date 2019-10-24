@@ -20,9 +20,9 @@
 		<div z2:if="${not mobile}">
 		<label>
 			Search
-			<select name="db" z2:onchange="if (document.getElementById('q').value !== '') document.getElementById('queryForm').submit();" style="width:150px;">
+			<select name="db" onchange="if (document.getElementById('q').value !== '') document.getElementById('queryForm').submit();" style="width:150px;">
 				<option value="all">All Databanks</option>
-				<option z2:each="dbi: ${databanks}" z2:value="${dbi.id}" z2:text="${dbi.name}" z2:selected="${db.id == dbi.id}" />
+				<option z2:each="dbi: ${databanks}" z2:value="${dbi.id}" z2:text="${dbi.name}" z2:selected="${db == dbi.id}" />
 			</select>
 		</label>
 		<label>

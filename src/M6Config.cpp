@@ -49,7 +49,7 @@ File::File()
     fs::ifstream configFileStream(sConfigFile, ios::binary);
     mConfig.external_entity_ref_handler = bind(&File::LoadDTD, this, _1, _2, _3);
     mConfig.set_validating(true);
-    configFileStream >> mConfig;
+	mConfig.read(configFileStream, sConfigFile.parent_path().string());
 }
 
 File::File(const File& inFile)
@@ -93,6 +93,15 @@ void File::Validate()
     w.xml_decl(false);
     w.doctype("mrs-config", "", "https://mrs.cmbi.umcn.nl/dtd/mrs-config.dtd");
     mConfig.write(w);
+
+#if DEBUG
+ofstream scratch("/tmp/config");
+zx::writer w2(scratch, true);
+w2.xml_decl(false);
+w2.doctype("mrs-config", "", "https://mrs.cmbi.umcn.nl/dtd/mrs-config.dtd");
+mConfig.write(w2);
+scratch.close();
+#endif
 
     zx::document doc;
     doc.external_entity_ref_handler = bind(&File::LoadDTD, this, _1, _2, _3);

@@ -1,5 +1,6 @@
 <html xmlns="http://www.w3.org/1999/xhtml"
-	xmlns:mrs="http://mrs.cmbi.ru.nl/mrs-web/ml"
+	xmlns:z2="http://www.hekkelman.com/libzeep/m2"
+	xmlns:mrs="https://mrs.cmbi.ru.nl/mrs-web/ml"
 	xml:lang="en" lang="en">
 <head>
     <title>M6</title>
@@ -24,91 +25,74 @@ addLoadEvent(updateFindAllStatus);
 
 </head>
 <body>
-	<mrs:include file="header.html" />
+	<nav z2:replace="header.html :: #header" />
 
-	<div id="main">
-		<mrs:if test="${error}">
-			<div class="relaxed">The query contained a syntax error (${error})</div>
-		</mrs:if>
+	<div id="main" class="show-2-hits">
+		<div z2:if="${error}" class="relaxed">The query contained a syntax error (${error})</div>
 
-		<mrs:if test="${empty hit-databanks}">
-		<div class="no-hits">No hits found</div>
-		</mrs:if>
+		<div z2:if="${hitDatabanks.empty}" class="no-hits">No hits found</div>
 
-		<mrs:if test="${not empty hit-databanks}">
-		<mrs:if test="${not mobile}">
+		<div z2:test="${not mobile and not hitDatabanks.empty}">
+
 		<div class="nav">
-			<mrs:if test="${ranked}">
-				<span class="left chooseLink" id="chooseOrder">Order by
+				<span z2:if="${ranked}" class="left chooseLink" id="chooseOrder">Order by
 					<a href="javascript:orderBy('databank');">databank</a> or
 					<a href="javascript:orderBy('relevance');">relevance</a>
 				</span>
-			</mrs:if>
-			<span class="right chooseLink" id="chooseCount">
-				Show <a href="javascript:nrOfHitsToShow(1);">1</a>
-					 <a href="javascript:nrOfHitsToShow(2, ${show});">2</a>
-					 <a href="javascript:nrOfHitsToShow(3, ${show});">3</a>
-					 <a href="javascript:nrOfHitsToShow(4, ${show});">4</a>
-					 <a href="javascript:nrOfHitsToShow(5, ${show});">5</a> hits per databank
-			</span>
-			&#x00a0;
+				<span class="right chooseLink" id="chooseCount">
+					Show <a class="show-1" href="javascript:nrOfHitsToShow(1);">1</a>
+						 <a class="show-2" href="javascript:nrOfHitsToShow(2);">2</a>
+						 <a class="show-3" href="javascript:nrOfHitsToShow(3);">3</a>
+						 <a class="show-4" href="javascript:nrOfHitsToShow(4);">4</a>
+						 <a class="show-5" href="javascript:nrOfHitsToShow(5);">5</a> hits per databank
+				</span>
+				&#x00a0;
+			</div>
+	
+			<table id="tabel" cellspacing="0" cellpadding="0" style="position:relative;" class="list"
+				xmlns:m2="https://mrs.cmbi.ru.nl/mrs-web/nl/my-ns">
+				<caption z2:text="|Results for query [${q}]|"></caption>
+				<thead>
+					<tr>
+						<th>Nr</th>
+						<th>Hits</th>
+						<th>ID</th>
+						<th if="${ranked}">Relevance</th>
+						<th>Title</th>
+					</tr>
+				</thead>
+				<tbody z2:each="db: ${hitDatabanks}">
+					<tr z2:each="hit, i: ${db.hits}" z2:class="|hit-${i.count}|"
+						z2:attr="m2:hitNr=${hit.nr}, m2:db=${db.name}, m2:score=${db.hits[0].score}">
+						<td class="rowspan-dep" z2:if="${i.index == 0}" z2:rowspan="${db.hits.count}" z2:attr="data-hit-count=${db.hits.count}"><a z2:href="@{search(db=${db.id},q=${q})}" z2:text="${db.name}"></a></td>
+						<td class="rowspan-dep" z2:if="${i.index == 0}" z2:rowspan="${db.hits.count}" z2:attr="data-hit-count=${db.hits.count}" style="text-align:right" z2:text="${db.hitCount}"></td>
+						<td>
+							<mrs:link z2:attr="db=${db.id},nr=${hit.docNr},index='id',q=${q}" z2:text="${hit.id}"></mrs:link>
+						</td>
+						<td z2:if="${ranked}"><img src="images/pixel-red.png" z2:width="${hit.score}" height="7" style="padding-top:4px" alt=""/></td>
+						<td z2:text="${hit.title}"></td>
+					</tr>
+				</tbody>
+			</table>
 		</div>
 
-		<table id="tabel" cellspacing="0" cellpadding="0" style="position:relative;" class="list"
-			xmlns:m2="http://mrs.cmbi.ru.nl/mrs-web/nl/my-ns">
+		<table z2:if="${mobile}" id="tabel" cellspacing="0" cellpadding="0" style="position:relative;" class="list">
 			<caption>Results for query [${q}]</caption>
-			<tr>
-				<th>Nr</th>
-				<th>Hits</th>
-				<th>ID</th>
-				<mrs:if test="${ranked}"><th>Relevance</th></mrs:if>
-				<th>Title</th>
-			</tr>
-	<mrs:iterate collection="hit-databanks" var="db">
-		<mrs:iterate collection="${db.hits}" var="hit">
-			<tr m2:hitNr="${hit.nr}" m2:db="${db.name}" m2:score="${db.hits[0].score}">
-				<mrs:if test="${hit.nr = 1}">
-					<td rowspan="${db.hits.count}"><a href="search?db=${db.id}&amp;q=${q}">${db.name}</a></td>
-					<td rowspan="${db.hits.count}" style="text-align:right">${db.hitCount}</td>
-				</mrs:if>
-				<td style="${(hit.nr > cookies.hitsToShow) ? 'display:none' : '' }">
-					<mrs:link db="${db.id}" nr="${hit.docNr}" index="id" q="${q}">${hit.id}</mrs:link>
-				</td>
-				<mrs:if test="${ranked}">
-					<td style="${(hit.nr > cookies.hitsToShow) ? 'display:none' : '' }"><img src="images/pixel-red.png" width="${hit.score}" height="7" style="padding-top:4px" alt=""/></td>
-				</mrs:if>
-				<td style="${hit.nr > cookies.hitsToShow ? 'display:none' : '' }">${hit.title}</td>
-			</tr>
-		</mrs:iterate>
-	</mrs:iterate>
-		</table>
-		</mrs:if>
-
-		<mrs:if test="${mobile}">
-		<table id="tabel" cellspacing="0" cellpadding="0" style="position:relative;" class="list">
-			<caption>Results for query [${q}]</caption>
-			<mrs:iterate collection="hit-databanks" var="db">
+			<mrs:iterate collection="hitDatabanks" var="db">
 			<tr>
 				<th colspan="2">${db.name} <span style="float:right">${db.hitCount} hits</span></th>
 			</tr>
-			<mrs:iterate collection="${db.hits}" var="hit">
-			<tr>
+			<tr z2:each="hit: ${db.hits}">
 				<td><mrs:link db="${db.id}" nr="${hit.docNr}" index="id" q="${q}">${hit.id}</mrs:link></td>
-				<td>${hit.title}</td>
+				<td z2:text="${hit.title}"></td>
 			</tr>
-			</mrs:iterate>
-			<mrs:if test="${db.hitCount gt db.hits.length}">
-			<tr>
-				<td colspan="2"><a href="search?db=${db.id}&amp;q=${q};show=50">more...</a></td>
+			<tr z2:if="${db.hitCount gt db.hits.length}">
+				<td colspan="2"><a z2:href="@{search(db=${db.id},q=${q},show=50)">more...</a></td>
 			</tr>
-			</mrs:if>
 			</mrs:iterate>
 		</table>
-		</mrs:if>
 
-		</mrs:if>
-
-		<mrs:include file="spelling-suggestions.html" />
+		<div z2:replace="spelling-suggestions.html :: suggestions" />
 	</div>
 </body>
 </html>

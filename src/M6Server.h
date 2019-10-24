@@ -11,15 +11,17 @@
 
 #include <tuple>
 
+#include <boost/thread/mutex.hpp>
+
 #include <zeep/http/webapp.hpp>
-#include <zeep/http/webapp/el.hpp>
+#include <zeep/el/element.hpp>
 #include <zeep/dispatcher.hpp>
 
 #include "M6Config.h"
 
 namespace zh = zeep::http;
 namespace zx = zeep::xml;
-namespace el = zeep::http::el;
+namespace el = zeep::el;
 
 class M6Iterator;
 class M6Databank;
@@ -99,7 +101,7 @@ class M6Server : public zh::webapp
 
 	virtual std::string
 					get_hashed_password(const std::string& username, const std::string& realm);
-	void			ProcessNewConfig(const std::string& inPage, zh::parameter_map& inParams);
+	void			ProcessNewConfig(const std::string& inPage, const zh::request& request);
 
 	void			handle_download(const zh::request& request, const el::scope& scope, zh::reply& reply);
 	void			handle_entry(const zh::request& request, const el::scope& scope, zh::reply& reply);

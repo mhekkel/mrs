@@ -1,5 +1,6 @@
 <html xmlns="http://www.w3.org/1999/xhtml"
-	xmlns:mrs="http://mrs.cmbi.ru.nl/mrs-web/ml"
+	xmlns:mrs="https://mrs.cmbi.ru.nl/mrs-web/ml"
+	xmlns:z2="http://www.hekkelman.com/libzeep/m2"
 	xml:lang="en" lang="en">
 <head>
     <title>M6</title>
@@ -25,7 +26,7 @@
 
 </head>
 <body>
-	<mrs:include file="header.html" />
+	<div z2:replace="header :: #header" />
 
 	<div id="main">
 		<div style="margin-bottom: 1em;">
@@ -39,14 +40,14 @@
 					<textarea name="query" rows="5" cols="72">${query}</textarea>
 <!--					<li>Or enter filename: <input type="file" name="queryFile" size="50" maxlength="80" /></li>-->
 					<div>
-						<label>Databank to search</label><select name="db" style="width:10em;">
+						<label for="db">Databank to search</label><select id="db" name="db" style="width:10em;">
 							<mrs:options collection="blastdatabanks" value="id" label="name" selected="${blastdb}" />
 						</select>
 					</div>
 					
 					<div id="options">
-<!--						<div><h3>Options</h3></div>-->
-						<div><label>Filter low complexity</label><mrs:checkbox name="filter" checked="${filter}" /></div>
+						<div><label for="filter">Filter low complexity</label><input type="checkbox" id="filter" z2:checked="${filter}" name="filter" />
+						</div>
 						<div><label>E-value cutoff</label><select name="expect"><mrs:options collection="expectRange" selected="${expect}" /></select></div>
 					</div>
 
@@ -60,7 +61,8 @@
 						<div><label>Scoring matrix</label><select name="matrix" onchange="updateGapValues();">
 							<mrs:options collection="matrices" selected="${matrix}" /></select>
 						</div>
-						<div><label>Perform gapped alignment</label><mrs:checkbox name="gapped" checked="${gapped}" onchange="gappedChanged();" /></div>
+						<div><label for="gapped">Perform gapped alignment</label>
+								<input id="gapped" type="checkbox" name="gapped" z2:checked="${gapped}" onchange="gappedChanged();" /></div>
 						<div><label>Cost to open a gap</label><select name="gapOpen" onchange="gapOpenChanged();">
 							<option value="-1">Default</option>
 							<mrs:options collection="gapOpenRange" selected="${gapOpen}" /></select>

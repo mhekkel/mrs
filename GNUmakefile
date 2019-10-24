@@ -30,11 +30,11 @@ DEFINES				+= MRS_ETC_DIR='"$(MRS_ETC_DIR)"' \
 
 BOOST_LIBS			= system thread filesystem regex math_c99 math_c99f program_options date_time iostreams timer random chrono
 BOOST_LIBS			:= $(BOOST_LIBS:%=boost_%$(BOOST_LIB_SUFFIX))
-LIBS				= m pthread rt z bz2 zeep log4cpp
+LIBS				= m pthread rt z bz2 zeep log4cpp nsl
 
 CXX					?= c++
 
-CXXFLAGS			+= -std=c++0x
+CXXFLAGS			+= -std=c++14
 CFLAGS				+= $(INCLUDE_DIR:%=-I%) -I. -pthread
 CFLAGS				+= -Wno-deprecated -Wno-multichar 
 CFLAGS				+= $(shell $(PERL) -MExtUtils::Embed -e perl_inc)
@@ -109,7 +109,7 @@ $(OBJDIR)/M6Config.o: make.config
 unicode/M6UnicodeTables.h src/../unicode/M6UnicodeTables.h:
 	cd unicode; $(PERL) unicode-table-creator.pl > $(@F)
 
-include $(OBJECTS:%.o=%.d)
+-include $(OBJECTS:%.o=%.d)
 
 $(OBJECTS:.o=.d):
 

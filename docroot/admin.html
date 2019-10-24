@@ -1,5 +1,6 @@
 <html xmlns="http://www.w3.org/1999/xhtml"
-	xmlns:mrs="http://mrs.cmbi.ru.nl/mrs-web/ml"
+	xmlns:mrs="https://mrs.cmbi.ru.nl/mrs-web/ml"
+	xmlns:z2="http://www.hekkelman.com/libzeep/m2"
 	xml:lang="en" lang="en">
 <head>
     <title>MRS Administration</title>
@@ -22,17 +23,17 @@
 
 </head>
 <body>
-	<mrs:include file="header.html" />
+	<div z2:replace="header :: #header" />
 	<div id="main">
 		<div class="nav">
 			<ul>
-				<li><a href="#" id="global">Main</a></li>
-				<li><a href="#" id="server">Server</a></li>
-				<li><a href="#" id="parsers">Parsers</a></li>
-				<li><a href="#" id="formats">Formats</a></li>
-				<li><a href="#" id="databanks">Databanks</a></li>
-				<li><a href="#" id="scheduler">Scheduler</a></li>
-				<li><a href="#" id="blast">Blast Queue</a></li>
+				<li><a href="#" data-id="global">Main</a></li>
+				<li><a href="#" data-id="server">Server</a></li>
+				<li><a href="#" data-id="parsers">Parsers</a></li>
+				<li><a href="#" data-id="formats">Formats</a></li>
+				<li><a href="#" data-id="databanks">Databanks</a></li>
+				<li><a href="#" data-id="scheduler">Scheduler</a></li>
+				<li><a href="#" data-id="blast">Blast Queue</a></li>
 			</ul>
 		</div>
 
@@ -99,7 +100,7 @@
 						<table cellspacing="0" cellpadding="0" class="select_form">
 							<caption>Parsers</caption>
 							<mrs:iterate collection="parsers" var="parser">
-								<tr><td>${parser.id}</td></tr>
+								<tr data-target="parser-${parser.id}"><td>${parser.id}</td></tr>
 							</mrs:iterate>
 						</table>
 					</div>
@@ -113,7 +114,7 @@
 				
 				<div class="admin-right">
 					<mrs:iterate collection="parsers" var="parser">
-					<form id="${parser.id}" class="admin_form" method="post" style="display:none">
+					<form data-id="${parser.id}" class="admin_form" method="post" style="display:none">
 						<input type='hidden' name='submit' value='parsers'/>
 						<fieldset>
 							<h3>Parser configuration</h3>
@@ -138,7 +139,7 @@
 						<table cellspacing="0" cellpadding="0" class="select_form">
 							<caption>Formats</caption>
 							<mrs:iterate collection="formats" var="format">
-								<tr><td>${format.id}</td></tr>
+								<tr data-target="format-${format.id}"><td>${format.id}</td></tr>
 							</mrs:iterate>
 						</table>
 					</div>
@@ -152,13 +153,13 @@
 				
 				<div class="admin-right">
 				<mrs:iterate collection="formats" var="format">
-					<form id="${format.id}" class="admin_form" method="POST" style="display:none">
+					<form data-id="format-${format.id}" class="admin_form" method="POST" style="display:none">
 						<fieldset>
 							<h3>Format specification</h3>
 							<input type='hidden' name='submit' value='formats'/>
 							<input type='hidden' name='original-id' value='${format.id}'/>
 
-							<div><label>ID</label><input type="text" name="id" value="${format.id}"/></div>
+							<div><label>ID</label><input type="text" name="format-id" value="${format.id}"/></div>
 
 							<h3>Document layout</h3>
 
@@ -173,7 +174,7 @@
 							<h3>Links</h3>
 							<p>Create 'live' links in documents based on a regular expression. You can reference captures in the
 							regular expression using the variable names $1 for the first capture, $2 for the second, etc.</p>
-							<table cellspacing="0" cellpadding="0" style="${empty format.links ? 'display:none' : ''}">
+							<table id="format-link-table-${format.id}" cellspacing="0" cellpadding="0" style="${empty format.links ? 'display:none' : ''}">
 								<tr>
 									<th>Regular Expression</th>
 									<th>Target Databank</th>
@@ -201,8 +202,8 @@
 									<td><div class="delete">Delete</div></td>
 								</tr>
 							</table>
-							<button onclick='Admin.addLinkToFormat("${format.id}"); return false;'>Add link</button>
-							
+							<button class="add-link" data-format="${format.id}">Add link</button>
+					
 							<hr/>
 							<input type='submit' value='Submit'/><input type='reset' value='Reset'/>
 						</fieldset>
@@ -220,7 +221,7 @@
 						<table cellspacing="0" cellpadding="0" class="select_form">
 							<caption>Databanks</caption>
 							<mrs:iterate collection="config-databanks" var="db">
-								<tr><td><mrs:if test="${db.enabled}">${db.id}</mrs:if><mrs:if test="${not db.enabled}"><em>${db.id}</em></mrs:if></td></tr>
+								<tr data-target="db-${db.id}"><td><mrs:if test="${db.enabled}">${db.id}</mrs:if><mrs:if test="${not db.enabled}"><em>${db.id}</em></mrs:if></td></tr>
 							</mrs:iterate>
 						</table>
 					</div>
@@ -234,7 +235,7 @@
 				
 				<div class="admin-right">
 				<mrs:iterate collection="config-databanks" var="db">
-					<form id="${db.id}" class="admin_form" method="POST" style="display:none">
+					<form data-id="db-${db.id}" class="admin_form" method="POST" style="display:none">
 						<fieldset>
 							<h3>Databank information</h3>
 							<input type='hidden' name='submit' value='databanks'/>
@@ -249,7 +250,7 @@
 							the values found in e.g. db_xref records. The <em>name</em> is used in the blast databank popup menu.</p>
 							
 							<div><label>Aliases</label><div class="aliases">
-								<table id="${db.id}-aliases" cellspacing="0" cellpadding="0"
+								<table data-id="${db.id}-aliases" cellspacing="0" cellpadding="0"
 												style="${empty db.aliases ? 'display:none;' : ''}">
 									<tr>
 										<th>ID</th>
@@ -269,7 +270,7 @@
 										<td><div class="delete">Delete</div></td>
 									</tr>
 								</table>
-								<span class="clickable" onclick='Admin.addAliasToDb("${db.id}"); return false;'>Add alias</span>
+								<span class="clickable add-alias" data-db="${db.id}">Add alias</span>
 							</div>
 							</div>
 
@@ -304,7 +305,7 @@
 							<p>Formatting can be done with one of the defined formatters, or for XML databanks, with
 							an XML Stylesheet.</p>
 							
-							<div><label>Formatter</label><select name="format" onchange="Admin.changeFormat('${db.id}');">
+							<div><label>Formatter</label><select name="format" data-db="${db.id}">
 									<option value="none">No format</option>
 									<mrs:option value="xml" selected="${db.format}">XML Stylesheet</mrs:option>
 									<mrs:options collection="formats" value="id" label="id" selected="${db.format}"/>

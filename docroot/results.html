@@ -1,5 +1,6 @@
 <html xmlns="http://www.w3.org/1999/xhtml"
-	xmlns:mrs="http://mrs.cmbi.ru.nl/mrs-web/ml"
+	xmlns:z2="http://www.hekkelman.com/libzeep/m2"
+	xmlns:mrs="https://mrs.cmbi.ru.nl/mrs-web/ml"
 	xml:lang="en" lang="en">
 <head>
     <title>M6</title>
@@ -11,110 +12,76 @@
 
 	<link rel="stylesheet" type="text/css" href="css/mrs-style.css" />
 
-	<script src="scripts/jquery/jquery.js" type="text/javascript">
-	</script>
-	
-	<script src="scripts/mrs.js" type="text/javascript">
-	</script>
-
-	<mrs:if test="${mobile}">
-	<script src="scripts/mrs-m.js" type="text/javascript">
-	</script>
-	</mrs:if>
+	<script src="scripts/jquery/jquery.js" type="text/javascript"></script>
+	<script src="scripts/mrs.js" type="text/javascript"></script>
+	<script z2:if="${mobile}" src="scripts/mrs-m.js" type="text/javascript"></script>
 </head>
 <body>
 
-<script type="text/javascript">
+<script z2:if="${mobile}" z2:inline="javascript" type="text/javascript">
 $(document).ready(function(){
 	if (M6M.init != null)
-		M6M.init(${hitCount}, '${db}', '${q}');
+		M6M.init(${hitCount}, [[${db}]], [[${q}]]);
 });
 </script>
 
-	<mrs:include file="header.html" />
+	<div z2:replace="header :: #header" />
 
 	<div id="main">
-		<mrs:if test="${error}">
-			<div class="relaxed">The query contained a syntax error (${error})</div>
-		</mrs:if>
+		<div z2:if="${error}" class="relaxed">The query contained a syntax error (<span z2:text="${error}"></span>")</div>
 
-		<mrs:if test="${empty hits}">
-		<div class="no-hits">No hits found</div>
-		</mrs:if>
+		<div z2:if="${hits.empty}" class="no-hits">No hits found</div>
 
-		<mrs:if test="${relaxed and hits}">
-			<div class="relaxed">Query did not return an exact result, displaying the closest matches</div>
-		</mrs:if>
+		<div z2:if="${relaxed and hits}" class="relaxed">Query did not return an exact result, displaying the closest matches</div>
 
-		<mrs:if test="${not empty hits}">
-		
-		<mrs:if test="${not mobile}">
-		<div class="nav">
+		<div z2:if="${not (hits.empty or mobile)}" class="nav">
 			<span class="left">
-				Records ${first}-${last} of <mrs:number f="#,##0" n="${hitCount}"/>
+				Records <span z2:text="${first}"></span>-<span z2:text="${last}"></span> of <span z2:text="${#numbers.formatDecimal(hitCount)}"/>
 			</span>
 			
 			<span class="right">
-				<mrs:if test="${page > 1}">
-					<mrs:url var="url"><mrs:param name="page" value="${page - 1}"/></mrs:url>
-					<a href="${url}">previous</a>
-				</mrs:if>
-				<mrs:for var="p" begin="${page > 4 ? page - 4 : 1}"
-							end="${lastPage > page + 4 ? page + 4 : lastPage}">
-					<mrs:if test="${p != page}">
-						<mrs:url var="url"><mrs:param name="page" value="${p}"/></mrs:url>
-						<a href="${url}">${p}</a>
-					</mrs:if>
-					<mrs:if test="${p = page}">${p}</mrs:if>
-				</mrs:for>
-				<mrs:if test="${lastPage > page}">
-					<mrs:url var="url"><mrs:param name="page" value="${page + 1}"/></mrs:url>
-					<a href="${url}">next</a>
-				</mrs:if>
+				<a z2:if="${page > 1}" href="#" z2:href="@{search(db=${db},q=${q},page=${page - 1})}">previous</a>
+				<a z2:if="${page - 2 >= 1}" href="#" z2:href="@{search(db=${db},q=${q},page=${page - 2})}" z2:text="${page - 2}"></a>
+				<a z2:if="${page - 1 >= 1}" href="#" z2:href="@{search(db=${db},q=${q},page=${page - 1})}" z2:text="${page - 1}"></a>
+				<span z2:text="${page}"></span>
+				<a z2:if="${lastPage >= page + 1}" href="#" z2:href="@{search(db=${db},q=${q},page=${page + 1})}" z2:text="${page + 1}"></a>
+				<a z2:if="${lastPage >= page + 2}" href="#" z2:href="@{search(db=${db},q=${q},page=${page + 2})}" z2:text="${page + 2}"></a>
+				<a z2:if="${lastPage > page}" href="#" z2:href="@{search(db=${db},q=${q},page=${page + 1})}">next</a>
 			</span>
 			&#x00a0;
 		</div>
+
 		<table id="tabel" cellspacing="0" cellpadding="0" style="position:relative;" class="list">
 			<caption>
-				<mrs:if test="${q and not linked.db}">Results for query [${q}]</mrs:if>
-				<mrs:if test="${similar}">Records similar to ${db}/${similar}</mrs:if>
-				<mrs:if test="${linked.db}">Records linked to ${linked.db}/${linked.id}</mrs:if>
+				<span z2:if="${q and not linked.db}">Results for query [<span z2:text="${q}"></span>]</span>
+				<span z2:if="${similar}">Records similar to <span z2:text="${db+'/'+similar}"></span></span>
+				<span z2:if="${linked.db}">Records linked to <span z2:text="${linked.db+'/'+linked.id}"></span></span>
 			</caption>
 			<tr>
 				<th colspan="2">Nr</th>
-				<mrs:if test="${ranked}"><th>Relevance</th></mrs:if>
+				<th z2:if="${ranked}">Relevance</th>
 				<th>ID</th>
 				<th>Title</th>
 			</tr>
 	
-			<mrs:iterate collection="hits" var="hit">
-			<tr>
+			<tr z2:each="hit: ${hits}">
 				<td><input type="checkbox" id="${db}/${hit.id}" /></td>
-				<td class="nr">${hit.nr}</td>
-				<mrs:if test="${ranked}">
-					<td><img src="images/pixel-red.png" width="${hit.score}" height="7" style="padding-top:4px"/></td>
-				</mrs:if>
+				<td class="nr" z2:text="${hit.nr}"></td>
+				<td z2:if="${ranked}"><img src="images/pixel-red.png" z2:width="${hit.score}" height="7" style="padding-top:4px"/></td>
 				<td>
-					<mrs:link db="${db}" nr="${hit.docNr}" q="${q}">${hit.id}</mrs:link>
+					<mrs:link z2:db="${db}" z2:nr="${hit.docNr}" z2:q="${q}" z2:text="${hit.id}"></mrs:link>
 				</td>
 				<td>
-					<span class="row-title">${hit.title}</span>
-					<mrs:if test="${hit.links}">
-						<span class="reference">
-							<span class="reference-label">References:</span>
-							<mrs:iterate collection="${hit.links}" var="link">
-								<a href="linked?s=${db}&amp;d=${link}&amp;nr=${hit.docNr}">${link}</a>
-							</mrs:iterate>
-						</span>
-					</mrs:if>
+					<span class="row-title" z2:text="${hit.title}"></span>
+					<span z2:if="${hit.links}" class="reference">
+						<span class="reference-label">References:</span>
+						<a z2:each="link: ${hit.links}" z2:href="@{linked(s=${db},d=${link},nr=${hit.docNr})}" z2:text="${link}"></a>
+					</span>
 				</td>
 			</tr>
-			</mrs:iterate>
 		</table>
-		</mrs:if>
 
-		<mrs:if test="${mobile}">
-		<table id="tabel" cellspacing="0" cellpadding="0" style="position:relative;" class="list">
+		<table z2:if="${not hits.empty and mobile}" id="tabel" cellspacing="0" cellpadding="0" style="position:relative;" class="list">
 			<caption>
 				<mrs:if test="${q and not linked.db}">Results for query [${q}]</mrs:if>
 				<mrs:if test="${similar}">Records similar to ${db}/${similar}</mrs:if>
@@ -138,10 +105,8 @@ $(document).ready(function(){
 			</tr>
 			</mrs:iterate>
 		</table>
-		</mrs:if>
-		</mrs:if>
 
-		<mrs:include file="spelling-suggestions.html" />
+		<div z2:replace="spelling-suggestions :: suggestions" />
 	</div>
 
 	<mrs:include file="select.html" />

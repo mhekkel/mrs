@@ -1,5 +1,6 @@
 <html xmlns="http://www.w3.org/1999/xhtml"
-	xmlns:mrs="http://mrs.cmbi.ru.nl/mrs-web/ml"
+	xmlns:z2="http://www.hekkelman.com/libzeep/m2"
+	xmlns:mrs="https://mrs.cmbi.ru.nl/mrs-web/ml"
 	xml:lang="en" lang="en">
 <head>
     <title>M6</title>
@@ -28,13 +29,13 @@
 	</mrs:if>
 </head>
 <body>
-	<mrs:include file="header.html" />
+	<div z2:replace="header :: #header" />
 	
 	<div id="main">
 		
 		<mrs:if test="${not mobile}">
 		<table id="databanks" class="list status" cellspacing="0" cellpadding="0" style="width:100%;"
-			xmlns:m2="http://mrs.cmbi.ru.nl/mrs-web/nl/my-ns">
+			xmlns:m2="https://mrs.cmbi.ru.nl/mrs-web/nl/my-ns">
 		<caption>Indexed databanks</caption>
 		<tr>
 			<th><a href="#" onclick="Status.sortTable('databanks', 0);">ID</a> </th>
@@ -46,23 +47,22 @@
 	        <th colspan="2">Status</th>
 		</tr>
 
-		<mrs:iterate collection="statusDatabanks" var="db">
-		<tr id="db-${db.id}" m2:keys="s=${db.id}|s=${db.name}|i=${db.entries}|i=${db.size}||s=${db.buildDate}">
-			<td><a href="info?db=${db.id}">${db.id}</a></td>
-			<td><a href="info?db=${db.id}">${db.name}</a></td>
-			<td style="text-align:right"><mrs:if test="${db.entries}"><mrs:number f='#,##0' n='${db.entries}'/></mrs:if></td>
-			<td style="text-align:right; white-space: nowrap;"><mrs:if test="${db.size}"><mrs:number f='#,##0B' n='${db.size}'/></mrs:if></td>
-			<td>${db.version}</td>
-			<td>${db.buildDate}</td>
+		<tr z2:each="db: ${statusDatabanks}"
+	z2:attr="id=|db-${db.id}|,m2:keys=${'s=' + db.id + '|s=' + (db.name ?: db.id) + '|i=' + (db.entries ?: 0) + '|i=' + (db.size ?: 0) + '||s=' + (db.buildDate ?: '')}" >
+			<td><a z2:href="@{info(db=${db.id})}" z2:text="${db.id}"></a></td>
+			<td><a z2:href="@{info(db=${db.id})}" z2:text="${db.name}"></a></td>
+			<td style="text-align:right"><span z2:if="${db.entries}" z2:text="${#numbers.formatDecimal(db.entries)}"></span></td>
+			<td style="text-align:right; white-space: nowrap;"><span z2:if="${db.size}" z2:text="${#numbers.formatDiskSize(db.size)}"/></td>
+			<td z2:text="${db.version}"></td>
+			<td z2:text="${db.buildDate}"></td>
 			<td><canvas id='update-progress' width="102" height="10" style="display:none;" /></td>
 			<td><span id='update-status' /></td>
 		</tr>
-		</mrs:iterate>
 		</table>
 		</mrs:if>
 
 		<mrs:if test="${mobile}">
-		<ul id="ul-db-list" class="status-list" xmlns:m2="http://mrs.cmbi.ru.nl/mrs-web/nl/my-ns">
+		<ul id="ul-db-list" class="status-list" xmlns:m2="https://mrs.cmbi.ru.nl/mrs-web/nl/my-ns">
 			<mrs:iterate collection="statusDatabanks" var="db">
 			<li id="db-${db.id}" m2:key="${db.buildDate}">
 				<ul class="status-sub-list">

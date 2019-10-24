@@ -1,23 +1,23 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<div xmlns:mrs="http://mrs.cmbi.ru.nl/mrs-web/ml"
-	xml:lang="en" lang="en"
-	class="alt" style="margin-top:20px;">
+<html xmlns:z2="http://www.hekkelman.com/libzeep/m2"
+	xml:lang="en" lang="en">
 
-	<mrs:if test="${suggestions}">
-		<table class="alt" cellpadding="0" cellspacing="0">
+	<div z2:fragment="suggestions" class="alt" style="margin-top:20px;">
+		<table if="${suggestions}" class="alt" cellpadding="0" cellspacing="0">
 			<caption>Alternative spelling suggestions</caption>
-			<mrs:iterate collection="${suggestions}" var="suggestion">
-				<tr>
-					<td class="term">${suggestion.term}</td>
-					<td class="altterm">
-						<mrs:iterate collection="${suggestion.alternatives}" var="alt">
-							<a href="search?db=${db}&amp;q=${alt.q}">${alt.term}</a>
-						</mrs:iterate>
-					</td>
-				</tr>
-			</mrs:iterate>
+			<tr z2:each="suggestion: ${suggestions}">
+				<td class="term" z2:text="${suggestion.term}"></td>
+				<td class="altterm">
+					<span z2:each="alt: ${suggestion.alternatives}">
+						<a z2:href="'search?db='+${db}+'&amp;q='+${alt.q}" z2:text="${alt.term}"></a>
+					</span>
+				</td>
+			</tr>
 		</table>
-	</mrs:if>
-</div>
-	
+	</div>
+
+
+<body>
+</body>
+</html>	
 

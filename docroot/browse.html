@@ -1,5 +1,5 @@
 <html xmlns="http://www.w3.org/1999/xhtml"
-	xmlns:mrs="http://mrs.cmbi.ru.nl/mrs-web/ml"
+	xmlns:z2="http://www.hekkelman.com/libzeep/m2"
 	xml:lang="en" lang="en">
 <head>
     <title>M6</title>
@@ -18,74 +18,33 @@
 	</script>
 </head>
 <body>
-	<mrs:include file="header.html" />
+	<div z2:replace="header :: #header" />
 
 	<div id="main">
 
 		<div class="nav">
 			<span class="left">
 <!--				Records ${first}-${last} of <mrs:number f="#,##0" n="${keyCount}"/>-->
-				<mrs:if test="${not empty first}">Keys ${first} to ${last} for index ${ix} in ${db}</mrs:if>
-				<mrs:if test="${empty first}">Keys for index ${ix} in ${db}</mrs:if>
+				<span z2:if="${not first.empty}" z2:text="|Keys ${first} to ${last} for index ${ix} in ${db}|"></span>
+				<span z2:if="${first.empty}" z2:text="|Keys for index ${ix} in ${db}|"></span>
 			</span>
 			
-			<span class="right">
-				<mrs:if test="${page > 1}">
-					<mrs:url var="url"><mrs:param name="page" value="${page - 1}"/></mrs:url>
-					<a href="${url}">previous</a>
-				</mrs:if>
-				<mrs:for var="p" begin="${page > 4 ? page - 4 : 1}"
-							end="${lastPage > page + 4 ? page + 4 : lastPage}">
-					<mrs:if test="${p != page}">
-						<mrs:url var="url"><mrs:param name="page" value="${p}"/></mrs:url>
-						<a href="${url}">${p}</a>
-					</mrs:if>
-					<mrs:if test="${p = page}">${p}</mrs:if>
-				</mrs:for>
-				<mrs:if test="${lastPage > page}">
-					<mrs:url var="url"><mrs:param name="page" value="${page + 1}"/></mrs:url>
-					<a href="${url}">next</a>
-				</mrs:if>
-			</span>
 			&#x00a0;
 		</div>
 		
-		<mrs:if test="${not empty sections}">
-			<div class="wbox">
-				
-				<div class="wleft">
-					<ul class="browse">
-						<mrs:for begin="0" end="${(sections.count / 2) - 1}" var="i">
-							<li>
-								<a href="browse?ix=${ix};db=${db};first=${sections[i].first};last=${sections[i].last}">
-									${sections[i].first} .. ${sections[i].last}
-								</a>
-							</li>
-						</mrs:for>
-					</ul>
-				</div>
-				<div class="wright">
-					<ul class="browse">
-						<mrs:for begin="${sections.count / 2}" end="${sections.count - 1}" var="i">
-							<li>
-								<a href="browse?ix=${ix};db=${db};first=${sections[i].first};last=${sections[i].last}">
-									${sections[i].first} .. ${sections[i].last}
-								</a>
-							</li>
-						</mrs:for>
-					</ul>
-				</div>
-				<div class="wclear"/>
-			</div>
-		</mrs:if>
-		
-		<mrs:if test="${not empty keys}">
-			<mrs:iterate collection="keys" var="key">
+		<div z2:if="${not sections.empty}" class="wbox">
 			<ul class="browse">
-				<li><a href="link?db=${db}&amp;ix=${ix}&amp;id=${key}">${key}</a></li>
+				<li z2:each="section: ${sections}">
+					<a z2:href="@{browse(ix=${ix},db=${db},first=${section.first},last=${section.last})}"
+						z2:text="|${section.first} .. ${section.last}|">
+					</a>
+				</li>
 			</ul>
-			</mrs:iterate>
-		</mrs:if>
+		</div>
+
+		<ul class="browse">
+			<li z2:each="key: ${keys}"><a z2:href="@{link(db=${db},ix=${ix},id=${key})}" z2:text="${key}"></a></li>
+		</ul>
 	</div>
 </body>
 </html>

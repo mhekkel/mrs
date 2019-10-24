@@ -1,9 +1,8 @@
 <html xmlns="http://www.w3.org/1999/xhtml"
-	xmlns:mrs="http://mrs.cmbi.ru.nl/mrs-web/ml"
+	xmlns:z2="http://www.hekkelman.com/libzeep/m2"
+	xmlns:mrs="https://mrs.cmbi.ru.nl/mrs-web/ml"
 	xml:lang="en" lang="en">
 <head>
-	<mrs:if test="${baseUrl}"><base href="${baseUrl}" /></mrs:if>
-
     <title>M6</title>
 
 	<meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -32,7 +31,7 @@
 
 </head>
 <body>
-	<mrs:include file="header.html" />
+	<div z2:replace="header :: #header" />
 
 	<div id="main">
 
@@ -50,11 +49,11 @@
 					<form id="downloadForm" action="download">
 						<input type="hidden" name="db" value="${db}"/>
 						<input type="hidden" name="nr" value="${nr}"/>
-						<mrs:enable test="${blastable}"><select id="formatSelector" name="format">
+						<select id="formatSelector" name="format">
 							<option value="entry" disabled="disabled">Entry</option>
 							<option value="plain" selected="selected">Plain text</option>
-							<mrs:enable test="${blastable}"><option value="fasta">FastA</option></mrs:enable>
-						</select></mrs:enable>
+							<option value="fasta" z2:disabled="${not blastable}">FastA</option>
+						</select>
 					</form>
 				</li>
 				<mrs:if test="${not mobile}">
@@ -70,9 +69,7 @@
 					<form id="blastForm" method="post" action="blast">
 						<input type="hidden" name="db" value="${db}" />
 						<input type="hidden" name="nr" value="${nr}" />
-						<mrs:enable test="${blastable}">
-							<input type="submit" name="blast" value="Blast" class="submit" />
-						</mrs:enable>
+						<input type="submit" name="blast" value="Blast" class="submit" z2:disabled="${not blastable}" />
 					</form>
 				</li>
 				<li>

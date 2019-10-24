@@ -399,32 +399,32 @@ END
 	$cxxflags = sprintf("$cxxflags %s %s", &perl_inc(), &ldopts());
 	$cxxflags =~ s/\s+/ /g;
 	
-	$header_check =<<END;
-#include "EXTERN.h"
-#include "perl.h"
-#include "XSUB.h"
-#include <iostream>
-int main() { std::cout << 1 << '\t' << 0; return 0; }
-END
-
-	$lib_check =<<END;
-#include "EXTERN.h"
-#include "perl.h"
-#include "XSUB.h"
-int main()
-{ 
-	int argc = 0;
-	const char* env[] = { nullptr };
-	const char* argv[] = { nullptr };
-	PERL_SYS_INIT3(&argc, (char***)&argv, (char***)&env);
-	return 0;
-}
-END
-	if (not CheckLib("perl", $header_check, $lib_check))
-	{
-		die "\n\nCannot continue since libperl is not installed correctly\n",
-			"Please install the libperl-dev package and run configure again\n";
-	}
+#	$header_check =<<END;
+##include "EXTERN.h"
+##include "perl.h"
+##include "XSUB.h"
+##include <iostream>
+#int main() { std::cout << 1 << '\t' << 0; return 0; }
+#END
+#
+#	$lib_check =<<END;
+##include "EXTERN.h"
+##include "perl.h"
+##include "XSUB.h"
+#int main()
+#{ 
+#	int argc = 0;
+#	const char* env[] = { nullptr };
+#	const char* argv[] = { nullptr };
+#	PERL_SYS_INIT3(&argc, (char***)&argv, (char***)&env);
+#	return 0;
+#}
+#END
+#	if (not CheckLib("perl", $header_check, $lib_check))
+#	{
+#		die "\n\nCannot continue since libperl is not installed correctly\n",
+#			"Please install the libperl-dev package and run configure again\n";
+#	}
 }
 
 sub CheckLib

@@ -1,5 +1,5 @@
 <html xmlns="http://www.w3.org/1999/xhtml"
-	xmlns:mrs="http://mrs.cmbi.ru.nl/mrs-web/ml"
+	xmlns:z2="http://www.hekkelman.com/libzeep/m2"
 	xml:lang="en" lang="en">
 <head>
     <title>M6</title>
@@ -18,73 +18,67 @@
 	</script>
 </head>
 <body>
-	<mrs:include file="header.html" />
+	<div z2:replace="header :: #header" />
 
 	<div id="main">
-		<mrs:if test="${empty databank.id}">
-			<p>No such databank</p>
-		</mrs:if>
+		<p z2:if="${databank.id.empty}">No such databank</p>
 
-		<mrs:if test="${databank}">
+		<div z2:if="${databank}">
 
-		<table class="list" cellspacing="0" cellpadding="0">
-			<caption>Statistics for ${databank.id}</caption>
-			<tr><th>Name</th><th>Value</th></tr>
-			<tr>
-				<td>Name</td>
-				<td style="text-align:right;">${databank.name}</td>
-			</tr>
-			<tr>
-				<td>Source</td>
-				<td style="text-align:right;"><a href="${databank.info}">${databank.info}</a></td>
-			</tr>
-			<tr>
-				<td>Parser</td>
-				<td style="text-align:right;">
-					<a href="script?script=${databank.parser}">${databank.parser}</a>
-				</td>
-			</tr>
-			<tr>
-				<td>Number of records</td>
-				<td style="text-align:right;"><mrs:number n="${databank.count}"/></td>
-			</tr>
-			<tr>
-				<td>Location</td>
-				<td style="text-align:right;">${databank.path}</td>
-			</tr>
-			<tr>
-				<td>Last Update</td>
-				<td style="text-align:right;">${databank.buildDate}</td>
-			</tr>
-			<tr>
-				<td>On Disk Size</td>
-				<td style="text-align:right"><mrs:number f='#,##0B' n='${databank.onDiskSize}'/></td>
-			</tr>
-			<tr>
-				<td>Raw Data Size</td>
-				<td style="text-align:right"><mrs:number f='#,##0B' n='${databank.rawDataSize}'/></td>
-			</tr>
-		</table>
-		
-		<br/>
-		
-		<mrs:if test="${databank.indices}">
 			<table class="list" cellspacing="0" cellpadding="0">
-				<caption>Indices for ${databank.id}</caption>
-				<tr><th>id</th><th>kind</th><th>count</th><th>file size</th><th>description</th></tr>
-				<mrs:iterate var="i" collection="${databank.indices}">
-					<tr>
-						<td><a href="browse?db=${databank.id}&amp;ix=${i.id}">${i.id}</a></td>
-						<td>${i.type}</td>
-						<td style="text-align:right"><mrs:number n="${i.count}"/></td>
-						<td style="text-align:right;"><mrs:number f='#,##0B' n="${i.size}"/></td>
-						<td>${i.desc}</td>
-					</tr>
-				</mrs:iterate>
+				<caption z2:text="|Statistics for ${databank.id}|"></caption>
+				<tr><th>Name</th><th>Value</th></tr>
+				<tr>
+					<td>Name</td>
+					<td style="text-align:right;" z2:text="${databank.name}"></td>
+				</tr>
+				<tr>
+					<td>Source</td>
+					<td style="text-align:right;"><a z2:href="${databank.info}" z2:text="${databank.info}"></a></td>
+				</tr>
+				<tr>
+					<td>Parser</td>
+					<td style="text-align:right;">
+						<a z2:href="@{script(script=${databank.parser})}" z2:text="${databank.parser}"></a>
+					</td>
+				</tr>
+				<tr>
+					<td>Number of records</td>
+					<td style="text-align:right;" z2:text="${#numbers.formatDecimal(databank.count)}"></td>
+				</tr>
+				<tr>
+					<td>Location</td>
+					<td style="text-align:right;" z2:text="${databank.path}"></td>
+				</tr>
+				<tr>
+					<td>Last Update</td>
+					<td style="text-align:right;" z2:text="${databank.buildDate}"></td>
+				</tr>
+				<tr>
+					<td>On Disk Size</td>
+					<td style="text-align:right" z2:text='${#numbers.formatDiskSize(databank.onDiskSize,0)}'></td>
+				</tr>
+				<tr>
+					<td>Raw Data Size</td>
+					<td style="text-align:right" z2:text='${#numbers.formatDiskSize(databank.rawDataSize)}'></td>
+				</tr>
 			</table>
-		</mrs:if>
+			
+			<br/>
+			
+			<table z2:if="${databank.indices}" class="list" cellspacing="0" cellpadding="0">
+				<caption z2:text="|Indices for ${databank.id}|"></caption>
+				<tr><th>id</th><th>kind</th><th>count</th><th>file size</th><th>description</th></tr>
+				<tr z2:each="i: ${databank.indices}">
+					<td><a z2:href="@{browse(db=${databank.id},ix=${i.id})}" z2:text="${i.id}"></a></td>
+					<td z2:text="${i.type}"></td>
+					<td style="text-align:right" z2:text="${#numbers.formatDecimal(i.count)}"></td>
+					<td style="text-align:right;" z2:text="${#numbers.formatDiskSize(i.size)}"></td>
+					<td z2:text="${i.desc}"></td>
+				</tr>
+			</table>
 		
-		</mrs:if>
+		</div>
 	</div>
 </body>
 </html>

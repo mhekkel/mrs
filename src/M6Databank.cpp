@@ -112,11 +112,11 @@ class M6DatabankImpl
 
 	M6Document*		Fetch(uint32 inDocNr);
 	M6Iterator*		Find(const string& inQuery, bool inAllTermsRequired, uint32 inReportLimit);
-	M6Iterator*	 FindBoolean(const string& inQuery, uint32 inReportLimit);
+	M6Iterator*		FindBoolean(const string& inQuery, uint32 inReportLimit);
 	M6Iterator*		Find(const vector<string>& inQueryTerms,
 						M6Iterator* inFilter, bool inAllTermsRequired, uint32 inReportLimit);
 	M6Iterator*		Find(const string& inIndex, const string& inTerm, M6QueryOperator inOperator);
-	M6Iterator*	 Find(const string& inIndex, const string& inLowerBound, const string& inUpperBound);
+	M6Iterator*		Find(const string& inIndex, const string& inLowerBound, const string& inUpperBound);
 	M6Iterator*		FindPattern(const string& inIndex, const string& inPattern);
 	M6Iterator*		FindString(const string& inIndex, const string& inString);
 	tuple<bool,uint32>
@@ -136,7 +136,7 @@ class M6DatabankImpl
 						vector<string>& outEntries);
 
 	M6DocStore&		GetDocStore()						{ return *mStore; }
-	uint32			GetMaxDocNr() const				 { return mStore->GetMaxDocNr(); }
+	uint32			GetMaxDocNr() const					{ return mStore->GetMaxDocNr(); }
 	
 	M6BasicIndexPtr	GetIndex(const string& inName);
 	M6BasicIndexPtr	GetIndex(const string& inName, M6IndexType inType);

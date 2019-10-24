@@ -9,6 +9,7 @@
 #include <boost/regex.hpp>
 #include <boost/bind.hpp>
 #include <boost/algorithm/string.hpp>
+#include <boost/filesystem/operations.hpp>
 
 #include "M6Config.h"
 #include "M6Error.h"
@@ -81,26 +82,11 @@ M6WSBlast::M6WSBlast(M6Server& inServer, const string& inNS, const string& inSer
 	SOAP_XML_ADD_ENUM(JobStatus, running);
 	SOAP_XML_ADD_ENUM(JobStatus, error);
 	SOAP_XML_ADD_ENUM(JobStatus, finished);
-	
-	const char* kBlastArgs[] = {
-		"query", "program", "db", "params", "reportLimit", "jobId"
-	};
-	register_action("Blast", this, &M6WSBlast::Blast, kBlastArgs);
-		
-	const char* kBlastJobStatusArgs[] = {
-		"jobId", "status"
-	};
-	register_action("BlastJobStatus", this, &M6WSBlast::BlastJobStatus, kBlastJobStatusArgs);
-		
-	const char* kBlastJobResultArgs[] = {
-		"jobId", "result"
-	};
-	register_action("BlastJobResult", this, &M6WSBlast::BlastJobResult, kBlastJobResultArgs);
-	
-	const char* kBlastJobErrorArgs[] = {
-		"jobId", "error"
-	};
-	register_action("BlastJobError", this, &M6WSBlast::BlastJobError, kBlastJobErrorArgs);
+
+	register_action("Blast", this, &M6WSBlast::Blast, {"query", "program", "db", "params", "reportLimit", "jobId"});
+	register_action("BlastJobStatus", this, &M6WSBlast::BlastJobStatus, {"jobId", "status"});
+	register_action("BlastJobResult", this, &M6WSBlast::BlastJobResult, {"jobId", "result"});
+	register_action("BlastJobError", this, &M6WSBlast::BlastJobError, {"jobId", "error"});
 }
 
 M6WSBlast::~M6WSBlast()
